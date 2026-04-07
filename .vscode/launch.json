@@ -1,0 +1,28 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug Blazepilot (Full Rebuild)",
+            "type": "lldb",
+            "request": "launch",
+            "cargo": {
+                "args": [
+                    "run",
+                    "--bin=blazepilot"
+                ],
+                "filter": {
+                    "name": "blazepilot",
+                    "kind": "bin"
+                }
+            },
+            "program": "${workspaceFolder}/target/debug/blazepilot",
+            "env": {
+                "RUST_LOG": "blaze=debug",
+                "SLINT_LOG": "info",
+                "SLINT_LIVE_RELOAD": "1"
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}/blazer-app"
+        }
+    ]
+}

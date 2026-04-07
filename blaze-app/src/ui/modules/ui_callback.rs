@@ -1,0 +1,33 @@
+use std::sync::Arc;
+
+use egui::{Area, Order, TopBottomPanel, Window};
+
+use crate::{core::{blaze_state::BlazeCoreState, files::motor::FileEntry}, ui::{blaze_ui_state::BlazeUiState, modules::{file_view::file_view_component, sidebar_left::sidebar_left_component, sidebar_right::sidebar_right_component, toolbar::toolbar_component}}};
+
+
+pub fn connect_ui_components_callback(ctx: &egui::Context, files: &Vec<Arc<FileEntry>>, state: &mut BlazeCoreState, ui_state: &mut BlazeUiState) {
+
+    // -------------------------------
+    //  Toolbar     
+    // -------------------------------
+    toolbar_component(ctx, state);
+
+
+    // -------------------------------
+    //  sidebar left     
+    // -------------------------------
+    sidebar_left_component(ctx, state);
+
+
+    // -------------------------------
+    //  sidebar right     
+    // -------------------------------
+    //sidebar_right_component(ctx, state);
+
+
+    // -------------------------------
+    //  file view 
+    // -------------------------------
+    file_view_component(ctx, files, state, ui_state);
+
+}

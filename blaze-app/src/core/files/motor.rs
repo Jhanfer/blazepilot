@@ -1,0 +1,820 @@
+// Copyright 2026 Jhanfer
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+
+
+
+
+use std::path::PathBuf;
+use std::time::{Duration, SystemTime};
+use std::{fs, thread, vec};
+use dirs::{home_dir};
+use once_cell::sync::Lazy;
+use tokio::sync::Semaphore;
+use tracing::{debug, info, warn};
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::RwLock; 
+use lru::LruCache;
+use std::num::NonZeroUsize;
+use crate::core::files::recursive_search::{RecursiveMessages, RecursiveSearchIterator};
+
+use crate::core::configs::config_state::{with_configs, OrderingMode};
+use crate::utils::channel_pool::{NotifyingSender, cache_sender, remove_cached_sender, with_channel_pool};
+use uuid::Uuid;
+use notify::{Watcher, RecursiveMode, Event, EventKind};
+use notify::event::{CreateKind, ModifyKind, RemoveKind};
+use std::cell::RefCell;
+use std::rc::Rc;
+use std::sync::mpsc::channel as std_channel;
+use crate::core::system::clipboard::TOKIO_RUNTIME;
+
+
+
+static NEXT_TASK: AtomicU64 = AtomicU64::new(1);
+pub fn new_task_id() -> u64 {
+    NEXT_TASK.fetch_add(1, Ordering::Relaxed)
+}
+
+
+#[derive(Debug, Clone)]
+pub enum TaskType {
+    FileLoading,
+    CopyPaste,
+    CutPaste,
+    MoveTrash,
+    Delete,
+}
+
+#[derive(Debug, Clone)]
+pub enum FileLoadingMessage {
+    Batch(u64, Vec<Arc<FileEntry>>),
+    Finished(u64),
+    ProgressUpdate {
+        total: usize,
+        done: usize,
+        text: String,
+    },
+
+    FileAdded { name: String },
+    FileRemoved { name: String },
+    FileModified { name: String },
+    FullRefresh,
+
+    RecursiveBatch {
+        generation: u64,
+        batch: Vec<Arc<FileEntry>>,
+        source_dir: PathBuf,
+    }
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct FileEntry {
+    pub name: Box<str>,
+    pub kind: FileKind,
+    pub size: u64,
+    pub modified: u64,
+    pub created: u64,
+    pub readonly: bool,
+    pub is_hidden: bool,
+    pub is_dir: bool,
+    pub full_path: PathBuf,
+}
+
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub enum FileKind {
+    #[default]File,
+    Dir,
+    Symlink
+}
+
+
+pub struct ExtendedInfo {
+    _permissions: Option<u32>,
+    _owner: Option<String>,
+    _symlink_target: Option<PathBuf>,
+    _dimensions: Option<(u32, u32)>,
+    _git_status: Option<GitStatus>
+}
+
+enum GitStatus {
+    _Changed,
+    _Updated,
+}
+
+#[derive(Default)]
+pub struct TabState {
+    pub id: Uuid,
+    pub cwd: PathBuf,
+    pub history: Vec<PathBuf>,
+    pub future: Vec<PathBuf>,
+    pub loading_flag: Arc<AtomicBool>,
+
+    pub lower_names: Vec<(usize, String)>,
+    pub loading_generation: u64,
+    pub active_generation: u64,
+    loading_handles: Vec<tokio::task::JoinHandle<()>>, 
+
+    pub files: Vec<Arc<FileEntry>>,
+    pub sorted_indices: Vec<usize>,
+    pub current_ordering: OrderingMode,
+
+    pub watcher: Option<Box<dyn Watcher + Send>>,
+    pub watching: Arc<AtomicBool>,
+
+    pub recursive_entries: Vec<Arc<FileEntry>>,
+    pub is_recursive_active: bool,
+
+}
+
+pub static FILE_CACHE: Lazy<RwLock<LruCache<PathBuf, Vec<Arc<FileEntry>>>>> = Lazy::new(|| {
+    RwLock::new(LruCache::new(NonZeroUsize::new(2).unwrap()))
+});
+
+impl TabState {
+    pub fn new(start_path: PathBuf, tab_id: Uuid) -> Self {
+
+        //registrar el notificador por ventana
+        with_channel_pool(|pool| {
+            pool.register_notifier(tab_id, || {});
+        });
+
+        let sender = with_channel_pool(|pool| pool.get_notifying_sender(tab_id)).unwrap();
+        cache_sender(tab_id, sender);
+
+        let ordering = with_configs(|ccgf|ccgf.configs.app_ordering_mode.clone());
+
+        Self {
+            id: tab_id,
+            cwd: start_path,
+            history: Vec::new(),
+            future: Vec::new(),
+            files: Vec::new(),
+            loading_flag: Arc::new(AtomicBool::new(false)),
+            lower_names: Vec::new(),
+            loading_generation: 0,
+            active_generation: 0,
+            loading_handles: Vec::new(),
+            sorted_indices: Vec::new(),
+            current_ordering: ordering,
+            watcher: None,
+            watching: Arc::new(AtomicBool::new(false)),
+
+            recursive_entries: Vec::new(),
+            is_recursive_active: false,
+        }
+    }
+
+    pub fn stop_watching(&mut self) {
+        self.watching.store(false, Ordering::Relaxed);
+        self.watcher = None;
+    }
+
+
+    pub fn start_watching(&mut self, sender: NotifyingSender) {
+        self.stop_watching();
+    
+        let path = self.cwd.clone();
+        let watching = Arc::new(AtomicBool::new(true));
+        self.watching = watching.clone();
+        
+        let (fs_tx, fs_rx) = std_channel();
+        
+        // se crea el watcher
+        let mut watcher = notify::recommended_watcher(move |res: Result<Event, _>| {
+            if let Ok(event) = res {
+                fs_tx.send(event).ok();
+            }
+        }).ok();
+        
+        if let Some(ref mut w) = watcher {
+            w.watch(&path, RecursiveMode::NonRecursive).ok();
+        }
+        
+        self.watcher = watcher.map(|w| Box::new(w) as Box<dyn Watcher + Send>);
+        
+        
+        TOKIO_RUNTIME.spawn(async move {
+            while watching.load(Ordering::Relaxed) {
+                if let Ok(event) = fs_rx.recv_timeout(Duration::from_millis(100)) {
+                    match event.kind {
+                        EventKind::Create(CreateKind::File) => {
+                            // Archivo creado
+                            if let Some(path) = event.paths.first() {
+                                let name = path.file_name()
+                                    .unwrap()
+                                    .to_string_lossy()
+                                    .into_owned();
+                                
+                                sender.send_files_batch(FileLoadingMessage::FileAdded { name }).ok();
+                            }
+                        },
+                        EventKind::Remove(RemoveKind::File) => {
+                            // Archivo eliminado
+                            if let Some(path) = event.paths.first() {
+                                let name = path.file_name()
+                                    .unwrap()
+                                    .to_string_lossy()
+                                    .into_owned();
+                                
+                                sender.send_files_batch(FileLoadingMessage::FileRemoved { name }).ok();
+                            }
+                        },
+                        EventKind::Modify(ModifyKind::Name(_)) => {
+                            // Archivo renombrado
+                            sender.send_files_batch(FileLoadingMessage::FullRefresh).ok();
+                        },
+                        _ => {}
+                    }
+                }
+            }
+        });
+    }
+
+
+    pub fn load_path(&mut self, skip_cache: bool,  sender: NotifyingSender) {
+        debug!("🚀 Load_path llamado para: {:?}", self.cwd);
+        self.loading_generation += 1;
+        let current_generation = self.loading_generation;
+
+        sender.send_files_batch(
+            FileLoadingMessage::ProgressUpdate {
+                total: 0,
+                done: 0,
+                text: "Iniciando carga...".to_string(),
+            }
+        ).ok();
+
+
+        self.files.clear();
+        self.sorted_indices.clear();
+        self.lower_names.clear();
+
+        self.active_generation = 0;
+        
+        self.loading_flag.store(true, Ordering::Relaxed);
+        let path = self.cwd.clone();
+
+        if !path.exists() || !path.is_dir() {
+
+            sender.send_files_batch(FileLoadingMessage::Finished(current_generation)).ok();
+
+            self.loading_flag.store(false, Ordering::Relaxed);
+            return;
+        }
+
+        let flag = self.loading_flag.clone();
+        //comporbar caché
+        if !skip_cache {
+            if let Ok(cache) = FILE_CACHE.read() {
+                if let Some(cached_files) = cache.peek(&path) {
+                    sender.send_files_batch(
+                        FileLoadingMessage::ProgressUpdate {
+                            total: cached_files.len(),
+                            done: 0,
+                            text: "Cargando desde caché...".to_string(),
+                        }
+                    ).ok();
+
+                    debug!("Usando caché para: {:?} ({} archivos)", path, cached_files.len());
+
+                    let batch = cached_files.clone();
+
+
+                    if sender.send_files_batch(FileLoadingMessage::Batch(current_generation, batch)).is_err() {
+                        self.loading_flag.store(false, Ordering::Relaxed);
+                        return;
+                    }
+
+
+                    sender.send_files_batch(
+                        FileLoadingMessage::ProgressUpdate {
+                            total: cached_files.len(),
+                            done: cached_files.len(),
+                            text: "Caché completado".to_string(),
+                        }
+                    ).ok();
+
+
+                    sender.send_files_batch(FileLoadingMessage::Finished(current_generation)).ok();
+
+                    
+                    self.loading_flag.store(false, Ordering::Relaxed);
+                    return;
+                }
+            }
+        }
+
+        let sender_clone = sender.clone();
+        let handle = TOKIO_RUNTIME.spawn(async move {
+            let mut entries_buffer = Vec::with_capacity(500);
+            let mut processed: usize = 0;
+            
+            let total_files = match fs::read_dir(&path) {
+                Ok(entries) => entries.count(),
+                Err(_) => 0,
+            };
+
+            if total_files == 0 {
+                sender.send_files_batch(FileLoadingMessage::Finished(current_generation)).ok();
+                flag.store(false, Ordering::Relaxed);
+                return;
+            }
+
+            let estimated_total = total_files;
+
+            if !flag.load(Ordering::Relaxed) {
+                return;
+            }
+
+            sender.send_files_batch(
+                FileLoadingMessage::ProgressUpdate {
+                    total: estimated_total,
+                    done: processed,
+                    text: format!("Leyendo {} archivos...", processed),
+                }
+            ).ok();
+
+
+            if let Ok(mut entries) = tokio::fs::read_dir(&path).await {
+                while let Ok(Some(entry)) = entries.next_entry().await {
+                    if processed % 10 == 0 && !flag.load(Ordering::Relaxed) {
+                        return;
+                    }
+
+                    processed += 1;
+
+                    if processed % 100 == 0 || processed == estimated_total {
+                        sender.send_files_batch(
+                            FileLoadingMessage::ProgressUpdate {
+                                total: estimated_total, 
+                                done: processed, 
+                                text: format!("Leyendo {} archivos...", processed),
+                            }
+                        ).ok();
+                    }
+
+                    let name_os = entry.file_name();
+                    let name = name_os.to_string_lossy().into_owned().into_boxed_str();
+                    
+                    let Ok(m) = entry.metadata().await else {
+                        continue;
+                    };
+
+                    let kind = if m.file_type().is_symlink() {
+                        FileKind::Symlink
+                    } else if m.is_dir() {
+                        FileKind::Dir
+                    } else {
+                        FileKind::File
+                    };
+                
+                    let size = m.len();
+
+                    let modified = m.modified()
+                        .unwrap_or(SystemTime::UNIX_EPOCH)
+                        .duration_since(SystemTime::UNIX_EPOCH)
+                        .unwrap_or_default()
+                        .as_secs();
+
+                    let created = m.created()
+                        .unwrap_or(SystemTime::UNIX_EPOCH)
+                        .duration_since(SystemTime::UNIX_EPOCH)
+                        .unwrap_or_default()
+                        .as_secs();
+
+                    let readonly = m.permissions().readonly();
+
+                    let is_hidden = name.starts_with(".");
+
+                    let is_dir = entry.file_type().await
+                    .map(|t| t.is_dir())
+                    .unwrap_or(false);
+
+                    let file_entry = Arc::new(
+                    FileEntry {
+                            name, 
+                            is_dir,
+                            kind,
+                            size,
+                            modified, 
+                            created,
+                            readonly,
+                            is_hidden,
+                            full_path: entry.path(),
+                        }
+                    );
+
+                    entries_buffer.push(file_entry);
+
+                    if entries_buffer.len() >= 500 {
+                        if !flag.load(Ordering::Relaxed) {
+                            return;
+                        }
+
+                        let batch_to_send = std::mem::take(&mut entries_buffer);
+
+                        sender.send_files_batch(
+                            FileLoadingMessage::ProgressUpdate {
+                                total: estimated_total, 
+                                done: processed, 
+                                text: format!("Enviando batch {}...", processed),
+                            }
+                        ).ok();
+                        if sender.send_files_batch(FileLoadingMessage::Batch(current_generation, batch_to_send)).is_err() {
+                            return;
+                        }
+
+                    }
+                }
+
+                if !entries_buffer.is_empty() {
+                    sender.send_files_batch(FileLoadingMessage::Batch(current_generation, entries_buffer)).ok();
+
+                    sender.send_files_batch(
+                        FileLoadingMessage::ProgressUpdate {
+                            total: estimated_total,
+                            done: processed,
+                            text: "Ordenando...".to_string(),
+                        }
+                    ).ok();
+                }
+
+                sender.send_files_batch(FileLoadingMessage::Finished(current_generation)).ok();
+                
+            }
+
+            flag.store(false, Ordering::Relaxed);
+        });
+
+        self.loading_handles.push(handle);
+        self.start_watching(sender_clone);
+    }
+
+    pub fn cancel_loading(&mut self) {
+        self.loading_flag.store(false, Ordering::Relaxed);
+
+        if self.loading_handles.is_empty() {
+            return;
+        }
+
+        let start = std::time::Instant::now();
+        let mut all_finished ;
+
+        while start.elapsed() < Duration::from_millis(50) {
+            all_finished = self.loading_handles.iter().all(|h|h.is_finished());
+            if all_finished {
+                info!("\n Thread terminado \n");
+                break;
+            }
+            thread::sleep(Duration::from_millis(10));
+        }
+        for handle in self.loading_handles.drain(..) {
+            if handle.is_finished() {
+                let _ = handle.abort();
+            } else {
+                info!("Hilo abandonado tab_id={}", self.id);
+            }
+        }
+    }
+
+
+
+    pub fn start_recursive_search(&mut self, query: String, max_depth: usize, sender: NotifyingSender) {
+        self.recursive_entries.clear();
+        self.recursive_entries.shrink_to_fit();
+        self.is_recursive_active = true;
+
+        self.loading_generation += 1;
+        let current_generation = self.loading_generation;
+        self.loading_flag.store(true, Ordering::Relaxed);
+
+        let path = self.cwd.clone();
+        let flag = self.loading_flag.clone();
+
+        let show_hidden = with_configs(|cfg| cfg.configs.show_hidden_files);
+
+        TOKIO_RUNTIME.spawn(async move {
+            let mut iterator = RecursiveSearchIterator::new(
+                path, 
+                query.clone(), 
+                show_hidden, 
+                max_depth
+            );
+
+            let mut total_files = 0;
+
+            sender.send_recursive(RecursiveMessages::Started {
+                task_id: current_generation as u64,
+                text: format!("Buscando \"{}\"...", query),
+            }).ok();
+
+            while let Some(batch) = iterator.next_batch().await {
+                if !flag.load(Ordering::Relaxed) {
+                    debug!("Búsqueda cancelada.");
+                    sender.send_recursive(RecursiveMessages::Finished {
+                        task_id: current_generation as u64,
+                        success: false,
+                        text: "Búsqueda cancelada.".into(),
+                    });
+                    return;
+                }
+
+                total_files += batch.len();
+
+                sender.send_recursive(RecursiveMessages::Progress {
+                    task_id: current_generation as u64,
+                    files_found: total_files,
+                    current_dir: iterator.current_dir.clone(),
+                    text: format!("{} archivos encontrados", total_files),
+                }).ok();
+
+                if sender.send_files_batch(FileLoadingMessage::RecursiveBatch { 
+                    generation: current_generation, 
+                    batch, 
+                    source_dir: iterator.current_dir.clone(),
+                }).is_err() {
+                    warn!("Canal cerrado, cancelando búsqueda.");
+                    return;
+                }
+                tokio::task::yield_now().await;
+            }
+
+            sender.send_recursive(RecursiveMessages::Finished {
+                task_id: current_generation as u64,
+                success: true,
+                text: format!("Completado: {} archivos encontrados", total_files),
+            }).ok();
+
+            sender.send_files_batch(FileLoadingMessage::Finished(current_generation)).ok();
+            flag.store(false, std::sync::atomic::Ordering::Relaxed);
+
+            debug!("Búsqueda recursiva completada: {} archivos", total_files);
+
+        });
+    }
+
+
+    pub fn navigate_to(&mut self, new_path: PathBuf) {
+        if new_path.is_dir() && new_path != self.cwd {
+            let old_path = self.cwd.clone();
+            if self.history.last() != Some(&old_path) {
+                self.history.push(old_path);
+            }
+
+            self.future.clear();
+
+            if self.history.len() > 100 {
+                self.history.remove(0);
+            }
+
+            self.cwd = new_path;
+        }
+    }
+
+
+    #[deprecated(since = "1.5.0", note = "usa `navigate_to` en su lugar")]
+    pub fn enter(&mut self, name: &str) {
+        let target = self.cwd.join(name);
+        self.navigate_to(target);
+    }
+
+    pub fn up(&mut self) {
+        if let Some(parent) = self.cwd.parent() {
+            let old_path = self.cwd.clone();
+            let new_path = parent.to_path_buf();
+
+            if new_path == old_path { return; }
+            
+            self.history.push(old_path.clone());
+
+            self.future.clear();
+            self.future.push(old_path);
+
+            if self.history.len() > 100 {
+                self.history.remove(0);
+            }
+
+            self.cwd = new_path;
+        }
+    }
+
+    pub fn back(&mut self) {
+        if let Some(prev) = self.history.pop() {
+            self.future.push(self.cwd.clone());
+            self.cwd = prev;
+        }
+    }
+
+    pub fn foward(&mut self) {
+        if let Some(next) = self.future.pop() {
+            self.history.push(self.cwd.clone());
+            self.cwd = next;
+        }
+    }
+
+    pub fn get_trash_dir(&mut self) -> Option<PathBuf> {
+        #[cfg(target_os = "linux")]
+        {
+            let xdg_data = std::env::var_os("XDG_DATA_HOME")
+            .and_then(|xdg| PathBuf::from(xdg).canonicalize().ok())
+            .unwrap_or_else(|| {
+                home_dir().map(|h| h.join(".local/share")).unwrap()
+            });
+
+            let trash_files = xdg_data.join("Trash/files");
+            if trash_files.exists() { return trash_files.canonicalize().ok(); }
+        }
+
+        #[cfg(target_os = "windows")]
+        {
+            let drives = ["C", "D", "E", "F"];
+            for drive in drives.iter().chain(&["A", "Z", "H"]) {
+                let recycle = PathBuf::from(format!("{}:\\$Recycle.Bin", drive));
+                if recycle.exists() { return recycle.canonicalize().ok(); }
+            }
+        }
+
+        #[cfg(target_os = "macos")]
+        {
+            if let Some(home) = home_dir() {
+                let trash = home.join(".Trash");
+                if trash.exists() { return trash.canonicalize().ok(); }
+            }
+        }
+        
+        None
+    }
+
+
+
+    pub fn sort_indices(&mut self, _: OrderingMode) {
+        let new_mode = with_configs(|cfg| cfg.configs.app_ordering_mode.clone());
+
+        self.sorted_indices.sort_by(|&i1, &i2|{
+            let a = &self.files[i1];
+            let b = &self.files[i2];
+
+            match (a.is_dir, b.is_dir)  {
+                (true, false) => return std::cmp::Ordering::Less,
+                (false, true) => return std::cmp::Ordering::Greater,
+                _ => (),
+            }
+
+            match new_mode {
+                OrderingMode::Az => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
+                OrderingMode::Za => b.name.to_lowercase().cmp(&a.name.to_lowercase()),
+                OrderingMode::SizeAsc => a.size.cmp(&b.size),
+                OrderingMode::SizeDesc => b.size.cmp(&a.size),
+                OrderingMode::DateAsc => a.modified.cmp(&b.modified),
+                OrderingMode::DateDesc => b.modified.cmp(&a.modified),
+            }
+        });
+    }
+
+}
+
+
+
+
+
+
+pub struct BlazeMotor {
+    pub tabs: Vec<TabState>,
+    pub active_tab_index: usize,
+    pub limit: usize,
+}
+
+
+thread_local! {
+    pub static MOTOR: RefCell<Option<Rc<RefCell<BlazeMotor>>>> = RefCell::new(None);
+}
+pub fn with_motor<F, R>(f: F) -> R 
+    where F: FnOnce(&mut BlazeMotor) -> R {
+        MOTOR.with(|m|{
+            let binding = m.borrow();
+            let motor_rc = binding.as_ref().expect("Motor no inicializado");
+            f(&mut motor_rc.borrow_mut())
+        })
+    }
+
+
+impl BlazeMotor {
+    pub fn new() -> Self {
+        let tab_id = Uuid::new_v4();
+
+        // //fallback para los canales
+        // let _= with_channel_pool(|c|c.get_or_create_file_channel(tab_id));
+        // let _ = with_channel_pool(|pool|pool.get_or_create_task_channel(tab_id));
+
+        let fist_tab = TabState::new(home_dir().unwrap(), tab_id);
+        Self {
+            tabs: vec![fist_tab],
+            active_tab_index: 0,
+            limit: 100,
+        }
+    }
+
+    pub fn active_tab_mut(&mut self) -> &mut TabState {
+        &mut self.tabs[self.active_tab_index]
+    }
+
+    pub fn switch_to_tab(&mut self, index:usize) {
+        if index < self.tabs.len() {
+            self.active_tab_index = index;
+        }
+    }
+
+    pub fn close_tab(&mut self, index:usize) -> bool{
+        if self.tabs.len() <= 1 {
+            return false;
+        }
+
+        let tab = &mut self.tabs[index];
+        tab.files.clear();
+        tab.files.shrink_to_fit();
+        tab.lower_names.clear();
+        tab.lower_names.shrink_to_fit();
+        tab.cwd.clear();
+
+        remove_cached_sender(tab.id);
+
+
+        self.tabs.remove(index);
+        if self.active_tab_index >= self.tabs.len() {
+            self.active_tab_index = self.tabs.len() - 1;
+        }
+        true
+    }
+
+    pub fn add_tab_from_file(&mut self, tab_path: PathBuf) {
+        let tab_id = Uuid::new_v4();
+
+        // //fallback para los canales
+        // let _= with_channel_pool(|c|c.get_or_create_file_channel(tab_id));
+        // let _ = with_channel_pool(|pool|pool.get_or_create_task_channel(tab_id));
+
+        let new_tab = TabState::new(tab_path, tab_id);
+
+        let insert_index = self.active_tab_index + 1;
+        self.tabs.insert(insert_index, new_tab);
+        self.active_tab_index = insert_index;
+    }
+
+    pub fn create_tab(&mut self) {
+        let path = home_dir().unwrap();
+        let tab_id = Uuid::new_v4();
+
+        // //fallback para los canales
+        // let _= with_channel_pool(|c|c.get_or_create_file_channel(tab_id));
+        // let _ = with_channel_pool(|pool|pool.get_or_create_task_channel(tab_id));
+
+        let new_tab = TabState::new(path, tab_id);
+        let insert_index = self.active_tab_index + 1;
+        self.tabs.insert(insert_index, new_tab);
+    }
+
+    pub fn tab_title(&self, index:usize) -> String {
+        self.tabs.get(index)
+        .and_then(|tab|tab.cwd.file_name())
+        .and_then(|name|name.to_str())
+        .unwrap_or("Home")
+        .to_owned()
+    }
+
+    pub fn go_to(&mut self, path:PathBuf) {
+        if path.is_dir() {
+            let tab = self.active_tab_mut();
+            tab.history.push(tab.cwd.clone());
+            tab.future.clear();
+            tab.cwd = path;
+        }
+    }
+
+    pub fn active_tab(&mut self) -> &mut TabState {
+        &mut self.tabs[self.active_tab_index]
+    }
+
+    pub fn add_tab(&mut self, path: PathBuf) {
+        let tab_id = Uuid::new_v4();
+
+        // //fallback para los canales
+        // let _= with_channel_pool(|c|c.get_or_create_file_channel(tab_id));
+        // let _ = with_channel_pool(|pool|pool.get_or_create_task_channel(tab_id));
+
+        let new_tab = TabState::new(path, tab_id);
+        self.tabs.push(new_tab);
+        self.active_tab_index = self.tabs.len() - 1;
+    }
+}
