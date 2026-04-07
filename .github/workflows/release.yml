@@ -15,20 +15,16 @@ jobs:
       - name: Checkout código
         uses: actions/checkout@v4
 
-      - name: Instalar Rust + target musl
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: x86_64-unknown-linux-musl
-
-      - name: Instalar musl-tools
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y musl-tools musl-dev perl make
+      - name: Instalar cross
+        uses: taiki-e/install-action@cross
 
       - name: Compilar en modo Release
-        run: cargo build --release --target x86_64-unknown-linux-musl
-        env:
-          OPENSSL_NO_VENDOR: 0
+        run: cross build --release --target x86_64-unknown-linux-musl
+
+      - name: Renombrar binario para self_update
+        run: |
+          BIN_NAME="blazepilot"
+          cp "target/x86_64-unknown-linux-musl/release/$BIN_NAME" "./${BIN_NAME}-x86_64-unknown-linux-musl"
 
       - name: Renombrar binario para self_update
         run: |
