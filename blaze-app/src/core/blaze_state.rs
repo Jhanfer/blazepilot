@@ -144,10 +144,9 @@ impl BlazeCoreState {
         };
 
         if let Some(sender) = state.sender().cloned() {
-            state.motor.borrow_mut().active_tab().load_path(true, sender);
+            state.motor.borrow_mut().active_tab().load_path(true, sender.clone());
+            state.updater.check_for_update(sender);
         }
-
-        state.updater.check_for_update();
 
         state
     }
@@ -512,6 +511,10 @@ impl BlazeCoreState {
                     info!("Se intenta mover");
                     self.move_files(files, dest);
                 },
+
+                FileOperation::Update => {
+                    self.updater.start_update_process();
+                }
             }
         }
 

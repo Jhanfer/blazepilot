@@ -26,6 +26,7 @@ use crate::core::files::{motor::FileLoadingMessage, recursive_search::RecursiveM
 use crate::core::system::fileopener_module::AppAssociation;
 use crate::core::system::fileopener_module::platform::linux::linux::AppsIconData;
 use crate::core::system::taskmanager::TaskMessage;
+use crate::core::system::updater::updater::UpdateMessages;
 use tracing::{info, warn};
 use std::sync::RwLock;
 
@@ -59,6 +60,7 @@ pub enum FileOperation {
     Move { files: Vec<PathBuf>, dest: PathBuf, tab_id: Uuid},
     Delete { files: Vec<PathBuf> },
     Copy { files: Vec<PathBuf>, dest: PathBuf },
+    Update,
 }
 
 #[derive(Debug)]
@@ -84,6 +86,8 @@ pub enum UiEvent {
 
     SureTo(SureTo),
 
+    UpdateMessages(UpdateMessages),
+
     ShowError(String),
     RefreshList,
 }
@@ -91,8 +95,7 @@ pub enum UiEvent {
 
 #[derive(Clone)]
 pub struct NotifyingSender {
-    tab_id: Uuid,
-    
+    pub tab_id: Uuid,
     file_sender: Sender<FileLoadingMessage>,
     task_sender: Sender<TaskMessage>,
     recursive_search_sender: Sender<RecursiveMessages>,
@@ -147,7 +150,7 @@ pub struct ChannelPool {
     recursive_channels: HashMap<Uuid, Arc<(Sender<RecursiveMessages>, Receiver<RecursiveMessages>)>>,
     ui_event_channels: HashMap<Uuid, Arc<(Sender<UiEvent>, Receiver<UiEvent>)>>,
     fileops_channels: HashMap<Uuid, Arc<(Sender<FileOperation>, Receiver<FileOperation>)>>,
-    
+
     ui_notifier: HashMap<Uuid, Arc<dyn Fn() + Send + Sync>>,
 }
 
@@ -176,6 +179,7 @@ impl ChannelPool {
             recursive_channels: HashMap::new(),
             ui_event_channels: HashMap::new(),
             fileops_channels: HashMap::new(),
+
             ui_notifier: HashMap::new(),
         }
     }
@@ -196,8 +200,8 @@ impl ChannelPool {
         let file_sender = self.get_file_sender(tab_id);
         let task_sender = self.get_task_sender(tab_id);
         let recursive_search_sender = self.get_recursive_sender(tab_id);
-        let ui_event_sender = self.get_ui_event_channels(tab_id);
-        let file_operation_sender = self.get_fileop_channels(tab_id);
+        let ui_event_sender = self.get_ui_event_channels_sender(tab_id);
+        let file_operation_sender = self.get_fileop_sender(tab_id);
 
         let Some(notifier) = self.ui_notifier.get(&tab_id) else {
             warn!(tab_id = %tab_id, "NO HAY NOTIFIER para tab_id");
@@ -213,6 +217,7 @@ impl ChannelPool {
                 recursive_search_sender,
                 ui_event_sender,
                 file_operation_sender,
+
                 notifier: notifier.clone() 
             }
         )
@@ -242,7 +247,7 @@ impl ChannelPool {
         self.recursive_channels.get(&tab_id).unwrap().0.clone()
     }
 
-    pub fn get_ui_event_channels(&mut self, tab_id: Uuid) -> Sender<UiEvent> {
+    pub fn get_ui_event_channels_sender(&mut self, tab_id: Uuid) -> Sender<UiEvent> {
         if !self.ui_event_channels.contains_key(&tab_id) {
             let (tx, rx) = unbounded();
             self.ui_event_channels.insert(tab_id, (tx, rx).into());
@@ -250,13 +255,14 @@ impl ChannelPool {
         self.ui_event_channels.get(&tab_id).unwrap().0.clone()
     }
 
-    pub fn get_fileop_channels(&mut self, tab_id: Uuid) -> Sender<FileOperation> {
+    pub fn get_fileop_sender(&mut self, tab_id: Uuid) -> Sender<FileOperation> {
         if !self.fileops_channels.contains_key(&tab_id) {
             let (tx, rx) = unbounded();
             self.fileops_channels.insert(tab_id, (tx, rx).into());
         }
         self.fileops_channels.get(&tab_id).unwrap().0.clone()
     }
+
 
     pub fn process_file_messages<F>(&self, tab_id: Uuid, mut processor: F) -> bool
         where
