@@ -25,6 +25,8 @@ jobs:
 
       - name: Compilar en modo Release
         run: cargo build --release --target x86_64-unknown-linux-musl
+        env:
+          OPENSSL_NO_VENDOR: 0
 
       - name: Renombrar binario para self_update
         run: |
