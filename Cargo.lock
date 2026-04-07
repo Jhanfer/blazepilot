@@ -588,7 +588,6 @@ dependencies = [
  "notify",
  "once_cell",
  "openssl",
- "openssl-sys",
  "resvg",
  "self_update",
  "serde",
