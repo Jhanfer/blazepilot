@@ -15,30 +15,28 @@ jobs:
       - name: Checkout código
         uses: actions/checkout@v4
 
-      - name: Instalar Rust + target musl
+      - name: Instalar Rust + target gnu
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: x86_64-unknown-linux-musl
+          targets: x86_64-unknown-linux-gnu
 
-      - name: Instalar musl-tools
+      - name: Instalar dependencias del sistema
         run: |
           sudo apt-get update
-          sudo apt-get install -y musl-tools musl-dev perl make
+          sudo apt-get install -y libssl-dev pkg-config
 
       - name: Compilar en modo Release
-        run: cargo build --release --target x86_64-unknown-linux-musl
-        env:
-          OPENSSL_NO_VENDOR: 0
+        run: cargo build --release --target x86_64-unknown-linux-gnu
 
       - name: Renombrar binario para self_update
         run: |
           BIN_NAME="blazepilot"
-          cp "target/x86_64-unknown-linux-musl/release/$BIN_NAME" "./${BIN_NAME}-x86_64-unknown-linux-musl"
+          cp "target/x86_64-unknown-linux-gnu/release/$BIN_NAME" "./${BIN_NAME}-x86_64-unknown-linux-gnu"
 
       - name: Subir binario al Release
         uses: softprops/action-gh-release@v2
         with:
-          files: blazepilot-x86_64-unknown-linux-musl
+          files: blazepilot-x86_64-unknown-linux-gnu
           tag_name: ${{ github.ref_name }}
           name: Release ${{ github.ref_name }}
           draft: false
