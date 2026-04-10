@@ -17,12 +17,56 @@
 use std::path::PathBuf;
 
 use dirs::{desktop_dir, document_dir, download_dir, home_dir, picture_dir};
-use egui::{Color32, CornerRadius, FontId, Frame, Margin, RichText, ScrollArea, Sense, SidePanel, Ui, pos2, scroll_area::ScrollSource, vec2};
+use egui::{Color32, CornerRadius, FontId, Frame, Margin, Rect, ScrollArea, Sense, SidePanel, Ui, pos2, scroll_area::ScrollSource, vec2};
 use tracing::info;
-use crate::core::{blaze_state::BlazeCoreState, configs::config_state::{FavoriteLinks, with_configs}, system::{clipboard::TOKIO_RUNTIME, disk_reader::disk::Disk}};
+use crate::{core::{blaze_state::BlazeCoreState, configs::config_state::{FavoriteLinks, with_configs}, system::{clipboard::TOKIO_RUNTIME, disk_reader::disk::Disk}}, ui::{blaze_ui_state::BlazeUiState, icons_cache::icons::{ICON_ARCHIVE, ICON_DESKTOP, ICON_DOWNLOADS, ICON_HOME, ICON_POLAROID, ICON_SERVER, ICON_STAR, ICON_TRASH, ICON_USER}}};
 
 
-pub fn render_local_buttons(label:&str, path: PathBuf, state: &mut BlazeCoreState, ui: &mut Ui) {
+
+
+fn get_folder_icon(label: &str) -> (&'static str, &'static [u8]) {
+    let label_lower = label.to_lowercase();
+    match label_lower.as_str() {
+        "home" => ("home", ICON_HOME),
+        "escritorio" | "desktop" => ("desktop", ICON_DESKTOP),
+        "descargas" | "downloads" => ("downloads", ICON_DOWNLOADS),
+        "documentos" | "documents" => ("documents", ICON_ARCHIVE),
+        "imágenes" | "imagenes" | "pictures" | "images" => ("pictures", ICON_POLAROID),
+        "papelera" | "trash" | "basura" => ("trash", ICON_TRASH),
+        _ => ("default", ICON_HOME),
+    }
+}
+
+
+fn get_herader_icon(label: &str) -> (&'static str, &'static [u8]) {
+    let label_lower = label.to_lowercase();
+    match label_lower.as_str() {
+        "locales" => ("locales", ICON_USER),
+        "favoritos" | "favorites" => ("favorites", ICON_STAR),
+        "discos" | "disks" => ("disks", ICON_SERVER),
+        _ => ("default", ICON_HOME),
+    }
+}
+
+
+pub fn render_icon(ui_state: &mut BlazeUiState, ctx: &egui::Context, icon_name: &str, color: Color32, icon_bytes: &[u8], ui: &mut Ui, rect: Rect) {
+    let icon = ui_state.icon_cache.get_or_load(ctx, icon_name, icon_bytes, color);
+
+    let icon_size = vec2(16.0, 16.0);
+    let icon_pos = rect.left_center() - vec2(-10.0, icon_size.y / 2.0);
+    let icon_rect = Rect::from_min_size(icon_pos, icon_size);
+
+    ui.painter().image(
+        icon.id(),
+        icon_rect,
+        Rect::from_min_max(pos2(0.0, 0.0),
+        pos2(1.0, 1.0)),
+        Color32::WHITE,
+    );
+}
+
+
+pub fn render_local_buttons(label:&str, path: PathBuf, state: &mut BlazeCoreState, ui: &mut Ui, ui_state: &mut BlazeUiState, ctx: &egui::Context) {
     let (rect, response) = ui.allocate_exact_size(
         egui::vec2(ui.available_width(), 30.0),
         Sense::click_and_drag()
@@ -41,8 +85,22 @@ pub fn render_local_buttons(label:&str, path: PathBuf, state: &mut BlazeCoreStat
         state.navigate_to(path);
     }
 
+    let (icon_name, icon_bytes) = get_folder_icon(label);
+    let color = Color32::WHITE;
+
+    render_icon(
+        ui_state, 
+        ctx, 
+        icon_name,
+        color,
+        icon_bytes,
+        ui,
+        rect
+    );
+
+
     ui.painter().text(
-        rect.left_center(),
+        rect.left_center() + vec2(34.0, 0.0),
         egui::Align2::LEFT_CENTER,
         label,
         egui::FontId::default(),
@@ -52,7 +110,7 @@ pub fn render_local_buttons(label:&str, path: PathBuf, state: &mut BlazeCoreStat
 }
 
 
-pub fn render_fav_buttons(fav: FavoriteLinks, state: &mut BlazeCoreState, ui: &mut Ui) {
+pub fn render_fav_buttons(fav: FavoriteLinks, state: &mut BlazeCoreState, ui: &mut Ui, ui_state: &mut BlazeUiState, ctx: &egui::Context) {
     let (rect, response) = ui.allocate_exact_size(
         egui::vec2(ui.available_width(), 30.0),
         Sense::click()
@@ -99,9 +157,21 @@ pub fn render_fav_buttons(fav: FavoriteLinks, state: &mut BlazeCoreState, ui: &m
         )
     });
 
+    let color = Color32::YELLOW;
+
+    render_icon(
+        ui_state, 
+        ctx, 
+        "star",
+        color,
+        ICON_STAR,
+        ui,
+        rect
+    );
+
     ui.painter().with_clip_rect(rect)
         .galley(
-            rect.left_center() + vec2(8.0, -galley.size().y / 2.0),
+            rect.left_center() + vec2(34.0, -galley.size().y / 2.0),
             galley,
             ui.visuals().text_color()
         );
@@ -109,7 +179,7 @@ pub fn render_fav_buttons(fav: FavoriteLinks, state: &mut BlazeCoreState, ui: &m
 }
 
 
-pub fn render_drives_button(state: &mut BlazeCoreState, ui: &mut Ui, drive: Disk) {
+pub fn render_drives_button(state: &mut BlazeCoreState, ui: &mut Ui, drive: Disk, ui_state: &mut BlazeUiState, ctx: &egui::Context) {
     let (rect, response) = ui.allocate_exact_size(
         egui::vec2(ui.available_width(), 30.0),
         Sense::click_and_drag()
@@ -125,8 +195,9 @@ pub fn render_drives_button(state: &mut BlazeCoreState, ui: &mut Ui, drive: Disk
     response.context_menu(|ui|{
         if drive.mountpoint.is_none() {
             if ui.button("Montar").clicked() {
+                let mut manager = state.motor.borrow_mut().disk_manager.clone();
                 TOKIO_RUNTIME.block_on(async {
-                    let mut manager = state.disk_manager.lock().await;
+                    let mut manager = manager.lock().await;
                     manager.mount_disk(&drive).await.ok();
                 });
             }
@@ -142,8 +213,9 @@ pub fn render_drives_button(state: &mut BlazeCoreState, ui: &mut Ui, drive: Disk
         if drive.is_removable && drive.mountpoint.is_none() {
             ui.separator();
             if ui.button("Expulsar").clicked() {
+                let mut manager = state.motor.borrow_mut().disk_manager.clone();
                 TOKIO_RUNTIME.block_on(async {
-                    let mut manager = state.disk_manager.lock().await;
+                    let mut manager = manager.lock().await;
                     manager.eject_disk(&drive).await.ok();
                 });
             }
@@ -153,8 +225,9 @@ pub fn render_drives_button(state: &mut BlazeCoreState, ui: &mut Ui, drive: Disk
             ui.separator();
 
             if ui.button("Desmontar").clicked() {
+                let mut manager = state.motor.borrow_mut().disk_manager.clone();
                 TOKIO_RUNTIME.block_on(async {
-                    let mut manager = state.disk_manager.lock().await;
+                    let mut manager = manager.lock().await;
                     manager.unmount_disk(&drive).await.ok();
                 });
             }
@@ -171,9 +244,20 @@ pub fn render_drives_button(state: &mut BlazeCoreState, ui: &mut Ui, drive: Disk
 
     ui.painter().rect_filled(rect, 5.0, bg_color);
 
+    let color = Color32::WHITE;
+
+    render_icon(
+        ui_state, 
+        ctx, 
+        "server",
+        color,
+        ICON_SERVER,
+        ui,
+        rect
+    );
 
     ui.painter().text(
-        rect.left_center(),
+        rect.left_center() + vec2(34.0, 0.0),
         egui::Align2::LEFT_CENTER,
         drive.display_name,
         FontId::default(),
@@ -182,14 +266,28 @@ pub fn render_drives_button(state: &mut BlazeCoreState, ui: &mut Ui, drive: Disk
 }
 
 
-pub fn render_header_text(label: &str,ui: &mut Ui) {
+pub fn render_header_text(label: &str,ui: &mut Ui, ui_state: &mut BlazeUiState, ctx: &egui::Context) {
     let (rect, _resp) = ui.allocate_exact_size(
         vec2(ui.available_width(), 24.0),
         Sense::hover(),
     );
 
+
+    let (icon_name, icon_bytes) = get_herader_icon(label);
+    let color = Color32::WHITE;
+
+    render_icon(
+        ui_state, 
+        ctx, 
+        icon_name,
+        color,
+        icon_bytes,
+        ui,
+        rect
+    );
+
     ui.painter().text(
-        rect.left_center(),
+        rect.left_center() + vec2(34.0, 0.0),
         egui::Align2::LEFT_CENTER,
         label,
         FontId::proportional(20.0),
@@ -198,7 +296,7 @@ pub fn render_header_text(label: &str,ui: &mut Ui) {
 }
 
 
-pub fn sidebar_left_component(ctx: &egui::Context, state: &mut BlazeCoreState) {
+pub fn sidebar_left_component(ctx: &egui::Context, state: &mut BlazeCoreState, ui_state: &mut BlazeUiState) {
     let custom_frame = Frame::NONE
         .fill(Color32::from_rgb(16, 21, 25))
         .inner_margin(Margin::same(10));
@@ -216,27 +314,27 @@ pub fn sidebar_left_component(ctx: &egui::Context, state: &mut BlazeCoreState) {
         .corner_radius(CornerRadius::same(20))
         .show(ui, |ui|{
 
-            render_header_text("Locales", ui);
+            render_header_text("Locales", ui, ui_state, ctx);
 
             ui.add_space(10.0);
 
             let home = home_dir().unwrap();
-            render_local_buttons("Home", home, state, ui);
+            render_local_buttons("Home", home, state, ui, ui_state, ctx);
 
             let desk = desktop_dir().unwrap();
-            render_local_buttons("Escritorio", desk, state, ui);
+            render_local_buttons("Escritorio", desk, state, ui, ui_state, ctx);
 
             let donw = download_dir().unwrap();
-            render_local_buttons("Descargas", donw, state, ui);
+            render_local_buttons("Descargas", donw, state, ui, ui_state, ctx);
 
             let docs = document_dir().unwrap();
-            render_local_buttons("Documentos", docs, state, ui);
+            render_local_buttons("Documentos", docs, state, ui, ui_state, ctx);
 
             let imgs = picture_dir().unwrap();
-            render_local_buttons("Imágenes", imgs, state, ui);
+            render_local_buttons("Imágenes", imgs, state, ui, ui_state, ctx);
 
-            let trsh = state.motor.borrow_mut().active_tab().get_trash_dir().unwrap();
-            render_local_buttons("Papelera", trsh, state, ui);
+            let trsh = state.motor.borrow_mut().get_trash_dir(None).unwrap();
+            render_local_buttons("Papelera", trsh, state, ui, ui_state, ctx);
 
 
             ui.add_space(20.0);
@@ -244,7 +342,7 @@ pub fn sidebar_left_component(ctx: &egui::Context, state: &mut BlazeCoreState) {
         
 
             ui.add_space(10.0);
-            render_header_text("Favoritos", ui);
+            render_header_text("Favoritos", ui, ui_state, ctx);
             ui.add_space(10.0);
 
             ScrollArea::vertical()
@@ -253,7 +351,6 @@ pub fn sidebar_left_component(ctx: &egui::Context, state: &mut BlazeCoreState) {
                 .max_height(200.0)
                 .animated(true)
                 .show(ui, |ui|{
-
                     let favorites = with_configs(|c| {
                         c.configs.favorite_list.clone()
                     });
@@ -263,7 +360,7 @@ pub fn sidebar_left_component(ctx: &egui::Context, state: &mut BlazeCoreState) {
                     }
 
                     for fav in favorites.clone() {
-                        render_fav_buttons(fav, state, ui);
+                        render_fav_buttons(fav, state, ui, ui_state, ctx);
                     }
             });
 
@@ -273,16 +370,17 @@ pub fn sidebar_left_component(ctx: &egui::Context, state: &mut BlazeCoreState) {
             ui.separator();
 
             ui.add_space(10.0);
-            render_header_text("Discos", ui);
+            render_header_text("Discos", ui, ui_state, ctx);
             ui.add_space(10.0);
 
+            let manager = state.motor.borrow_mut().disk_manager.clone();
             let drives = TOKIO_RUNTIME.block_on(async {
-                let manager = state.disk_manager.lock().await;
+                let manager = manager.lock().await;
                 manager.get_partitions().await
-            });   
+            });
 
             for drive in drives {
-                render_drives_button(state, ui, drive);
+                render_drives_button(state, ui, drive, ui_state, ctx);
             }
 
         });

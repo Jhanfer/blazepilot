@@ -15,91 +15,34 @@
 
 
 
-use core::f32;
-use std::path::PathBuf;
-use std::{sync::Arc, time::{Duration, UNIX_EPOCH}};
-use chrono::{DateTime, Local, TimeDelta};
-use egui::{Button, Color32, CornerRadius, Frame, Key, Margin, SidePanel, TextEdit, Ui};
-use tracing::info;
+
+use std::sync::Arc;
+use egui::{Button, Color32, Context, CornerRadius, Frame, Margin, SidePanel, TextEdit, Window};
 
 use crate::core::files::motor::FileEntry;
 use crate::core::{blaze_state::BlazeCoreState, configs::config_state::{OrderingMode, with_configs}};
+use crate::utils::formating::format_date;
 
-
-
-pub fn format_size(size: u64) -> String {
-    let size_f = size as f64;
-    let kb = 1024.0;
-    let mb = 1024.0 * 1024.0;
-    let gb = 1024.0 * 1024.0 * 1024.0;
-
-    if size_f < kb {
-        format!("{} B", size)
-    } else if size_f < mb {
-        format!("{:.1} KB", size_f / kb)
-    } else if size_f < gb {
-        format!("{:.1} MB", size_f / mb)
-    } else {
-        format!("{:.2} GB", size_f / gb)
-    }
-}
-
-fn format_date(seconds: u64) -> String {
-    if seconds == 0 { return "---".to_string(); }
-
-    let d = UNIX_EPOCH + Duration::from_secs(seconds);
-
-    let modified_date: DateTime<Local> = d.into();
-    let now: DateTime<Local> = Local::now();
-    
-    let diff: TimeDelta = now - modified_date;
-    
-    let min: i32 = diff.num_minutes() as i32;
-    let hours: i32 = diff.num_hours() as i32;
-    let days: i32 = diff.num_days() as i32;
-    let weeks: i32 = days / 7;
-    let months: i32 = weeks / 4;
-    let years: i32 = months / 12;
-
-    
-    if min < 60 {
-        return format!("Hace {:?}min", min).to_string();
-    } else if hours < 24 {
-        return format!("Hace {:?}h", hours).to_string();
-    } else if days < 7 {
-        return format!("Hace {:?} dia/s", days).to_string();
-    } else if weeks < 4 {
-        return format!("Hace {:?} semana/s", weeks).to_string();
-    } else if months < 12 {
-        return format!("Hace {:?} mes/ses", months).to_string();
-    } else if years > 1 {
-        return format!("Hace {:?} año/s", years).to_string();
-    }
-    return "desconocido".to_string();
-}
-
-
-
-pub fn sidebar_right_component(state: &mut BlazeCoreState, ui: &mut Ui, files: &Vec<Arc<FileEntry>>) {
+pub fn sidebar_right_component(state: &mut BlazeCoreState, files: &Vec<Arc<FileEntry>>, ctx: &Context) {
 
     let custom_frame = Frame::NONE
-        .fill(Color32::from_rgb(27, 31, 35))
+        .fill(Color32::from_rgb(16, 21, 25))
         .inner_margin(Margin::same(10));
 
     SidePanel::right("info_panel")
         .resizable(false)
-        .default_width(200.0)
-        .min_width(120.0)
-        .exact_width(240.0)
+        .exact_width(230.0)
         .frame(custom_frame)
         .show_separator_line(false)
-        .show_inside(ui, |ui| {
+        .show(ctx,|ui| {
+
+        ui.add_space(10.0);
 
 
         Frame::NONE
             .inner_margin(egui::Margin::same(10))
-            .fill(Color32::from_rgb(36, 42, 47))
-            .corner_radius(CornerRadius::same(10))
+            .fill(Color32::from_rgb(27, 31, 35))
+            .corner_radius(CornerRadius::same(20))
             .show(ui, |ui|{
 
                 ui.horizontal(|ui|{
@@ -121,7 +64,7 @@ pub fn sidebar_right_component(state: &mut BlazeCoreState, ui: &mut Ui, files: &
                     }
                 });
 
-                ui.label("Ordén");
+                ui.label("Orden");
 
                 ui.horizontal_top(|ui|{
 
@@ -150,9 +93,9 @@ pub fn sidebar_right_component(state: &mut BlazeCoreState, ui: &mut Ui, files: &
 
 
                     let size_label = match current_order  {
-                        OrderingMode::SizeAsc => "Size ↗",
-                        OrderingMode::SizeDesc => "Size ↘",
-                        _ => "Size ↗",
+                        OrderingMode::SizeAsc => "Gb ↗",
+                        OrderingMode::SizeDesc => "Gb ↘",
+                        _ => "Gb ↗",
                     };
 
                     if ui.button(size_label).clicked() {
@@ -169,9 +112,9 @@ pub fn sidebar_right_component(state: &mut BlazeCoreState, ui: &mut Ui, files: &
 
 
                     let date_label = match current_order {
-                        OrderingMode::DateAsc => "Date ⏳",
-                        OrderingMode::DateDesc => "Date ⌛",
-                        _ => "Date ⏳",
+                        OrderingMode::DateAsc => "⏳",
+                        OrderingMode::DateDesc => "⌛",
+                        _ => "⏳",
                     };
 
                     if ui.button(date_label).clicked() {
@@ -182,17 +125,6 @@ pub fn sidebar_right_component(state: &mut BlazeCoreState, ui: &mut Ui, files: &
                             };
 
                             c.set_ordering_mode(new_mode);
-                        });
-                        state.refresh();
-                    };
-
-                    let is_hidden = with_configs(|c| {c.configs.show_hidden_files.clone()});
-
-                    let date_label = if is_hidden { "Oculto" } else {"Mostrar"};
-
-                    if ui.button(date_label).clicked() {
-                        with_configs(|c| {
-                            c.set_show_hidden_files(!is_hidden);
                         });
                         state.refresh();
                     };

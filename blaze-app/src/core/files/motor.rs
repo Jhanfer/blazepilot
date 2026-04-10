@@ -16,21 +16,26 @@
 
 
 
-use std::path::PathBuf;
+use std::collections::HashSet;
+use std::os::unix::fs::MetadataExt;
+use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime};
 use std::{fs, thread, vec};
 use dirs::{home_dir};
+use jwalk::{Parallelism, WalkDir};
 use once_cell::sync::Lazy;
 use tokio::sync::Semaphore;
-use tracing::{debug, info, warn};
-use std::sync::Arc;
+use tracing::{debug, error, info, warn};
+use std::sync::{Arc, Mutex};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::RwLock; 
 use lru::LruCache;
 use std::num::NonZeroUsize;
+use crate::core::files::file_extension::FileExtension;
 use crate::core::files::recursive_search::{RecursiveMessages, RecursiveSearchIterator};
 
 use crate::core::configs::config_state::{with_configs, OrderingMode};
+use crate::core::system::disk_reader::disk_manager::DiskManager;
 use crate::utils::channel_pool::{NotifyingSender, cache_sender, remove_cached_sender, with_channel_pool};
 use uuid::Uuid;
 use notify::{Watcher, RecursiveMode, Event, EventKind};
@@ -55,6 +60,7 @@ pub enum TaskType {
     CutPaste,
     MoveTrash,
     Delete,
+    RestoreTrash
 }
 
 #[derive(Debug, Clone)]
@@ -79,9 +85,12 @@ pub enum FileLoadingMessage {
     }
 }
 
+
+
 #[derive(Debug, Default, Clone)]
 pub struct FileEntry {
     pub name: Box<str>,
+    pub extension: FileExtension,
     pub kind: FileKind,
     pub size: u64,
     pub modified: u64,
@@ -380,7 +389,11 @@ impl TabState {
                         FileKind::File
                     };
                 
-                    let size = m.len();
+                    let size = if m.is_dir() {
+                        0
+                    } else {
+                        m.len()
+                    };
 
                     let modified = m.modified()
                         .unwrap_or(SystemTime::UNIX_EPOCH)
@@ -401,12 +414,15 @@ impl TabState {
                     let is_dir = entry.file_type().await
                     .map(|t| t.is_dir())
                     .unwrap_or(false);
+                
+                    let extension = FileExtension::from_path(&entry.path());
 
                     let file_entry = Arc::new(
                     FileEntry {
-                            name, 
+                            name,
                             is_dir,
                             kind,
+                            extension,
                             size,
                             modified, 
                             created,
@@ -462,7 +478,56 @@ impl TabState {
         self.start_watching(sender_clone);
     }
 
-    pub fn cancel_loading(&mut self) {
+    pub async fn get_recursive_size(root: impl AsRef<Path>, max_concurrency: usize) -> u64 {
+        let total_size = Arc::new(AtomicU64::new(0));
+        let seen_inodes = Arc::new(Mutex::new(HashSet::new()));
+        let semaphore = Arc::new(Semaphore::new(max_concurrency));
+
+        let walker = WalkDir::new(root)
+            .skip_hidden(false)
+            .process_read_dir(|_, _, _, children| {
+
+            })
+            .parallelism(Parallelism::RayonNewPool(0));
+
+        let mut tasks = vec![];
+
+        for entry in walker {
+            let entry = match entry {
+                Ok(e) => e,
+                Err(_) => continue,
+            };
+
+            if entry.file_type().is_file() {
+                let size_arc = total_size.clone();
+                let inodes_arc = seen_inodes.clone();
+                let permit = semaphore.clone().acquire_owned().await.unwrap();
+                
+                let task = tokio::task::spawn_blocking(move || {
+                    let _permit = permit;
+
+                    if let Ok(meta) = entry.metadata() {
+                        let inode = (meta.dev(), meta.ino());
+                        let mut guard = inodes_arc.lock().unwrap();
+
+                        if guard.insert(inode) {
+                            size_arc.fetch_add(meta.len(), Ordering::Relaxed);
+                        }
+                    }
+                });
+                
+                tasks.push(task);
+            }
+        }
+
+        for task in tasks {
+            let _ = task.await;
+        }
+
+        total_size.load(Ordering::Relaxed)
+    }
+
+    pub fn _cancel_loading(&mut self) {
         self.loading_flag.store(false, Ordering::Relaxed);
 
         if self.loading_handles.is_empty() {
@@ -526,8 +591,8 @@ impl TabState {
                     sender.send_recursive(RecursiveMessages::Finished {
                         task_id: current_generation as u64,
                         success: false,
-                        text: "Búsqueda cancelada.".into(),
-                    });
+                        text: "Búsqueda cancelada.".into()
+                    }).ok();
                     return;
                 }
 
@@ -584,12 +649,6 @@ impl TabState {
     }
 
 
-    #[deprecated(since = "1.5.0", note = "usa `navigate_to` en su lugar")]
-    pub fn enter(&mut self, name: &str) {
-        let target = self.cwd.join(name);
-        self.navigate_to(target);
-    }
-
     pub fn up(&mut self) {
         if let Some(parent) = self.cwd.parent() {
             let old_path = self.cwd.clone();
@@ -624,39 +683,6 @@ impl TabState {
         }
     }
 
-    pub fn get_trash_dir(&mut self) -> Option<PathBuf> {
-        #[cfg(target_os = "linux")]
-        {
-            let xdg_data = std::env::var_os("XDG_DATA_HOME")
-            .and_then(|xdg| PathBuf::from(xdg).canonicalize().ok())
-            .unwrap_or_else(|| {
-                home_dir().map(|h| h.join(".local/share")).unwrap()
-            });
-
-            let trash_files = xdg_data.join("Trash/files");
-            if trash_files.exists() { return trash_files.canonicalize().ok(); }
-        }
-
-        #[cfg(target_os = "windows")]
-        {
-            let drives = ["C", "D", "E", "F"];
-            for drive in drives.iter().chain(&["A", "Z", "H"]) {
-                let recycle = PathBuf::from(format!("{}:\\$Recycle.Bin", drive));
-                if recycle.exists() { return recycle.canonicalize().ok(); }
-            }
-        }
-
-        #[cfg(target_os = "macos")]
-        {
-            if let Some(home) = home_dir() {
-                let trash = home.join(".Trash");
-                if trash.exists() { return trash.canonicalize().ok(); }
-            }
-        }
-        
-        None
-    }
-
 
 
     pub fn sort_indices(&mut self, _: OrderingMode) {
@@ -687,12 +713,10 @@ impl TabState {
 
 
 
-
-
-
 pub struct BlazeMotor {
     pub tabs: Vec<TabState>,
     pub active_tab_index: usize,
+    pub disk_manager: Arc<tokio::sync::Mutex<DiskManager>>, 
     pub limit: usize,
 }
 
@@ -711,17 +735,24 @@ pub fn with_motor<F, R>(f: F) -> R
 
 
 impl BlazeMotor {
-    pub fn new() -> Self {
+    pub async fn new() -> Self {
         let tab_id = Uuid::new_v4();
-
-        // //fallback para los canales
-        // let _= with_channel_pool(|c|c.get_or_create_file_channel(tab_id));
-        // let _ = with_channel_pool(|pool|pool.get_or_create_task_channel(tab_id));
-
         let fist_tab = TabState::new(home_dir().unwrap(), tab_id);
+
+        let disk_manager = Arc::new(tokio::sync::Mutex::new(DiskManager::new().await));
+
+        {
+            let mut mgr_guard = disk_manager.lock().await;
+            mgr_guard.load_disks().await;
+            if let Err(e) = mgr_guard.start_watcher_linux(disk_manager.clone()).await {
+                error!("Error inicializando watcher de discos: {}", e);
+            }
+        }
+
         Self {
             tabs: vec![fist_tab],
             active_tab_index: 0,
+            disk_manager,
             limit: 100,
         }
     }
@@ -760,11 +791,6 @@ impl BlazeMotor {
 
     pub fn add_tab_from_file(&mut self, tab_path: PathBuf) {
         let tab_id = Uuid::new_v4();
-
-        // //fallback para los canales
-        // let _= with_channel_pool(|c|c.get_or_create_file_channel(tab_id));
-        // let _ = with_channel_pool(|pool|pool.get_or_create_task_channel(tab_id));
-
         let new_tab = TabState::new(tab_path, tab_id);
 
         let insert_index = self.active_tab_index + 1;
@@ -775,10 +801,6 @@ impl BlazeMotor {
     pub fn create_tab(&mut self) {
         let path = home_dir().unwrap();
         let tab_id = Uuid::new_v4();
-
-        // //fallback para los canales
-        // let _= with_channel_pool(|c|c.get_or_create_file_channel(tab_id));
-        // let _ = with_channel_pool(|pool|pool.get_or_create_task_channel(tab_id));
 
         let new_tab = TabState::new(path, tab_id);
         let insert_index = self.active_tab_index + 1;
@@ -809,12 +831,152 @@ impl BlazeMotor {
     pub fn add_tab(&mut self, path: PathBuf) {
         let tab_id = Uuid::new_v4();
 
-        // //fallback para los canales
-        // let _= with_channel_pool(|c|c.get_or_create_file_channel(tab_id));
-        // let _ = with_channel_pool(|pool|pool.get_or_create_task_channel(tab_id));
-
         let new_tab = TabState::new(path, tab_id);
         self.tabs.push(new_tab);
         self.active_tab_index = self.tabs.len() - 1;
     }
+
+
+
+    fn get_home_trash_dir(&mut self) -> Option<PathBuf> {
+        let data_home = std::env::var_os("XDG_DATA_HOME")
+            .map(PathBuf::from)
+            .filter(|p| p.is_absolute())
+            .or_else(|| home_dir().map(|h| h.join(".local/share")))
+            .unwrap();
+
+        let trash_root = data_home.join("Trash");
+        let files_dir = trash_root.join("files");
+        let info_dir = trash_root.join("info");
+
+        if !files_dir.exists() {
+            fs::create_dir_all(&files_dir).ok()?;
+            fs::create_dir_all(&info_dir).ok()?;
+        }
+
+        #[cfg(unix)]
+        {
+            if let Ok(metadata) = fs::metadata(&trash_root) {
+                let permissions = metadata.permissions();
+                if !permissions.readonly() {
+                    return files_dir.canonicalize().ok();
+                }
+            }
+        }
+
+        files_dir.canonicalize().ok()
+    } 
+
+
+
+    fn get_external_trash_dir(&mut self, file_path: &PathBuf, mount_point: PathBuf) -> Option<PathBuf> {
+        let uid = unsafe {libc::getuid()};
+        let trash_dir_name = format!(".Trash-{}", uid);
+        let external_trash_root = mount_point.join(trash_dir_name);
+
+        let files_dir = external_trash_root.join("files");
+        let info_dir = external_trash_root.join("info");
+
+        if !files_dir.exists() {
+            fs::create_dir_all(&files_dir).ok()?;
+            fs::create_dir_all(&info_dir).ok()?;
+
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+
+                fs::set_permissions(&external_trash_root, fs::Permissions::from_mode(0o700)).ok()?;
+            }
+        }
+
+        files_dir.canonicalize().ok()
+    }
+
+
+    fn is_same_device(&mut self, path1: &Path, path2: &Path) -> bool {
+        #[cfg(unix)]
+        {
+            use std::os::linux::fs::MetadataExt;
+            if let (Ok(meta1), Ok(meta2)) = (fs::metadata(path1), fs::metadata(path2)) {
+                return meta1.st_dev() == meta2.st_dev();
+            }
+        }
+
+        false
+    }
+
+    fn is_mount_point(&mut self, path: &PathBuf) -> bool {
+        #[cfg(unix)]
+        {
+            if let (Ok(meta), Some(parent)) = (std::fs::metadata(path), path.parent()) {
+                if let Ok(parent_meta) = std::fs::metadata(parent) {
+                    use std::os::linux::fs::MetadataExt;
+                    return meta.st_dev() != parent_meta.st_dev(); 
+                }
+            }
+        }
+
+        path.to_str() == Some("/")
+    }
+
+    fn get_mount_point(&mut self, path: &PathBuf) -> Option<PathBuf> {
+        let mut current = path.canonicalize().ok()?;
+
+        loop {
+            if self.is_mount_point(&current) {
+                return Some(current);
+            }
+            
+            match current.parent() {
+                Some(parent) => current = parent.to_path_buf(),
+                None => return Some(PathBuf::from("/")),
+            }
+        }
+    }
+
+    pub fn get_trash_dir(&mut self, file_path: Option<&Path>) -> Option<PathBuf> {
+        #[cfg(target_os = "linux")]
+        {
+            match file_path {
+                None => {
+                    return self.get_home_trash_dir()
+                },
+
+                Some(path) => {
+                    let path_canonical = path.canonicalize().ok()?;
+                    
+                    if let Some(home) = home_dir() {
+                        if self.is_same_device(&path_canonical, &home) {
+                            return self.get_home_trash_dir();
+                        }
+                    }
+
+                    let mount_point = self.get_mount_point(&path_canonical)?;
+                    return self.get_external_trash_dir(&path_canonical, mount_point);
+                },
+            };
+        }
+
+        #[cfg(target_os = "windows")]
+        {
+            let drives = ["C", "D", "E", "F"];
+            for drive in drives.iter().chain(&["A", "Z", "H"]) {
+                let recycle = PathBuf::from(format!("{}:\\$Recycle.Bin", drive));
+                if recycle.exists() { return recycle.canonicalize().ok(); }
+            }
+        }
+
+        #[cfg(target_os = "macos")]
+        {
+            if let Some(home) = home_dir() {
+                let trash = home.join(".Trash");
+                if trash.exists() { return trash.canonicalize().ok(); }
+            }
+        }
+
+    }
+
+
+
+
 }

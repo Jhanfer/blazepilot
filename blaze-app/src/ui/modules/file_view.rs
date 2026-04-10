@@ -18,9 +18,9 @@
 
 
 use std::sync::Arc;
-use egui::{Button, CentralPanel, Color32, CornerRadius, Frame, Key, Margin, Painter, Rect, ScrollArea, Sense, Stroke, StrokeKind, TextEdit, UiBuilder, pos2, scroll_area::ScrollSource, vec2};
+use egui::{Align2, Area, Button, CentralPanel, Color32, CornerRadius, FontId, Frame, Key, Margin, Painter, Rect, ScrollArea, Sense, Stroke, StrokeKind, TextEdit, Ui, UiBuilder, pos2, scroll_area::ScrollSource, vec2};
 use tracing::{error, info};
-use crate::{core::{blaze_state::{BlazeCoreState, NewItemType}, configs::config_state::with_configs, files::motor::FileEntry}, ui::{blaze_ui_state::BlazeUiState, icons_cache::icons, modules::sidebar_right::sidebar_right_component}, utils::channel_pool::{SureTo, UiEvent}};
+use crate::{core::{blaze_state::{BlazeCoreState, NewItemType}, configs::config_state::with_configs, files::{file_extension::{DocType, FileExtension}, motor::{FileEntry, TabState}}, system::clipboard::TOKIO_RUNTIME}, ui::{blaze_ui_state::BlazeUiState, icons_cache::icons::{self}, modules::sidebar_right::sidebar_right_component, task_manager::task_manager::TaskStatus}, utils::{channel_pool::{FileOperation, SureTo, UiEvent}, formating::{format_date, format_size}}};
 
 
 
@@ -132,14 +132,16 @@ pub fn render_rubberband(state: &mut BlazeCoreState, files: &Vec<Arc<FileEntry>>
 
 
 pub fn file_view_component(ctx: &egui::Context, files: &Vec<Arc<FileEntry>>, state: &mut BlazeCoreState, ui_state: &mut BlazeUiState) {
-
+    
     let custom_frame = Frame::NONE
         .fill(Color32::from_rgb(16, 21, 25))
         .inner_margin(Margin::same(20));
 
     CentralPanel::default()
-    .frame(custom_frame)
-    .show(ctx, |ui| {
+        .frame(custom_frame)
+        .show(ctx, |ui| {
+        
+        ui.set_width(ui.available_width() + 20.0);
 
         Frame::NONE
             .inner_margin(egui::Margin::same(10))
@@ -178,7 +180,39 @@ pub fn file_view_component(ctx: &egui::Context, files: &Vec<Arc<FileEntry>>, sta
                     let del = ui.add_enabled(!state.selected_files.is_empty(), Button::new("🗑 Borrar"));
 
                     if del.clicked() {
-                        state.move_to_trash(files);
+                        let cwd = state.motor.borrow_mut().active_tab().cwd.clone();
+                        let trash = state.motor.borrow_mut().get_trash_dir(None).unwrap_or_default();
+
+                        if trash == cwd {
+                            let Some(sender) = state.sender().cloned() else {return;};
+                            let tab_id = state.motor.borrow_mut().active_tab().id;
+
+                            let sources: Vec<_> = state.selected_files.iter().cloned().collect();
+
+                            sender.send_ui_event(
+                                UiEvent::SureTo(
+                                    SureTo::SureToDelete { 
+                                        files: sources, 
+                                        tab_id 
+                                    }
+                                )
+                            ).ok();
+                        } else {
+                            state.move_to_trash(files);
+                        }
+                        
+                    }
+
+                    ui.add_space(8.0);
+
+                    let select_all_text = if state.selected_files.len() == files.len() && !files.is_empty() {
+                        "Deseleccionar todo" 
+                    } else {
+                        "Seleccionar todo"
+                    };
+
+                    if ui.button(select_all_text).clicked() {
+                        state.toggle_select_all(files);
                     }
 
                     ui.separator();
@@ -186,18 +220,25 @@ pub fn file_view_component(ctx: &egui::Context, files: &Vec<Arc<FileEntry>>, sta
                         state.refresh();
                     }
 
+                    if ui.button("T").clicked() {
+                        state.is_testing = !state.is_testing;
+                    }
+
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         ui.visuals_mut().button_frame = false;
-                        let mut coso = false;
 
-                        ui.checkbox(&mut coso, "Show hidden");
+                        let mut is_hidden = with_configs(|c| {c.configs.show_hidden_files.clone()});
+
+                        let resp = ui.checkbox(&mut is_hidden, "");
+
+                        if resp.clicked() {
+                            with_configs(|c| {
+                                c.set_show_hidden_files(is_hidden);
+                            });
+                            state.refresh();
+                        };
+
                         ui.separator();
-                        if ui.selectable_label(true, "Grid").clicked() {
-                            
-                        }
-                        if ui.selectable_label(true, "List").clicked() {
-                            
-                        }
                     });
                 });
 
@@ -207,6 +248,7 @@ pub fn file_view_component(ctx: &egui::Context, files: &Vec<Arc<FileEntry>>, sta
                 let content_rect = ui.available_rect_before_wrap();
                 let panel_top = content_rect.min.y;
                 let clipped_painter = &ui.painter_at(content_rect);
+
                 let row_height = 30.0;
                 let total_rows = files.len();
                 let mut first_visible: usize = 0;
@@ -223,8 +265,6 @@ pub fn file_view_component(ctx: &egui::Context, files: &Vec<Arc<FileEntry>>, sta
                     render_rubberband(state, files, clipped_painter, panel_top, content_rect, row_height);
                 }
 
-                //SIDEBAR-RIGHT
-                sidebar_right_component(state, ui, files);
 
 
                 if !ctx.memory(|m| m.focused().is_some()) {
@@ -310,6 +350,11 @@ pub fn file_view_component(ctx: &egui::Context, files: &Vec<Arc<FileEntry>>, sta
                     }
                 }
 
+                //seleccionar todo
+                if input.modifiers.command && input.key_pressed(Key::A) {
+                    state.select_all(files);
+                }
+
                 let bg_id = ui.id().with("background_interact");
                 let bg_response = ui.interact(ui.available_rect_before_wrap(), bg_id, egui::Sense::click_and_drag());
 
@@ -325,19 +370,28 @@ pub fn file_view_component(ctx: &egui::Context, files: &Vec<Arc<FileEntry>>, sta
                     state.rubber_band.rubber_band_current = ctx.input(|i| i.pointer.interact_pos());
 
                     if let Some(current) = state.rubber_band.rubber_band_current {
-                        let scroll_speed = 8.0;
-                        let scroll_zone = 40.0;
+                        let total_content_height = total_rows as f32 * row_height;
+                        let max_scroll = (total_content_height - content_rect.height()).max(0.0) + 80.0;
 
-                        if current.y > content_rect.max.y - scroll_zone {
-                            let distance = (current.y - (content_rect.max.y - scroll_zone)) / scroll_zone;
-                            state.scroll_offset += scroll_speed * distance;
-                            state.scroll_offset = state.scroll_offset.min(total_rows as f32 * row_height);
-                        }
+                        if total_content_height <= content_rect.height() {
+                            state.scroll_offset = 0.0;
+                        } else {
+                            let scroll_speed = 14.0;
+                            let scroll_zone = 60.0;
 
-                        if current.y < content_rect.min.y + scroll_zone {
-                            let distance = ((content_rect.min.y + scroll_zone) - current.y) / scroll_zone;
-                            state.scroll_offset -= scroll_speed * distance;
-                            state.scroll_offset = state.scroll_offset.max(0.0);
+                            if current.y > content_rect.max.y - scroll_zone {
+                                let distance = (current.y - (content_rect.max.y - scroll_zone)) / scroll_zone;
+                                let acceleration = distance * distance;
+                                state.scroll_offset += scroll_speed * acceleration;
+                            }
+
+                            if current.y < content_rect.min.y + scroll_zone {
+                                let distance = ((content_rect.min.y + scroll_zone) - current.y) / scroll_zone;
+                                let acceleration = distance * distance;
+                                state.scroll_offset -= scroll_speed * acceleration;
+                            }
+
+                            state.scroll_offset = state.scroll_offset.clamp(0.0, max_scroll);
                         }
                     }
                 }
@@ -348,24 +402,71 @@ pub fn file_view_component(ctx: &egui::Context, files: &Vec<Arc<FileEntry>>, sta
                     state.rubber_band.rubber_band_current = None;
                 }
 
-                bg_response.context_menu(|ui| {
-                    if ui.add_enabled(state.clipboard.clipboard_has_files(), Button::new("Pegar aquí")).clicked() {
-                        let cwd = state.motor.borrow_mut().active_tab().cwd.clone();
-                        state.paste(cwd);
-                        ui.close();
-                    }
 
-                    if ui.button("Nueva carpeta").clicked() {
-                        state.creating_new = Some(NewItemType::Folder);
-                        state.new_item_buffer = "nueva carpeta".to_string(); 
-                        ui.close();
-                    }
-                    if ui.button("Nuevo archivo").clicked() {
-                        state.creating_new = Some(NewItemType::File);
-                        state.new_item_buffer = "nuevo archivo".to_string();
-                        ui.close();
-                    }
-                });
+                let cwd = state.motor.borrow_mut().active_tab().cwd.clone();
+                let trash = state.motor.borrow_mut().get_trash_dir(None).unwrap_or_default();
+                
+                if trash == cwd {
+                    let Some(sender) = state.sender().cloned() else {return;};
+                    let tab_id = state.motor.borrow_mut().active_tab().id;
+
+                    bg_response.context_menu(|ui| {
+
+                        let file_names: Vec<_> = state.selected_files.iter().map(|p| p.file_name().unwrap_or_default().to_string_lossy().to_string() ).collect();
+
+                        let res = ui.add_enabled(state.selected_files.is_empty(), Button::new("Restaurar"));
+
+                        if res.clicked() {
+                            sender.send_fileop(
+                                FileOperation::RestoreDeletedFiles {
+                                    file_names
+                                }
+                            ).ok();
+                        }
+
+                        ui.separator();
+
+                        let del = ui.add_enabled(state.selected_files.is_empty(), Button::new("Eliminar"));
+
+                        if del.clicked() {
+
+                            let sources: Vec<_> = state.selected_files.iter().cloned().collect();
+
+                            sender.send_ui_event(
+                                UiEvent::SureTo(
+                                    SureTo::SureToDelete { 
+                                        files: sources, 
+                                        tab_id 
+                                    }
+                                )
+                            ).ok();
+                        }
+                    });
+                } else {
+                    bg_response.context_menu(|ui| {
+                        if ui.add_enabled(state.clipboard.clipboard_has_files(), Button::new("Pegar aquí")).clicked() {
+                            let cwd = state.motor.borrow_mut().active_tab().cwd.clone();
+                            state.paste(cwd);
+                            ui.close();
+                        }
+
+                        if ui.button("Nueva carpeta").clicked() {
+                            state.creating_new = Some(NewItemType::Folder);
+                            state.new_item_buffer = "nueva carpeta".to_string(); 
+                            ui.close();
+                        }
+                        if ui.button("Nuevo archivo").clicked() {
+                            state.creating_new = Some(NewItemType::File);
+                            state.new_item_buffer = "nuevo archivo".to_string();
+                            ui.close();
+                        }
+                    });
+                }
+
+
+                
+
+
 
                 if bg_response.clicked() {
                     state.last_selected_index = None;
@@ -437,35 +538,43 @@ pub fn file_view_component(ctx: &egui::Context, files: &Vec<Arc<FileEntry>>, sta
                         if response.drag_stopped() {
                             state.row_view.drag_ghost_pos = None;
 
+                            let drop_in_file_area = ctx.input(|i| i.pointer.interact_pos())
+                                .map(|p| p.x <= content_rect.min.x + content_rect.width() * 0.80)
+                                .unwrap_or(false);
+
                             if let Some(invalid_target) = state.row_view.drop_invalid_target.take() {
                                 info!("No es posible mover a {:?}", invalid_target);  
                             }
 
-                            let Some(sender) = state.sender().cloned() else {return;};
-                            let tab_id = state.motor.borrow_mut().active_tab().id;
+                            if drop_in_file_area {
+                                let Some(sender) = state.sender().cloned() else {return;};
+                                let tab_id = state.motor.borrow_mut().active_tab().id;
 
-                            if let Some(target) = state.row_view.drop_target.take() {
-                                let sources: Vec<_> = state.selected_files.iter().cloned().collect();
-                                
-                                sender.send_ui_event(UiEvent::SureTo(SureTo::SureToMove { 
-                                    files: sources, 
-                                    dest: target,
-                                    tab_id,
-                                })).ok();
+                                if let Some(target) = state.row_view.drop_target.take() {
+                                    let sources: Vec<_> = state.selected_files.iter().cloned().collect();
+                                    
+                                    sender.send_ui_event(UiEvent::SureTo(
+                                            SureTo::SureToMove { 
+                                                files: sources, 
+                                                dest: target,
+                                                tab_id,
+                                            }
+                                        )).ok();
 
-                            } else {
-                                let cwd = state.motor.borrow_mut().active_tab().cwd.clone();
-                                let sources: Vec<_> = state.selected_files.iter().cloned().collect();
+                                } else {
+                                    let cwd = state.motor.borrow_mut().active_tab().cwd.clone();
+                                    let sources: Vec<_> = state.selected_files.iter().cloned().collect();
 
-                                if sources.iter().all(|p| p.parent() == Some(&cwd)) {
-                                    continue;
+                                    if sources.iter().all(|p| p.parent() == Some(&cwd)) {
+                                        continue;
+                                    }
+
+                                    sender.send_ui_event(UiEvent::SureTo(SureTo::SureToMove { 
+                                        files: sources, 
+                                        dest: cwd,
+                                        tab_id
+                                    })).ok();
                                 }
-
-                                sender.send_ui_event(UiEvent::SureTo(SureTo::SureToMove { 
-                                    files: sources, 
-                                    dest: cwd,
-                                    tab_id
-                                })).ok();
                             }
 
                             state.row_view.is_dragging_files = false; 
@@ -482,80 +591,115 @@ pub fn file_view_component(ctx: &egui::Context, files: &Vec<Arc<FileEntry>>, sta
                                 state.last_selected_index = Some(i);
                             }
                         }
-                        
 
-                        response.context_menu(|ui| {
-                            if !file.is_dir {
-                                let respo =  ui.menu_button("Abrir...", |ui|{
-                                    if ui.button("Abrir con...").clicked() {
-                                        state.open_file_with(&file);
+
+                        if trash == cwd {
+                            let Some(sender) = state.sender().cloned() else {return;};
+                            let tab_id = state.motor.borrow_mut().active_tab().id;
+
+                            response.context_menu(|ui| {
+
+                                let file_names: Vec<_> = state.selected_files.iter().map(|p| p.file_name().unwrap_or_default().to_string_lossy().to_string() ).collect();
+
+                                if ui.button("Restaurar").clicked() {
+                                    sender.send_fileop(
+                                        FileOperation::RestoreDeletedFiles {
+                                            file_names
+                                        }
+                                    ).ok();
+                                }
+
+                                ui.separator();
+
+                                if ui.button("Eliminar").clicked() {
+
+                                    let sources: Vec<_> = state.selected_files.iter().cloned().collect();
+
+                                    sender.send_ui_event(
+                                        UiEvent::SureTo(
+                                            SureTo::SureToDelete { 
+                                                files: sources, 
+                                                tab_id 
+                                            }
+                                        )
+                                    ).ok();
+                                }
+                            });
+                        } else {
+                            response.context_menu(|ui| {
+                                if !file.is_dir {
+                                    let respo =  ui.menu_button("Abrir...", |ui|{
+                                        if ui.button("Abrir con...").clicked() {
+                                            state.open_file_with(&file);
+                                            ui.close();
+                                        }
+                                    }).response;
+
+                                    if respo.clicked() {
+                                        if file.is_dir {
+                                            state.navigate_to(file.full_path.clone());
+                                        } else {
+                                            state.open_file(&file);
+                                        }
                                         ui.close();
                                     }
-                                }).response;
-
-                                if respo.clicked() {
-                                    if file.is_dir {
+                                } else {
+                                    if ui.button("Abrir").clicked() {
                                         state.navigate_to(file.full_path.clone());
-                                    } else {
-                                        state.open_file(&file);
                                     }
+                                }
+
+                                if ui.add_enabled(state.clipboard.clipboard_has_files() && file.is_dir, Button::new("Pegar aquí")).clicked() {
+                                    state.paste(file.full_path.clone());
                                     ui.close();
                                 }
-                            } else {
-                                if ui.button("Abrir").clicked() {
-                                    state.navigate_to(file.full_path.clone());
+                                
+                                if ui.button("Copiar").clicked() {
+                                    state.copy(files);
+                                    ui.close();
                                 }
-                            }
+                                if ui.button("Cortar").clicked() {
+                                    state.cut(files);
+                                    ui.close();
+                                }
 
-                            if ui.add_enabled(state.clipboard.clipboard_has_files() && file.is_dir, Button::new("Pegar aquí")).clicked() {
-                                state.paste(file.full_path.clone());
-                                ui.close();
-                            }
+                                ui.separator();
+
+
+                                let is_in_fav = with_configs(|c| {
+                                    c.is_in_favorite(file.full_path.clone())
+                                });
                             
-                            if ui.button("Copiar").clicked() {
-                                state.copy(files);
-                                ui.close();
-                            }
-                            if ui.button("Cortar").clicked() {
-                                state.cut(files);
-                                ui.close();
-                            }
+                                if !is_in_fav {
+                                    if ui.button("Agregar a favoritos").clicked() {
+                                        with_configs(|c| {
+                                            c.add_to_favorites(file.name.to_string(),file.full_path.clone(), file.is_dir)
+                                        });
+                                    }
+                                } else {
+                                    if ui.button("Quitar de favoritos").clicked() {
+                                        with_configs(|c| {
+                                            c.delete_from_favorites(file.name.to_string(),file.full_path.clone())
+                                        });
+                                    }
+                                }
+                                
 
-                            ui.separator();
+                                ui.separator();
+                                
+                                if ui.button("Borrar").clicked() {
+                                    state.move_to_trash(files);
+                                    ui.close();
+                                }
 
-
-                            let is_in_fav = with_configs(|c| {
-                                c.is_in_favorite(file.full_path.clone())
+                                if ui.button("Renombrar").clicked() {
+                                    state.renaming_file = Some(file.full_path.clone());
+                                    state.rename_buffer = file.name.to_ascii_lowercase();
+                                    ui.close();
+                                }
                             });
-                        
-                            if !is_in_fav {
-                                if ui.button("Agregar a favoritos").clicked() {
-                                    with_configs(|c| {
-                                        c.add_to_favorites(file.name.to_string(),file.full_path.clone(), file.is_dir)
-                                    });
-                                }
-                            } else {
-                                if ui.button("Quitar de favoritos").clicked() {
-                                    with_configs(|c| {
-                                        c.delete_from_favorites(file.name.to_string(),file.full_path.clone())
-                                    });
-                                }
-                            }
-                            
+                        }
 
-                            ui.separator();
-                            
-                            if ui.button("Borrar").clicked() {
-                                state.move_to_trash(files);
-                                ui.close();
-                            }
-
-                            if ui.button("Renombrar").clicked() {
-                                state.renaming_file = Some(file.full_path.clone());
-                                state.rename_buffer = file.name.to_ascii_lowercase();
-                                ui.close();
-                            }
-                        });
 
 
                         if state.selected_files.contains(&file.full_path) {
@@ -632,35 +776,40 @@ pub fn file_view_component(ctx: &egui::Context, files: &Vec<Arc<FileEntry>>, sta
 
                             //Sin renombrado
 
-                            let icon_bytes = if file.is_dir {
-                                icons::ICON_FOLDER
+                            let (icon_name, icon_bytes, color) = if file.is_dir {
+                                ("folder", icons::ICON_FOLDER, Color32::YELLOW)
                             } else {
-                                match file.full_path.extension().and_then(|e| e.to_str()) {
-                                    Some("png") | Some("jpg") | Some("jpeg") => icons::ICON_IMAGE,
-                                    Some("rs") => icons::ICON_FILE,
-                                    _ => icons::ICON_FILE,
+                                match &file.extension {
+                                    FileExtension::Image(_) => ("image", icons::ICON_IMAGE,    Color32::from_rgb(100, 200, 255)),
+                                    FileExtension::Document(DocType::Pdf) => ("pdf",      icons::ICON_PDF, Color32::from_rgb(255, 80,  80)),
+                                    FileExtension::Document(_) => ("doc", icons::ICON_DOC, Color32::from_rgb(100, 140, 255)),
+                                    FileExtension::Video(_) => ("video", icons::ICON_VIDEO,    Color32::from_rgb(200, 100, 255)),
+                                    FileExtension::Audio(_) => ("audio", icons::ICON_VIDEO,    Color32::from_rgb(255, 200, 80)),
+                                    FileExtension::Archive(_) => ("archive", icons::ICON_ARCHIVE,  Color32::from_rgb(255, 160, 60)),
+                                    FileExtension::Code(_) => ("code", icons::ICON_CODE,     Color32::from_rgb(100, 255, 150)),
+                                    FileExtension::Font(_) => ("font", icons::ICON_FONT,     Color32::from_rgb(200, 200, 200)),
+                                    FileExtension::Executable(_) => ("exe", icons::ICON_EXE,      Color32::from_rgb(255, 100, 100)),
+                                    FileExtension::Unknown => ("file", icons::ICON_FILE, Color32::WHITE),
                                 }
-                            };
-
-                            let (icon_name, color) = if file.is_dir {
-                                ("folder", Color32::YELLOW)
-                            } else {
-                                ("file", Color32::WHITE)
                             };
 
                             
                             let icon = ui_state.icon_cache.get_or_load(ctx, icon_name, icon_bytes, color);
 
                             let icon_size = egui::vec2(16.0, 16.0);
+                            let icon_spacing = 4.0;
                             let icon_pos = rect.left_center() - egui::vec2(0.0, icon_size.y / 2.0);
                             let icon_rect = Rect::from_min_size(icon_pos, icon_size);
 
                             ui.painter().image(
                                 icon.id(),
                                 icon_rect,
-                                egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0)),
+                                Rect::from_min_max(egui::pos2(0.0, 0.0), 
+                                pos2(1.0, 1.0)),
                                 Color32::WHITE,
                             );
+
+
 
                             let mut motor = state.motor.borrow_mut();
                             let display_name = if motor.active_tab().is_recursive_active {
@@ -673,22 +822,129 @@ pub fn file_view_component(ctx: &egui::Context, files: &Vec<Arc<FileEntry>>, sta
                                 file.name.to_string()
                             };
 
-                            ui.painter().text(
-                                rect.left_center() + egui::vec2(icon_size.x + 4.0, 0.0),
-                                egui::Align2::LEFT_CENTER,
-                                display_name,
-                                egui::FontId::default(),
-                                ui.visuals().text_color(),
+                            let file_size = if file.is_dir {
+                                state.dir_size_cache.get(&file.full_path).unwrap_or_else(|| &0)
+                            } else {
+                                &file.size
+                            };
+
+
+                            let min_name_width = 40.0;
+                            let date_col_width = 36.0;
+                            let size_col_width = 48.0; 
+                            let col_gap = 12.0;
+                            let right_margin = 8.0;
+
+                            let date_right = rect.max.x - right_margin;
+                            let size_right = date_right - date_col_width - col_gap;
+                            let name_right = size_right - size_col_width - col_gap;
+
+                            let name_start_x = icon_rect.right() + icon_spacing;
+                            let name_max_width = (name_right - name_start_x).max(min_name_width);
+
+
+
+                            let size_text = format_size(*file_size);
+                            let size_galley = ui.fonts_mut(|f| {
+                                f.layout_no_wrap(
+                                    size_text,
+                                    FontId::proportional(12.0),
+                                    Color32::from_rgb(109, 108, 111),
+                                )
+                            });
+
+
+                            let date_text = format_date(file.modified);
+                            let date_galley = ui.fonts_mut(|f| {
+                                f.layout_no_wrap(
+                                    date_text,
+                                    FontId::proportional(12.0),
+                                    Color32::from_rgb(109, 108, 111),
+                                )
+                            });
+
+
+                            let chars: Vec<char> = display_name.chars().collect();
+                            let mut lo = 0;
+                            let mut hi = chars.len();
+
+                            while lo < hi {
+                                let mid = (lo + hi + 1) / 2;
+                                let candidate: String = chars[..mid].iter().collect();
+                                let test_text = if mid < chars.len() {
+                                    format!("{}…", candidate)
+                                } else {
+                                    candidate
+                                };
+
+                                let g = ui.fonts_mut(|f| {
+                                    f.layout_no_wrap(
+                                        test_text,
+                                        FontId::proportional(14.0),
+                                        Color32::from_rgb(189, 189, 189),
+                                    )
+                                });
+
+                                if g.size().x <= name_max_width {
+                                    lo = mid;
+                                } else {
+                                    hi = mid - 1;
+                                }
+                            }
+
+                            let final_text = if lo < chars.len() {
+                                format!("{}…", chars[..lo].iter().collect::<String>())
+                            } else {
+                                display_name.clone()
+                            };
+
+
+                            let name_galley = ui.fonts_mut(|f| {
+                                f.layout_no_wrap(
+                                    final_text,
+                                    FontId::proportional(14.0),
+                                    Color32::from_rgb(189, 189, 189),
+                                )
+                            });
+
+                            let y_center = rect.center().y;
+
+                            let date_pos = pos2(
+                                date_right - date_galley.size().x,
+                                y_center - date_galley.size().y / 2.0,
                             );
+
+                            let size_pos = pos2(
+                                size_right - size_galley.size().x,
+                                y_center - size_galley.size().y / 2.0,
+                            );
+
+                            let name_pos = pos2(
+                                name_start_x,
+                                y_center - name_galley.size().y / 2.0,
+                            );
+
+
+                            let painter = ui.painter().with_clip_rect(rect);
+
+                            painter.galley(name_pos, name_galley, ui.visuals().text_color());
+                            painter.galley(size_pos, size_galley, ui.visuals().text_color());
+                            painter.galley(date_pos, date_galley, ui.visuals().text_color());
                         }
                     }
                 });
 
 
-
-
                 if !state.rubber_band.is_rubber_banding {
                     state.scroll_offset = scroll_output.state.offset.y;
+                }
+
+
+                if state.row_view.is_dragging_files && !ctx.input(|i| i.pointer.any_down()) {
+                    state.row_view.is_dragging_files = false;
+                    state.row_view.drag_ghost_pos = None;
+                    state.row_view.drop_target = None;
+                    state.row_view.drop_invalid_target = None;
                 }
 
 
@@ -698,7 +954,7 @@ pub fn file_view_component(ctx: &egui::Context, files: &Vec<Arc<FileEntry>>, sta
                         let y = state.row_view.scroll_area_origin_y + idx as f32 * row_height - state.scroll_offset;
                         let target_rect = Rect::from_min_size(
                             pos2(content_rect.min.x, y),
-                            vec2(content_rect.width() * 0.52, row_height)
+                            vec2(content_rect.width() * 0.80, row_height)
                         );
 
                         clipped_painter.rect_stroke(
@@ -712,7 +968,7 @@ pub fn file_view_component(ctx: &egui::Context, files: &Vec<Arc<FileEntry>>, sta
                         let y = state.row_view.scroll_area_origin_y + idx as f32 * row_height - state.scroll_offset;
                         let target_rect = Rect::from_min_size(
                             pos2(content_rect.min.x, y),
-                            vec2(content_rect.width() * 0.52, row_height)
+                            vec2(content_rect.width() * 0.80, row_height)
                         );
 
                         clipped_painter.rect_stroke(
@@ -722,6 +978,236 @@ pub fn file_view_component(ctx: &egui::Context, files: &Vec<Arc<FileEntry>>, sta
                         );
                     }
                 }
-            });
+
+                if let Some(sender) = state.sender().cloned() {
+                    for i in first_visible..last_visible.min(files.len()) {
+                        let file = &files[i];
+
+                        if file.is_dir && file.size == 0 {
+                            if !state.calculating_dir_sizes.contains(&file.full_path) {
+                                state.calculating_dir_sizes.insert(file.full_path.clone());
+
+                                let path = file.full_path.clone();
+                                let sender_clone = sender.clone();
+                                let generation = state.motor.borrow_mut().active_tab().active_generation;
+
+                                TOKIO_RUNTIME.spawn(async move {
+                                    let size = TabState::get_recursive_size(&path, 12).await;
+
+                                    sender_clone.send_fileop(
+                                        FileOperation::UpdateDirSize {
+                                            full_path: path,
+                                            size, 
+                                            gene: generation,
+                                        }
+                                    ).ok();
+                                });
+                            }
+                        }
+                    }
+                }
+        });
+
+
+        let tasks = state.task_manager.get_tasks();
+        let has_tasks = !tasks.is_empty();
+
+        let anim = ctx.animate_bool_with_time(
+            egui::Id::new("processing_bubble"), 
+            has_tasks, 
+            0.2
+        );
+
+        let eased = ease_in_out_bounce(anim);
+
+        let target_width = 300.0;
+        let target_height = 100.0;
+
+        let current_width = 150.0 + eased * (target_width - 150.0);
+        let current_height = 20.0 + eased * (target_height - 20.0);
+        let anchor_y = -35.0;
+
+        Area::new("processing_bubble".into())
+            .anchor(Align2::CENTER_BOTTOM, [0.0, anchor_y ])
+            .default_size(vec2(current_width, current_height))
+            .order(egui::Order::Background)
+            .show(ctx, |ui| {
+
+                Frame::NONE
+                    .inner_margin(egui::Margin::same(10))
+                    //36
+                    .fill(Color32::from_rgb(122, 42, 47))
+                    .corner_radius(CornerRadius::same(20))
+                    .show(ui, |ui| {
+
+                        ui.set_min_size(vec2(current_width - 20.0, current_height - 20.0));
+                        ui.set_max_size(vec2(current_width - 20.0, current_height - 20.0));
+
+                        ScrollArea::vertical()
+                            .id_salt("tasks_scroll")
+                            .max_height(current_height - 20.0)
+                            .show(ui, |ui| {
+                                ui.set_min_width(current_width - 20.0);
+
+                                ui.vertical(|ui|{
+                                    for task in &tasks {
+                                        ui.horizontal(|ui| {
+                                            let icon = match task.status {
+                                                TaskStatus::Running => "⏳",
+                                                TaskStatus::FinishedSuccess => "✅",
+                                                TaskStatus::FinishedError => "❌",
+                                            };
+                                            ui.label(icon);
+                                            ui.label(&task.text);
+                                        });
+
+
+                                        let bar_width = current_width - 40.0;
+                                        let bar_height = 4.0;
+                                        let (bar_rect, _) = ui.allocate_exact_size(vec2(bar_width, bar_height), Sense::hover());
+
+                                        ui.painter().rect_filled(
+                                            bar_rect,
+                                            CornerRadius::same(2),
+                                            Color32::from_rgba_unmultiplied(255, 255, 255, 30),
+                                        );
+
+
+                                        let filled = Rect::from_min_size(
+                                            bar_rect.min,
+                                            vec2(bar_rect.width() * task.progress, bar_height),
+                                        );
+
+                                        ui.painter().rect_filled(
+                                            filled,
+                                            CornerRadius::same(2),
+                                            Color32::from_rgb(100, 200, 100),
+                                        );
+
+                                        ui.add_space(6.0);
+
+                                    }
+                                });
+                            });
+                });
+        });
+
+
+
+        Area::new("blaze_island".into())
+            .anchor(Align2::CENTER_BOTTOM, [0.0, -30.0])
+            .order(egui::Order::Middle)
+            .show(ctx, |ui| {
+
+                Frame::NONE
+                    .inner_margin(egui::Margin::same(10))
+                    .fill(Color32::from_rgb(36, 42, 47))
+                    .corner_radius(CornerRadius::same(20))
+                    .show(ui, |ui| {
+                        ui.set_width(150.0);
+                        ui.set_min_height(20.0);
+                        ui.set_max_height(20.0);
+                        
+                        ui.centered_and_justified(|ui|{
+                            ui.horizontal_centered(|ui| {
+                                let icon_size = egui::vec2(14.0, 14.0);
+                                let (icon_rect, _) = ui.allocate_exact_size(icon_size, Sense::hover());
+                                let (icon_name, icon_bytes) = ("file", icons::ICON_FILE);
+                                let icon = ui_state.icon_cache.get_or_load(ctx, icon_name, icon_bytes, Color32::GRAY);
+                                
+                                ui.painter().image(
+                                    icon.id(),
+                                    icon_rect,
+                                    Rect::from_min_max(egui::pos2(0.0, 0.0), 
+                                    pos2(1.0, 1.0)),
+                                    Color32::WHITE,
+                                );
+
+                                ui.add_space(1.0);
+                                
+                                let total = files.len();
+                                ui.label(format!("{}", total));
+                                
+                                ui.add_space(5.0);
+                                
+
+                                let (icon_rect, _) = ui.allocate_exact_size(icon_size, Sense::hover());
+
+                                let (icon_name, icon_bytes) = ("list", icons::ICON_LIST);
+                                let icon = ui_state.icon_cache.get_or_load(ctx, icon_name, icon_bytes, Color32::GRAY);
+
+                                ui.painter().image(
+                                    icon.id(),
+                                    icon_rect,
+                                    Rect::from_min_max(egui::pos2(0.0, 0.0), 
+                                    pos2(1.0, 1.0)),
+                                    Color32::WHITE,
+                                );
+
+
+                                ui.add_space(1.0);
+                                
+                                let selected = state.selected_files.len();
+                                ui.label(format!("{}", selected));
+                                
+                                ui.add_space(5.0);
+                                
+                                let (icon_rect, _) = ui.allocate_exact_size(icon_size, Sense::hover());
+                                let (icon_name, icon_bytes) = ("server", icons::ICON_SERVER);
+                                let icon = ui_state.icon_cache.get_or_load(ctx, icon_name, icon_bytes, Color32::GRAY);
+                                
+                                ui.painter().image(
+                                    icon.id(),
+                                    icon_rect,
+                                    Rect::from_min_max(egui::pos2(0.0, 0.0), 
+                                    pos2(1.0, 1.0)),
+                                    Color32::WHITE,
+                                );
+
+                                ui.add_space(1.0);
+                                
+                                let selected_size: u64 = state.selected_files
+                                    .iter()
+                                    .filter_map(|selected_path| {
+                                        files.iter()
+                                            .find(|f| &f.full_path == selected_path)
+                                            .map(|f| f.size)
+                                    })
+                                    .sum();
+                                
+                                ui.label(format_size(selected_size));
+
+                            });
+                        });
+                    });
+        });
+
     });
+}
+
+
+fn ease_out_bounce(t: f32) -> f32 {
+    let n1 = 7.5625_f32;
+    let d1 = 2.75_f32;
+
+    if t < 1.0 / d1 {
+        n1 * t * t
+    } else if t < 2.0 / d1 {
+        let t = t - 1.5 / d1;
+        n1 * t * t + 0.75
+    } else if t < 2.5 / d1 {
+        let t = t - 2.25 / d1;
+        n1 * t * t + 0.9375
+    } else {
+        let t = t - 2.625 / d1;
+        n1 * t * t + 0.984375
+    }
+}
+
+fn ease_in_out_bounce(t: f32) -> f32 {
+    if t < 0.5 {
+        (1.0 - ease_out_bounce(1.0 - 2.0 * t)) / 2.0
+    } else {
+        (1.0 + ease_out_bounce(2.0 * t - 1.0)) / 2.0
+    }
 }

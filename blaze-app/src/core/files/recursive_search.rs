@@ -26,6 +26,7 @@ use tokio::sync::Semaphore;
 use tracing::{debug, warn};
 use fuzzy_matcher::skim::SkimMatcherV2;
 use tokio::fs;
+use crate::core::files::file_extension::FileExtension;
 use crate::core::files::motor::{FileEntry, FileKind};
 
 
@@ -224,20 +225,23 @@ impl RecursiveSearchIterator {
         };
 
         let modified = metadata.modified()
-        .unwrap_or(std::time::SystemTime::UNIX_EPOCH)
-        .duration_since(std::time::SystemTime::UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_secs();
+            .unwrap_or(std::time::SystemTime::UNIX_EPOCH)
+            .duration_since(std::time::SystemTime::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
 
         let created = metadata.created()
-        .unwrap_or(std::time::SystemTime::UNIX_EPOCH)
-        .duration_since(std::time::SystemTime::UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_secs();
+            .unwrap_or(std::time::SystemTime::UNIX_EPOCH)
+            .duration_since(std::time::SystemTime::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+
+        let extension = FileExtension::from_path(&path);
 
         Arc::new(FileEntry {
             name: name.clone().into_boxed_str(),
             is_dir,
+            extension,
             kind,
             size: metadata.len(),
             modified,

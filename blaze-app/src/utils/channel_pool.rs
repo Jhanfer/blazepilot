@@ -25,8 +25,8 @@ use crate::core::files::motor::with_motor;
 use crate::core::files::{motor::FileLoadingMessage, recursive_search::RecursiveMessages};
 use crate::core::system::fileopener_module::AppAssociation;
 use crate::core::system::fileopener_module::platform::linux::linux::AppsIconData;
-use crate::core::system::taskmanager::TaskMessage;
 use crate::core::system::updater::updater::UpdateMessages;
+use crate::ui::task_manager::task_manager::TaskMessage;
 use tracing::{info, warn};
 use std::sync::RwLock;
 
@@ -61,6 +61,14 @@ pub enum FileOperation {
     Delete { files: Vec<PathBuf> },
     Copy { files: Vec<PathBuf>, dest: PathBuf },
     Update,
+    UpdateDirSize {
+        full_path: PathBuf, 
+        size: u64, 
+        gene: u64,
+    },
+    RestoreDeletedFiles {
+        file_names: Vec<String>,
+    }
 }
 
 #[derive(Debug)]
@@ -70,7 +78,10 @@ pub enum SureTo {
         dest: PathBuf,
         tab_id: Uuid,
     },
-    SureToDelete,
+    SureToDelete {
+        files: Vec<PathBuf>,
+        tab_id: Uuid,
+    },
     SureToCopy,
 }
 

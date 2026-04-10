@@ -16,11 +16,10 @@
 
 
 use std::path::PathBuf;
-use egui::{Area, CentralPanel, ColorImage, ComboBox, Context, Image, Order, RichText, ScrollArea, Sense, SizeHint, TextureOptions, TopBottomPanel, Window, load::Bytes, scroll_area::ScrollSource};
-use tracing_subscriber::fmt::format;
+use egui::{Area, Context, Order, Sense};
 use uuid::Uuid;
-use crate::{core::{files::motor::with_motor, system::{clipboard::TOKIO_RUNTIME, fileopener_module::{AppAssociation, GLOBAL_FILE_OPENER, platform::linux::linux::AppsIconData}, updater::updater::UpdateMessages}}, ui::{dialogs::{selector_dialog::{AppSelectorDialog, SelectorData}, sure_to_move_to::SureToMoveToDialog, update_dialog::UpdateDialog}, icons_cache::icon_cache::IconCache}, utils::channel_pool::{FileOperation, SureTo, UiEvent, with_channel_pool}};
-use tracing::info;
+use crate::{core::{files::{self, motor::with_motor}, system::{fileopener_module::{AppAssociation, platform::linux::linux::AppsIconData}, updater::updater::UpdateMessages}}, ui::{dialogs::{error_dialog::ErrorDialog, selector_dialog::AppSelectorDialog, sure_to_delete::SureToDeleteDialog, sure_to_move_to::SureToMoveToDialog, update_dialog::UpdateDialog}, icons_cache::icon_cache::IconCache}, utils::channel_pool::{SureTo, UiEvent, with_channel_pool}};
+use tracing::{debug, info};
 
 
 pub trait ModalDialog {
@@ -34,6 +33,8 @@ pub struct DialogManager {
     pub selector_dialog: AppSelectorDialog,
     pub sure_to_dialog: SureToMoveToDialog,
     pub update_dialog: UpdateDialog,
+    pub error_dialog: ErrorDialog,
+    pub sure_to_delete_dialog: SureToDeleteDialog,
 }
 
 impl DialogManager {
@@ -42,6 +43,8 @@ impl DialogManager {
             selector_dialog: AppSelectorDialog::new(),
             sure_to_dialog: SureToMoveToDialog::new(),
             update_dialog: UpdateDialog::new(),
+            error_dialog: ErrorDialog::new(),
+            sure_to_delete_dialog: SureToDeleteDialog::new(),
         }
     }
 
@@ -53,8 +56,16 @@ impl DialogManager {
         self.sure_to_dialog.open(sources, dest, tab_id);
     }
 
+    pub fn open_sure_to_delete(&mut self, sources: Vec<PathBuf>, tab_id: Uuid) {
+        self.sure_to_delete_dialog.open(sources, tab_id);
+    }
+
     pub fn open_updater_dialog(&mut self, current_version: String, new_version: String, tab_id: Uuid) {
         self.update_dialog.open(current_version, new_version, tab_id);
+    }
+
+    pub fn open_error_dialog(&mut self, message: String) {
+        self.error_dialog.open(message);
     }
 
     pub fn render_area(&mut self, ctx: &Context) {
@@ -62,6 +73,8 @@ impl DialogManager {
             &mut self.selector_dialog,
             &mut self.sure_to_dialog,
             &mut self.update_dialog,
+            &mut self.error_dialog,
+            &mut self.sure_to_delete_dialog,            
         ];
 
         let open_dialog = dialogs.into_iter().find(|d| d.is_open());
@@ -133,7 +146,12 @@ impl BlazeUiState {
                 },
 
 
-                UiEvent::ShowError(_) => todo!(),
+                UiEvent::ShowError(message) => {
+                    info!("Error recibido");
+                    self.dialog_manager.open_error_dialog(message);
+                },
+
+
                 UiEvent::RefreshList => {
                     info!("RECIBIDO!!");
                 },
@@ -141,10 +159,12 @@ impl BlazeUiState {
                 UiEvent::SureTo(sureto) => {
                     match sureto {
                         SureTo::SureToMove { files, dest, tab_id } => {
-                            info!("Mover {:?} → {:?}", files, dest);
+                            debug!("Mover {:?} → {:?}", files, dest);
                             self.dialog_manager.open_sure_move_dialog(files, dest, tab_id);
                         },
-                        SureTo::SureToDelete => todo!(),
+                        SureTo::SureToDelete{files, tab_id} => {
+                            self.dialog_manager.open_sure_to_delete(files, tab_id);
+                        },
                         SureTo::SureToCopy => todo!(),
                     }
                 },

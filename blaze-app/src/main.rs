@@ -28,7 +28,6 @@ use crate::{core::{blaze_state::BlazeCoreState, configs::config_state::with_conf
 #[global_allocator]
 static GLOBAL: MiMalloc = MiMalloc;
 
-
 fn main() {
 
     fmt()

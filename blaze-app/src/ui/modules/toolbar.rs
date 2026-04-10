@@ -75,7 +75,7 @@ pub fn toolbar_component(ctx: &egui::Context, state: &mut BlazeCoreState) {
                     ui.horizontal_centered(|ui| {
                         for (i, component) in components.iter().enumerate() {
                             let name = component.as_os_str().to_string_lossy().to_string();
-                            if name.is_empty() { continue; } // evita raíz vacía
+                            if name.is_empty() { continue; }
 
                             current_path.push(component);
 

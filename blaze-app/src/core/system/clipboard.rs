@@ -1,4 +1,6 @@
+use std::path::Path;
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::time::{SystemTime, UNIX_EPOCH};
 use std::vec;
 use std::{fs, path::PathBuf};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -9,9 +11,9 @@ use uuid::Uuid;
 use zbus::zvariant::Str;
 
 use crate::core::files::motor::{FileEntry, with_motor, new_task_id, TaskType};
+use crate::ui::task_manager::task_manager::TaskMessage;
 use std::sync::{Arc, Mutex};
 use std::sync::OnceLock;
-use crate::core::system::taskmanager::TaskMessage;
 use crate::utils::channel_pool::{NotifyingSender, UiEvent, with_channel_pool};
 use tracing::{info, warn, error, debug};
 
@@ -80,7 +82,7 @@ impl GlobalClipboard {
     }
 
     pub fn is_in_trash(&self, file_name: String) -> Option<bool> {
-        Self::inner().is_in_trash(file_name)
+        Self::inner().is_in_trash_ui(file_name)
     }
 
     pub fn clear(&self) {
@@ -115,6 +117,9 @@ impl GlobalClipboard {
         Self::inner().move_to_trash(items, current_cwd, sender)
     }
 
+    pub fn restore_from_trash(&self, items: Vec<String>, trash_root: PathBuf, sender: NotifyingSender) -> Result<(), String>  {
+        Self::inner().restore_items(items, trash_root, sender)
+    }
 
     pub fn rename_file(&self, file_name: &str, new_file_name: &str) -> Result<(), String> {
         Self::inner().rename_file(file_name, new_file_name)
@@ -149,8 +154,8 @@ impl Clipboard {
         !inner.items.is_empty()
     }
 
-    pub fn is_in_trash(&self, file_name: String) -> Option<bool> {
-        let (trash_dir, cwd) = with_motor(|m| (m.active_tab().get_trash_dir().unwrap(), m.active_tab().cwd.clone())); 
+    pub fn is_in_trash_ui(&self, file_name: String) -> Option<bool> {
+        let (trash_dir, cwd) = with_motor(|m| (m.get_trash_dir(None).unwrap(), m.active_tab().cwd.clone()));
 
         let file_path = cwd.join(file_name);
         if !file_path.exists() { return Some(false); }
@@ -159,6 +164,17 @@ impl Clipboard {
         .ok()
         .map(|canonical_path| canonical_path.starts_with(&*trash_dir))
     }
+
+
+    fn is_in_trash(path: &Path) -> bool {
+        path.components().any(|c| {
+            let s = c.as_os_str().to_string_lossy();
+            s == ".Trash" || 
+            s.starts_with(".Trash-") ||
+            s == "Trash"
+        })
+    }
+
 
     pub fn clear(&self) {
         let mut inner = self.inner.lock().unwrap();
@@ -279,7 +295,9 @@ impl Clipboard {
 
                         let needs_root = err_msg.to_lowercase().contains("permission denied") || err_msg.to_lowercase().contains("permiso denegado");
 
-                        error!("Error procesando item {}: {}", item.name, err_msg);
+                        sender.send_ui_event(
+                            UiEvent::ShowError(err_msg)
+                        ).ok();
 
                         if needs_root {
                             info!("Error de permisos detectado. Abortando tarea.");
@@ -486,27 +504,32 @@ impl Clipboard {
         total
     }
 
-    pub fn generate_unique_path(path: &PathBuf) -> PathBuf {
+    pub fn generate_unique_path(path: &Path) -> PathBuf {
         if !path.exists() {
             return path.to_path_buf();
         }
 
-        let binding = PathBuf::from(".");
-        let parent = path.parent().unwrap_or(&binding);
+        let parent = path.parent().unwrap_or_else(|| Path::new("."));
         let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("file");
-        let ext = path.extension().and_then(|s|s.to_str());
+        let ext = path.extension().and_then(|s| s.to_str());
 
-        let mut counter = 1;
+        let mut counter = 1u32;
+
         loop {
             let new_name = match ext {
-                Some(e) => format!("{} ({}) {}", stem, counter, e),
+                Some(e) => format!("{} ({}) .{}", stem, counter, e),
                 None => format!("{} ({})", stem, counter),
             };
+
             let new_path = parent.join(new_name);
             if !new_path.exists() {
                 return new_path;
             }
             counter += 1;
+
+            if counter > 10_00 {
+                return parent.join(format!("{}_{}", stem, uuid::Uuid::new_v4()));
+            }
         }
     }
     
@@ -646,6 +669,47 @@ impl Clipboard {
         Ok(())
     }
 
+
+    fn generate_unique_trash_path(original_path: &Path, trash_files_dir: &Path) -> PathBuf {
+        let stem = original_path.file_stem().and_then(|s| s.to_str()).unwrap_or("file");
+        let ext = original_path.extension().and_then(|s| s.to_str());
+
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default();
+    
+        let base = format!("{}_{}{}", stem, now.as_secs(), now.subsec_nanos() / 1_000_000);
+        
+        let candidate = match ext {
+            Some(e) => format!("{}.{}", base, e),
+            None => base.clone(),
+        };
+
+        let mut new_path = trash_files_dir.join(candidate);
+        if !new_path.exists() {
+            return new_path;
+        }
+
+        let mut counter = 1u32;
+
+        loop {
+            let candidate = match ext {
+                Some(e) => format!("{}_{}.{}", base, counter, e),
+                None => format!("{}_{}", base, counter),
+            };
+
+            new_path = trash_files_dir.join(candidate);
+            if !new_path.exists() {
+                return new_path;
+            }
+            counter += 1;
+
+            if counter > 1000 {
+                return trash_files_dir.join(format!("{}_{}", stem, uuid::Uuid::new_v4().simple()));
+            }
+        }
+    }
+
     pub fn move_to_trash(&self, items: Vec<Arc<FileEntry>>, current_cwd: PathBuf, sender: NotifyingSender) -> Result<(), String> {
         let task_id = new_task_id();
 
@@ -657,84 +721,99 @@ impl Clipboard {
             }
         ).ok();
 
-        let trash_dir = with_motor(|m|m.active_tab().get_trash_dir()).unwrap();
+
+        let mut items_with_trash: Vec<(Arc<FileEntry>, PathBuf, PathBuf)> = Vec::new();
+
+        for item in &items {
+            let source_path = current_cwd.join(&*item.name);
+            
+            let trash_root = match with_motor(|m| m.get_trash_dir(Some(&source_path))) {
+                Some(dir) => dir,
+                None => {
+                    with_motor(|m| m.get_trash_dir(None))
+                    .unwrap_or_else(|| dirs::home_dir().unwrap_or_default().join(".local/share/Trash"))
+                }
+            };
+
+            let trash_files_dir = trash_root.join("files");
+            let trash_info_dir = trash_root.join("info");
+
+            std::fs::create_dir_all(&trash_files_dir).ok();
+            std::fs::create_dir_all(&trash_info_dir).ok();
+
+            items_with_trash.push((item.clone(), source_path, trash_files_dir));
+        }
+
 
         TOKIO_RUNTIME.spawn(async move {
             let total = items.len();
             let mut errors = Vec::new();
 
-            for (done, item) in items.iter().enumerate() {
-                let final_path = current_cwd.join(&*item.name);
-
-                let final_path_canonical = match final_path.canonicalize() {
-                    Ok(p) => p,
-                    Err(_) => {
-                        errors.push(format!("No se pudo acceder a {}.", item.name));
-                        continue;
-                    },
-                };
-
-                let is_in_trash = final_path_canonical.starts_with(&*trash_dir);
-
-                if is_in_trash {
-                    // Eliminar de manera permanente
-                    let res = if item.is_dir {
-                        fs::remove_dir_all(&final_path_canonical)
+            for (done, (item, source_path, trash_files_dir)) in items_with_trash.into_iter().enumerate() {
+                if Self::is_in_trash(&source_path) {
+                    let r = if source_path.is_dir() {
+                        std::fs::remove_dir_all(&source_path)
                     } else {
-                        fs::remove_file(&final_path_canonical)
+                        std::fs::remove_file(&source_path)
                     };
 
-                    if let Err(e) = res {
-                        errors.push(format!("Error eliminando '{}' desde papelera: {}.", item.name, e));
+                    if let Err(e) = r {
+                        errors.push(format!("Error borrando '{}': {}", item.name, e));
+                    }
+
+                    let info_dir = trash_files_dir.parent().unwrap_or(&trash_files_dir).join("info");
+                    if let Some(name) = source_path.file_name() {
+                        let info_path = info_dir.join(format!("{}.trashinfo", name.to_string_lossy()));
+                        std::fs::remove_file(info_path).ok();
                     }
                 } else {
-                    // Mover a papelera
-                    if let Err(e) = trash::delete(&*final_path_canonical) {
-                        if item.size > 256_000_000 {
-                            let trash_path = trash_dir.join(item.name.to_string());
-                            let info_path = trash_dir.join(format!(".trashinfo/{}", item.name));
 
-                            if let Err(e) = fs::create_dir_all(trash_dir.join(".trashinfo")) {
-                                errors.push(format!("Error creando directorio .trashinfo: {}", e));
+                    if let Err(e) = trash::delete(&source_path) {
+                        if item.size > 256_000_000 {
+                            let dest_path = Self::generate_unique_trash_path(&source_path, &trash_files_dir);
+                            let info_dir = trash_files_dir.parent().unwrap_or(&trash_files_dir).join("trashinfo");
+
+                            if let Err(e) = std::fs::create_dir_all(&info_dir) {
+                                errors.push(format!("Error creando directorio info: {}", e));
                                 continue;
                             }
 
                             let deletion_time = chrono::Local::now().to_rfc3339();
                             let trash_info_content = format!(
                                 "[Trash Info]\nPath={}\nDeletionDate={}\n",
-                                final_path_canonical.to_string_lossy(),
+                                source_path.to_string_lossy(),
                                 deletion_time
                             );
 
-                            if let Err(e) = fs::rename(&final_path_canonical, &trash_path) {
+                            if let Err(e) = std::fs::rename(&source_path, &dest_path) {
                                 if e.kind() == std::io::ErrorKind::NotFound {
-                                    errors.push(format!("Archivo origen no encontrado: {:?}", final_path_canonical.clone()));
+                                    errors.push(format!("Archivo no encontrado: {:?}", source_path));
                                 } else {
-                                    std::fs::copy(&final_path_canonical, &trash_path)
-                                    .and_then(|_|std::fs::remove_file(&final_path_canonical))
-                                    .map_err(|e|format!("Error moviendo {}: {}", item.name, e)).ok();
+                                    std::fs::copy(&source_path, &dest_path)
+                                        .and_then(|_| std::fs::remove_file(&source_path)).ok();
                                 }
                             }
 
-                            if let Err(e) = fs::write(&info_path, trash_info_content) {
-                                errors.push(format!("Error creando archivo .trashinfo: {}", e));
-                            }
+                            let info_filename = dest_path.file_name()
+                                .unwrap_or_else(|| std::ffi::OsStr::new("unknown"))
+                                .to_string_lossy();
+                            let info_path = info_dir.join(format!("{}.trashinfo", info_filename));
 
+                            if let Err(e) = std::fs::write(&info_path, trash_info_content) {
+                                errors.push(format!("Error escribiendo .trashinfo: {}", e));
+                            }
                         } else {
-                            errors.push(format!("Error moviendo '{}' a papelera: {}.", item.name, e));
+                            errors.push(format!("Error moviendo '{}' a la papelera: {}", item.name, e));
                         }
                     }
                 }
 
-                sender.send_tasks(
-                    TaskMessage::Progress { 
-                        task_id, 
-                        progress: (done + 1) as f32 / total as f32, 
-                        text: "Moviendo a papelera...".to_string(),
-                        task_type: TaskType::MoveTrash,
-                    }
-                ).ok();
-
+                sender.send_tasks(TaskMessage::Progress { 
+                    task_id, 
+                    progress: (done + 1) as f32 / total as f32, 
+                    text: "Procesando...".to_string(),
+                    task_type: TaskType::MoveTrash,
+                }).ok();
             }
 
             sender.send_tasks(
@@ -742,10 +821,111 @@ impl Clipboard {
                     task_id, 
                     success: errors.is_empty(),
                     task_type: TaskType::MoveTrash,
-                    text: "Movido a papelera".to_string(),
+                    text: if errors.is_empty() {
+                        "Listo".to_string()
+                    } else {
+                        format!("Completado con {} errores", errors.len())
+                    },
                 }
             ).ok();
         });
+        
+        Ok(())
+    }
+
+    pub fn restore_from_trash(trashed_name: &str, trash_files_dir: &Path, trash_info_dir: &Path) -> Result<PathBuf, String> {
+        let trashed_path = trash_files_dir.join(trashed_name);
+        if !trashed_path.exists() {
+            return Err(format!("Archivo no encontrado en la papelera: {}", trashed_name));
+        }
+
+        let info_path = trash_info_dir.join(format!("{}.trashinfo", trashed_name));
+        if !info_path.exists() {
+            return Err(format!("No se encontró el archivo .trashinfo para {}", trashed_name));
+        }
+
+        let content = std::fs::read_to_string(&info_path)
+            .map_err(|e| format!("Error leyendo .trashinfo: {}", e))?;
+
+        let original_path_str = content
+            .lines()
+            .find(|line| line.starts_with("Path="))
+            .and_then(|line| line.strip_prefix("Path="))
+            .map(|s| s.trim())
+            .ok_or("No se encontró la línea 'Path=' en el .trashinfo")?;
+
+        let mut original_path = PathBuf::from(original_path_str);
+
+        if let Some(parent) = original_path.parent() {
+            if !parent.exists() {
+                std::fs::create_dir_all(parent)
+                    .map_err(|e| format!("No se pudo crear la carpeta original: {}", e))?;
+            }
+        }
+
+        if original_path.exists() {
+            original_path = Self::generate_unique_path(&original_path);
+        }
+
+        std::fs::rename(&trashed_path, &original_path)
+            .or_else(|_| {
+                std::fs::copy(&trashed_path, &original_path)
+                    .and_then(|_| std::fs::remove_file(&trashed_path))
+            })
+            .map_err(|e| format!("Error restaurando '{}': {}", trashed_name, e))?;
+
+        std::fs::remove_file(&info_path).ok();
+
+        Ok(original_path)
+    }
+
+
+    pub fn restore_items(&self, items_to_restore: Vec<String>, trash_root: PathBuf, sender: NotifyingSender) -> Result<(), String> {
+        let task_id = new_task_id();
+
+        sender.send_tasks(TaskMessage::Started {
+            task_id,
+            text: "Restaurando desde la papelera...".to_string(),
+            task_type: TaskType::RestoreTrash,
+        }).ok();
+
+        let trash_files_dir = trash_root.join("files");
+        let trash_info_dir = trash_root.join("info");
+
+        TOKIO_RUNTIME.spawn(async move {
+            let total = items_to_restore.len();
+            let mut errors = Vec::new();
+
+            for (done, name) in items_to_restore.iter().enumerate() {
+                match Self::restore_from_trash(name, &trash_files_dir, &trash_info_dir) {
+                    Ok(final_path) => {
+                        println!("Restaurado: {} → {:?}", name, final_path);
+                    }
+                    Err(e) => {
+                        errors.push(format!("{}: {}", name, e));
+                    }
+                }
+
+                sender.send_tasks(TaskMessage::Progress {
+                    task_id,
+                    progress: (done + 1) as f32 / total as f32,
+                    text: "Restaurando...".to_string(),
+                    task_type: TaskType::RestoreTrash,
+                }).ok();
+            }
+
+            sender.send_tasks(TaskMessage::Finished {
+                task_id,
+                success: errors.is_empty(),
+                task_type: TaskType::RestoreTrash,
+                text: if errors.is_empty() {
+                    "Elementos restaurados correctamente".to_string()
+                } else {
+                    format!("Restauración completada con {} error(es)", errors.len())
+                },
+            }).ok();
+        });
+
         Ok(())
     }
 

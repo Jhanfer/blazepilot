@@ -16,13 +16,13 @@ pub fn connect_ui_components_callback(ctx: &egui::Context, files: &Vec<Arc<FileE
     // -------------------------------
     //  sidebar left     
     // -------------------------------
-    sidebar_left_component(ctx, state);
+    sidebar_left_component(ctx, state, ui_state);
 
 
     // -------------------------------
     //  sidebar right     
     // -------------------------------
-    //sidebar_right_component(ctx, state);
+    sidebar_right_component(state, files, ctx);
 
 
     // -------------------------------

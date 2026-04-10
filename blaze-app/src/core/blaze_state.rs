@@ -16,11 +16,11 @@
 
 
 
-use std::{cell::RefCell, collections::HashSet, path::PathBuf, rc::Rc, sync::{Arc, atomic::Ordering}};
+use std::{cell::RefCell, collections::{HashMap, HashSet}, path::PathBuf, rc::Rc, sync::{Arc, atomic::Ordering}, time::Instant};
 use fuzzy_matcher::{FuzzyMatcher, skim::SkimMatcherV2};
 use tracing::{debug, error, info, warn};
 use tokio::sync::Mutex as TokioMutex;
-use crate::{core::{configs::config_state::with_configs, files::{motor::{BlazeMotor, FileEntry, FileLoadingMessage, MOTOR}, recursive_search::RecursiveMessages}, system::{clipboard::{GlobalClipboard, TOKIO_RUNTIME}, disk_reader::disk_manager::DiskManager, fileopener_module::{FileOpenerManager, GLOBAL_FILE_OPENER}, updater::updater::Updater}}, utils::channel_pool::{FileOperation, NotifyingSender, with_active_sender_for, with_channel_pool}};
+use crate::{core::{configs::config_state::with_configs, files::{motor::{BlazeMotor, FileEntry, FileLoadingMessage, MOTOR}, recursive_search::RecursiveMessages}, system::{clipboard::{GlobalClipboard, TOKIO_RUNTIME}, fileopener_module::{FileOpenerManager, GLOBAL_FILE_OPENER}, updater::updater::Updater}}, ui::task_manager::task_manager::TaskManager, utils::channel_pool::{FileOperation, NotifyingSender, with_active_sender_for, with_channel_pool}};
 
 pub struct RubberBand {
     pub rubber_band_start: Option<egui::Pos2>,
@@ -53,7 +53,6 @@ pub struct BlazeCoreState {
     pub active_tasks: usize,
     pub motor: Rc<RefCell<BlazeMotor>>,
 
-    pub disk_manager: Arc<TokioMutex<DiskManager>>, 
     pub file_opener_manager: Arc<TokioMutex<FileOpenerManager>>,
 
     pub last_selected_index: Option<usize>,
@@ -72,14 +71,22 @@ pub struct BlazeCoreState {
 
     pub updater: Updater,
 
+    pub calculating_dir_sizes: HashSet<PathBuf>,
+    pub dir_size_cache: HashMap<PathBuf, u64>,
+
     pub cwd_input: String,
     pub last_search_was_recursive: bool,
     pub dirty_tasks: bool,
+
+    pub is_testing: bool,
+
+    pub last_fs_event: Option<Instant>,
+    pub task_manager: &'static TaskManager,
 }
 
 impl BlazeCoreState {
     pub async fn new() -> Self {
-        let motor = Rc::new(RefCell::new(BlazeMotor::new()));
+        let motor = Rc::new(RefCell::new(BlazeMotor::new().await));
 
         MOTOR.with(|m|{
             *m.borrow_mut() = Some(motor.clone());
@@ -100,17 +107,9 @@ impl BlazeCoreState {
             scroll_area_origin_y: 0.0,
         };
 
-        let disk_manager = Arc::new(TokioMutex::new(DiskManager::new().await));
-
-        {
-            let mut mgr_guard = disk_manager.lock().await;
-            mgr_guard.load_disks().await;
-            if let Err(e) = mgr_guard.start_watcher_linux(disk_manager.clone()).await {
-                error!("Error inicializando watcher de discos: {}", e);
-            }
-        }
-
         let file_opener_manager = GLOBAL_FILE_OPENER.clone();
+
+        let task_manager = TaskManager::global();
 
         let mut state = Self {
             motor,
@@ -139,8 +138,15 @@ impl BlazeCoreState {
 
             updater: Updater::init(),
 
-            disk_manager,
-            file_opener_manager
+            calculating_dir_sizes: HashSet::new(),
+            dir_size_cache: HashMap::new(),
+
+            file_opener_manager,
+
+            is_testing: false,
+
+            last_fs_event: None,
+            task_manager
         };
 
         if let Some(sender) = state.sender().cloned() {
@@ -263,6 +269,36 @@ impl BlazeCoreState {
         }
     }
 
+    
+    pub fn select_all(&mut self, files: &[Arc<FileEntry>]) {
+        self.selected_files.clear();
+
+        for file in files {
+            self.selected_files.insert(file.full_path.clone());
+        }
+
+        if !files.is_empty() {
+            self.last_selected_index = Some(files.len() - 1);
+        } else {
+            self.last_selected_index = None;
+        }
+    }
+
+    pub fn toggle_select_all(&mut self, files: &[Arc<FileEntry>]) {
+        let all_selected = files.iter().all(|f| self.selected_files.contains(&f.full_path));
+
+        if all_selected {
+            self.selected_files.clear();
+            self.last_selected_index = None;
+        } else {
+            self.selected_files.clear();
+            for file in files {
+                self.selected_files.insert(file.full_path.clone());
+            }
+            self.last_selected_index = if files.is_empty() { None } else { Some(files.len() - 1) };
+        }
+    }
+
 
     pub fn active_files(&self) -> Vec<Arc<FileEntry>> {
         let mut motor = self.motor.borrow_mut();
@@ -355,13 +391,14 @@ impl BlazeCoreState {
     }
 
 
-
     pub fn process_messages(&mut self) {
         let active_id = {
             let mut motor = self.motor.borrow_mut();
             let tab = motor.active_tab();
             tab.id
         };
+
+        self.task_manager.process_message(active_id);
 
         let file_messages: Vec<FileLoadingMessage> = with_channel_pool(|pool|{
             let mut msgs = Vec::new();
@@ -429,6 +466,7 @@ impl BlazeCoreState {
                 FileLoadingMessage::Finished(gene) => {
                     let mut motor = self.motor.borrow_mut();
                     let tab = motor.active_tab();
+
                     debug!("Finished recibido: generation={}", gene);
                     if gene == tab.loading_generation {
                         debug!("Finished aplicado a tab");
@@ -454,33 +492,21 @@ impl BlazeCoreState {
 
                 },
 
-                FileLoadingMessage::FileAdded { name } => {
-                    debug!("+ Archivo añadido: {}, active_tasks={}", name, self.active_tasks);
-                    if self.active_tasks == 0 {
-                        
-                    }
-                    if let Some(sender) = self.sender().cloned() {
-                        self.motor.borrow_mut().active_tab().load_path(true, sender);
-                    }
-                },
                 FileLoadingMessage::FileRemoved { name } => {
                     debug!("- Archivo eliminado: {}", name);
-                    if self.active_tasks == 0 {
-
-                    }
+                    self.last_fs_event = Some(std::time::Instant::now());
                 },
-                FileLoadingMessage::FullRefresh => {
-                    debug!("Recarga completa solicitada");
-                    if let Some(sender) = self.sender().cloned() {
-                        self.motor.borrow_mut().active_tab().load_path(true, sender);
-                    }
+                FileLoadingMessage::FileAdded { name } => {
+                    debug!("+ Archivo añadido: {}", name);
+                    self.last_fs_event = Some(std::time::Instant::now());
                 },
                 FileLoadingMessage::FileModified { name } => {
                     debug!("Archivo {} modificado", name);
-                    if self.active_tasks == 0 {
-                        
-                    }
-                }
+                    self.last_fs_event = Some(std::time::Instant::now());
+                },
+                FileLoadingMessage::FullRefresh => {
+                    self.last_fs_event = Some(std::time::Instant::now());
+                },
 
             }
         }
@@ -504,9 +530,18 @@ impl BlazeCoreState {
                 FileOperation::Copy { files, dest } => {
 
                 }, 
-                FileOperation::Delete { files } => {
 
+                FileOperation::Delete { files } => {
+                    let files: Vec<Arc<FileEntry>> = self.motor.borrow_mut()
+                        .active_tab()
+                        .files
+                        .iter()
+                        .filter(|f| files.contains(&f.full_path))
+                        .cloned()
+                        .collect();
+                    self.move_to_trash(&files);
                 },
+
                 FileOperation::Move { files, dest, tab_id } => {
                     info!("Se intenta mover");
                     self.move_files(files, dest);
@@ -514,6 +549,47 @@ impl BlazeCoreState {
 
                 FileOperation::Update => {
                     self.updater.start_update_process();
+                },
+
+                FileOperation::UpdateDirSize { full_path, size, gene } => {
+                    let mut motor = self.motor.borrow_mut();
+                    let tab = motor.active_tab();
+
+                    if gene != tab.active_generation {
+                        return;
+                    }
+
+                    self.dir_size_cache.insert(full_path.clone(), size);
+
+                    if let Some(file) = tab.files.iter_mut().find(|f| f.full_path == full_path) {
+                        let file = Arc::make_mut(file);
+                        file.size = size;
+                    }
+
+                    self.calculating_dir_sizes.remove(&full_path);
+                },
+
+                FileOperation::RestoreDeletedFiles { file_names } => {
+                    let trash_path = self.motor.borrow_mut().get_trash_dir(None).unwrap_or_default();
+                    
+                    if let Some(trash_root) = trash_path.parent() {
+                        if let Some(sender) = self.sender().cloned() {
+                            self.clipboard.restore_from_trash(file_names, trash_root.to_path_buf(), sender).ok();
+                        }
+                    }
+                },
+            }
+        }
+
+
+
+        if let Some(last_event) = self.last_fs_event {
+            if last_event.elapsed() > std::time::Duration::from_millis(50) {
+                self.last_fs_event = None;
+                if self.active_tasks == 0 {
+                    if let Some(sender) = self.sender().cloned() {
+                        self.motor.borrow_mut().active_tab().load_path(true, sender);
+                    }
                 }
             }
         }
