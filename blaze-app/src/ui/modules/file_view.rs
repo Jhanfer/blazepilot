@@ -20,7 +20,7 @@
 use std::sync::Arc;
 use egui::{Align2, Area, Button, CentralPanel, Color32, CornerRadius, FontId, Frame, Key, Margin, Painter, Rect, ScrollArea, Sense, Stroke, StrokeKind, TextEdit, Ui, UiBuilder, pos2, scroll_area::ScrollSource, vec2};
 use tracing::{error, info};
-use crate::{core::{blaze_state::{BlazeCoreState, NewItemType}, configs::config_state::with_configs, files::{file_extension::{DocType, FileExtension}, motor::{FileEntry, TabState}}, system::clipboard::TOKIO_RUNTIME}, ui::{blaze_ui_state::BlazeUiState, icons_cache::icons::{self}, modules::sidebar_right::sidebar_right_component, task_manager::task_manager::TaskStatus}, utils::{channel_pool::{FileOperation, SureTo, UiEvent}, formating::{format_date, format_size}}};
+use crate::{core::{blaze_state::{BlazeCoreState, NewItemType}, configs::config_state::with_configs, files::{file_extension::{DocType, FileExtension}, motor::{FileEntry, TabState}}, system::{clipboard::TOKIO_RUNTIME, sizer_manager::sizer_manager::SizerMessages}}, ui::{blaze_ui_state::BlazeUiState, icons_cache::icons::{self}, modules::sidebar_right::sidebar_right_component, task_manager::task_manager::TaskStatus}, utils::{channel_pool::{FileOperation, SureTo, UiEvent}, formating::{format_date, format_size}}};
 
 
 
@@ -822,10 +822,21 @@ pub fn file_view_component(ctx: &egui::Context, files: &Vec<Arc<FileEntry>>, sta
                                 file.name.to_string()
                             };
 
-                            let file_size = if file.is_dir {
-                                state.dir_size_cache.get(&file.full_path).unwrap_or_else(|| &0)
+                            
+                            let display_size = if file.is_dir {
+                                if state.calculating_dir_sizes.contains(&file.full_path) {
+                                    None
+                                } else {
+                                    state.sizer_manager.cache_manager.get_cached_size(&file.full_path)
+                                }
                             } else {
-                                &file.size
+                                Some(file.size)
+                            };
+
+                            let size_text = match display_size {
+                                None => "...",
+                                Some(0) if file.is_dir => "-",
+                                Some(size) => &format_size(size),
                             };
 
 
@@ -842,12 +853,10 @@ pub fn file_view_component(ctx: &egui::Context, files: &Vec<Arc<FileEntry>>, sta
                             let name_start_x = icon_rect.right() + icon_spacing;
                             let name_max_width = (name_right - name_start_x).max(min_name_width);
 
-
-
-                            let size_text = format_size(*file_size);
+                            
                             let size_galley = ui.fonts_mut(|f| {
                                 f.layout_no_wrap(
-                                    size_text,
+                                    size_text.to_owned(),
                                     FontId::proportional(12.0),
                                     Color32::from_rgb(109, 108, 111),
                                 )
@@ -984,24 +993,14 @@ pub fn file_view_component(ctx: &egui::Context, files: &Vec<Arc<FileEntry>>, sta
                         let file = &files[i];
 
                         if file.is_dir && file.size == 0 {
-                            if !state.calculating_dir_sizes.contains(&file.full_path) {
+                            if file.is_dir && !state.calculating_dir_sizes.contains(&file.full_path) && !state.calculated_dir_sizes.contains(&file.full_path) {
                                 state.calculating_dir_sizes.insert(file.full_path.clone());
 
                                 let path = file.full_path.clone();
-                                let sender_clone = sender.clone();
-                                let generation = state.motor.borrow_mut().active_tab().active_generation;
 
-                                TOKIO_RUNTIME.spawn(async move {
-                                    let size = TabState::get_recursive_size(&path, 12).await;
-
-                                    sender_clone.send_fileop(
-                                        FileOperation::UpdateDirSize {
-                                            full_path: path,
-                                            size, 
-                                            gene: generation,
-                                        }
-                                    ).ok();
-                                });
+                                sender.send_sizer(
+                                    SizerMessages::StartCal(path)
+                                ).ok();
                             }
                         }
                     }

@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   build-linux:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-22.04
     steps:
       - name: Checkout código
         uses: actions/checkout@v4
@@ -23,15 +23,20 @@ jobs:
       - name: Instalar dependencias del sistema
         run: |
           sudo apt-get update
-          sudo apt-get install -y libssl-dev pkg-config
+          sudo apt-get install -y \
+            libssl-dev pkg-config \
+            libx11-dev \
+            libxkbcommon-dev \
+            libwayland-dev
 
       - name: Compilar en modo Release
         run: cargo build --release --target x86_64-unknown-linux-gnu
 
       - name: Renombrar binario para self_update
         run: |
+          VERSION=${GITHUB_REF_NAME#v}
           BIN_NAME="blazepilot"
-          cp "target/x86_64-unknown-linux-gnu/release/$BIN_NAME" "./${BIN_NAME}-x86_64-unknown-linux-gnu"
+          cp "target/x86_64-unknown-linux-gnu/release/$BIN_NAME" "./${BIN_NAME}-x86_64-unknown-linux-gnu-v${VERSION}"
 
       - name: Subir binario al Release
         uses: softprops/action-gh-release@v2

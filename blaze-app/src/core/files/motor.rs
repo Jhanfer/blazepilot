@@ -478,55 +478,6 @@ impl TabState {
         self.start_watching(sender_clone);
     }
 
-    pub async fn get_recursive_size(root: impl AsRef<Path>, max_concurrency: usize) -> u64 {
-        let total_size = Arc::new(AtomicU64::new(0));
-        let seen_inodes = Arc::new(Mutex::new(HashSet::new()));
-        let semaphore = Arc::new(Semaphore::new(max_concurrency));
-
-        let walker = WalkDir::new(root)
-            .skip_hidden(false)
-            .process_read_dir(|_, _, _, children| {
-
-            })
-            .parallelism(Parallelism::RayonNewPool(0));
-
-        let mut tasks = vec![];
-
-        for entry in walker {
-            let entry = match entry {
-                Ok(e) => e,
-                Err(_) => continue,
-            };
-
-            if entry.file_type().is_file() {
-                let size_arc = total_size.clone();
-                let inodes_arc = seen_inodes.clone();
-                let permit = semaphore.clone().acquire_owned().await.unwrap();
-                
-                let task = tokio::task::spawn_blocking(move || {
-                    let _permit = permit;
-
-                    if let Ok(meta) = entry.metadata() {
-                        let inode = (meta.dev(), meta.ino());
-                        let mut guard = inodes_arc.lock().unwrap();
-
-                        if guard.insert(inode) {
-                            size_arc.fetch_add(meta.len(), Ordering::Relaxed);
-                        }
-                    }
-                });
-                
-                tasks.push(task);
-            }
-        }
-
-        for task in tasks {
-            let _ = task.await;
-        }
-
-        total_size.load(Ordering::Relaxed)
-    }
-
     pub fn _cancel_loading(&mut self) {
         self.loading_flag.store(false, Ordering::Relaxed);
 

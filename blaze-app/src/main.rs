@@ -49,7 +49,7 @@ fn main() {
             .with_decorations(true)
             .with_transparent(true),
         multisampling: 4,
-        renderer: eframe::Renderer::Glow,
+        renderer: eframe::Renderer::Wgpu,
         hardware_acceleration: HardwareAcceleration::Required,
         ..Default::default()
     };

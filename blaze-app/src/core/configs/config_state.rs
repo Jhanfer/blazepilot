@@ -82,7 +82,7 @@ impl ConfigsFlags {
     }
 
     fn init_project_folder() -> Result<PathBuf, String> {
-        let proj = ProjectDirs::from("com", "blazepilot", "app").expect("No se pudo obtener ProjectDirs.");
+        let proj = ProjectDirs::from("com", "blazepilot", "blazepilotapp").expect("No se pudo obtener ProjectDirs.");
 
         let mut path = proj.config_dir().to_path_buf();
         

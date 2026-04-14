@@ -20,7 +20,7 @@ use std::{cell::RefCell, collections::{HashMap, HashSet}, path::PathBuf, rc::Rc,
 use fuzzy_matcher::{FuzzyMatcher, skim::SkimMatcherV2};
 use tracing::{debug, error, info, warn};
 use tokio::sync::Mutex as TokioMutex;
-use crate::{core::{configs::config_state::with_configs, files::{motor::{BlazeMotor, FileEntry, FileLoadingMessage, MOTOR}, recursive_search::RecursiveMessages}, system::{clipboard::{GlobalClipboard, TOKIO_RUNTIME}, fileopener_module::{FileOpenerManager, GLOBAL_FILE_OPENER}, updater::updater::Updater}}, ui::task_manager::task_manager::TaskManager, utils::channel_pool::{FileOperation, NotifyingSender, with_active_sender_for, with_channel_pool}};
+use crate::{core::{configs::config_state::with_configs, files::{motor::{BlazeMotor, FileEntry, FileLoadingMessage, MOTOR}, recursive_search::RecursiveMessages}, system::{clipboard::{GlobalClipboard, TOKIO_RUNTIME}, fileopener_module::{FileOpenerManager, GLOBAL_FILE_OPENER}, sizer_manager::{self, sizer_manager::SizerManager}, updater::updater::Updater}}, ui::task_manager::task_manager::TaskManager, utils::channel_pool::{FileOperation, NotifyingSender, with_active_sender_for, with_channel_pool}};
 
 pub struct RubberBand {
     pub rubber_band_start: Option<egui::Pos2>,
@@ -71,8 +71,8 @@ pub struct BlazeCoreState {
 
     pub updater: Updater,
 
+    pub calculated_dir_sizes: HashSet<PathBuf>,
     pub calculating_dir_sizes: HashSet<PathBuf>,
-    pub dir_size_cache: HashMap<PathBuf, u64>,
 
     pub cwd_input: String,
     pub last_search_was_recursive: bool,
@@ -82,6 +82,8 @@ pub struct BlazeCoreState {
 
     pub last_fs_event: Option<Instant>,
     pub task_manager: &'static TaskManager,
+
+    pub sizer_manager: SizerManager,
 }
 
 impl BlazeCoreState {
@@ -111,6 +113,8 @@ impl BlazeCoreState {
 
         let task_manager = TaskManager::global();
 
+        let sizer_manager = SizerManager::new();
+
         let mut state = Self {
             motor,
             is_loading: false,
@@ -139,14 +143,16 @@ impl BlazeCoreState {
             updater: Updater::init(),
 
             calculating_dir_sizes: HashSet::new(),
-            dir_size_cache: HashMap::new(),
+            calculated_dir_sizes: HashSet::new(),
 
             file_opener_manager,
 
             is_testing: false,
 
             last_fs_event: None,
-            task_manager
+            task_manager,
+
+            sizer_manager,
         };
 
         if let Some(sender) = state.sender().cloned() {
@@ -400,6 +406,12 @@ impl BlazeCoreState {
 
         self.task_manager.process_message(active_id);
 
+        let sender = {
+            self.sender().unwrap().clone()
+        };
+
+        self.sizer_manager.process_messages(active_id, sender);
+        
         let file_messages: Vec<FileLoadingMessage> = with_channel_pool(|pool|{
             let mut msgs = Vec::new();
             pool.process_file_messages(active_id, |msg|{
@@ -554,12 +566,8 @@ impl BlazeCoreState {
                 FileOperation::UpdateDirSize { full_path, size, gene } => {
                     let mut motor = self.motor.borrow_mut();
                     let tab = motor.active_tab();
-
-                    if gene != tab.active_generation {
-                        return;
-                    }
-
-                    self.dir_size_cache.insert(full_path.clone(), size);
+                    self.calculating_dir_sizes.remove(&full_path);
+                    self.calculated_dir_sizes.insert(full_path.clone());
 
                     if let Some(file) = tab.files.iter_mut().find(|f| f.full_path == full_path) {
                         let file = Arc::make_mut(file);

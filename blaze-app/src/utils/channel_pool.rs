@@ -25,6 +25,7 @@ use crate::core::files::motor::with_motor;
 use crate::core::files::{motor::FileLoadingMessage, recursive_search::RecursiveMessages};
 use crate::core::system::fileopener_module::AppAssociation;
 use crate::core::system::fileopener_module::platform::linux::linux::AppsIconData;
+use crate::core::system::sizer_manager::sizer_manager::SizerMessages;
 use crate::core::system::updater::updater::UpdateMessages;
 use crate::ui::task_manager::task_manager::TaskMessage;
 use tracing::{info, warn};
@@ -112,6 +113,7 @@ pub struct NotifyingSender {
     recursive_search_sender: Sender<RecursiveMessages>,
     ui_event_sender: Sender<UiEvent>,
     file_operation_sender: Sender<FileOperation>,
+    sizer_sender: Sender<SizerMessages>,
 
     notifier: Arc<dyn Fn() + Send + Sync>,
 }
@@ -153,6 +155,13 @@ impl NotifyingSender {
         result
     }
 
+    pub fn send_sizer(&self, msg: SizerMessages) -> Result<(), SendError<SizerMessages>> {
+        let result = self.sizer_sender.send(msg);
+        if result.is_ok() {(self.notifier)();}
+        result
+    }
+
+
 }
 
 pub struct ChannelPool {
@@ -161,6 +170,7 @@ pub struct ChannelPool {
     recursive_channels: HashMap<Uuid, Arc<(Sender<RecursiveMessages>, Receiver<RecursiveMessages>)>>,
     ui_event_channels: HashMap<Uuid, Arc<(Sender<UiEvent>, Receiver<UiEvent>)>>,
     fileops_channels: HashMap<Uuid, Arc<(Sender<FileOperation>, Receiver<FileOperation>)>>,
+    sizer_channels: HashMap<Uuid, Arc<(Sender<SizerMessages>, Receiver<SizerMessages>)>>,
 
     ui_notifier: HashMap<Uuid, Arc<dyn Fn() + Send + Sync>>,
 }
@@ -190,6 +200,7 @@ impl ChannelPool {
             recursive_channels: HashMap::new(),
             ui_event_channels: HashMap::new(),
             fileops_channels: HashMap::new(),
+            sizer_channels: HashMap::new(),
 
             ui_notifier: HashMap::new(),
         }
@@ -213,6 +224,7 @@ impl ChannelPool {
         let recursive_search_sender = self.get_recursive_sender(tab_id);
         let ui_event_sender = self.get_ui_event_channels_sender(tab_id);
         let file_operation_sender = self.get_fileop_sender(tab_id);
+        let sizer_sender = self.get_sizer_sender(tab_id);
 
         let Some(notifier) = self.ui_notifier.get(&tab_id) else {
             warn!(tab_id = %tab_id, "NO HAY NOTIFIER para tab_id");
@@ -228,6 +240,7 @@ impl ChannelPool {
                 recursive_search_sender,
                 ui_event_sender,
                 file_operation_sender,
+                sizer_sender,
 
                 notifier: notifier.clone() 
             }
@@ -274,6 +287,13 @@ impl ChannelPool {
         self.fileops_channels.get(&tab_id).unwrap().0.clone()
     }
 
+    pub fn get_sizer_sender(&mut self, tab_id: Uuid) -> Sender<SizerMessages> {
+        if !self.sizer_channels.contains_key(&tab_id) {
+            let (tx, rx) = unbounded();
+            self.sizer_channels.insert(tab_id, (tx, rx).into());
+        }
+        self.sizer_channels.get(&tab_id).unwrap().0.clone()
+    }
 
     pub fn process_file_messages<F>(&self, tab_id: Uuid, mut processor: F) -> bool
         where
@@ -344,6 +364,21 @@ impl ChannelPool {
         {
             let mut process_any = false;
             if let Some(arc_pair) = self.fileops_channels.get(&tab_id) {
+                while let Ok(msg) = arc_pair.1.try_recv() {
+                    if processor(msg) {
+                        process_any = true;
+                    }
+                }
+            }
+            process_any
+        }
+
+    pub fn process_sizer_events<F>(&self, tab_id: Uuid, mut processor: F) -> bool 
+        where 
+            F: FnMut(SizerMessages) -> bool 
+        {
+            let mut process_any = false;
+            if let Some(arc_pair) = self.sizer_channels.get(&tab_id) {
                 while let Ok(msg) = arc_pair.1.try_recv() {
                     if processor(msg) {
                         process_any = true;
