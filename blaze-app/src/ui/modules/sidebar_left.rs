@@ -195,7 +195,7 @@ pub fn render_drives_button(state: &mut BlazeCoreState, ui: &mut Ui, drive: Disk
     response.context_menu(|ui|{
         if drive.mountpoint.is_none() {
             if ui.button("Montar").clicked() {
-                let mut manager = state.motor.borrow_mut().disk_manager.clone();
+                let manager = state.motor.borrow_mut().disk_manager.clone();
                 TOKIO_RUNTIME.block_on(async {
                     let mut manager = manager.lock().await;
                     manager.mount_disk(&drive).await.ok();
@@ -213,7 +213,7 @@ pub fn render_drives_button(state: &mut BlazeCoreState, ui: &mut Ui, drive: Disk
         if drive.is_removable && drive.mountpoint.is_none() {
             ui.separator();
             if ui.button("Expulsar").clicked() {
-                let mut manager = state.motor.borrow_mut().disk_manager.clone();
+                let manager = state.motor.borrow_mut().disk_manager.clone();
                 TOKIO_RUNTIME.block_on(async {
                     let mut manager = manager.lock().await;
                     manager.eject_disk(&drive).await.ok();
@@ -225,7 +225,7 @@ pub fn render_drives_button(state: &mut BlazeCoreState, ui: &mut Ui, drive: Disk
             ui.separator();
 
             if ui.button("Desmontar").clicked() {
-                let mut manager = state.motor.borrow_mut().disk_manager.clone();
+                let manager = state.motor.borrow_mut().disk_manager.clone();
                 TOKIO_RUNTIME.block_on(async {
                     let mut manager = manager.lock().await;
                     manager.unmount_disk(&drive).await.ok();
@@ -256,10 +256,17 @@ pub fn render_drives_button(state: &mut BlazeCoreState, ui: &mut Ui, drive: Disk
         rect
     );
 
+    let root_symbol = "/".to_string();
+    let display_name = if drive.mountpoint == Some(root_symbol.clone()) {
+        root_symbol
+    } else {
+        drive.display_name
+    };
+
     ui.painter().text(
         rect.left_center() + vec2(34.0, 0.0),
         egui::Align2::LEFT_CENTER,
-        drive.display_name,
+        display_name,
         FontId::default(),
         ui.visuals().text_color(),
     );

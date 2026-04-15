@@ -17,10 +17,11 @@
 
 
 use std::{cell::RefCell, collections::{HashMap, HashSet}, path::PathBuf, rc::Rc, sync::{Arc, atomic::Ordering}, time::Instant};
+use bitvec::vec::BitVec;
 use fuzzy_matcher::{FuzzyMatcher, skim::SkimMatcherV2};
 use tracing::{debug, error, info, warn};
 use tokio::sync::Mutex as TokioMutex;
-use crate::{core::{configs::config_state::with_configs, files::{motor::{BlazeMotor, FileEntry, FileLoadingMessage, MOTOR}, recursive_search::RecursiveMessages}, system::{clipboard::{GlobalClipboard, TOKIO_RUNTIME}, fileopener_module::{FileOpenerManager, GLOBAL_FILE_OPENER}, sizer_manager::{self, sizer_manager::SizerManager}, updater::updater::Updater}}, ui::task_manager::task_manager::TaskManager, utils::channel_pool::{FileOperation, NotifyingSender, with_active_sender_for, with_channel_pool}};
+use crate::{core::{configs::config_state::{OrderingMode, with_configs}, files::{motor::{BlazeMotor, FileEntry, FileLoadingMessage, MOTOR}, recursive_search::RecursiveMessages}, system::{clipboard::{GlobalClipboard, TOKIO_RUNTIME}, fileopener_module::{FileOpenerManager, GLOBAL_FILE_OPENER}, sizer_manager::{self, sizer_manager::SizerManager}, updater::updater::Updater}}, ui::task_manager::task_manager::TaskManager, utils::channel_pool::{FileOperation, NotifyingSender, with_active_sender_for, with_channel_pool}};
 
 pub struct RubberBand {
     pub rubber_band_start: Option<egui::Pos2>,
@@ -36,6 +37,8 @@ pub struct RowView {
     pub drop_target: Option<PathBuf>,
     pub drop_invalid_target: Option<PathBuf>,
     pub scroll_area_origin_y: f32,
+    pub first_visible: usize,
+    pub last_visible: usize,
 }
 
 #[derive(Clone, PartialEq)]
@@ -48,42 +51,32 @@ pub struct BlazeCoreState {
     pub is_loading: bool,
     pub search_filter: String,
     pub clipboard: GlobalClipboard,
-    pub selected_files: HashSet<PathBuf>,
-    pub dirty_flag: bool,
+    pub last_selected_index: Option<usize>,
+    pub select_all_mode: bool,
+    pub selection_anchor: Option<usize>,
+    pub selection: BitVec,
     pub active_tasks: usize,
     pub motor: Rc<RefCell<BlazeMotor>>,
-
     pub file_opener_manager: Arc<TokioMutex<FileOpenerManager>>,
-
-    pub last_selected_index: Option<usize>,
     pub pending_scroll_to: Option<usize>,
     pub scroll_offset: f32,
     pub rubber_band: RubberBand,
     pub row_view: RowView,
-
     pub renaming_file:Option<PathBuf>,
     pub rename_buffer: String,
     pub creating_new: Option<NewItemType>,
     pub new_item_buffer: String,
     pub focus_requested: bool, 
-
     pub cached_sender: Option<NotifyingSender>,
-
     pub updater: Updater,
-
     pub calculated_dir_sizes: HashSet<PathBuf>,
     pub calculating_dir_sizes: HashSet<PathBuf>,
-
-    pub cwd_input: String,
-    pub last_search_was_recursive: bool,
-    pub dirty_tasks: bool,
-
-    pub is_testing: bool,
-
     pub last_fs_event: Option<Instant>,
     pub task_manager: &'static TaskManager,
-
     pub sizer_manager: SizerManager,
+    pub needs_sort: bool,
+    pub cwd_input: String,
+    pub test: bool,
 }
 
 impl BlazeCoreState {
@@ -107,6 +100,8 @@ impl BlazeCoreState {
             drop_target: None,
             drop_invalid_target: None,
             scroll_area_origin_y: 0.0,
+            first_visible: 0,
+            last_visible: 0,
         };
 
         let file_opener_manager = GLOBAL_FILE_OPENER.clone();
@@ -120,39 +115,31 @@ impl BlazeCoreState {
             is_loading: false,
             search_filter: String::new(),
             clipboard: GlobalClipboard::new(),
-            selected_files: HashSet::new(),
-            dirty_flag: false,
-            dirty_tasks: false,
-            active_tasks: 0,
-            last_search_was_recursive: false,
-            cwd_input: String::new(),
             last_selected_index: None,
+            selection_anchor: None,
+            selection: BitVec::new(),
+            select_all_mode: false,
+            active_tasks: 0,
             pending_scroll_to: None,
             scroll_offset: 0.0,
             rubber_band,
             row_view,
-
             renaming_file: None,
             rename_buffer: String::new(),
             creating_new: None,
             new_item_buffer: String::new(),
             focus_requested: false,
-
             cached_sender: None,
-
             updater: Updater::init(),
-
             calculating_dir_sizes: HashSet::new(),
             calculated_dir_sizes: HashSet::new(),
-
             file_opener_manager,
-
-            is_testing: false,
-
             last_fs_event: None,
             task_manager,
-
             sizer_manager,
+            needs_sort: false,
+            cwd_input: String::new(),
+            test: false,
         };
 
         if let Some(sender) = state.sender().cloned() {
@@ -163,7 +150,154 @@ impl BlazeCoreState {
         state
     }
 
-    
+    pub fn sort_indices(&mut self, files: &mut Vec<Arc<FileEntry>>) -> Vec<Arc<FileEntry>> {
+        let new_mode = with_configs(|cfg| cfg.configs.app_ordering_mode.clone());
+        let by_size = matches!(new_mode, OrderingMode::SizeAsc | OrderingMode::SizeDesc);
+        
+        if by_size {
+            files.sort_by(|a, b|{
+                match (a.is_dir, b.is_dir) {
+                    (true, false) => return std::cmp::Ordering::Less,
+                    (false, true) => return std::cmp::Ordering::Greater,
+                    _ => (),
+                }
+
+                let size_a = if a.is_dir {
+                    let key = &a.full_path.to_string_lossy();
+                    self.sizer_manager.cache_manager.size_cache
+                        .read()
+                        .get(key.as_ref())
+                        .map(|c| c.size)
+                        .unwrap_or(0)
+                } else {
+                    a.size
+                };
+
+                let size_b = if b.is_dir {
+                    let key = &b.full_path.to_string_lossy();
+                    self.sizer_manager.cache_manager.size_cache
+                        .read()
+                        .get(key.as_ref())
+                        .map(|c| c.size)
+                        .unwrap_or(0)
+                } else {
+                    b.size
+                };
+
+                match new_mode {
+                    OrderingMode::SizeAsc => size_a.cmp(&size_b),
+                    OrderingMode::SizeDesc => size_b.cmp(&size_a),
+                    OrderingMode::Az => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
+                    OrderingMode::Za => b.name.to_lowercase().cmp(&a.name.to_lowercase()),
+                    OrderingMode::DateAsc => a.modified.cmp(&b.modified),
+                    OrderingMode::DateDesc => b.modified.cmp(&a.modified),
+                }
+            });
+        } else {
+            files.sort_by(|a, b|{
+                match (a.is_dir, b.is_dir) {
+                    (true, false) => return std::cmp::Ordering::Less,
+                    (false, true) => return std::cmp::Ordering::Greater,
+                    _ => {}
+                }
+
+                match new_mode {
+                    OrderingMode::Az => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
+                    OrderingMode::Za => b.name.to_lowercase().cmp(&a.name.to_lowercase()),
+                    OrderingMode::DateAsc => a.modified.cmp(&b.modified),
+                    OrderingMode::DateDesc => b.modified.cmp(&a.modified),
+                    _ => std::cmp::Ordering::Equal,
+                }
+            });
+        }
+
+        files.to_vec()
+    }
+
+    pub fn is_selected(&self, index: usize) -> bool {
+        if index >= self.selection.len() {
+            return false;
+        }
+
+        if self.select_all_mode {
+            !self.selection[index]
+        } else {
+            self.selection[index]
+        }
+    }
+
+
+    pub fn select_all(&mut self, files_len: usize) {
+        self.select_all_mode = true;
+        self.selection.clear();
+        self.resize_selection(files_len);
+        self.last_selected_index = if files_len > 0 {
+            Some(files_len - 1)
+        } else {
+            None
+        };
+    }
+
+
+    pub fn deselect_all(&mut self) {
+        self.select_all_mode = false;
+        self.selection.clear();
+        self.last_selected_index = None;
+        self.selection_anchor = None;
+    }
+
+    pub fn toggle_select_all(&mut self, files_len: usize) {
+        if self.select_all_mode && self.selection.not_any() {
+            self.deselect_all();
+        } else {
+            self.select_all(files_len);
+        }
+    }
+
+    pub fn select_range(&mut self, start: usize, end: usize) {
+        let start = start.min(end);
+        let end = start.max(end);
+
+        if start >= self.selection.len() {
+            return;
+        }
+        let end = end.min(self.selection.len() - 1);
+
+        if self.select_all_mode {
+            for i in start..=end {
+                self.selection.set(i, false);
+            }
+        } else {
+            for i in start..=end {
+                self.selection.set(i, true);
+            }
+        }
+    }
+
+
+    pub fn selected_count(&self, files_len: usize) -> usize {
+        if self.select_all_mode {
+            files_len - self.selection.count_ones()
+        } else {
+            self.selection.count_ones()
+        }
+    }
+
+    pub fn get_selected_paths(&self, files: &[Arc<FileEntry>]) -> Vec<PathBuf> {
+        files.iter()
+            .enumerate()
+            .filter(|(i, _)| self.is_selected(*i))
+            .map(|(_, f)| f.full_path.clone())
+            .collect()
+    }
+
+
+    pub fn resize_selection(&mut self, new_len: usize) {
+        if self.selection.len() != new_len {
+            self.selection.resize(new_len, false);
+        }
+    }
+
 
     pub fn sender(&mut self) -> Option<&NotifyingSender> {
         if self.cached_sender.is_none() {
@@ -177,20 +311,12 @@ impl BlazeCoreState {
         self.cached_sender = None;
     }
 
-
-    pub fn clean_selections(&mut self) {
-        self.selected_files.shrink_to_fit();
-        self.selected_files.clear();
-        self.last_selected_index = None;
-    }
-
-
     pub fn navigate_to(&mut self, path: PathBuf) {
         self.motor.borrow_mut().active_tab_mut().navigate_to(path);
         if let Some(sender) = self.sender().cloned() {
             self.motor.borrow_mut().active_tab_mut().load_path(false, sender);
         }
-        self.clean_selections();
+        self.deselect_all();
     }
 
     pub fn up(&mut self) {
@@ -198,7 +324,7 @@ impl BlazeCoreState {
         if let Some(sender) = self.sender().cloned() {
             self.motor.borrow_mut().active_tab_mut().load_path(false, sender);
         }
-        self.clean_selections();
+        self.deselect_all();
     }
 
     pub fn back(&mut self) {
@@ -206,7 +332,7 @@ impl BlazeCoreState {
         if let Some(sender) = self.sender().cloned() {
             self.motor.borrow_mut().active_tab_mut().load_path(false, sender);
         }
-        self.clean_selections();
+        self.deselect_all();
     }
 
     pub fn forward(&mut self) {
@@ -214,23 +340,39 @@ impl BlazeCoreState {
         if let Some(sender) = self.sender().cloned() {
             self.motor.borrow_mut().active_tab_mut().load_path(false, sender);
         }
-        self.clean_selections();
+        self.deselect_all();
     }
 
     pub fn refresh(&mut self) {
         if let Some(sender) = self.sender().cloned() {
             self.motor.borrow_mut().active_tab_mut().load_path(false, sender);
         }
-        self.clean_selections();
+        self.deselect_all();
     }
 
 
-    pub fn selected_as_entries(&self, files: &Vec<Arc<FileEntry>>) -> Vec<Arc<FileEntry>> {
-        files.iter()
-            .filter(|f| self.selected_files.contains(&f.full_path))
-            .cloned()
-            .collect()
-    }
+        pub fn selected_as_entries(&self, files: &[Arc<FileEntry>]) -> Vec<Arc<FileEntry>> {
+            if files.is_empty() {
+                return  vec![];
+            }
+
+            let mut result = Vec::with_capacity(files.len() / 2);
+
+            if self.select_all_mode {
+                for (i, file) in files.iter().enumerate() {
+                    if !self.selection.get(i).map(|b| *b).unwrap_or(false) {
+                        result.push(file.clone());
+                    }
+                }
+            } else {
+                for (i, file) in files.iter().enumerate() {
+                    if self.selection.get(i).map(|b| *b).unwrap_or(false) {
+                        result.push(file.clone());
+                    }
+                }
+            }
+            result
+        }
 
     pub fn _get_file_entry(&self, path: &PathBuf) -> Option<Arc<FileEntry>> {
         self.motor.borrow_mut()
@@ -262,6 +404,13 @@ impl BlazeCoreState {
         }
     }
 
+    fn move_to_trash_event_only(&mut self, items: Vec<Arc<FileEntry>>) {
+        let cwd = self.motor.borrow().tabs[self.motor.borrow().active_tab_index].cwd.clone();
+        if let Some(sender) = self.sender().cloned() {
+            self.clipboard.move_to_trash(items, cwd, sender).ok();
+        }
+    }
+
     pub fn move_files(&mut self, files: Vec<PathBuf>, dest: PathBuf) {
         if let Some(sender) = self.sender().cloned() {
             self.clipboard.move_files(files, dest, sender).ok();
@@ -272,36 +421,6 @@ impl BlazeCoreState {
         self.clipboard.set_dest(path);
         if let Some(sender) = self.sender().cloned() {
             self.clipboard.paste(sender).ok();
-        }
-    }
-
-    
-    pub fn select_all(&mut self, files: &[Arc<FileEntry>]) {
-        self.selected_files.clear();
-
-        for file in files {
-            self.selected_files.insert(file.full_path.clone());
-        }
-
-        if !files.is_empty() {
-            self.last_selected_index = Some(files.len() - 1);
-        } else {
-            self.last_selected_index = None;
-        }
-    }
-
-    pub fn toggle_select_all(&mut self, files: &[Arc<FileEntry>]) {
-        let all_selected = files.iter().all(|f| self.selected_files.contains(&f.full_path));
-
-        if all_selected {
-            self.selected_files.clear();
-            self.last_selected_index = None;
-        } else {
-            self.selected_files.clear();
-            for file in files {
-                self.selected_files.insert(file.full_path.clone());
-            }
-            self.last_selected_index = if files.is_empty() { None } else { Some(files.len() - 1) };
         }
     }
 
@@ -454,9 +573,8 @@ impl BlazeCoreState {
     
                         tab.files.extend(batch.iter().cloned());
                         let new_start = tab.sorted_indices.len();
-                        tab.sorted_indices.extend(new_start..tab.files.len());
-                        let ordering = with_configs(|ccfg| ccfg.configs.app_ordering_mode.clone());
-                        tab.sort_indices(ordering);
+                        tab.sorted_indices.extend(new_start..tab.files.len());                        
+                        self.needs_sort = true;
 
                     } else {
                         warn!("Generation no coincide: esperado={}, recibido={}", tab.loading_generation, gene);
@@ -488,17 +606,17 @@ impl BlazeCoreState {
                         self.is_loading = false;
 
                         if tab.is_recursive_active {
-                            self.dirty_flag = true;
+                            
                         } else {
                             tab.files.shrink_to_fit();
-                            let ordering = with_configs(|cfg| cfg.configs.app_ordering_mode.clone());
-                            tab.sort_indices(ordering);
                             tab.lower_names.clear();
                             tab.lower_names.extend(
                                 tab.files.iter().enumerate()
                                     .map(|(i, e)| (i, e.name.to_lowercase()))
                             );
                             tab.lower_names.shrink_to_fit();
+
+                            self.needs_sort = true;
                         }
                     }
 
@@ -517,6 +635,7 @@ impl BlazeCoreState {
                     self.last_fs_event = Some(std::time::Instant::now());
                 },
                 FileLoadingMessage::FullRefresh => {
+                    debug!("FullRefresh solicitado");
                     self.last_fs_event = Some(std::time::Instant::now());
                 },
 
@@ -543,6 +662,8 @@ impl BlazeCoreState {
 
                 }, 
 
+
+
                 FileOperation::Delete { files } => {
                     let files: Vec<Arc<FileEntry>> = self.motor.borrow_mut()
                         .active_tab()
@@ -551,7 +672,7 @@ impl BlazeCoreState {
                         .filter(|f| files.contains(&f.full_path))
                         .cloned()
                         .collect();
-                    self.move_to_trash(&files);
+                    self.move_to_trash_event_only(files);
                 },
 
                 FileOperation::Move { files, dest, tab_id } => {
@@ -563,18 +684,20 @@ impl BlazeCoreState {
                     self.updater.start_update_process();
                 },
 
-                FileOperation::UpdateDirSize { full_path, size, gene } => {
+                FileOperation::UpdateDirSize { full_path, size, tab_id } => {
                     let mut motor = self.motor.borrow_mut();
-                    let tab = motor.active_tab();
-                    self.calculating_dir_sizes.remove(&full_path);
-                    self.calculated_dir_sizes.insert(full_path.clone());
-
-                    if let Some(file) = tab.files.iter_mut().find(|f| f.full_path == full_path) {
-                        let file = Arc::make_mut(file);
-                        file.size = size;
+                    if let Some(tab) = motor.tabs.iter_mut().find(|t| t.id == tab_id) {
+                        if let Some((idx, _)) = tab.files.iter().enumerate().find(|(_, f)| f.full_path == full_path) {
+                            let mut new_file = (*tab.files[idx]).clone();
+                            new_file.size = size;
+                            tab.files[idx] = Arc::new(new_file);
+                        }
+                        
+                        self.calculating_dir_sizes.remove(&full_path);
+                        self.calculated_dir_sizes.insert(full_path.clone());
+                        self.needs_sort = true;
                     }
 
-                    self.calculating_dir_sizes.remove(&full_path);
                 },
 
                 FileOperation::RestoreDeletedFiles { file_names } => {

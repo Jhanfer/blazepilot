@@ -14,7 +14,7 @@ use crate::core::files::motor::{FileEntry, with_motor, new_task_id, TaskType};
 use crate::ui::task_manager::task_manager::TaskMessage;
 use std::sync::{Arc, Mutex};
 use std::sync::OnceLock;
-use crate::utils::channel_pool::{NotifyingSender, UiEvent, with_channel_pool};
+use crate::utils::channel_pool::{FileConflict, NotifyingSender, UiEvent, with_channel_pool};
 use tracing::{info, warn, error, debug};
 
 pub static TOKIO_RUNTIME: Lazy<Runtime> = Lazy::new(|| {
@@ -600,13 +600,15 @@ impl Clipboard {
                         },
                         ConflictStrategy::Ask => {
                             
-                            // sender.send_ui_event(UiEvent::FileConflict {
-                            //     task_id,
-                            //     source: source.clone(),
-                            //     target: target.clone(),
-                            // }).ok();
+                            sender.send_ui_event(
+                                UiEvent::FileConflict(
+                                    FileConflict::AlreadyExist {
+                                        name: file_name.to_string_lossy().to_string(),
+                                        path: target,
+                                    }
+                                )
+                            ).ok();
 
-                            info!("ya existe archivo con este nombre!");
                             continue;
                         }
                     }
@@ -712,7 +714,6 @@ impl Clipboard {
 
     pub fn move_to_trash(&self, items: Vec<Arc<FileEntry>>, current_cwd: PathBuf, sender: NotifyingSender) -> Result<(), String> {
         let task_id = new_task_id();
-
         sender.send_tasks(
             TaskMessage::Started { 
                 task_id, 
@@ -726,7 +727,6 @@ impl Clipboard {
 
         for item in &items {
             let source_path = current_cwd.join(&*item.name);
-            
             let trash_root = match with_motor(|m| m.get_trash_dir(Some(&source_path))) {
                 Some(dir) => dir,
                 None => {
@@ -767,7 +767,6 @@ impl Clipboard {
                         std::fs::remove_file(info_path).ok();
                     }
                 } else {
-
                     if let Err(e) = trash::delete(&source_path) {
                         if item.size > 256_000_000 {
                             let dest_path = Self::generate_unique_trash_path(&source_path, &trash_files_dir);
@@ -817,7 +816,7 @@ impl Clipboard {
             }
 
             sender.send_tasks(
-                TaskMessage::Finished { 
+                TaskMessage::Finished {
                     task_id, 
                     success: errors.is_empty(),
                     task_type: TaskType::MoveTrash,

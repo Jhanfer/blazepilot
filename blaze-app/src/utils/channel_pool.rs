@@ -65,7 +65,7 @@ pub enum FileOperation {
     UpdateDirSize {
         full_path: PathBuf, 
         size: u64, 
-        gene: u64,
+        tab_id: Uuid,
     },
     RestoreDeletedFiles {
         file_names: Vec<String>,
@@ -87,6 +87,14 @@ pub enum SureTo {
 }
 
 #[derive(Debug)]
+pub enum FileConflict {
+    AlreadyExist {
+        name: String,
+        path: PathBuf
+    }
+}
+
+#[derive(Debug)]
 pub enum UiEvent {
     OpenWithSelector {
         path: PathBuf,
@@ -99,6 +107,8 @@ pub enum UiEvent {
     SureTo(SureTo),
 
     UpdateMessages(UpdateMessages),
+
+    FileConflict(FileConflict),
 
     ShowError(String),
     RefreshList,
@@ -126,13 +136,7 @@ impl NotifyingSender {
 
     pub fn send_tasks(&self, msg: TaskMessage) -> Result<(), SendError<TaskMessage>> {
         let result = self.task_sender.send(msg);
-
-        if result.is_ok() {
-            let tab_id = self.tab_id;
-            info!(tab_id = %tab_id, "Notifier disparado desde send_tasks");
-            (self.notifier)();
-        }
-
+        if result.is_ok() {(self.notifier)();}
         result
     }
 

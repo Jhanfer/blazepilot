@@ -10,6 +10,19 @@ pub const ICON_VIDEO: &[u8] = include_bytes!("../assets/icons/movie.svg");
 pub const ICON_CODE: &[u8] = include_bytes!("../assets/icons/file-code.svg");
 pub const ICON_FONT: &[u8] = include_bytes!("../assets/icons/file-typography.svg");
 pub const ICON_EXE: &[u8] = include_bytes!("../assets/icons/file-digit.svg");
+pub const ICON_PLUS_FOLDER: &[u8] = include_bytes!("../assets/icons/folder-plus.svg");
+pub const ICON_FOLDER_DISABLE: &[u8] = include_bytes!("../assets/icons/folder-off.svg");
+pub const ICON_SCISSORS: &[u8] = include_bytes!("../assets/icons/scissors.svg");
+pub const ICON_SCISSORS_DISABLE: &[u8] = include_bytes!("../assets/icons/scissors-off.svg");
+pub const ICON_COPY: &[u8] = include_bytes!("../assets/icons/copy.svg");
+pub const ICON_COPY_DISABLE: &[u8] = include_bytes!("../assets/icons/copy-off.svg");
+pub const ICON_CLIPBOARD: &[u8] = include_bytes!("../assets/icons/clipboard.svg");
+pub const ICON_CLIPBOARD_DISABLE: &[u8] = include_bytes!("../assets/icons/clipboard-off.svg");
+pub const ICON_TRASH_DISABLED: &[u8] = include_bytes!("../assets/icons/trash-off.svg");
+pub const ICON_PLUS_FILE: &[u8] = include_bytes!("../assets/icons/file-plus.svg");
+pub const ICON_REFRESH: &[u8] = include_bytes!("../assets/icons/refresh.svg");
+pub const ICON_EYE: &[u8] = include_bytes!("../assets/icons/eye.svg");
+pub const ICON_EYE_CLOSED: &[u8] = include_bytes!("../assets/icons/eye-closed.svg");
 
 
 //Iconos varios
@@ -21,3 +34,5 @@ pub const ICON_SERVER: &[u8] = include_bytes!("../assets/icons/server.svg");
 pub const ICON_STAR: &[u8] = include_bytes!("../assets/icons/star.svg");
 pub const ICON_USER: &[u8] = include_bytes!("../assets/icons/user.svg");
 pub const ICON_LIST: &[u8] = include_bytes!("../assets/icons/list-check.svg");
+pub const ICON_SELECTALL: &[u8] = include_bytes!("../assets/icons/select-all.svg");
+pub const ICON_DESELECT: &[u8] = include_bytes!("../assets/icons/deselect.svg");

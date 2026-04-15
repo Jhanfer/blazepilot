@@ -1,4 +1,4 @@
-use std::{collections::HashSet, os::unix::fs::MetadataExt, path::{Path, PathBuf}, sync::{Arc, atomic::{AtomicU64, Ordering}}, time::UNIX_EPOCH};
+use std::{collections::HashSet, os::unix::fs::MetadataExt, path::{Path, PathBuf}, sync::{Arc, atomic::{AtomicU64, Ordering}}, time::{SystemTime, UNIX_EPOCH}};
 use jwalk::{Parallelism, WalkDir};
 use tokio::sync::{Mutex, Semaphore};
 use tracing::{debug, info};
@@ -56,6 +56,7 @@ impl SizerManager {
 
 
         let cm = self.cache_manager;
+        let tab_id = sender.tab_id;
 
         for msg in sizer_messages {
             match msg {
@@ -78,7 +79,7 @@ impl SizerManager {
                                 FileOperation::UpdateDirSize {
                                     full_path: path_buf,
                                     size: cached_size,
-                                    gene: 0,
+                                    tab_id,
                                 }
                             ).ok();
                         }
@@ -92,7 +93,8 @@ impl SizerManager {
                                 &path_to_task, 
                                 12,
                                 sender_clone.clone(),
-                                path_buf.clone()
+                                path_buf.clone(),
+                                tab_id,
                             ).await;
 
                             CacheManager::global()
@@ -105,7 +107,7 @@ impl SizerManager {
                             sender_clone.send_fileop(FileOperation::UpdateDirSize {
                                 full_path: path_buf,
                                 size: calculated_size,
-                                gene: 0,
+                                tab_id,
                             }).ok();
 
 
@@ -118,7 +120,7 @@ impl SizerManager {
 
     }
 
-    pub async fn get_recursive_size(root: impl AsRef<Path>, max_concurrency: usize, sender: NotifyingSender, path_buf: PathBuf) -> u64 {
+    pub async fn get_recursive_size(root: impl AsRef<Path>, max_concurrency: usize, sender: NotifyingSender, path_buf: PathBuf, tab_id: Uuid) -> u64 {
         let total_size = Arc::new(AtomicU64::new(0));
         let seen_inodes = Arc::new(Mutex::new(HashSet::new()));
         let semaphore = Arc::new(Semaphore::new(max_concurrency));
@@ -169,7 +171,7 @@ impl SizerManager {
                                         FileOperation::UpdateDirSize {
                                             full_path: path_task,
                                             size: new_total,
-                                            gene: 0,
+                                            tab_id,
                                         }
                                     ).ok();
                                 }

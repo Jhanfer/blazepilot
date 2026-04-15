@@ -123,7 +123,6 @@ impl SureToDeleteDialog {
             });
 
         if should_close {
-            info!("Se cierra");
             self.close();
         }
     }

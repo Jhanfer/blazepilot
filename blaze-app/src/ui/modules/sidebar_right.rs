@@ -21,7 +21,7 @@ use egui::{Button, Color32, Context, CornerRadius, Frame, Margin, SidePanel, Tex
 
 use crate::core::files::motor::FileEntry;
 use crate::core::{blaze_state::BlazeCoreState, configs::config_state::{OrderingMode, with_configs}};
-use crate::utils::formating::format_date;
+use crate::utils::formating::{format_date, format_size};
 
 pub fn sidebar_right_component(state: &mut BlazeCoreState, files: &Vec<Arc<FileEntry>>, ctx: &Context) {
 
@@ -131,16 +131,20 @@ pub fn sidebar_right_component(state: &mut BlazeCoreState, files: &Vec<Arc<FileE
                 });
 
 
-                if let Some(selected_path) = state.selected_files.iter().next() {
-                    let matching_file = files.iter().find(|file| &file.full_path == selected_path);
+                if let Some(first_selected_idx) = (0..files.len()).find(|&i| state.is_selected(i)) {
+                    let file = &files[first_selected_idx];
+
+                    ui.heading("Info");
+                    ui.separator();
                     
-                    if let Some(file) = matching_file {
-                        ui.heading("Info");
-                        ui.separator();
-                        
-                        ui.heading(file.name.clone());
-                        ui.label(format_date(file.modified));
-                        // etc.
+                    ui.heading(file.name.clone());
+                    ui.label(format_date(file.modified));
+                    
+                    if file.is_dir {
+                        ui.label("Tipo: Carpeta");
+                    } else {
+                        ui.label(format!("Tipo: {:?}", file.extension));
+                        ui.label(format!("Tamaño: {:?}", format_size(file.size)));
                     }
                 }
             });

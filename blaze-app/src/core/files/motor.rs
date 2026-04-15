@@ -229,7 +229,9 @@ impl TabState {
                                 sender.send_files_batch(FileLoadingMessage::FileAdded { name }).ok();
                             }
                         },
-                        EventKind::Remove(RemoveKind::File) => {
+                        EventKind::Remove(RemoveKind::File) |
+                        EventKind::Remove(RemoveKind::Folder) |
+                        EventKind::Remove(RemoveKind::Any) => {
                             // Archivo eliminado
                             if let Some(path) = event.paths.first() {
                                 let name = path.file_name()
@@ -632,32 +634,6 @@ impl TabState {
             self.history.push(self.cwd.clone());
             self.cwd = next;
         }
-    }
-
-
-
-    pub fn sort_indices(&mut self, _: OrderingMode) {
-        let new_mode = with_configs(|cfg| cfg.configs.app_ordering_mode.clone());
-
-        self.sorted_indices.sort_by(|&i1, &i2|{
-            let a = &self.files[i1];
-            let b = &self.files[i2];
-
-            match (a.is_dir, b.is_dir)  {
-                (true, false) => return std::cmp::Ordering::Less,
-                (false, true) => return std::cmp::Ordering::Greater,
-                _ => (),
-            }
-
-            match new_mode {
-                OrderingMode::Az => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
-                OrderingMode::Za => b.name.to_lowercase().cmp(&a.name.to_lowercase()),
-                OrderingMode::SizeAsc => a.size.cmp(&b.size),
-                OrderingMode::SizeDesc => b.size.cmp(&a.size),
-                OrderingMode::DateAsc => a.modified.cmp(&b.modified),
-                OrderingMode::DateDesc => b.modified.cmp(&a.modified),
-            }
-        });
     }
 
 }

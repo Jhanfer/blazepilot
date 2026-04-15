@@ -156,7 +156,7 @@ impl LinuxDisks {
             }
 
             if let Some(mp) = &mountpoint {
-                let system_paths = ["/", "/boot", "/boot/efi", "/var", "/etc"];
+                let system_paths = [ "/boot", "/boot/efi", "/var", "/etc"];
                 if system_paths.contains(&mp.as_str()) {
                     continue;
                 }

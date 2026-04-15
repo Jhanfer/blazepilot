@@ -32,7 +32,11 @@ impl eframe::App for BlazeApp {
         self.ui_state.dialog_manager.render_area(ctx);
         self.ui_state.process_events();
 
-        let files = self.state.active_files();
+        let mut files = self.state.active_files();
+        if self.state.needs_sort {
+            files = self.state.sort_indices(&mut files);
+        }
+
         connect_ui_components_callback(ctx, &files, &mut self.state, &mut self.ui_state);
 
 

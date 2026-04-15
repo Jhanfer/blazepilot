@@ -18,7 +18,7 @@
 use std::path::PathBuf;
 use egui::{Area, Context, Order, Sense};
 use uuid::Uuid;
-use crate::{core::{files::{self, motor::with_motor}, system::{fileopener_module::{AppAssociation, platform::linux::linux::AppsIconData}, updater::updater::UpdateMessages}}, ui::{dialogs::{error_dialog::ErrorDialog, selector_dialog::AppSelectorDialog, sure_to_delete::SureToDeleteDialog, sure_to_move_to::SureToMoveToDialog, update_dialog::UpdateDialog}, icons_cache::icon_cache::IconCache}, utils::channel_pool::{SureTo, UiEvent, with_channel_pool}};
+use crate::{core::{files::{self, motor::with_motor}, system::{fileopener_module::{AppAssociation, platform::linux::linux::AppsIconData}, updater::updater::UpdateMessages}}, ui::{dialogs::{error_dialog::ErrorDialog, selector_dialog::AppSelectorDialog, sure_to_delete::SureToDeleteDialog, sure_to_move_to::SureToMoveToDialog, update_dialog::UpdateDialog}, icons_cache::icon_cache::IconCache}, utils::channel_pool::{FileConflict, SureTo, UiEvent, with_channel_pool}};
 use tracing::{debug, info};
 
 
@@ -144,18 +144,13 @@ impl BlazeUiState {
                 UiEvent::OpenWithSelector { path, mime, apps, icon_data, show_all_apps} => {
                     self.dialog_manager.open_selector_dialog(path, mime, apps, icon_data, show_all_apps);
                 },
-
-
                 UiEvent::ShowError(message) => {
                     info!("Error recibido");
                     self.dialog_manager.open_error_dialog(message);
                 },
-
-
                 UiEvent::RefreshList => {
                     info!("RECIBIDO!!");
                 },
-
                 UiEvent::SureTo(sureto) => {
                     match sureto {
                         SureTo::SureToMove { files, dest, tab_id } => {
@@ -168,7 +163,6 @@ impl BlazeUiState {
                         SureTo::SureToCopy => todo!(),
                     }
                 },
-
                 UiEvent::UpdateMessages(update_message) => {
                     match update_message {
                         UpdateMessages::NewVersionAvailable { current_version, new_version , tab_id} => {
@@ -180,6 +174,14 @@ impl BlazeUiState {
                         },
                         UpdateMessages::ProcedToUpdate => {
 
+                        },
+                    }
+                },
+
+                UiEvent::FileConflict(file_conflict) => {
+                    match file_conflict {
+                        FileConflict::AlreadyExist { name, path } => {
+                            info!("Ya existe {} en {:?}", name, path);
                         },
                     }
                 },

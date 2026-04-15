@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use egui::{Area, Order, TopBottomPanel, Window};
 
-use crate::{core::{blaze_state::BlazeCoreState, files::motor::FileEntry}, ui::{blaze_ui_state::BlazeUiState, modules::{file_view::file_view_component, sidebar_left::sidebar_left_component, sidebar_right::sidebar_right_component, toolbar::toolbar_component}}};
+use crate::{core::{blaze_state::BlazeCoreState, files::motor::FileEntry}, ui::{blaze_ui_state::BlazeUiState, modules::{row_view::row_view_callback::render_row_view, sidebar_left::sidebar_left_component, sidebar_right::sidebar_right_component, toolbar::toolbar_component}}};
 
 
 pub fn connect_ui_components_callback(ctx: &egui::Context, files: &Vec<Arc<FileEntry>>, state: &mut BlazeCoreState, ui_state: &mut BlazeUiState) {
@@ -28,6 +28,6 @@ pub fn connect_ui_components_callback(ctx: &egui::Context, files: &Vec<Arc<FileE
     // -------------------------------
     //  file view 
     // -------------------------------
-    file_view_component(ctx, files, state, ui_state);
+    render_row_view(ctx, files, state, ui_state);
 
 }
