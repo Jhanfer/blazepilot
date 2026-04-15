@@ -1,5 +1,5 @@
 use std::{path::PathBuf, sync::Arc};
-use egui::{Button, CentralPanel, Color32, Context, CornerRadius, Frame, Key, Margin, Rect, Stroke, StrokeKind, TextEdit, Ui, pos2, vec2};
+use egui::{Button, CentralPanel, Color32, Context, CornerRadius, Frame, Key, Margin, Rect, TextEdit, Ui};
 use tracing::error;
 use crate::{core::{blaze_state::{BlazeCoreState, NewItemType}, files::motor::FileEntry, system::sizer_manager::sizer_manager::SizerMessages}, ui::{blaze_ui_state::BlazeUiState, modules::row_view::{drag_drop_logic::drag_files, hot_keys::hot_keys_logic, island_n_bubble::render_island_bubble, render_drag::render_drag_files, rubber_band_logic::render_rubberband, srcoll_view::render_scrollview, tools_view::tools}}, utils::channel_pool::{FileOperation, SureTo, UiEvent}};
 
@@ -45,7 +45,9 @@ fn background_response_logic(state: &mut BlazeCoreState, files: &Vec<Arc<FileEnt
     let bg_id = ui.id().with("background_interact");
     let bg_response = ui.interact(ui.available_rect_before_wrap(), bg_id, egui::Sense::click_and_drag());
 
-    if bg_response.drag_started() {
+    let dragged_by  = bg_response.drag_started_by(egui::PointerButton::Primary) || bg_response.drag_started_by(egui::PointerButton::Secondary);
+    
+    if dragged_by {
         if let Some(orgin) = ctx.input(|i| i.pointer.press_origin()) {
             state.rubber_band.rubber_band_start_content_y = orgin.y - panel_top + state.scroll_offset;
             state.rubber_band.rubber_band_start = Some(orgin);
@@ -222,11 +224,8 @@ pub fn render_row_view(ctx: &egui::Context, files: &Vec<Arc<FileEntry>>, state: 
                 //Background
                 background_response_logic(state, files, ui, ctx, panel_top, total_rows, row_height, content_rect);
 
-                
 
-
-
-
+                //Scrollview
                 render_scrollview(ctx, files, state, ui_state, ui, row_height, total_rows, content_rect);
 
 

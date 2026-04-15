@@ -1,6 +1,7 @@
-use std::sync::Arc;
-use egui::{ Key, Ui};
-use crate::core::{blaze_state::BlazeCoreState, files::motor::FileEntry};
+use std::{path::PathBuf, sync::Arc};
+use egui::{ Key, Modifiers, PointerButton, Ui};
+use tracing::info;
+use crate::{core::{blaze_state::{BlazeCoreState, NewItemType}, files::motor::FileEntry}, utils::channel_pool::{FileOperation, SureTo, UiEvent}};
 
 pub fn hot_keys_logic(state: &mut BlazeCoreState, files: &Vec<Arc<FileEntry>>, ui: &mut Ui, total_rows: usize) {
     let input = ui.input(|i| i.clone());
@@ -54,4 +55,102 @@ pub fn hot_keys_logic(state: &mut BlazeCoreState, files: &Vec<Arc<FileEntry>>, u
     if input.modifiers.command && input.key_pressed(Key::A) {
         state.toggle_select_all(files.len());
     }
+
+
+    //Recargar
+    if (input.key_pressed(Key::F5) || 
+    (input.modifiers.command && input.key_pressed(Key::R))) && disable_keys {
+        state.refresh();
+    }
+
+
+    //Botones del ratón
+    if input.pointer.button_pressed(PointerButton::Extra1) && disable_keys {
+        state.back();
+    }
+
+    if input.pointer.button_pressed(PointerButton::Extra2) && disable_keys {
+        state.forward();
+    }
+
+
+    //eliminar 
+    if (input.key_pressed(Key::Delete) || input.key_pressed(Key::Backspace)) && disable_keys {
+        let cwd = state.motor.borrow_mut().active_tab().cwd.clone();
+        let trash = state.motor.borrow_mut().get_trash_dir(None).unwrap_or_default();
+
+        if trash == cwd {
+            let Some(sender) = state.sender().cloned() else {return;};
+            let tab_id = state.motor.borrow_mut().active_tab().id;
+            let sources = state.get_selected_paths(files);
+            sender.send_ui_event(
+                UiEvent::SureTo(
+                    SureTo::SureToDelete { 
+                        files: sources, 
+                        tab_id 
+                    }
+                )
+            ).ok();
+            
+        } else {
+            state.move_to_trash(files);
+        }
+    }
+
+
+    let (mut do_copy, mut do_cut, mut do_paste) = (false, false, false);
+
+    ui.ctx().input(|i| {
+        for event in &i.events {
+            match event {
+                egui::Event::Copy => do_copy = true,
+                egui::Event::Cut => do_cut = true,
+                egui::Event::Paste(_) => do_paste = true,
+                _ => {}
+            }
+        }
+    });
+
+    //copiar
+    if do_copy && disable_keys { 
+        state.copy(files);
+    }
+
+    //cortar
+    if do_cut && disable_keys { 
+        state.cut(files);
+    }
+
+    //pegar
+    if do_paste && disable_keys { 
+        let cwd = state.motor.borrow_mut().active_tab().cwd.clone();
+        state.paste(cwd);
+    }
+    
+    //creación de nueva carpeta
+    if input.modifiers.command && input.modifiers.shift && input.key_pressed(Key::N) {
+        state.creating_new = Some(NewItemType::Folder);
+        state.new_item_buffer = "nueva carpeta".to_string(); 
+    }
+
+
+
+
+    // ---- Pestañas ----
+
+    // nueva pestaña
+    if input.modifiers.command && input.key_pressed(Key::N) && disable_keys {
+        info!("pestaña nueva")
+    }
+
+    // cerrar pestaña actual
+    if input.modifiers.command && input.key_pressed(Key::W) {
+        info!("cerrar pestaña")
+    }
+
+    // cambiar de pestaña
+    if input.modifiers.command && input.key_pressed(Key::Tab) {
+        info!("cambiar pestaña")
+    }
+
 }

@@ -65,7 +65,7 @@ impl SureToDeleteDialog {
             .corner_radius(CornerRadius::same(10))
             .inner_margin(Margin::same(10));
 
-        Window::new("Mover...")
+        Window::new("")
             .frame(custom_frame)
             .order(Order::Foreground)
             .collapsible(false)

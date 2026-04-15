@@ -1,7 +1,4 @@
 use std::sync::Arc;
-
-use egui::{Area, Order, TopBottomPanel, Window};
-
 use crate::{core::{blaze_state::BlazeCoreState, files::motor::FileEntry}, ui::{blaze_ui_state::BlazeUiState, modules::{row_view::row_view_callback::render_row_view, sidebar_left::sidebar_left_component, sidebar_right::sidebar_right_component, toolbar::toolbar_component}}};
 
 
