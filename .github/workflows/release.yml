@@ -32,20 +32,19 @@ jobs:
       - name: Compilar en modo Release
         run: cargo build --release --target x86_64-unknown-linux-gnu
 
-      - name: Renombrar binario para self_update
+      - name: Renombrar binario
+        id: rename
         run: |
           VERSION=${GITHUB_REF_NAME#v}
-          BIN_NAME="blazepilot"
-          cp "target/x86_64-unknown-linux-gnu/release/$BIN_NAME" "./${BIN_NAME}-x86_64-unknown-linux-gnu-v${VERSION}"
+          FILE="blazepilot-x86_64-unknown-linux-gnu-v${VERSION}"
+          cp target/x86_64-unknown-linux-gnu/release/blazepilot "./$FILE"
+          echo "file=$FILE" >> "$GITHUB_OUTPUT"
 
       - name: Subir binario al Release
         uses: softprops/action-gh-release@v2
         with:
-          files: blazepilot-x86_64-unknown-linux-gnu-v${{ github.ref_name }}
+          files: ${{ steps.rename.outputs.file }}
           tag_name: ${{ github.ref_name }}
           name: Release ${{ github.ref_name }}
-          draft: false
-          prerelease: false
-          generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
