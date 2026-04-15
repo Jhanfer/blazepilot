@@ -41,7 +41,7 @@ jobs:
       - name: Subir binario al Release
         uses: softprops/action-gh-release@v2
         with:
-          files: blazepilot-x86_64-unknown-linux-gnu
+          files: blazepilot-x86_64-unknown-linux-gnu-v${{ github.ref_name }}
           tag_name: ${{ github.ref_name }}
           name: Release ${{ github.ref_name }}
           draft: false
