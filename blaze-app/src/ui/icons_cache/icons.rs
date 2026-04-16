@@ -23,7 +23,13 @@ pub const ICON_PLUS_FILE: &[u8] = include_bytes!("../assets/icons/file-plus.svg"
 pub const ICON_REFRESH: &[u8] = include_bytes!("../assets/icons/refresh.svg");
 pub const ICON_EYE: &[u8] = include_bytes!("../assets/icons/eye.svg");
 pub const ICON_EYE_CLOSED: &[u8] = include_bytes!("../assets/icons/eye-closed.svg");
-
+pub const ICON_RESTORE: &[u8] = include_bytes!("../assets/icons/restore.svg");
+pub const ICON_TERMINAL: &[u8] = include_bytes!("../assets/icons/terminal.svg");
+pub const ICON_FOLDER_OPEN: &[u8] = include_bytes!("../assets/icons/folder-open.svg");
+pub const ICON_EXTERNAL_LINK: &[u8] = include_bytes!("../assets/icons/external-link.svg");
+pub const ICON_EDIT: &[u8] = include_bytes!("../assets/icons/edit.svg");
+pub const ICON_EDIT_DISABLE: &[u8] = include_bytes!("../assets/icons/edit-off.svg");
+pub const ICON_BELL: &[u8] = include_bytes!("../assets/icons/bell.svg");
 
 //Iconos varios
 pub const ICON_HOME: &[u8] = include_bytes!("../assets/icons/home.svg");
@@ -32,6 +38,7 @@ pub const ICON_DOWNLOADS: &[u8] = include_bytes!("../assets/icons/download.svg")
 pub const ICON_TRASH: &[u8] = include_bytes!("../assets/icons/trash.svg");
 pub const ICON_SERVER: &[u8] = include_bytes!("../assets/icons/server.svg");
 pub const ICON_STAR: &[u8] = include_bytes!("../assets/icons/star.svg");
+pub const ICON_STAR_DISABLE: &[u8] = include_bytes!("../assets/icons/star-off.svg");
 pub const ICON_USER: &[u8] = include_bytes!("../assets/icons/user.svg");
 pub const ICON_LIST: &[u8] = include_bytes!("../assets/icons/list-check.svg");
 pub const ICON_SELECTALL: &[u8] = include_bytes!("../assets/icons/select-all.svg");

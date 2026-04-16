@@ -21,7 +21,7 @@ use bitvec::vec::BitVec;
 use fuzzy_matcher::{FuzzyMatcher, skim::SkimMatcherV2};
 use tracing::{debug, error, info, warn};
 use tokio::sync::Mutex as TokioMutex;
-use crate::{core::{configs::config_state::{OrderingMode, with_configs}, files::{motor::{BlazeMotor, FileEntry, FileLoadingMessage, MOTOR}, recursive_search::RecursiveMessages}, system::{clipboard::{GlobalClipboard, TOKIO_RUNTIME}, fileopener_module::{FileOpenerManager, GLOBAL_FILE_OPENER}, sizer_manager::{self, sizer_manager::SizerManager}, updater::updater::Updater}}, ui::task_manager::task_manager::TaskManager, utils::channel_pool::{FileOperation, NotifyingSender, with_active_sender_for, with_channel_pool}};
+use crate::{core::{configs::config_state::{OrderingMode, with_configs}, files::{motor::{BlazeMotor, FileEntry, FileLoadingMessage, MOTOR}, recursive_search::RecursiveMessages}, system::{clipboard::{GlobalClipboard, TOKIO_RUNTIME}, fileopener_module::{FileOpenerManager, GLOBAL_FILE_OPENER}, sizer_manager::{self, sizer_manager::SizerManager}, terminal_opener::terminal_manager::{self, GLOBAL_TERMINAL_MANAGER, TerminalManager}, updater::updater::Updater}}, ui::task_manager::task_manager::TaskManager, utils::channel_pool::{FileOperation, NotifyingSender, with_active_sender_for, with_channel_pool}};
 
 pub struct RubberBand {
     pub rubber_band_start: Option<egui::Pos2>,
@@ -77,6 +77,7 @@ pub struct BlazeCoreState {
     pub needs_sort: bool,
     pub cwd_input: String,
     pub test: bool,
+    pub terminal_manager: Arc<TokioMutex<TerminalManager>>,
 }
 
 impl BlazeCoreState {
@@ -110,6 +111,8 @@ impl BlazeCoreState {
 
         let sizer_manager = SizerManager::new();
 
+        let terminal_manager = GLOBAL_TERMINAL_MANAGER.clone();
+
         let mut state = Self {
             motor,
             is_loading: false,
@@ -140,6 +143,7 @@ impl BlazeCoreState {
             needs_sort: false,
             cwd_input: String::new(),
             test: false,
+            terminal_manager,
         };
 
         if let Some(sender) = state.sender().cloned() {
@@ -515,6 +519,16 @@ impl BlazeCoreState {
         });
     }
 
+
+    pub fn open_terminal_here(&self) {
+        let cwd = self.motor.borrow_mut().active_tab().cwd.clone();
+        let tm_manager = self.terminal_manager.clone();
+        TOKIO_RUNTIME.spawn(async move {
+            let mut tm_manager = tm_manager.lock().await;
+            tm_manager.request_open_terminal(&cwd).await
+        });
+    }
+    
 
     pub fn process_messages(&mut self) {
         let active_id = {

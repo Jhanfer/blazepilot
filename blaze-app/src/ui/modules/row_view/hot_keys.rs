@@ -133,7 +133,16 @@ pub fn hot_keys_logic(state: &mut BlazeCoreState, files: &Vec<Arc<FileEntry>>, u
         state.new_item_buffer = "nueva carpeta".to_string(); 
     }
 
+    //creación de nuevo archivo
+    if input.modifiers.command && input.modifiers.shift && input.key_pressed(Key::F) {
+        state.creating_new = Some(NewItemType::File);
+        state.new_item_buffer = "nuevo archivo".to_string();
+    }
 
+
+    if input.modifiers.alt && input.key_pressed(Key::T) {
+        state.open_terminal_here();
+    }
 
 
     // ---- Pestañas ----

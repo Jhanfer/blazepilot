@@ -1,7 +1,7 @@
 use std::{path::PathBuf, sync::Arc};
-use egui::{Button, CentralPanel, Color32, Context, CornerRadius, Frame, Key, Margin, Rect, TextEdit, Ui};
+use egui::{Button, CentralPanel, Color32, Context, CornerRadius, Frame, Key, Label, Margin, Rect, RichText, Sense, TextEdit, Ui, pos2};
 use tracing::error;
-use crate::{core::{blaze_state::{BlazeCoreState, NewItemType}, files::motor::FileEntry, system::sizer_manager::sizer_manager::SizerMessages}, ui::{blaze_ui_state::BlazeUiState, modules::row_view::{drag_drop_logic::drag_files, hot_keys::hot_keys_logic, island_n_bubble::render_island_bubble, render_drag::render_drag_files, rubber_band_logic::render_rubberband, srcoll_view::render_scrollview, tools_view::tools}}, utils::channel_pool::{FileOperation, SureTo, UiEvent}};
+use crate::{core::{blaze_state::{BlazeCoreState, NewItemType}, files::motor::FileEntry, system::{clipboard::TOKIO_RUNTIME, sizer_manager::sizer_manager::SizerMessages}}, ui::{blaze_ui_state::BlazeUiState, icons_cache::icons, modules::row_view::{drag_drop_logic::drag_files, hot_keys::hot_keys_logic, island_n_bubble::render_island_bubble, render_drag::render_drag_files, rubber_band_logic::render_rubberband, srcoll_view::render_scrollview, tools_view::tools}}, utils::channel_pool::{FileOperation, SureTo, UiEvent}};
 
 
 fn new_ff_logic(state: &mut BlazeCoreState, ui: &mut Ui) {
@@ -41,7 +41,7 @@ fn new_ff_logic(state: &mut BlazeCoreState, ui: &mut Ui) {
     }
 }
 
-fn background_response_logic(state: &mut BlazeCoreState, files: &Vec<Arc<FileEntry>>, ui: &mut Ui, ctx: &Context, panel_top: f32, total_rows: usize, row_height: f32, content_rect: Rect) {
+fn background_response_logic(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, files: &Vec<Arc<FileEntry>>, ui: &mut Ui, ctx: &Context, panel_top: f32, total_rows: usize, row_height: f32, content_rect: Rect) {
     let bg_id = ui.id().with("background_interact");
     let bg_response = ui.interact(ui.available_rect_before_wrap(), bg_id, egui::Sense::click_and_drag());
 
@@ -109,52 +109,216 @@ fn background_response_logic(state: &mut BlazeCoreState, files: &Vec<Arc<FileEnt
                     .into_owned())
                 .collect();
 
-            let res = ui.add_enabled(sources.is_empty(), Button::new("Restaurar"));
+            
+            ui.horizontal(|ui|{
+                let (icon, bytes) = ("restore", icons::ICON_RESTORE);
 
-            if res.clicked() {
-                sender.send_fileop(
-                    FileOperation::RestoreDeletedFiles {
-                        file_names
-                    }
-                ).ok();
-            }
+                let icon = ui_state.icon_cache.get_or_load(ctx, icon, bytes, Color32::GRAY);
+
+                let res = ui.add_enabled(
+                    !sources.is_empty(),
+                    egui::Button::image_and_text(
+                        icon,
+                        "Restaurar"
+                    )
+                );
+
+                if res.clicked() {
+                    sender.send_fileop(
+                        FileOperation::RestoreDeletedFiles {
+                            file_names
+                        }
+                    ).ok();
+                }
+
+                //Poner hotkey para esto
+            });
 
             ui.separator();
             
-            let del = ui.add_enabled(!sources.is_empty(), Button::new("Eliminar"));
+            ui.horizontal(|ui|{
+                let (icon, bytes) = ("trash-forever", icons::ICON_TRASH);
 
-            if del.clicked() {
-                sender.send_ui_event(
-                    UiEvent::SureTo(
-                        SureTo::SureToDelete {
-                            files: sources, 
-                            tab_id 
-                        }
+                let icon = ui_state.icon_cache.get_or_load(ctx, icon, bytes, Color32::RED);
+
+                let del = ui.add_enabled(
+                    !sources.is_empty(),
+                    egui::Button::image_and_text(
+                        icon,
+                        RichText::new("Eliminar")
+                                .color(Color32::RED)
                     )
-                ).ok();
-            }
+                );
+
+                if del.clicked() {
+                    sender.send_ui_event(
+                        UiEvent::SureTo(
+                            SureTo::SureToDelete {
+                                files: sources, 
+                                tab_id 
+                            }
+                        )
+                    ).ok();
+                }
+                
+                ui.add(
+                    Label::new(
+                        RichText::new("Supr")
+                                .color(Color32::RED)
+                                .small()
+                                .weak()
+                    )
+                    .selectable(false)
+                );
+            });
         });
     } else {
         bg_response.context_menu(|ui| {
             state.deselect_all();
             state.resize_selection(files.len());
 
-            if ui.add_enabled(state.clipboard.clipboard_has_files(), Button::new("Pegar aquí")).clicked() {
-                let cwd = state.motor.borrow_mut().active_tab().cwd.clone();
-                state.paste(cwd);
-                ui.close();
-            }
 
-            if ui.button("Nueva carpeta").clicked() {
-                state.creating_new = Some(NewItemType::Folder);
-                state.new_item_buffer = "nueva carpeta".to_string(); 
-                ui.close();
-            }
-            if ui.button("Nuevo archivo").clicked() {
-                state.creating_new = Some(NewItemType::File);
-                state.new_item_buffer = "nuevo archivo".to_string();
-                ui.close();
-            }
+            ui.horizontal(|ui|{
+                let has_clipboard = state.clipboard.clipboard_has_files();
+                let (icon, bytes) = if has_clipboard {
+                    ("clipboard", icons::ICON_CLIPBOARD)
+                } else {
+                    ("clipboard-disabled", icons::ICON_CLIPBOARD_DISABLE)
+                };
+
+                let icon = ui_state.icon_cache.get_or_load(ctx, icon, bytes, Color32::GRAY);
+
+
+                let paste = ui.add_enabled(
+                    has_clipboard,
+                    egui::Button::image_and_text(
+                        icon,
+                        "Pegar aquí"
+                    )
+                );
+
+                if paste.hovered() {
+                    ctx.set_cursor_icon(egui::CursorIcon::PointingHand);
+                }
+
+                if paste.clicked() {
+                    let cwd = state.motor.borrow_mut().active_tab().cwd.clone();
+                    state.paste(cwd);
+                    ui.close();
+                }
+
+                ui.add(
+                    Label::new(
+                        RichText::new("Ctrl + V")
+                                .small()
+                                .weak()
+                    )
+                    .selectable(false)
+                );
+            });
+
+            ui.separator();
+
+
+            ui.horizontal(|ui|{
+                let (icon, bytes) = ("terminal", icons::ICON_TERMINAL);
+
+                let icon = ui_state.icon_cache.get_or_load(ctx, icon, bytes, Color32::GRAY);
+
+                let term = ui.add(
+                    egui::Button::image_and_text(
+                        icon,
+                        "Abrir terminal aqui"
+                    )
+                );
+
+                if term.hovered() {
+                    ctx.set_cursor_icon(egui::CursorIcon::PointingHand);
+                }
+
+                if term.clicked() {
+                    state.open_terminal_here();
+                    ui.close();
+                }
+
+                ui.add(
+                    Label::new(
+                        RichText::new("Alt + T")
+                                .small()
+                                .weak()
+                    )
+                    .selectable(false)
+                );
+            });
+
+
+            ui.separator();
+
+
+            ui.horizontal(|ui|{
+                let (icon, bytes) = ("plus-folder", icons::ICON_PLUS_FOLDER);
+
+                let icon = ui_state.icon_cache.get_or_load(ctx, icon, bytes, Color32::GRAY);
+
+                let new_fol = ui.add(
+                    egui::Button::image_and_text(
+                        icon,
+                        "Nueva carpeta"
+                    )
+                );
+
+                if new_fol.hovered() {
+                    ctx.set_cursor_icon(egui::CursorIcon::PointingHand);
+                }
+
+                if new_fol.clicked() {
+                    state.creating_new = Some(NewItemType::Folder);
+                    state.new_item_buffer = "nueva carpeta".to_string(); 
+                    ui.close();
+                }
+
+                ui.add(
+                    Label::new(
+                        RichText::new("Ctrl + Shfit + N")
+                                .small()
+                                .weak()
+                    )
+                    .selectable(false)
+                );
+            });
+
+            
+            ui.horizontal(|ui|{
+                let (icon, bytes) = ("plus-file", icons::ICON_PLUS_FILE);
+
+                let icon = ui_state.icon_cache.get_or_load(ctx, icon, bytes, Color32::GRAY);
+
+                let new_file = ui.add(
+                    egui::Button::image_and_text(
+                        icon,
+                        "Nuevo archivo"
+                    )
+                );
+
+                if new_file.hovered() {
+                    ctx.set_cursor_icon(egui::CursorIcon::PointingHand);
+                }
+
+                if new_file.clicked() {
+                    state.creating_new = Some(NewItemType::File);
+                    state.new_item_buffer = "nuevo archivo".to_string();
+                    ui.close();
+                }
+
+                ui.add(
+                    Label::new(
+                        RichText::new("Ctrl + Shfit + F")
+                                .small()
+                                .weak()
+                    )
+                    .selectable(false)
+                );
+            });
         });
     }
 
@@ -222,7 +386,7 @@ pub fn render_row_view(ctx: &egui::Context, files: &Vec<Arc<FileEntry>>, state: 
                 hot_keys_logic(state, files, ui, total_rows);
 
                 //Background
-                background_response_logic(state, files, ui, ctx, panel_top, total_rows, row_height, content_rect);
+                background_response_logic(state, ui_state, files, ui, ctx, panel_top, total_rows, row_height, content_rect);
 
 
                 //Scrollview

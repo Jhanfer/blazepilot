@@ -1,7 +1,7 @@
 use std::{path::PathBuf, sync::Arc};
-use egui::{Button, Color32, FontId, Key, Rect, ScrollArea, Sense, Ui, UiBuilder, pos2, scroll_area::ScrollSource, vec2};
+use egui::{Button, Color32, FontId, Key, Label, Rect, RichText, ScrollArea, Sense, Ui, UiBuilder, pos2, scroll_area::ScrollSource, vec2};
 use tracing::{error, info};
-use crate::{core::{blaze_state::BlazeCoreState, configs::config_state::with_configs, files::{file_extension::{DocType, FileExtension}, motor::FileEntry}}, ui::{blaze_ui_state::BlazeUiState, icons_cache::icons}, utils::{channel_pool::{FileOperation, SureTo, UiEvent}, formating::{format_date, format_size}}};
+use crate::{core::{blaze_state::BlazeCoreState, configs::config_state::with_configs, files::{file_extension::{DocType, FileExtension}, motor::FileEntry}, system::clipboard::TOKIO_RUNTIME}, ui::{blaze_ui_state::BlazeUiState, icons_cache::icons}, utils::{channel_pool::{FileOperation, SureTo, UiEvent}, formating::{format_date, format_size}}};
 
 
 pub fn render_scrollview(ctx: &egui::Context, files: &Vec<Arc<FileEntry>>, state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, ui: &mut Ui, row_height: f32, total_rows: usize, content_rect: Rect) {
@@ -127,64 +127,261 @@ pub fn render_scrollview(ctx: &egui::Context, files: &Vec<Arc<FileEntry>>, state
                                 .into_owned())
                             .collect();
 
-                        if ui.button("Restaurar").clicked() {
-                            sender.send_fileop(
-                                FileOperation::RestoreDeletedFiles {
-                                    file_names
-                                }
-                            ).ok();
-                        }
+
+                        ui.horizontal(|ui|{
+                            let (icon, bytes) = ("restore", icons::ICON_RESTORE);
+
+                            let icon = ui_state.icon_cache.get_or_load(ctx, icon, bytes, Color32::GRAY);
+
+                            let restore = ui.add(
+                                egui::Button::image_and_text(
+                                    icon,
+                                    "Restaurar"
+                                )
+                            );
+
+                            if restore.hovered() {
+                                ctx.set_cursor_icon(egui::CursorIcon::PointingHand);
+                            }
+
+                            if restore.clicked() {
+                                sender.send_fileop(
+                                    FileOperation::RestoreDeletedFiles {
+                                        file_names
+                                    }
+                                ).ok();
+                                ui.close();
+                            }
+
+                            //Añadirle hotkey
+                        });
 
                         ui.separator();
 
-                        if ui.button("Eliminar").clicked() {
-                            sender.send_ui_event(
-                                UiEvent::SureTo(
-                                    SureTo::SureToDelete { 
-                                        files: sources, 
-                                        tab_id 
-                                    }
+
+                        ui.horizontal(|ui|{
+                            let (icon, bytes) = ("trash-forever", icons::ICON_TRASH);
+
+                            let icon = ui_state.icon_cache.get_or_load(ctx, icon, bytes, Color32::RED);
+
+                            let restore = ui.add(
+                                egui::Button::image_and_text(
+                                    icon,
+                                    RichText::new("Eliminar")
+                                            .color(Color32::RED)
                                 )
-                            ).ok();
-                        }
+                            );
+
+                            if restore.hovered() {
+                                ctx.set_cursor_icon(egui::CursorIcon::PointingHand);
+                            }
+
+                            if restore.clicked() {
+                                sender.send_ui_event(
+                                    UiEvent::SureTo(
+                                        SureTo::SureToDelete { 
+                                            files: sources, 
+                                            tab_id 
+                                        }
+                                    )
+                                ).ok();
+                                ui.close();
+                            }
+
+                            ui.add(
+                                Label::new(
+                                    RichText::new("Supr")
+                                            .color(Color32::RED)
+                                            .small()
+                                            .weak()
+                                )
+                                .selectable(false)
+                            );
+                        });
                     });
                 } else {
                     response.context_menu(|ui| {
-                        if !file.is_dir {
-                            let respo =  ui.menu_button("Abrir...", |ui|{
-                                if ui.button("Abrir con...").clicked() {
-                                    state.open_file_with(&file);
+
+                        ui.horizontal(|ui|{
+
+                            if !file.is_dir {
+
+                                let (icon_plus_fol, icon_bytes_plus_fol) = ("external-link", icons::ICON_EXTERNAL_LINK);
+
+                                let icon_size = egui::vec2(16.0, 16.0);
+                                let icon_rect = ui.allocate_exact_size(icon_size, Sense::click()).0;
+                                
+                                let icon = ui_state.icon_cache.get_or_load(ctx, icon_plus_fol, icon_bytes_plus_fol, Color32::GRAY);
+                                
+                                let painter = ui.painter();
+
+                                painter.image(
+                                    icon.id(),
+                                    icon_rect,
+                                    Rect::from_min_max(egui::pos2(0.0, 0.0), 
+                                    pos2(1.0, 1.0)),
+                                    Color32::WHITE,
+                                );
+
+                                let respo =  ui.menu_button("Abrir...", |ui|{
+                                    if ui.button("Abrir con...").clicked() {
+                                        state.open_file_with(&file);
+                                        ui.close();
+                                    }
+                                }).response;
+
+                                if respo.clicked() {
+                                    if file.is_dir {
+                                        state.navigate_to(file.full_path.clone());
+                                    } else {
+                                        state.open_file(&file);
+                                    }
                                     ui.close();
                                 }
-                            }).response;
 
-                            if respo.clicked() {
-                                if file.is_dir {
-                                    state.navigate_to(file.full_path.clone());
-                                } else {
-                                    state.open_file(&file);
-                                }
+                                ui.add(
+                                    Label::new(
+                                        RichText::new("Enter")
+                                                .color(Color32::GRAY)
+                                                .small()
+                                                .weak()
+                                    )
+                                    .selectable(false)
+                                );
+
+                            } else {
+
+                                ui.horizontal(|ui|{
+                                    let (icon, bytes) = ("folder-open", icons::ICON_FOLDER_OPEN);
+
+                                    let icon = ui_state.icon_cache.get_or_load(ctx, icon, bytes, Color32::GRAY);
+
+                                    let paste = ui.add(
+                                        egui::Button::image_and_text(
+                                            icon,
+                                            "Abrir"
+                                        )
+                                    );
+
+                                    if paste.hovered() {
+                                        ctx.set_cursor_icon(egui::CursorIcon::PointingHand);
+                                    }
+
+                                    if paste.clicked() {
+                                        state.navigate_to(file.full_path.clone());
+                                        ui.close();
+                                    }
+
+                                    ui.add(
+                                        Label::new(
+                                            RichText::new("Enter")
+                                                    .color(Color32::GRAY)
+                                                    .small()
+                                                    .weak()
+                                        )
+                                        .selectable(false)
+                                    );
+                                });
+                            }
+
+                        });
+
+
+
+                        ui.horizontal(|ui|{
+                            let enable = state.clipboard.clipboard_has_files() && file.is_dir;
+
+                            let (icon, bytes) = if enable {
+                                ("clipboard", icons::ICON_CLIPBOARD)
+                            } else {
+                                ("clipboard-disable", icons::ICON_CLIPBOARD_DISABLE)
+                            };
+
+                            let icon = ui_state.icon_cache.get_or_load(ctx, icon, bytes, Color32::GRAY);
+
+                            let paste = ui.add_enabled(
+                                enable,
+                                egui::Button::image_and_text(
+                                    icon,
+                                    "Pegar aquí"
+                                )
+                            );
+
+                            if paste.hovered() {
+                                ctx.set_cursor_icon(egui::CursorIcon::PointingHand);
+                            }
+
+                            if paste.clicked() {
+                                state.paste(file.full_path.clone());
                                 ui.close();
                             }
-                        } else {
-                            if ui.button("Abrir").clicked() {
-                                state.navigate_to(file.full_path.clone());
-                            }
-                        }
+                            //Añadirle hotkey
+                        });
 
-                        if ui.add_enabled(state.clipboard.clipboard_has_files() && file.is_dir, Button::new("Pegar aquí")).clicked() {
-                            state.paste(file.full_path.clone());
-                            ui.close();
-                        }
-                        
-                        if ui.button("Copiar").clicked() {
-                            state.copy(files);
-                            ui.close();
-                        }
-                        if ui.button("Cortar").clicked() {
-                            state.cut(files);
-                            ui.close();
-                        }
+
+                        ui.horizontal(|ui|{
+                            let (icon, bytes) = ("copy", icons::ICON_COPY);
+
+                            let icon = ui_state.icon_cache.get_or_load(ctx, icon, bytes, Color32::GRAY);
+
+                            let copy = ui.add(
+                                egui::Button::image_and_text(
+                                    icon,
+                                    "Copiar"
+                                )
+                            );
+
+                            if copy.hovered() {
+                                ctx.set_cursor_icon(egui::CursorIcon::PointingHand);
+                            }
+
+                            if copy.clicked() {
+                                state.copy(files);
+                                ui.close();
+                            }
+
+                            ui.add(
+                                Label::new(
+                                    RichText::new("Ctrl + C")
+                                            .color(Color32::GRAY)
+                                            .small()
+                                            .weak()
+                                )
+                                .selectable(false)
+                            );
+                        });
+
+                        ui.horizontal(|ui|{
+                            let (icon, bytes) = ("scissors", icons::ICON_SCISSORS);
+
+                            let icon = ui_state.icon_cache.get_or_load(ctx, icon, bytes, Color32::GRAY);
+
+                            let copy = ui.add(
+                                egui::Button::image_and_text(
+                                    icon,
+                                    "Cortar"
+                                )
+                            );
+
+                            if copy.hovered() {
+                                ctx.set_cursor_icon(egui::CursorIcon::PointingHand);
+                            }
+
+                            if copy.clicked() {
+                                state.cut(files);
+                                ui.close();
+                            }
+
+                            ui.add(
+                                Label::new(
+                                    RichText::new("Ctrl + X")
+                                            .color(Color32::GRAY)
+                                            .small()
+                                            .weak()
+                                )
+                                .selectable(false)
+                            );
+                        });
 
                         ui.separator();
 
@@ -194,32 +391,119 @@ pub fn render_scrollview(ctx: &egui::Context, files: &Vec<Arc<FileEntry>>, state
                         });
                     
                         if !is_in_fav {
-                            if ui.button("Agregar a favoritos").clicked() {
-                                with_configs(|c| {
-                                    c.add_to_favorites(file.name.to_string(),file.full_path.clone(), file.is_dir)
-                                });
-                            }
+                            ui.horizontal(|ui|{
+                                let (icon, bytes) = ("star-row", icons::ICON_STAR);
+
+                                let icon = ui_state.icon_cache.get_or_load(ctx, icon, bytes, Color32::GRAY);
+
+                                let resp = ui.add(
+                                    egui::Button::image_and_text(
+                                        icon,
+                                        "Agregar a favoritos"
+                                    )
+                                );
+
+                                if resp.hovered() {
+                                    ctx.set_cursor_icon(egui::CursorIcon::PointingHand);
+                                }
+
+                                if resp.clicked() {
+                                    with_configs(|c| {
+                                        c.add_to_favorites(file.name.to_string(),file.full_path.clone(), file.is_dir)
+                                    });
+                                }
+                                //Añadirle hotkey
+                            });
+
+                            
                         } else {
-                            if ui.button("Quitar de favoritos").clicked() {
-                                with_configs(|c| {
-                                    c.delete_from_favorites(file.name.to_string(),file.full_path.clone())
-                                });
-                            }
+                            ui.horizontal(|ui|{
+                                let (icon, bytes) = ("star-disable", icons::ICON_STAR_DISABLE);
+
+                                let icon = ui_state.icon_cache.get_or_load(ctx, icon, bytes, Color32::GRAY);
+
+                                let resp = ui.add(
+                                    egui::Button::image_and_text(
+                                        icon,
+                                        "Quitar de favoritos"
+                                    )
+                                );
+
+                                if resp.hovered() {
+                                    ctx.set_cursor_icon(egui::CursorIcon::PointingHand);
+                                }
+
+                                if resp.clicked() {
+                                    with_configs(|c| {
+                                        c.delete_from_favorites(file.name.to_string(),file.full_path.clone())
+                                    });
+                                }
+                                //Añadirle hotkey
+                            });
                         }
                         
 
                         ui.separator();
-                        
-                        if ui.button("Borrar").clicked() {
-                            state.move_to_trash(files);
-                            ui.close();
-                        }
 
-                        if ui.button("Renombrar").clicked() {
-                            state.renaming_file = Some(file.full_path.clone());
-                            state.rename_buffer = file.name.to_ascii_lowercase();
-                            ui.close();
-                        }
+
+                        ui.horizontal(|ui|{
+                            let (icon, bytes) = ("trash", icons::ICON_TRASH);
+
+                            let icon = ui_state.icon_cache.get_or_load(ctx, icon, bytes, Color32::GRAY);
+
+                            let del = ui.add(
+                                egui::Button::image_and_text(
+                                    icon,
+                                    "Mover a Papelera"
+                                )
+                            );
+
+                            if del.hovered() {
+                                ctx.set_cursor_icon(egui::CursorIcon::PointingHand);
+                            }
+
+                            if del.clicked() {
+                                state.move_to_trash(files);
+                                ui.close();
+                            }
+
+                            ui.add(
+                                Label::new(
+                                    RichText::new("Supr")
+                                            .color(Color32::GRAY)
+                                            .small()
+                                            .weak()
+                                )
+                                .selectable(false)
+                            );
+                        });
+
+
+
+                        ui.horizontal(|ui|{
+                            let (icon, bytes) = ("edit", icons::ICON_EDIT);
+
+                            let icon = ui_state.icon_cache.get_or_load(ctx, icon, bytes, Color32::GRAY);
+
+                            let copy = ui.add(
+                                egui::Button::image_and_text(
+                                    icon,
+                                    "Renombrar"
+                                )
+                            );
+
+                            if copy.hovered() {
+                                ctx.set_cursor_icon(egui::CursorIcon::PointingHand);
+                            }
+
+                            if copy.clicked() {
+                                state.renaming_file = Some(file.full_path.clone());
+                                state.rename_buffer = file.name.to_ascii_lowercase();
+                                ui.close();
+                            }
+
+                            //poner hotkey
+                        });
                     });
                 }
 
