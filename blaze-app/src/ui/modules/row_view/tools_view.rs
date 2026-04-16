@@ -115,7 +115,7 @@ pub fn tools(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, files: &Ve
         }
 
 
-        let (icon_paste, icon_bytes_paste) = if has_selection {
+        let (icon_paste, icon_bytes_paste) = if has_clipboard {
             ("clipboard", icons::ICON_CLIPBOARD)
         } else {
             ("clipboard-disable", icons::ICON_CLIPBOARD_DISABLE)
