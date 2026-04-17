@@ -22,7 +22,7 @@ use fuzzy_matcher::{FuzzyMatcher, skim::SkimMatcherV2};
 use tracing::{debug, error, info, warn};
 use tokio::sync::Mutex as TokioMutex;
 use uuid::Uuid;
-use crate::{core::{configs::config_state::{OrderingMode, with_configs}, files::{motor::{BlazeMotor, FileEntry, FileLoadingMessage, MOTOR}, recursive_search::RecursiveMessages}, system::{clipboard::{GlobalClipboard, TOKIO_RUNTIME}, fileopener_module::{FileOpenerManager, GLOBAL_FILE_OPENER}, sizer_manager::{self, sizer_manager::SizerManager}, terminal_opener::terminal_manager::{self, GLOBAL_TERMINAL_MANAGER, TerminalManager}, updater::updater::Updater}}, ui::task_manager::task_manager::TaskManager, utils::channel_pool::{FileOperation, NotifyingSender, with_active_sender_for, with_channel_pool}};
+use crate::{core::{configs::config_state::{OrderingMode, with_configs}, files::motor::{BlazeMotor, FileEntry, FileLoadingMessage, MOTOR, RecursiveMessages}, system::{clipboard::{GlobalClipboard, TOKIO_RUNTIME}, fileopener_module::{FileOpenerManager, GLOBAL_FILE_OPENER}, sizer_manager::{self, sizer_manager::SizerManager}, terminal_opener::terminal_manager::{self, GLOBAL_TERMINAL_MANAGER, TerminalManager}, updater::updater::Updater}}, ui::task_manager::task_manager::TaskManager, utils::channel_pool::{FileOperation, NotifyingSender, with_active_sender_for, with_channel_pool}};
 
 pub struct RubberBand {
     pub rubber_band_start: Option<egui::Pos2>,
@@ -476,9 +476,9 @@ impl BlazeCoreState {
 
         if is_recursive {
             let clean = query.replacen("rec:", "", 1);
-            if !clean.is_empty() {
+            if clean.len() >= 2 && clean != self.search_filter.replacen("rec:", "", 1) {
                 if let Some(sender) = self.sender().cloned() {
-                    self.motor.borrow_mut().active_tab_mut().start_recursive_search(clean, 5, sender);
+                    self.motor.borrow_mut().active_tab_mut().start_recursive_search(clean, 30, sender);
                 }
             }
         }

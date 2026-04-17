@@ -17,7 +17,7 @@
 
 
 use std::sync::Arc;
-use egui::{Button, Color32, Context, CornerRadius, Frame, Margin, SidePanel, TextEdit, Window};
+use egui::{Button, Color32, Context, CornerRadius, Frame, Id, Margin, SidePanel, TextEdit, Window};
 
 use crate::core::files::motor::FileEntry;
 use crate::core::{blaze_state::BlazeCoreState, configs::config_state::{OrderingMode, with_configs}};
@@ -51,6 +51,8 @@ pub fn sidebar_right_component(state: &mut BlazeCoreState, files: &Vec<Arc<FileE
                     let mut search = state.search_filter.clone();
                     let response = ui.add(
                         TextEdit::singleline(&mut search)
+                            .id("search_bar".into())
+                            .hint_text("Búsqueda")
                             .desired_width(ui.max_rect().width() - 60.0)
                     );
                     

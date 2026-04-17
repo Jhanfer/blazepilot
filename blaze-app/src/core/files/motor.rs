@@ -17,6 +17,7 @@
 
 
 use std::collections::HashSet;
+use std::fs::Metadata;
 use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime};
@@ -32,11 +33,10 @@ use std::sync::RwLock;
 use lru::LruCache;
 use std::num::NonZeroUsize;
 use crate::core::files::file_extension::FileExtension;
-use crate::core::files::recursive_search::{RecursiveMessages, RecursiveSearchIterator};
 
 use crate::core::configs::config_state::{with_configs, OrderingMode};
 use crate::core::system::disk_reader::disk_manager::DiskManager;
-use crate::utils::channel_pool::{NotifyingSender, cache_sender, remove_cached_sender, with_channel_pool};
+use crate::utils::channel_pool::{NotifyingSender, UiEvent, cache_sender, remove_cached_sender, with_channel_pool};
 use uuid::Uuid;
 use notify::{Watcher, RecursiveMode, Event, EventKind};
 use notify::event::{CreateKind, ModifyKind, RemoveKind};
@@ -85,6 +85,25 @@ pub enum FileLoadingMessage {
     }
 }
 
+
+#[derive(Debug, Clone)]
+pub enum RecursiveMessages {
+    Started {
+        task_id: u64,
+        text: String,
+    },
+    Progress {
+        task_id: u64,       
+        files_found: usize,  
+        current_dir: PathBuf, 
+        text: String, 
+    },
+    Finished {
+        task_id: u64,
+        success: bool,
+        text: String,
+    }
+}
 
 
 #[derive(Debug, Default, Clone)]
@@ -510,6 +529,156 @@ impl TabState {
     }
 
 
+    fn recursive_search(cwd: PathBuf, query: String, max_depth: usize, sender: NotifyingSender, show_hidden: bool, loading_generation: u64, flag: Arc<AtomicBool>) {
+        TOKIO_RUNTIME.spawn(async move {
+            let query_lower = query.to_lowercase().trim().to_string();
+            let mut total_files = 0usize;
+            let mut batch: Vec<Arc<FileEntry>> = Vec::with_capacity(150);
+
+            sender.send_recursive(RecursiveMessages::Started {
+                task_id: loading_generation as u64,
+                text: format!("Buscando \"{}\"...", query),
+            }).ok();
+
+            let cwd_clone = cwd.clone();
+            let flag_clone = flag.clone();
+            let sender_clone = sender.clone();
+
+            let walk_result = tokio::task::spawn_blocking(move || {
+                let walker = WalkDir::new(&cwd_clone)
+                    .max_depth(max_depth)
+                    .follow_links(false)
+                    .skip_hidden(!show_hidden)
+                    .parallelism(Parallelism::RayonNewPool(0));
+
+                for entry in walker {
+                    if !flag_clone.load(Ordering::Relaxed) {
+                        return (vec![], total_files);
+                    }
+                    
+                    let entry = match entry {
+                        Ok(e) => e,
+                        Err(e) => {
+                            warn!("Error caminando: {}", e);
+                            continue;
+                        }
+                    };
+
+                    let path = entry.path();
+
+                    if entry.file_type().is_dir() {
+                        continue;
+                    }
+
+                    if !show_hidden {
+                        if let Some(name) = path.file_name() {
+                            if name.to_string_lossy().starts_with('.') {
+                                continue;
+                            }
+                        }
+                    }
+
+                    let name = entry.file_name().to_string_lossy().to_string();
+                    let name_lower = name.to_lowercase();
+
+                    let is_match = query_lower.is_empty()
+                        || name_lower.contains(&query_lower)
+                        || {
+                            let name_norm = name_lower.replace(['-', '_', ' ', '.'], "");
+                            let query_norm = query_lower.replace(['-', '_', ' ', '.'], "");
+                            name_norm.contains(&query_norm)
+                        };
+
+                    if is_match {
+                        if let Ok(metadata) = entry.metadata() {
+                            let file_entry = Self::create_file_entry(name, metadata, path.to_path_buf());
+                            batch.push(file_entry);
+                            total_files += 1;
+
+                            if batch.len() >= 150 {
+                                let send_batch = std::mem::take(&mut batch);
+                                sender_clone.send_files_batch(FileLoadingMessage::RecursiveBatch {
+                                    generation: loading_generation,
+                                    batch: send_batch,
+                                    source_dir: cwd_clone.clone(),
+                                }).ok();
+                            }
+                        }
+                    }
+                }
+                (batch, total_files)
+            }).await;
+
+                match walk_result {
+                    Ok((remaining_batch, found_total)) => {
+                    total_files = found_total;
+
+                    if !remaining_batch.is_empty() {
+                        sender.send_files_batch(FileLoadingMessage::RecursiveBatch {
+                            generation: loading_generation,
+                            batch: remaining_batch,
+                            source_dir: cwd.clone(),
+                        }).ok();
+                    }
+
+                    sender.send_recursive(RecursiveMessages::Finished {
+                        task_id: loading_generation as u64,
+                        success: true,
+                        text: format!("Completado: {} archivos encontrados", total_files),
+                    }).ok();
+
+                    debug!("Búsqueda recursiva completada: {} archivos", total_files);
+                }
+                Err(e) => {
+                    sender.send_ui_event(
+                        UiEvent::ShowError(format!("Error buscando archivos: {}", e))
+                    ).ok();
+                }
+            }
+
+            flag.store(false, std::sync::atomic::Ordering::Relaxed);
+            debug!("Búsqueda recursiva completada: {} archivos", total_files);
+        });
+    }
+
+    fn create_file_entry(name: String, metadata: Metadata, path: PathBuf) -> Arc<FileEntry> {
+        let is_dir = metadata.is_dir();
+        let kind = if metadata.file_type().is_symlink() {
+            FileKind::Symlink
+        } else if is_dir {
+            FileKind::Dir
+        } else {
+            FileKind::File
+        };
+
+        let modified = metadata.modified()
+            .unwrap_or(std::time::SystemTime::UNIX_EPOCH)
+            .duration_since(std::time::SystemTime::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+
+        let created = metadata.created()
+            .unwrap_or(std::time::SystemTime::UNIX_EPOCH)
+            .duration_since(std::time::SystemTime::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+
+        let extension = FileExtension::from_path(&path);
+
+        Arc::new(FileEntry {
+            name: name.clone().into_boxed_str(),
+            is_dir,
+            extension,
+            kind,
+            size: metadata.len(),
+            modified,
+            created,
+            readonly: metadata.permissions().readonly(),
+            is_hidden: name.starts_with("."),
+            full_path: path,
+        })
+    }
+
 
     pub fn start_recursive_search(&mut self, query: String, max_depth: usize, sender: NotifyingSender) {
         self.recursive_entries.clear();
@@ -525,65 +694,10 @@ impl TabState {
 
         let show_hidden = with_configs(|cfg| cfg.configs.show_hidden_files);
 
-        TOKIO_RUNTIME.spawn(async move {
-            let mut iterator = RecursiveSearchIterator::new(
-                path, 
-                query.clone(), 
-                show_hidden, 
-                max_depth
-            );
-
-            let mut total_files = 0;
-
-            sender.send_recursive(RecursiveMessages::Started {
-                task_id: current_generation as u64,
-                text: format!("Buscando \"{}\"...", query),
-            }).ok();
-
-            while let Some(batch) = iterator.next_batch().await {
-                if !flag.load(Ordering::Relaxed) {
-                    debug!("Búsqueda cancelada.");
-                    sender.send_recursive(RecursiveMessages::Finished {
-                        task_id: current_generation as u64,
-                        success: false,
-                        text: "Búsqueda cancelada.".into()
-                    }).ok();
-                    return;
-                }
-
-                total_files += batch.len();
-
-                sender.send_recursive(RecursiveMessages::Progress {
-                    task_id: current_generation as u64,
-                    files_found: total_files,
-                    current_dir: iterator.current_dir.clone(),
-                    text: format!("{} archivos encontrados", total_files),
-                }).ok();
-
-                if sender.send_files_batch(FileLoadingMessage::RecursiveBatch { 
-                    generation: current_generation, 
-                    batch, 
-                    source_dir: iterator.current_dir.clone(),
-                }).is_err() {
-                    warn!("Canal cerrado, cancelando búsqueda.");
-                    return;
-                }
-                tokio::task::yield_now().await;
-            }
-
-            sender.send_recursive(RecursiveMessages::Finished {
-                task_id: current_generation as u64,
-                success: true,
-                text: format!("Completado: {} archivos encontrados", total_files),
-            }).ok();
-
-            sender.send_files_batch(FileLoadingMessage::Finished(current_generation)).ok();
-            flag.store(false, std::sync::atomic::Ordering::Relaxed);
-
-            debug!("Búsqueda recursiva completada: {} archivos", total_files);
-
-        });
+        Self::recursive_search(path, query, max_depth, sender, show_hidden, current_generation, flag);
     }
+
+
 
 
     pub fn navigate_to(&mut self, new_path: PathBuf) {

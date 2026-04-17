@@ -102,7 +102,7 @@ pub fn hot_keys_logic(state: &mut BlazeCoreState, files: &Vec<Arc<FileEntry>>, u
 
 
     //eliminar 
-    if (input.key_pressed(Key::Delete) || input.key_pressed(Key::Backspace)) && disable_keys {
+    if input.key_pressed(Key::Delete) && disable_keys {
         let cwd = state.motor.borrow_mut().active_tab().cwd.clone();
         let trash = state.motor.borrow_mut().get_trash_dir(None).unwrap_or_default();
 
@@ -172,6 +172,17 @@ pub fn hot_keys_logic(state: &mut BlazeCoreState, files: &Vec<Arc<FileEntry>>, u
     }
 
 
+    if input.modifiers.alt && input.key_pressed(Key::R) {
+        if state.search_filter.is_empty() || !ui.memory(|m| m.has_focus("search_bar".into())) {
+            state.set_search("rec:".to_owned());
+            
+            ui.ctx().memory_mut(|mem| {
+                mem.request_focus("search_bar".into());
+            });
+        }
+    }
+
+
     // ---- Pestañas ----
 
     // nueva pestaña
@@ -186,7 +197,7 @@ pub fn hot_keys_logic(state: &mut BlazeCoreState, files: &Vec<Arc<FileEntry>>, u
         state.refresh();
     }
 
-    // cambiar de pestaña
+    // cambiar de pestaña y encender búsqueda
     for event in &input.events {
         match event {
             egui::Event::Key { key, pressed, modifiers , ..} => {
@@ -209,6 +220,19 @@ pub fn hot_keys_logic(state: &mut BlazeCoreState, files: &Vec<Arc<FileEntry>>, u
                     Key::Num3 if modifiers.ctrl => {state.switch_to_tab(2); state.refresh();},
                     Key::Num4 if modifiers.ctrl => {state.switch_to_tab(3); state.refresh();},
                     Key::Num5 if modifiers.ctrl => {state.switch_to_tab(4); state.refresh();},
+
+                    Key::A | Key::B | Key::C | Key::D | Key::E | Key::F | Key::G | Key::H | Key::I |
+                    Key::J | Key::K | Key::L | Key::M | Key::N | Key::O | Key::P | Key::Q | Key::R |
+                    Key::S | Key::T | Key::U | Key::V | Key::W | Key::X | Key::Y | Key::Z 
+                    if !modifiers.ctrl && !modifiers.shift && !modifiers.alt => {
+                        if state.search_filter.is_empty() || !ui.memory(|m| m.has_focus("search_bar".into())) {
+                            state.set_search(key.name().to_lowercase());
+                            
+                            ui.ctx().memory_mut(|mem| {
+                                mem.request_focus("search_bar".into());
+                            });
+                        }
+                    },
                     _ => {}
                 }
             },
@@ -216,7 +240,6 @@ pub fn hot_keys_logic(state: &mut BlazeCoreState, files: &Vec<Arc<FileEntry>>, u
         }
         
     }
-
 
     if input.pointer.button_pressed(PointerButton::Middle) {
         let first = files
