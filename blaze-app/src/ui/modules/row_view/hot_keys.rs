@@ -1,5 +1,6 @@
 use std::{path::PathBuf, sync::Arc};
 use egui::{ Key, Modifiers, PointerButton, Ui};
+use notify::Event;
 use tracing::info;
 use crate::{core::{blaze_state::{BlazeCoreState, NewItemType}, files::motor::FileEntry}, utils::channel_pool::{FileOperation, SureTo, UiEvent}};
 
@@ -148,18 +149,62 @@ pub fn hot_keys_logic(state: &mut BlazeCoreState, files: &Vec<Arc<FileEntry>>, u
     // ---- Pestañas ----
 
     // nueva pestaña
-    if input.modifiers.command && input.key_pressed(Key::N) && disable_keys {
-        info!("pestaña nueva")
+    if input.modifiers.command && !input.modifiers.shift && input.key_pressed(Key::N) && disable_keys {
+        state.create_tab();
     }
 
     // cerrar pestaña actual
     if input.modifiers.command && input.key_pressed(Key::W) {
-        info!("cerrar pestaña")
+        let index = state.motor.borrow().active_tab_index;
+        state.close_tab(index);
+        state.refresh();
     }
 
     // cambiar de pestaña
-    if input.modifiers.command && input.key_pressed(Key::Tab) {
-        info!("cambiar pestaña")
+    for event in &input.events {
+        match event {
+            egui::Event::Key { key, pressed, modifiers , ..} => {
+                if !pressed {
+                    return;
+                }
+
+                match key {
+                    Key::Tab => {
+                        if modifiers.shift {
+                            state.prev_tab();
+                            state.refresh();
+                        } else {
+                            state.next_tab();
+                            state.refresh();
+                        }
+                    }
+                    Key::Num1 if modifiers.ctrl => {state.switch_to_tab(0); state.refresh();},
+                    Key::Num2 if modifiers.ctrl => {state.switch_to_tab(1); state.refresh();},
+                    Key::Num3 if modifiers.ctrl => {state.switch_to_tab(2); state.refresh();},
+                    Key::Num4 if modifiers.ctrl => {state.switch_to_tab(3); state.refresh();},
+                    Key::Num5 if modifiers.ctrl => {state.switch_to_tab(4); state.refresh();},
+                    _ => {}
+                }
+            },
+            _ => {},
+        }
+        
+    }
+
+
+    if input.pointer.button_pressed(PointerButton::Middle) {
+        let first = files
+            .iter()
+            .enumerate()
+            .find(|(i, _)| state.selection[*i])
+            .map(|(_, f)| f);
+
+        if let Some(file) = first {
+            if file.is_dir {
+                state.add_tab_from_file(file.full_path.clone());
+                state.refresh();
+            }
+        }
     }
 
 }

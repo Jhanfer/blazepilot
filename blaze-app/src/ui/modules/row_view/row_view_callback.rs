@@ -177,6 +177,38 @@ fn background_response_logic(state: &mut BlazeCoreState, ui_state: &mut BlazeUiS
             state.deselect_all();
             state.resize_selection(files.len());
 
+            ui.horizontal(|ui|{
+                let (icon, bytes) = ("tab-icon", icons::ICON_TAB_ICON);    
+
+                let icon = ui_state.icon_cache.get_or_load(ctx, icon, bytes, Color32::GRAY);
+
+                let paste = ui.add(
+                    egui::Button::image_and_text(
+                        icon,
+                        "Nueva pestaña"
+                    )
+                );
+
+                if paste.hovered() {
+                    ctx.set_cursor_icon(egui::CursorIcon::PointingHand);
+                }
+
+                if paste.clicked() {
+                    state.create_tab();
+                    ui.close();
+                }
+
+                ui.add(
+                    Label::new(
+                        RichText::new("Ctrl + N")
+                                .small()
+                                .weak()
+                    )
+                    .selectable(false)
+                );
+            });
+            
+            ui.separator();
 
             ui.horizontal(|ui|{
                 let has_clipboard = state.clipboard.clipboard_has_files();
@@ -333,9 +365,22 @@ fn background_response_logic(state: &mut BlazeCoreState, ui_state: &mut BlazeUiS
 pub fn render_row_view(ctx: &egui::Context, files: &Vec<Arc<FileEntry>>, state: &mut BlazeCoreState, ui_state: &mut BlazeUiState) {
     state.resize_selection(files.len());
 
+    let tabs_height: i8 = if state.motor.borrow_mut().tabs.len() > 1 {
+        50
+    } else {
+        0
+    };
+
+    let bottom_padding = 20.0 as i8;
+    
     let custom_frame = Frame::NONE
         .fill(Color32::from_rgb(16, 21, 25))
-        .inner_margin(Margin::same(20));
+        .inner_margin(Margin {
+            left: 20,
+            right: 20,
+            top: 20,
+            bottom: bottom_padding + tabs_height,
+        });
 
     CentralPanel::default()
         .frame(custom_frame)
@@ -382,8 +427,6 @@ pub fn render_row_view(ctx: &egui::Context, files: &Vec<Arc<FileEntry>>, state: 
                 //Creacion de carpetas nuevas
                 new_ff_logic(state, ui);
 
-                //hotkeys
-                hot_keys_logic(state, files, ui, total_rows);
 
                 //Background
                 background_response_logic(state, ui_state, files, ui, ctx, panel_top, total_rows, row_height, content_rect);
@@ -423,8 +466,13 @@ pub fn render_row_view(ctx: &egui::Context, files: &Vec<Arc<FileEntry>>, state: 
                     }
                 }
 
-                //Isla y burbuja
-                render_island_bubble(state, ui_state, files, ctx);
+                //Isla y burbuja y las tabs
+                render_island_bubble(state, ui_state, files, ctx, bottom_padding, tabs_height);
+
+
+
+                //hotkeys
+                hot_keys_logic(state, files, ui, total_rows);
 
         });
     });

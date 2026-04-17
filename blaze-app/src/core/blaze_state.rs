@@ -21,6 +21,7 @@ use bitvec::vec::BitVec;
 use fuzzy_matcher::{FuzzyMatcher, skim::SkimMatcherV2};
 use tracing::{debug, error, info, warn};
 use tokio::sync::Mutex as TokioMutex;
+use uuid::Uuid;
 use crate::{core::{configs::config_state::{OrderingMode, with_configs}, files::{motor::{BlazeMotor, FileEntry, FileLoadingMessage, MOTOR}, recursive_search::RecursiveMessages}, system::{clipboard::{GlobalClipboard, TOKIO_RUNTIME}, fileopener_module::{FileOpenerManager, GLOBAL_FILE_OPENER}, sizer_manager::{self, sizer_manager::SizerManager}, terminal_opener::terminal_manager::{self, GLOBAL_TERMINAL_MANAGER, TerminalManager}, updater::updater::Updater}}, ui::task_manager::task_manager::TaskManager, utils::channel_pool::{FileOperation, NotifyingSender, with_active_sender_for, with_channel_pool}};
 
 pub struct RubberBand {
@@ -68,6 +69,7 @@ pub struct BlazeCoreState {
     pub new_item_buffer: String,
     pub focus_requested: bool, 
     pub cached_sender: Option<NotifyingSender>,
+    cached_sender_tab_id: Option<Uuid>,
     pub updater: Updater,
     pub calculated_dir_sizes: HashSet<PathBuf>,
     pub calculating_dir_sizes: HashSet<PathBuf>,
@@ -133,6 +135,7 @@ impl BlazeCoreState {
             new_item_buffer: String::new(),
             focus_requested: false,
             cached_sender: None,
+            cached_sender_tab_id: None,
             updater: Updater::init(),
             calculating_dir_sizes: HashSet::new(),
             calculated_dir_sizes: HashSet::new(),
@@ -304,9 +307,11 @@ impl BlazeCoreState {
 
 
     pub fn sender(&mut self) -> Option<&NotifyingSender> {
-        if self.cached_sender.is_none() {
-            let tab_id = self.motor.borrow_mut().active_tab().id;
-            self.cached_sender = with_active_sender_for(tab_id, |s| s.clone());
+        let active_tab_id = self.motor.borrow_mut().active_tab().id;
+
+        if self.cached_sender_tab_id != Some(active_tab_id) {
+            self.cached_sender = with_active_sender_for(active_tab_id, |s| s.clone());
+            self.cached_sender_tab_id = Some(active_tab_id);
         }
         self.cached_sender.as_ref()
     }
@@ -529,6 +534,40 @@ impl BlazeCoreState {
         });
     }
     
+
+
+    pub fn switch_to_tab(&mut self, index:usize) {
+        self.motor.borrow_mut().switch_to_tab(index);
+    }
+
+    pub fn next_tab(&mut self) {
+        self.motor.borrow_mut().next_tab();
+    }
+
+    pub fn prev_tab(&mut self) {
+        self.motor.borrow_mut().prev_tab();
+    }
+    
+    pub fn close_tab(&mut self, index:usize) -> bool {
+        self.motor.borrow_mut().close_tab(index)
+    }
+
+    pub fn add_tab_from_file(&mut self, tab_path: PathBuf) {
+        self.motor.borrow_mut().add_tab_from_file(tab_path);
+    }
+
+    pub fn create_tab(&mut self) {
+        self.motor.borrow_mut().create_tab();
+    }
+
+    pub fn tab_title(&self, index:usize) -> String {
+        self.motor.borrow_mut().tab_title(index)
+    }
+
+    pub fn add_tab(&mut self, path: PathBuf) {
+        self.motor.borrow_mut().add_tab(path);
+    }
+
 
     pub fn process_messages(&mut self) {
         let active_id = {

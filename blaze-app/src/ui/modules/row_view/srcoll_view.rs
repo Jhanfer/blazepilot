@@ -28,6 +28,22 @@ pub fn render_scrollview(ctx: &egui::Context, files: &Vec<Arc<FileEntry>>, state
                 );
 
 
+                //Habilitar seleccion con rueda de ratón
+                let middle_clicked = ui.input(|i| {
+                    i.pointer.button_pressed(egui::PointerButton::Middle)
+                    && i.pointer.interact_pos()
+                        .map(|p| rect.contains(p))
+                        .unwrap_or(false)
+                });
+
+                if middle_clicked {
+                    state.resize_selection(files.len());
+                    let currently = state.is_selected(i);
+                    state.selection.set(i, !currently);
+                    state.last_selected_index = Some(i);
+                }
+
+
                 if i == state.row_view.first_visible {
                     state.row_view.scroll_area_origin_y = rect.min.y + state.scroll_offset - (i as f32 * row_height);
                 }
@@ -252,22 +268,39 @@ pub fn render_scrollview(ctx: &egui::Context, files: &Vec<Arc<FileEntry>>, state
                             } else {
 
                                 ui.horizontal(|ui|{
-                                    let (icon, bytes) = ("folder-open", icons::ICON_FOLDER_OPEN);
+                                    let (icon_plus_fol, icon_bytes_plus_fol) = ("folder-open", icons::ICON_FOLDER_OPEN);
 
-                                    let icon = ui_state.icon_cache.get_or_load(ctx, icon, bytes, Color32::GRAY);
+                                    let icon_size = egui::vec2(16.0, 16.0);
+                                    let icon_rect = ui.allocate_exact_size(icon_size, Sense::click()).0;
+                                    
+                                    let icon = ui_state.icon_cache.get_or_load(ctx, icon_plus_fol, icon_bytes_plus_fol, Color32::GRAY);
+                                    
+                                    let painter = ui.painter();
 
-                                    let paste = ui.add(
-                                        egui::Button::image_and_text(
-                                            icon,
-                                            "Abrir"
-                                        )
+                                    painter.image(
+                                        icon.id(),
+                                        icon_rect,
+                                        Rect::from_min_max(egui::pos2(0.0, 0.0), 
+                                        pos2(1.0, 1.0)),
+                                        Color32::WHITE,
                                     );
 
-                                    if paste.hovered() {
+                                    let respo =  ui.menu_button("Abrir", |ui|{
+                                        if ui.button("Abrir nueva pestaña").clicked() {
+
+                                            state.motor.borrow_mut().add_tab(file.full_path.clone());
+
+                                            state.refresh();
+
+                                            ui.close();
+                                        }
+                                    }).response;
+
+                                    if respo.hovered() {
                                         ctx.set_cursor_icon(egui::CursorIcon::PointingHand);
                                     }
 
-                                    if paste.clicked() {
+                                    if respo.clicked() {
                                         state.navigate_to(file.full_path.clone());
                                         ui.close();
                                     }

@@ -43,3 +43,6 @@ pub const ICON_USER: &[u8] = include_bytes!("../assets/icons/user.svg");
 pub const ICON_LIST: &[u8] = include_bytes!("../assets/icons/list-check.svg");
 pub const ICON_SELECTALL: &[u8] = include_bytes!("../assets/icons/select-all.svg");
 pub const ICON_DESELECT: &[u8] = include_bytes!("../assets/icons/deselect.svg");
+pub const ICON_X: &[u8] = include_bytes!("../assets/icons/x.svg");
+pub const ICON_PLUS: &[u8] = include_bytes!("../assets/icons/plus.svg");
+pub const ICON_TAB_ICON: &[u8] = include_bytes!("../assets/icons/tab-icon.svg");

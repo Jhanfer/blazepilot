@@ -259,6 +259,8 @@ impl TabState {
         self.loading_generation += 1;
         let current_generation = self.loading_generation;
 
+        debug!("Sender id, tab id? {}, {}",sender.tab_id, self.id);
+
         sender.send_files_batch(
             FileLoadingMessage::ProgressUpdate {
                 total: 0,
@@ -694,6 +696,24 @@ impl BlazeMotor {
         }
     }
 
+    pub fn next_tab(&mut self) {
+        if self.tabs.is_empty() || self.tabs.len() <= 1 {
+            return;
+        }
+        self.active_tab_index = (self.active_tab_index + 1) % self.tabs.len();
+    }
+
+    pub fn prev_tab(&mut self) {
+        if self.tabs.is_empty() || self.tabs.len() <= 1 {
+            return;
+        }
+        self.active_tab_index = if self.active_tab_index == 0 {
+            self.tabs.len() - 1
+        } else {
+            self.active_tab_index - 1
+        };
+    }
+    
     pub fn close_tab(&mut self, index:usize) -> bool{
         if self.tabs.len() <= 1 {
             return false;
@@ -728,7 +748,6 @@ impl BlazeMotor {
     pub fn create_tab(&mut self) {
         let path = home_dir().unwrap();
         let tab_id = Uuid::new_v4();
-
         let new_tab = TabState::new(path, tab_id);
         let insert_index = self.active_tab_index + 1;
         self.tabs.insert(insert_index, new_tab);
@@ -742,14 +761,6 @@ impl BlazeMotor {
         .to_owned()
     }
 
-    pub fn go_to(&mut self, path:PathBuf) {
-        if path.is_dir() {
-            let tab = self.active_tab_mut();
-            tab.history.push(tab.cwd.clone());
-            tab.future.clear();
-            tab.cwd = path;
-        }
-    }
 
     pub fn active_tab(&mut self) -> &mut TabState {
         &mut self.tabs[self.active_tab_index]
