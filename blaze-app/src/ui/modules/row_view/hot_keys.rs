@@ -8,33 +8,59 @@ pub fn hot_keys_logic(state: &mut BlazeCoreState, files: &Vec<Arc<FileEntry>>, u
     let input = ui.input(|i| i.clone());
     let disable_keys = state.renaming_file.is_none() && state.creating_new.is_none();
 
-    //tecla de abajo
-    if input.key_pressed(Key::ArrowDown) && disable_keys {
-        let next = state.last_selected_index
-            .map(|i| (i + 1).min(total_rows - 1))
-            .unwrap_or(state.row_view.first_visible);
-
-        state.deselect_all();
-        state.resize_selection(files.len());
-        state.selection.set(next, true);
-        state.selection_anchor = Some(next);
-        state.last_selected_index = Some(next);
-        state.pending_scroll_to = Some(next);
-    }
 
     //tecla de arriba
     if input.key_pressed(Key::ArrowUp) && disable_keys {
-        let prev = state.last_selected_index
-            .map(|i| i.saturating_sub(1))
-            .unwrap_or(state.row_view.last_visible);
+        let prev = if let Some(i) = state.last_selected_index {
+            if i == 0 {
+                0
+            } else {
+                i - 1
+            }
+        } else {
+            state.row_view.last_visible.min(files.len().saturating_sub(1))
+        };
         
         state.deselect_all();
         state.resize_selection(files.len());
-        state.selection.set(prev, true);
-        state.selection_anchor = Some(prev);
-        state.last_selected_index = Some(prev);
-        state.pending_scroll_to = Some(prev);
+
+        if files.is_empty() {
+            state.last_selected_index = None;
+            state.selection_anchor = None;
+        } else {
+            let safe_prev = prev.min(files.len() - 1);
+            state.selection.set(safe_prev, true);
+            state.selection_anchor = Some(safe_prev);
+            state.last_selected_index = Some(safe_prev);
+            state.pending_scroll_to = Some(safe_prev);
+        }
     }
+
+
+    //tecla de abajo
+    if input.key_pressed(Key::ArrowDown) && disable_keys {
+        let next = if let Some(i) = state.last_selected_index {
+            ( i + 1).min(files.len().saturating_sub(1))
+        } else {
+            state.row_view.first_visible.min(files.len().saturating_sub(1))
+        };
+
+        state.deselect_all();
+        state.resize_selection(files.len());
+        
+        if files.is_empty() {
+            state.last_selected_index = None;
+            state.selection_anchor = None;
+        } else {
+            let safe_next = next.min(files.len() - 1);
+            state.selection.set(safe_next, true);
+            state.selection_anchor = Some(safe_next);
+            state.last_selected_index = Some(safe_next);
+            state.pending_scroll_to = Some(safe_next);
+        }
+    }
+
+
 
     //tecla enter
     if ui.input(|i| i.key_pressed(Key::Enter)) && disable_keys {
