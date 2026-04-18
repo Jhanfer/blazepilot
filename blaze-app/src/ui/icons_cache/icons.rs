@@ -46,3 +46,4 @@ pub const ICON_DESELECT: &[u8] = include_bytes!("../assets/icons/deselect.svg");
 pub const ICON_X: &[u8] = include_bytes!("../assets/icons/x.svg");
 pub const ICON_PLUS: &[u8] = include_bytes!("../assets/icons/plus.svg");
 pub const ICON_TAB_ICON: &[u8] = include_bytes!("../assets/icons/tab-icon.svg");
+pub const ICON_PALETTE: &[u8] = include_bytes!("../assets/icons/palette.svg");

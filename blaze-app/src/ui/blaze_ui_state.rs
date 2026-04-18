@@ -17,8 +17,9 @@
 
 use std::path::PathBuf;
 use egui::{Area, Context, Order, Sense};
+use file_id::FileId;
 use uuid::Uuid;
-use crate::{core::{files::{self, motor::with_motor}, system::{fileopener_module::{AppAssociation, platform::linux::linux::AppsIconData}, updater::updater::UpdateMessages}}, ui::{dialogs::{error_dialog::ErrorDialog, selector_dialog::AppSelectorDialog, sure_to_delete::SureToDeleteDialog, sure_to_move_to::SureToMoveToDialog, update_dialog::UpdateDialog}, icons_cache::icon_cache::IconCache}, utils::channel_pool::{FileConflict, SureTo, UiEvent, with_channel_pool}};
+use crate::{core::{files::{self, motor::with_motor}, system::{cache::color_cache::color_cache::FolderColorManager, fileopener_module::{AppAssociation, platform::linux::linux::AppsIconData}, updater::updater::UpdateMessages}}, ui::{dialogs::{error_dialog::ErrorDialog, folder_color_selector_dialog::FolderColorSelector, selector_dialog::AppSelectorDialog, sure_to_delete::SureToDeleteDialog, sure_to_move_to::SureToMoveToDialog, update_dialog::UpdateDialog}, icons_cache::icon_cache::IconCache}, utils::channel_pool::{FileConflict, SureTo, UiEvent, with_channel_pool}};
 use tracing::{debug, info};
 
 
@@ -35,6 +36,7 @@ pub struct DialogManager {
     pub update_dialog: UpdateDialog,
     pub error_dialog: ErrorDialog,
     pub sure_to_delete_dialog: SureToDeleteDialog,
+    pub folder_color_dialog: FolderColorSelector,
 }
 
 impl DialogManager {
@@ -45,6 +47,7 @@ impl DialogManager {
             update_dialog: UpdateDialog::new(),
             error_dialog: ErrorDialog::new(),
             sure_to_delete_dialog: SureToDeleteDialog::new(),
+            folder_color_dialog: FolderColorSelector::new(),
         }
     }
 
@@ -68,13 +71,18 @@ impl DialogManager {
         self.error_dialog.open(message);
     }
 
+    pub fn open_folder_color_selector_dialog(&mut self, folder_id: FileId) {
+        self.folder_color_dialog.open(folder_id);
+    }
+
     pub fn render_area(&mut self, ctx: &Context) {
         let dialogs: Vec<&mut dyn ModalDialog> = vec![
             &mut self.selector_dialog,
             &mut self.sure_to_dialog,
             &mut self.update_dialog,
             &mut self.error_dialog,
-            &mut self.sure_to_delete_dialog,            
+            &mut self.sure_to_delete_dialog,
+            &mut self.folder_color_dialog,
         ];
 
         let open_dialog = dialogs.into_iter().find(|d| d.is_open());
@@ -116,6 +124,7 @@ impl DialogManager {
 pub struct BlazeUiState {
     pub dialog_manager: DialogManager,
     pub icon_cache: IconCache,
+    pub folder_color_manager: FolderColorManager,
 }
 
 
@@ -125,6 +134,7 @@ impl BlazeUiState {
         Self { 
             dialog_manager,
             icon_cache: IconCache::new(),
+            folder_color_manager: FolderColorManager::new(),
         }
     }
 
@@ -185,6 +195,10 @@ impl BlazeUiState {
                         },
                     }
                 },
+
+                UiEvent::ShowFolderColorSelector { folder_id } => {
+                    self.dialog_manager.open_folder_color_selector_dialog(folder_id);
+                }
             }
         }
     }

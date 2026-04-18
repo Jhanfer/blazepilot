@@ -452,16 +452,12 @@ pub fn render_row_view(ctx: &egui::Context, files: &Vec<Arc<FileEntry>>, state: 
                     for i in state.row_view.first_visible..state.row_view.last_visible.min(files.len()) {
                         let file = &files[i];
 
-                        if file.is_dir && file.size == 0 {
-                            if file.is_dir && !state.calculating_dir_sizes.contains(&file.full_path) && !state.calculated_dir_sizes.contains(&file.full_path) {
-                                state.calculating_dir_sizes.insert(file.full_path.clone());
-
-                                let path = file.full_path.clone();
-
-                                sender.send_sizer(
-                                    SizerMessages::StartCal(path)
-                                ).ok();
-                            }
+                        if file.is_dir 
+                            && !state.calculating_dir_sizes.contains(&file.full_path) 
+                            && !state.calculated_dir_sizes.contains(&file.full_path) 
+                        {
+                            state.calculating_dir_sizes.insert(file.full_path.clone());
+                            sender.send_sizer(SizerMessages::StartCal(file.full_path.clone())).ok();
                         }
                     }
                 }

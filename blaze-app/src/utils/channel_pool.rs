@@ -17,6 +17,7 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::collections::HashMap;
+use file_id::FileId;
 use once_cell::sync::Lazy;
 use uuid::Uuid;
 use std::sync::Mutex;
@@ -111,6 +112,11 @@ pub enum UiEvent {
     FileConflict(FileConflict),
 
     ShowError(String),
+
+    ShowFolderColorSelector {
+        folder_id: FileId,
+    },
+
     RefreshList,
 }
 

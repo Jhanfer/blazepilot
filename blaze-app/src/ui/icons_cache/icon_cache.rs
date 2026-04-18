@@ -30,7 +30,10 @@ impl IconCache {
     }
 
     pub fn get_or_load(&mut self, ctx: &Context, name: &str, svg_bytes: &[u8], tint: egui::Color32) -> &TextureHandle {
-        self.cache.entry(name.to_string()).or_insert_with(|| {
+        let tint_key = format!("{:02X}{:02X}{:02X}", tint.r(), tint.g(), tint.b());
+        let full_key = format!("{}-{}", name, tint_key);
+
+        self.cache.entry(full_key).or_insert_with(|| {
             let image = rasterize_svg(svg_bytes, 16, 16, tint);
             ctx.load_texture(name, image, egui::TextureOptions::LINEAR)
         })

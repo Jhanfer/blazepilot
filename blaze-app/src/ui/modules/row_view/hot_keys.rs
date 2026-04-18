@@ -2,7 +2,7 @@ use std::{path::PathBuf, sync::Arc};
 use egui::{ Key, Modifiers, PointerButton, Ui};
 use notify::Event;
 use tracing::info;
-use crate::{core::{blaze_state::{BlazeCoreState, NewItemType}, files::motor::FileEntry}, utils::channel_pool::{FileOperation, SureTo, UiEvent}};
+use crate::{core::{blaze_state::{BlazeCoreState, NewItemType}, files::motor::FileEntry, system::{cache::cache_manager::CacheManager, clipboard::TOKIO_RUNTIME, sizer_manager::sizer_manager::SizerMessages}}, utils::channel_pool::{FileOperation, SureTo, UiEvent}};
 
 pub fn hot_keys_logic(state: &mut BlazeCoreState, files: &Vec<Arc<FileEntry>>, ui: &mut Ui, total_rows: usize) {
     let input = ui.input(|i| i.clone());
@@ -87,6 +87,15 @@ pub fn hot_keys_logic(state: &mut BlazeCoreState, files: &Vec<Arc<FileEntry>>, u
     //Recargar
     if (input.key_pressed(Key::F5) || 
     (input.modifiers.command && input.key_pressed(Key::R))) && disable_keys {
+
+        let files = state.motor.borrow_mut().active_tab().files.clone();
+        for file in files.iter().filter(|f| f.is_dir) {
+            state.calculated_dir_sizes.remove(&file.full_path);
+            state.calculating_dir_sizes.remove(&file.full_path);
+            CacheManager::global().invalidate(&file.full_path);
+        }
+
+        ui.ctx().request_repaint();
         state.refresh();
     }
 

@@ -23,6 +23,7 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime};
 use std::{fs, thread, vec};
 use dirs::{home_dir};
+use file_id::{FileId, get_file_id};
 use jwalk::{Parallelism, WalkDir};
 use once_cell::sync::Lazy;
 use tokio::sync::Semaphore;
@@ -118,6 +119,7 @@ pub struct FileEntry {
     pub is_hidden: bool,
     pub is_dir: bool,
     pub full_path: PathBuf,
+    pub unique_id: Option<FileId>,
 }
 
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
@@ -440,6 +442,8 @@ impl TabState {
                 
                     let extension = FileExtension::from_path(&entry.path());
 
+                    let unique_id = get_file_id(&entry.path()).ok();
+
                     let file_entry = Arc::new(
                     FileEntry {
                             name,
@@ -452,6 +456,7 @@ impl TabState {
                             readonly,
                             is_hidden,
                             full_path: entry.path(),
+                            unique_id,
                         }
                     );
 
@@ -665,6 +670,8 @@ impl TabState {
 
         let extension = FileExtension::from_path(&path);
 
+        let unique_id = get_file_id(&path).ok();
+
         Arc::new(FileEntry {
             name: name.clone().into_boxed_str(),
             is_dir,
@@ -676,6 +683,7 @@ impl TabState {
             readonly: metadata.permissions().readonly(),
             is_hidden: name.starts_with("."),
             full_path: path,
+            unique_id,
         })
     }
 

@@ -423,6 +423,37 @@ pub fn render_scrollview(ctx: &egui::Context, files: &Vec<Arc<FileEntry>>, state
                             c.is_in_favorite(file.full_path.clone())
                         });
                     
+
+                        if file.is_dir {
+                            ui.horizontal(|ui|{
+                                let (icon, bytes) = ("palette", icons::ICON_PALETTE);
+
+                                let icon = ui_state.icon_cache.get_or_load(ctx, icon, bytes, Color32::GRAY);
+
+                                let resp = ui.add(
+                                    egui::Button::image_and_text(
+                                        icon,
+                                        "Color de carpeta"
+                                    )
+                                );
+
+                                if resp.hovered() {
+                                    ctx.set_cursor_icon(egui::CursorIcon::PointingHand);
+                                }
+
+                                if resp.clicked() {
+                                    if let Some(sender) = state.sender() {
+                                        let Some(folder_id) = file.unique_id else { return; };
+                                        sender.send_ui_event(
+                                            UiEvent::ShowFolderColorSelector { folder_id: folder_id }
+                                        ).ok();
+                                    }
+                                }
+                                //Añadirle hotkey
+                            });
+                        }
+                        
+
                         if !is_in_fav {
                             ui.horizontal(|ui|{
                                 let (icon, bytes) = ("star-row", icons::ICON_STAR);
@@ -625,24 +656,34 @@ pub fn render_scrollview(ctx: &egui::Context, files: &Vec<Arc<FileEntry>>, state
                     //Sin renombrado
 
                     let (icon_name, icon_bytes, color) = if file.is_dir {
-                        ("folder", icons::ICON_FOLDER, Color32::YELLOW)
+
+                        let (color, cache_key) = if let Some(file_id) = &file.unique_id {
+                            let color = ui_state.folder_color_manager.get_color(file_id);
+                            let cache_key = format!("folder-{:?}", file_id);
+
+                            (color, cache_key)
+                        } else {
+                            (Color32::YELLOW, "folder-unknown".to_string())
+                        };
+
+                        (cache_key, icons::ICON_FOLDER, color)
                     } else {
                         match &file.extension {
-                            FileExtension::Image(_) => ("image", icons::ICON_IMAGE,    Color32::from_rgb(100, 200, 255)),
-                            FileExtension::Document(DocType::Pdf) => ("pdf",      icons::ICON_PDF, Color32::from_rgb(255, 80,  80)),
-                            FileExtension::Document(_) => ("doc", icons::ICON_DOC, Color32::from_rgb(100, 140, 255)),
-                            FileExtension::Video(_) => ("video", icons::ICON_VIDEO,    Color32::from_rgb(200, 100, 255)),
-                            FileExtension::Audio(_) => ("audio", icons::ICON_VIDEO,    Color32::from_rgb(255, 200, 80)),
-                            FileExtension::Archive(_) => ("archive", icons::ICON_ARCHIVE,  Color32::from_rgb(255, 160, 60)),
-                            FileExtension::Code(_) => ("code", icons::ICON_CODE,     Color32::from_rgb(100, 255, 150)),
-                            FileExtension::Font(_) => ("font", icons::ICON_FONT,     Color32::from_rgb(200, 200, 200)),
-                            FileExtension::Executable(_) => ("exe", icons::ICON_EXE,      Color32::from_rgb(255, 100, 100)),
-                            FileExtension::Unknown => ("file", icons::ICON_FILE, Color32::WHITE),
+                            FileExtension::Image(_) => ("image".to_string(), icons::ICON_IMAGE,    Color32::from_rgb(100, 200, 255)),
+                            FileExtension::Document(DocType::Pdf) => ("pdf".to_string(),      icons::ICON_PDF, Color32::from_rgb(255, 80,  80)),
+                            FileExtension::Document(_) => ("doc".to_string(), icons::ICON_DOC, Color32::from_rgb(100, 140, 255)),
+                            FileExtension::Video(_) => ("video".to_string(), icons::ICON_VIDEO,    Color32::from_rgb(200, 100, 255)),
+                            FileExtension::Audio(_) => ("audio".to_string(), icons::ICON_VIDEO,    Color32::from_rgb(255, 200, 80)),
+                            FileExtension::Archive(_) => ("archive".to_string(), icons::ICON_ARCHIVE,  Color32::from_rgb(255, 160, 60)),
+                            FileExtension::Code(_) => ("code".to_string(), icons::ICON_CODE,     Color32::from_rgb(100, 255, 150)),
+                            FileExtension::Font(_) => ("font".to_string(), icons::ICON_FONT,     Color32::from_rgb(200, 200, 200)),
+                            FileExtension::Executable(_) => ("exe".to_string(), icons::ICON_EXE,      Color32::from_rgb(255, 100, 100)),
+                            FileExtension::Unknown => ("file".to_string(), icons::ICON_FILE, Color32::WHITE),
                         }
                     };
 
                     
-                    let icon = ui_state.icon_cache.get_or_load(ctx, icon_name, icon_bytes, color);
+                    let icon = ui_state.icon_cache.get_or_load(ctx, &icon_name, icon_bytes, color);
 
                     let icon_size = egui::vec2(16.0, 16.0);
                     let icon_spacing = 4.0;
@@ -674,13 +715,15 @@ pub fn render_scrollview(ctx: &egui::Context, files: &Vec<Arc<FileEntry>>, state
                     let display_size = if file.is_dir {
                         if state.calculating_dir_sizes.contains(&file.full_path) {
                             None
+                        } else if state.calculated_dir_sizes.contains(&file.full_path) {
+                            Some(file.size)
                         } else {
                             state.sizer_manager.cache_manager.get_cached_size(&file.full_path)
                         }
                     } else {
                         Some(file.size)
                     };
-
+                    
                     let size_text = match display_size {
                         None => "...",
                         Some(0) if file.is_dir => "-",

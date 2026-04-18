@@ -1,3 +1,20 @@
+// Copyright 2026 Jhanfer
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+
+
+
 use std::{collections::HashSet, os::unix::fs::MetadataExt, path::{Path, PathBuf}, sync::{Arc, atomic::{AtomicU64, Ordering}}, time::{SystemTime, UNIX_EPOCH}};
 use jwalk::{Parallelism, WalkDir};
 use tokio::sync::{Mutex, Semaphore};
@@ -21,20 +38,7 @@ impl SizerManager {
         TOKIO_RUNTIME.spawn(async move {
             cache_manager.load_size_cache().await;
         });
-
-        let sm = Self { 
-            cache_manager
-        };
-
-        sm.tests();
-
-        sm
-    }
-
-
-    pub fn tests(&self) {
-        let e = self.cache_manager.size_cache.read();
-        debug!("Test de tamaños {:?}", e);
+        Self { cache_manager }
     }
 
     fn get_real_mtime(path: &PathBuf) -> u64 {
@@ -61,10 +65,13 @@ impl SizerManager {
         for msg in sizer_messages {
             match msg {
                 SizerMessages::StartCal(path_buf) => {
+                    let force = cm.is_invalidated(&path_buf);
                     let current_mtime = Self::get_real_mtime(&path_buf);
                     let key = path_buf.to_string_lossy();
                     
-                    let cache_valid = {
+                    let cache_valid = if force {
+                        false
+                    } else {
                         let guard = cm.size_cache.read();
                         guard.get(key.as_ref())
                             .map(|c| c.modified == current_mtime)
@@ -73,8 +80,6 @@ impl SizerManager {
 
                     if cache_valid {
                         if let Some(cached_size) = cm.get_cached_size(&path_buf) {
-                            info!("Usando caché: {}, para {:?}", cached_size, path_buf);
-
                             sender.send_fileop(
                                 FileOperation::UpdateDirSize {
                                     full_path: path_buf,
@@ -84,6 +89,8 @@ impl SizerManager {
                             ).ok();
                         }
                     } else {
+                        cm.clear_invalidated(&path_buf);
+                        
                         let path_to_task = path_buf.clone();
                         let mtime_to_task = current_mtime.clone();
                         let sender_clone = sender.clone();
@@ -117,8 +124,8 @@ impl SizerManager {
                 },
             }
         }
-
     }
+
 
     pub async fn get_recursive_size(root: impl AsRef<Path>, max_concurrency: usize, sender: NotifyingSender, path_buf: PathBuf, tab_id: Uuid) -> u64 {
         let total_size = Arc::new(AtomicU64::new(0));

@@ -750,7 +750,6 @@ impl BlazeCoreState {
                         self.calculated_dir_sizes.insert(full_path.clone());
                         self.needs_sort = true;
                     }
-
                 },
 
                 FileOperation::RestoreDeletedFiles { file_names } => {
