@@ -7,7 +7,7 @@ use crate::{core::{blaze_state::{BlazeCoreState, NewItemType}, files::motor::Fil
 pub fn hot_keys_logic(state: &mut BlazeCoreState, files: &Vec<Arc<FileEntry>>, ui: &mut Ui, total_rows: usize) {
     let input = ui.input(|i| i.clone());
     let disable_keys = state.renaming_file.is_none() && state.creating_new.is_none();
-
+    let has_clipboard = state.clipboard.clipboard_has_files();
 
     //tecla de arriba
     if input.key_pressed(Key::ArrowUp) && disable_keys {
@@ -103,13 +103,13 @@ pub fn hot_keys_logic(state: &mut BlazeCoreState, files: &Vec<Arc<FileEntry>>, u
 
     //eliminar 
     if input.key_pressed(Key::Delete) && disable_keys {
+        let sources = state.get_selected_paths(files);
         let cwd = state.motor.borrow_mut().active_tab().cwd.clone();
         let trash = state.motor.borrow_mut().get_trash_dir(None).unwrap_or_default();
 
-        if trash == cwd {
+        if trash == cwd && !sources.is_empty() {
             let Some(sender) = state.sender().cloned() else {return;};
             let tab_id = state.motor.borrow_mut().active_tab().id;
-            let sources = state.get_selected_paths(files);
             sender.send_ui_event(
                 UiEvent::SureTo(
                     SureTo::SureToDelete { 
@@ -119,7 +119,7 @@ pub fn hot_keys_logic(state: &mut BlazeCoreState, files: &Vec<Arc<FileEntry>>, u
                 )
             ).ok();
             
-        } else {
+        } else if !sources.is_empty(){
             state.move_to_trash(files);
         }
     }
@@ -149,7 +149,7 @@ pub fn hot_keys_logic(state: &mut BlazeCoreState, files: &Vec<Arc<FileEntry>>, u
     }
 
     //pegar
-    if do_paste && disable_keys { 
+    if do_paste && disable_keys && has_clipboard { 
         let cwd = state.motor.borrow_mut().active_tab().cwd.clone();
         state.paste(cwd);
     }

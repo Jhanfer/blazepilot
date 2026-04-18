@@ -67,7 +67,15 @@ pub fn render_island_bubble(state: &mut BlazeCoreState, ui_state: &mut BlazeUiSt
                             let selected_size: u64 = files.iter()
                                 .enumerate()
                                 .filter(|(i, _)| state.is_selected(*i))
-                                .map(|(_, f)| f.size)
+                                .map(|(_, f)| {
+                                    if f.is_dir {
+                                        state.sizer_manager.cache_manager
+                                            .get_cached_size(&f.full_path)
+                                            .unwrap_or(0)
+                                    } else {
+                                        f.size
+                                    }
+                                })
                                 .sum();
 
                             ui.label(format!("{}", selected_count));

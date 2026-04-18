@@ -234,6 +234,8 @@ impl Clipboard {
             }
         ).ok();
 
+        let inner = Arc::clone(&self.inner);
+
         TOKIO_RUNTIME.spawn(async move {
             let mut total_bytes_global: u64 = 0;
             for item in &items {
@@ -248,6 +250,8 @@ impl Clipboard {
             let mut handles = Vec::default();
 
             let errors_count = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+
+            let is_cut = matches!(mode, Some(ClipboardMode::Cut));
 
             for item in items {
                 let permit = semaphore.clone().acquire_owned().await.unwrap();
@@ -277,7 +281,7 @@ impl Clipboard {
                         }
                     }
 
-                    let is_cut = matches!(mode, Some(ClipboardMode::Cut));
+                    
 
                     let result = Self::paste_item_with_progress(
                         &item.src_path,
@@ -314,6 +318,14 @@ impl Clipboard {
 
             let has_errors = errors_count.load(std::sync::atomic::Ordering::Relaxed) > 0;
 
+            let mut inner = inner.lock().unwrap();
+
+            if is_cut {
+                inner.mode = None;
+                inner.items.clear();
+            }
+            inner.dest_dir = None; 
+            
             info!("Todos los items procesados, mandando Finished");
             sender.send_tasks(
                 TaskMessage::Finished {
