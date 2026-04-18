@@ -325,23 +325,20 @@ pub fn sidebar_left_component(ctx: &egui::Context, state: &mut BlazeCoreState, u
 
             ui.add_space(10.0);
 
-            let home = home_dir().unwrap();
-            render_local_buttons("Home", home, state, ui, ui_state, ctx);
+            let dirs = [
+                ("Home",        home_dir()),
+                ("Escritorio",  desktop_dir()),
+                ("Descargas",   download_dir()),
+                ("Documentos",  document_dir()),
+                ("Imágenes",    picture_dir()),
+                ("Papelera",    state.motor.borrow_mut().get_trash_dir(None)),
+            ];
 
-            let desk = desktop_dir().unwrap();
-            render_local_buttons("Escritorio", desk, state, ui, ui_state, ctx);
-
-            let donw = download_dir().unwrap();
-            render_local_buttons("Descargas", donw, state, ui, ui_state, ctx);
-
-            let docs = document_dir().unwrap();
-            render_local_buttons("Documentos", docs, state, ui, ui_state, ctx);
-
-            let imgs = picture_dir().unwrap();
-            render_local_buttons("Imágenes", imgs, state, ui, ui_state, ctx);
-
-            let trsh = state.motor.borrow_mut().get_trash_dir(None).unwrap();
-            render_local_buttons("Papelera", trsh, state, ui, ui_state, ctx);
+            for (label, path) in dirs {
+                if let Some(path) = path {
+                    render_local_buttons(label, path, state, ui, ui_state, ctx);
+                }
+            }
 
 
             ui.add_space(20.0);

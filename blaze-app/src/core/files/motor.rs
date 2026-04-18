@@ -778,9 +778,13 @@ thread_local! {
 pub fn with_motor<F, R>(f: F) -> R 
     where F: FnOnce(&mut BlazeMotor) -> R {
         MOTOR.with(|m|{
-            let binding = m.borrow();
-            let motor_rc = binding.as_ref().expect("Motor no inicializado");
-            f(&mut motor_rc.borrow_mut())
+            let motor_rc = m.borrow()
+                .as_ref()
+                .expect("Motor no inicializado")
+                .clone();
+
+            let mut motor = motor_rc.borrow_mut();
+            f(&mut *motor)
         })
     }
 

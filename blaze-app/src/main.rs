@@ -50,7 +50,7 @@ fn main() {
             .with_transparent(true),
         multisampling: 4,
         renderer: eframe::Renderer::Wgpu,
-        hardware_acceleration: HardwareAcceleration::Required,
+        hardware_acceleration: HardwareAcceleration::Preferred,
         ..Default::default()
     };
 

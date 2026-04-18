@@ -627,7 +627,6 @@ pub fn render_scrollview(ctx: &egui::Context, files: &Vec<Arc<FileEntry>>, state
                     let mut temp_ui = ui.new_child(UiBuilder::new().max_rect(rect));
                     let response = temp_ui.put(rect,
                         egui::TextEdit::singleline(&mut state.rename_buffer)
-                            .frame(false)
                             .margin(vec2(0.0, 5.0)) 
                             .font(egui::FontId::default()) 
                     );

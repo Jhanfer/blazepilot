@@ -322,40 +322,30 @@ impl BlazeCoreState {
 
     pub fn navigate_to(&mut self, path: PathBuf) {
         self.motor.borrow_mut().active_tab_mut().navigate_to(path);
-        if let Some(sender) = self.sender().cloned() {
-            self.motor.borrow_mut().active_tab_mut().load_path(false, sender);
-        }
-        self.deselect_all();
+        self.refresh();
     }
 
     pub fn up(&mut self) {
         self.motor.borrow_mut().active_tab_mut().up();
-        if let Some(sender) = self.sender().cloned() {
-            self.motor.borrow_mut().active_tab_mut().load_path(false, sender);
-        }
-        self.deselect_all();
+        self.refresh();
     }
 
     pub fn back(&mut self) {
         self.motor.borrow_mut().active_tab_mut().back();
-        if let Some(sender) = self.sender().cloned() {
-            self.motor.borrow_mut().active_tab_mut().load_path(false, sender);
-        }
-        self.deselect_all();
+        self.refresh();
     }
 
     pub fn forward(&mut self) {
         self.motor.borrow_mut().active_tab_mut().foward();
-        if let Some(sender) = self.sender().cloned() {
-            self.motor.borrow_mut().active_tab_mut().load_path(false, sender);
-        }
-        self.deselect_all();
+        self.refresh();
     }
 
     pub fn refresh(&mut self) {
         if let Some(sender) = self.sender().cloned() {
             self.motor.borrow_mut().active_tab_mut().load_path(false, sender);
         }
+        self.calculating_dir_sizes.clear();
+        self.calculated_dir_sizes.clear();
         self.deselect_all();
     }
 
@@ -771,6 +761,8 @@ impl BlazeCoreState {
                 self.last_fs_event = None;
                 if self.active_tasks == 0 {
                     if let Some(sender) = self.sender().cloned() {
+                        self.calculating_dir_sizes.clear();
+                        self.calculated_dir_sizes.clear();
                         self.motor.borrow_mut().active_tab().load_path(true, sender);
                     }
                 }

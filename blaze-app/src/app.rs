@@ -15,6 +15,9 @@
 
 
 
+use eframe::Frame;
+use egui::Ui;
+
 use crate::core::blaze_state::BlazeCoreState;
 use crate::ui::blaze_ui_state::BlazeUiState;
 use crate::ui::modules::ui_callback::connect_ui_components_callback;
@@ -26,10 +29,10 @@ pub struct BlazeApp {
 }
 
 impl eframe::App for BlazeApp {
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {        
+    fn ui(&mut self, ui: &mut Ui, frame: &mut Frame) {     
         self.state.process_messages();
         
-        self.ui_state.dialog_manager.render_area(ctx);
+        self.ui_state.dialog_manager.render_area(ui.ctx());
         self.ui_state.process_events();
 
         let mut files = self.state.active_files();
@@ -37,13 +40,13 @@ impl eframe::App for BlazeApp {
             files = self.state.sort_indices(&mut files);
         }
 
-        connect_ui_components_callback(ctx, &files, &mut self.state, &mut self.ui_state);
+        connect_ui_components_callback(ui.ctx(), &files, &mut self.state, &mut self.ui_state);
 
 
         if self.state.is_loading || self.state.active_tasks > 0 {
-            ctx.request_repaint();
+            ui.ctx().request_repaint();
         } else {
-            ctx.request_repaint_after(std::time::Duration::from_millis(100));
+            ui.ctx().request_repaint_after(std::time::Duration::from_millis(100));
         }
     }
 }

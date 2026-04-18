@@ -431,6 +431,22 @@ pub fn render_row_view(ctx: &egui::Context, files: &Vec<Arc<FileEntry>>, state: 
                 //Background
                 background_response_logic(state, ui_state, files, ui, ctx, panel_top, total_rows, row_height, content_rect);
 
+            
+                //Disparador de sizer
+                if let Some(sender) = state.sender().cloned() {
+                    for i in state.row_view.first_visible..state.row_view.last_visible.min(files.len()) {
+                        let file = &files[i];
+
+                        if file.is_dir 
+                            && !state.calculating_dir_sizes.contains(&file.full_path) 
+                            && !state.calculated_dir_sizes.contains(&file.full_path) 
+                        {
+                            state.calculating_dir_sizes.insert(file.full_path.clone());
+                            sender.send_sizer(SizerMessages::StartCal(file.full_path.clone())).ok();
+                        }
+                    }
+                }
+
 
                 //Scrollview
                 render_scrollview(ctx, files, state, ui_state, ui, row_height, total_rows, content_rect);
@@ -447,20 +463,7 @@ pub fn render_row_view(ctx: &egui::Context, files: &Vec<Arc<FileEntry>>, state: 
                 render_drag_files(state, files, clipped_painter, content_rect, row_height);
                 
 
-                //Disparador de sizer
-                if let Some(sender) = state.sender().cloned() {
-                    for i in state.row_view.first_visible..state.row_view.last_visible.min(files.len()) {
-                        let file = &files[i];
 
-                        if file.is_dir 
-                            && !state.calculating_dir_sizes.contains(&file.full_path) 
-                            && !state.calculated_dir_sizes.contains(&file.full_path) 
-                        {
-                            state.calculating_dir_sizes.insert(file.full_path.clone());
-                            sender.send_sizer(SizerMessages::StartCal(file.full_path.clone())).ok();
-                        }
-                    }
-                }
 
                 //Isla y burbuja y las tabs
                 render_island_bubble(state, ui_state, files, ctx, bottom_padding, tabs_height);
