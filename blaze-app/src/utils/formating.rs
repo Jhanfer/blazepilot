@@ -4,12 +4,12 @@ use chrono::{DateTime, Local, TimeDelta};
 
 
 pub fn format_size(size: u64) -> String {
-    const KB: u64 = 1024;
-    const MB: u64 = KB * 1024;
-    const GB: u64 = MB * 1024;
-    const TB: u64 = GB * 1024;
-    const PB: u64 = TB * 1024;
-    const EB: u64 = PB * 1024;
+    const KB: u64 = 1000;
+    const MB: u64 = KB * 1000;
+    const GB: u64 = MB * 1000;
+    const TB: u64 = GB * 1000;
+    const PB: u64 = TB * 1000;
+    const EB: u64 = PB * 1000;
     
     match size {
         0 => "0 B".to_string(),
