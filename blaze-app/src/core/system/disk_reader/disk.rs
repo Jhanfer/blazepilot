@@ -13,4 +13,5 @@ pub struct Disk {
     pub is_removable: bool,
     pub is_partition: bool,
     pub size: u64,
+    pub is_system: bool,
 }

@@ -1,4 +1,4 @@
-use std::error::Error;
+use std::{error::Error, thread::current};
 use self_update::cargo_crate_version;
 use tracing::{error, info};
 use uuid::Uuid;
@@ -35,6 +35,19 @@ impl Updater {
         }
     }
 
+    fn is_newer_version(current: &str, new: &str) -> bool {
+        let parse = |v: &str| -> Vec<u32> {
+            v.split(".")
+            .map(|s| s.parse::<u32>().unwrap_or(0))
+            .collect()
+        };
+
+        let curr = parse(current);
+        let newv = parse(new);
+
+        newv > curr
+    }
+
     pub fn check_for_update(&mut self, sender: NotifyingSender) {
         let version = self.version.clone();
         let owner = self.owner.clone();
@@ -60,15 +73,23 @@ impl Updater {
                 Ok(new_ver) => {
                     if let Some(new_ver) = new_ver {
                         let tab_id = sender.tab_id;
-                        sender.send_ui_event(
-                                UiEvent::UpdateMessages(
-                                    UpdateMessages::NewVersionAvailable { 
-                                    current_version: version, 
-                                    new_version: new_ver,
-                                    tab_id,
-                                }
-                            )
-                        ).ok();
+                        if Self::is_newer_version(&version, &new_ver) {
+                            sender.send_ui_event(
+                                    UiEvent::UpdateMessages(
+                                        UpdateMessages::NewVersionAvailable { 
+                                        current_version: version, 
+                                        new_version: new_ver,
+                                        tab_id,
+                                    }
+                                )
+                            ).ok();
+                        } else {
+                            sender.send_ui_event(
+                                    UiEvent::UpdateMessages(
+                                        UpdateMessages::UpToDate
+                                )
+                            ).ok();
+                        }
                     } else {
                         info!("App actualizada a la última versión.");
                     }

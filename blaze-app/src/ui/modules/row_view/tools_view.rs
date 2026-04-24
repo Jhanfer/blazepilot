@@ -2,7 +2,7 @@ use std::sync::Arc;
 use egui::{Color32, Context, Rect, Sense, Ui, pos2};
 use crate::{core::{blaze_state::{BlazeCoreState, NewItemType}, configs::config_state::with_configs, files::motor::FileEntry}, ui::{blaze_ui_state::BlazeUiState, icons_cache::icons}, utils::channel_pool::{SureTo, UiEvent}};
 
-pub fn tools(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, files: &Vec<Arc<FileEntry>>, ui: &mut Ui, ctx: &Context) {
+pub fn tools(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, files: &Vec<Arc<FileEntry>>, ui: &mut Ui) {
     ui.horizontal(|ui|{
         ui.visuals_mut().button_frame = false;
 
@@ -15,7 +15,7 @@ pub fn tools(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, files: &Ve
             let icon_size = egui::vec2(16.0, 16.0);
             let (icon_rect, new_fol) = ui.allocate_exact_size(icon_size, Sense::click());
             
-            let icon = ui_state.icon_cache.get_or_load(ctx, icon_plus_fol, icon_bytes_plus_fol, Color32::GRAY);
+            let icon = ui_state.icon_cache.get_or_load(ui, icon_plus_fol, icon_bytes_plus_fol, Color32::GRAY);
             
             ui.painter().image(
                 icon.id(),
@@ -37,7 +37,7 @@ pub fn tools(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, files: &Ve
             let icon_size = egui::vec2(16.0, 16.0);
             let (icon_rect, new_file) = ui.allocate_exact_size(icon_size, Sense::click());
             
-            let icon = ui_state.icon_cache.get_or_load(ctx, icon_plus_file, icon_bytes_plus_file, Color32::GRAY);
+            let icon = ui_state.icon_cache.get_or_load(ui, icon_plus_file, icon_bytes_plus_file, Color32::GRAY);
             
             ui.painter().image(
                 icon.id(),
@@ -56,7 +56,7 @@ pub fn tools(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, files: &Ve
             ui.separator();
 
             if new_fol.hovered() || new_file.hovered() {
-                ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+                ui.set_cursor_icon(egui::CursorIcon::PointingHand);
             }
         });
 
@@ -75,7 +75,7 @@ pub fn tools(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, files: &Ve
         let icon_size = egui::vec2(16.0, 16.0);
         let (icon_rect, cut_resp) = ui.allocate_exact_size(icon_size, Sense::click());
         
-        let icon = ui_state.icon_cache.get_or_load(ctx, icon_cut, icon_bytes_cut, Color32::GRAY);
+        let icon = ui_state.icon_cache.get_or_load(ui, icon_cut, icon_bytes_cut, Color32::GRAY);
         
         ui.painter().image(
             icon.id(),
@@ -100,7 +100,7 @@ pub fn tools(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, files: &Ve
         let (icon_rect, cop_resp) = ui.allocate_exact_size(icon_size, Sense::click());
 
         
-        let icon = ui_state.icon_cache.get_or_load(ctx, icon_copy, icon_bytes_copy, Color32::GRAY);
+        let icon = ui_state.icon_cache.get_or_load(ui, icon_copy, icon_bytes_copy, Color32::GRAY);
         
         ui.painter().image(
             icon.id(),
@@ -125,7 +125,7 @@ pub fn tools(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, files: &Ve
         let (icon_rect, pas_resp) = ui.allocate_exact_size(icon_size, Sense::click());
 
         
-        let icon = ui_state.icon_cache.get_or_load(ctx, icon_paste, icon_bytes_paste, Color32::GRAY);
+        let icon = ui_state.icon_cache.get_or_load(ui, icon_paste, icon_bytes_paste, Color32::GRAY);
         
         ui.painter().image(
             icon.id(),
@@ -137,7 +137,7 @@ pub fn tools(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, files: &Ve
 
 
         if pas_resp.clicked() {
-            let cwd = state.motor.borrow_mut().active_tab().cwd.clone();
+            let cwd = state.cwd.clone();
             state.paste(cwd);
         }
 
@@ -152,7 +152,7 @@ pub fn tools(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, files: &Ve
         let (icon_rect, del_resp) = ui.allocate_exact_size(icon_size, Sense::click());
 
         
-        let icon = ui_state.icon_cache.get_or_load(ctx, icon_trash, icon_bytes_trash, Color32::GRAY);
+        let icon = ui_state.icon_cache.get_or_load(ui, icon_trash, icon_bytes_trash, Color32::GRAY);
         
         ui.painter().image(
             icon.id(),
@@ -163,7 +163,7 @@ pub fn tools(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, files: &Ve
         );
 
         if del_resp.clicked() {
-            let cwd = state.motor.borrow_mut().active_tab().cwd.clone();
+            let cwd = state.cwd.clone();
             let trash = state.motor.borrow_mut().get_trash_dir(None).unwrap_or_default();
 
             if trash == cwd {
@@ -200,7 +200,7 @@ pub fn tools(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, files: &Ve
         let (icon_rect, select_resp) = ui.allocate_exact_size(icon_size, Sense::click());
         
 
-        let icon = ui_state.icon_cache.get_or_load(ctx, icon_name, icon_bytes, Color32::GRAY);
+        let icon = ui_state.icon_cache.get_or_load(ui, icon_name, icon_bytes, Color32::GRAY);
         
         ui.painter().image(
             icon.id(),
@@ -223,7 +223,7 @@ pub fn tools(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, files: &Ve
         let icon_size = egui::vec2(16.0, 16.0);
         let (icon_rect, refresh_resp) = ui.allocate_exact_size(icon_size, Sense::click());
         
-        let icon = ui_state.icon_cache.get_or_load(ctx, icon_refresh, icon_bytes_refresh, Color32::GRAY);
+        let icon = ui_state.icon_cache.get_or_load(ui, icon_refresh, icon_bytes_refresh, Color32::GRAY);
         
         ui.painter().image(
             icon.id(),
@@ -255,7 +255,7 @@ pub fn tools(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, files: &Ve
             let icon_size = egui::vec2(16.0, 16.0);
             let (icon_rect, hidd_resp) = ui.allocate_exact_size(icon_size, Sense::click());
             
-            let icon = ui_state.icon_cache.get_or_load(ctx, icon_refresh, icon_bytes_refresh, Color32::GRAY);
+            let icon = ui_state.icon_cache.get_or_load(ui, icon_refresh, icon_bytes_refresh, Color32::GRAY);
             
             ui.painter().image(
                 icon.id(),
@@ -275,7 +275,7 @@ pub fn tools(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, files: &Ve
             ui.separator();
 
             if hidd_resp.hovered() {
-                ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+                ui.set_cursor_icon(egui::CursorIcon::PointingHand);
             }
 
         });

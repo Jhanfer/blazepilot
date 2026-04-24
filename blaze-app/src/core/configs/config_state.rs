@@ -16,9 +16,10 @@
 
 
 
+
 use serde::{Serialize, Deserialize};
 use directories::ProjectDirs;
-use std::path::PathBuf;
+use std::{collections::HashSet, path::PathBuf};
 use once_cell::sync::Lazy;
 use std::sync::Mutex;
 use tracing::debug;
@@ -34,12 +35,32 @@ pub enum OrderingMode {
     DateDesc,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, Hash, PartialEq, Eq)]
 pub struct FavoriteLinks {
     pub name: String,
     pub path: PathBuf,
     pub is_dir: bool,
 }
+
+
+#[derive(Serialize, Deserialize, Debug, Default, Clone, PartialEq)]
+pub enum DisplayBackend {
+    #[default]
+    Auto,
+    X11,
+    Wayland
+}
+
+impl DisplayBackend {
+    pub fn name(&self) -> &'static str {
+        match self {
+            DisplayBackend::Auto => "Auto",
+            DisplayBackend::X11 => "X11",
+            DisplayBackend::Wayland => "Wayland",
+        }
+    }
+}
+
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ConfigsFlags {
@@ -55,7 +76,24 @@ pub struct ConfigsFlags {
     pub item_file_list_size: usize,
 
     #[serde(default)]
-    pub favorite_list: Vec<FavoriteLinks>,
+    pub favorite_list: HashSet<FavoriteLinks>,
+
+    #[serde(default)]
+    pub default_terminal: String,
+
+    #[serde(default)]
+    pub display_backend: DisplayBackend,
+
+
+    #[serde(default)]
+    pub theme: String,
+    #[serde(default)]
+    pub accent_color: Option<String>,
+    #[serde(default)]
+    pub font_size: f32,
+    #[serde(default)]
+    pub confirm_on_delete: bool,
+
 }   
 
 impl ConfigsFlags {
@@ -68,8 +106,13 @@ impl ConfigsFlags {
             config_file_path: path,
             show_hidden_files: false,
             item_file_list_size: 10,
-
-            favorite_list: Vec::new(),
+            favorite_list: HashSet::new(),
+            display_backend: DisplayBackend::Auto,
+            default_terminal: String::new(),
+            theme: "system".to_string(),
+            accent_color: None,
+            font_size: 14.0,
+            confirm_on_delete: true,
         };
         cfg.save().unwrap();
         cfg
@@ -118,32 +161,37 @@ impl ConfigsFlags {
         self
     }
 
-    pub fn add_to_favorites(&mut self, name: String,  path: PathBuf, is_dir: bool) -> &mut Self {
-        let fav = FavoriteLinks {name, path, is_dir};
-        self.favorite_list.push(fav);
+    pub fn set_display_backend(&mut self, backend: DisplayBackend) -> &mut Self {
+        self.display_backend = backend;
         self.save().ok();
         self
     }
 
-    pub fn delete_from_favorites(&mut self, name: String,  path: PathBuf) -> &mut Self {
-        let fav = self.favorite_list
-            .iter()
-            .position(|f| f.name == name && f.path == path);
+    pub fn set_default_terminal(&mut self, terminal: String) -> &mut Self {
+        self.default_terminal = terminal;
+        self.save().ok();
+        self
+    }
 
-        if let Some(fav) = fav {
-            self.favorite_list.remove(fav);
+    
+    pub fn add_to_favorites(&mut self, name: String,  path: PathBuf, is_dir: bool) -> &mut Self {
+        if !self.is_in_favorite(&path) {
+            self.favorite_list.insert(FavoriteLinks {name, path, is_dir});
         }
         self.save().ok();
         self
     }
 
-    pub fn is_in_favorite(&mut self, path: PathBuf) -> bool {
-        let bool = self.favorite_list
-            .iter()
-            .any(|f| f.path == path);
-
+    pub fn delete_from_favorites(&mut self, name: String,  path: PathBuf) -> &mut Self {
+        self.favorite_list.retain(|f| !(f.name == name && f.path == path));
         self.save().ok();
-        bool
+        self
+    }
+
+    pub fn is_in_favorite(&self, path: &PathBuf) -> bool {
+        self.favorite_list
+            .iter()
+            .any(|f| f.path == *path)
     }
 
 
@@ -182,12 +230,17 @@ impl ConfigHandler {
             PathBuf::new()
         });
         Self { configs: ConfigsFlags {
-                app_ordering_mode: OrderingMode::default(),
+                app_ordering_mode: OrderingMode::Az,
                 config_file_path: path,
                 show_hidden_files: false,
                 item_file_list_size: 10,
-
-                favorite_list: Vec::new(),
+                favorite_list: HashSet::new(),
+                display_backend: DisplayBackend::Auto,
+                default_terminal: String::new(),
+                theme: "system".to_string(),
+                accent_color: None,
+                font_size: 14.0,
+                confirm_on_delete: true,
             } 
         }
     }
@@ -204,7 +257,6 @@ impl ConfigHandler {
         self.configs.set_item_file_list_size(size);
     }
 
-
     pub fn add_to_favorites(&mut self, name: String,  path: PathBuf, is_dir: bool) {
         self.configs.add_to_favorites(name, path, is_dir);
     }
@@ -213,8 +265,16 @@ impl ConfigHandler {
         self.configs.delete_from_favorites(name, path);
     }
 
-    pub fn is_in_favorite(&mut self, path: PathBuf) -> bool {
+    pub fn is_in_favorite(&mut self, path: &PathBuf) -> bool {
         self.configs.is_in_favorite(path)
+    }
+
+    pub fn set_display_backend(&mut self, backend: DisplayBackend) {
+        self.configs.set_display_backend(backend);
+    }
+
+    pub fn set_default_terminal(&mut self, terminal: String) {
+        self.configs.set_default_terminal(terminal);
     }
     
 

@@ -5,3 +5,5 @@ pub mod updater;
 pub mod sizer_manager;
 pub mod cache;
 pub mod terminal_opener;
+pub mod extended_info;
+pub mod zip_manager;

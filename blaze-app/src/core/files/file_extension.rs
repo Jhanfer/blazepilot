@@ -25,7 +25,17 @@ pub enum AudioType {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ArchiveType {
-    Zip, Tar, Gz, Bz2, Xz, Rar, SevenZ, Zst,
+    Zip,
+    Tar,
+    TarGz,
+    TarXz,
+    TarBz2,
+    Gz,
+    Bz2,
+    Xz,
+    Rar,
+    SevenZ,
+    Zst,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -70,6 +80,19 @@ pub enum FileExtension {
 
 impl FileExtension {
     pub fn from_path(path: &std::path::Path) -> Self {
+        let path_str = path.to_string_lossy().to_ascii_lowercase();
+
+        if path_str.ends_with(".tar.gz") {
+            return Self::Archive(ArchiveType::TarGz);
+        }
+        if path_str.ends_with(".tar.xz") {
+            return Self::Archive(ArchiveType::TarXz);
+        }
+        if path_str.ends_with(".tar.bz2") {
+            return Self::Archive(ArchiveType::TarBz2);
+        }
+
+
         match path.extension().and_then(|e| e.to_str()).map(|e| e.to_ascii_lowercase()).as_deref() {
             Some("pdf")  => Self::Document(DocType::Pdf),
             Some("doc")  => Self::Document(DocType::Doc),
@@ -116,14 +139,13 @@ impl FileExtension {
             Some("opus") => Self::Audio(AudioType::Opus),
             Some("wma")  => Self::Audio(AudioType::Wma),
 
-            Some("zip")  => Self::Archive(ArchiveType::Zip),
-            Some("tar")  => Self::Archive(ArchiveType::Tar),
-            Some("gz")   => Self::Archive(ArchiveType::Gz),
-            Some("bz2")  => Self::Archive(ArchiveType::Bz2),
-            Some("xz")   => Self::Archive(ArchiveType::Xz),
-            Some("rar")  => Self::Archive(ArchiveType::Rar),
-            Some("7z")   => Self::Archive(ArchiveType::SevenZ),
-            Some("zst")  => Self::Archive(ArchiveType::Zst),
+            Some("zip") => Self::Archive(ArchiveType::Zip),
+            Some("tar") => Self::Archive(ArchiveType::Tar),
+            Some("gz")  => Self::Archive(ArchiveType::Gz),
+            Some("bz2") => Self::Archive(ArchiveType::Bz2),
+            Some("xz")  => Self::Archive(ArchiveType::Xz),
+            Some("7z")  => Self::Archive(ArchiveType::SevenZ),
+            Some("rar") => Self::Archive(ArchiveType::Rar),
 
             Some("rs")   => Self::Code(CodeType::Rs),
             Some("py")   => Self::Code(CodeType::Py),
@@ -169,6 +191,32 @@ impl FileExtension {
             Some("app")      => Self::Executable(ExecutableType::App),
 
             _ => Self::Unknown,
+        }
+    }
+}
+
+
+impl FileExtension {
+    pub fn is_archive(&self) -> bool {
+        matches!(self, FileExtension::Archive(_))
+    }
+
+    pub fn is_image(&self) -> bool {
+        matches!(self, FileExtension::Image(_))
+    }
+
+    pub fn is_video(&self) -> bool {
+        matches!(self, FileExtension::Video(_))
+    }
+
+    pub fn is_code(&self) -> bool {
+        matches!(self, FileExtension::Code(_))
+    }
+
+    pub fn archive_type(&self) -> Option<ArchiveType> {
+        match self {
+            FileExtension::Archive(t) => Some(t.clone()),
+            _ => None,
         }
     }
 }

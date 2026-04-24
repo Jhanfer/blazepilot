@@ -17,7 +17,7 @@
 
 
 use std::sync::Arc;
-use tracing::{debug, error, info, instrument::WithSubscriber, trace, warn};
+use tracing::info;
 use crate::core::system::disk_reader::disk::Disk;
 use tokio::sync::{Mutex as TokioMutex};
 

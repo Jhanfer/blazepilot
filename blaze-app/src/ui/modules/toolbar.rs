@@ -15,150 +15,153 @@
 
 
 
-use egui::{Align, Color32, CornerRadius, Key, Layout, RichText, Sense, Stroke, TopBottomPanel};
+
+use egui::{Color32, CornerRadius, Frame, Margin, Panel, Rect, RichText, Sense, Stroke, Ui, pos2, vec2};
 use std::path::PathBuf;
-use crate::core::blaze_state::BlazeCoreState;
-
-pub fn toolbar_component(ctx: &egui::Context, state: &mut BlazeCoreState) {
-
-    
-    TopBottomPanel::top("toolbar")
-        .min_height(42.0)           // altura cómoda
-        .frame(egui::Frame::NONE.fill(Color32::from_rgb(80, 40, 140)))
-        .show(ctx, |ui| {
-
-            ui.with_layout(Layout::left_to_right(Align::Center), |ui|{
-                ui.add_space(20.0);
-
-                ui.horizontal(|ui| {
-
-                    let nav_btn = |ui: &mut egui::Ui, label: &str| -> bool {
-                        ui.add(
-                            egui::Button::new(RichText::new(label).size(14.0).color(Color32::WHITE))
-                                .frame(true)
-                                .fill(Color32::TRANSPARENT)
-                                .stroke(Stroke::new(1.0, Color32::from_rgb(120, 80, 200)))
-                                .corner_radius(CornerRadius::same(6.0 as u8))
-                                .min_size(egui::vec2(28.0, 28.0)),
-                        )
-                        .clicked()
-                    };
-
-                    ui.spacing_mut().item_spacing.x = 4.0;
+use crate::{core::blaze_state::BlazeCoreState, ui::{blaze_ui_state::BlazeUiState, icons_cache::icons}, utils::channel_pool::UiEvent};
 
 
-                    // Botones de navegación (izquierda)
-                    if nav_btn(ui, "<") {
-                        state.back();
-                    }
+fn render_bar_button<F>(ui: &mut Ui, total_height: f32, label: &'static str, bytes: &[u8], ui_state: &mut BlazeUiState, mut callback: F)
+where F: FnMut(),
+{
+    let ball_size = 35.0;
+    Frame::new()
+    .fill(Color32::from_rgb(80, 40, 140))
+    .corner_radius(CornerRadius::same((ball_size / 1.5) as u8))
+    .show(ui, |ui| {
+        ui.set_width(ball_size as f32);
+        ui.set_height(total_height);
 
-                    if nav_btn(ui,">") {
-                        state.forward();
-                    }
+        let (rect, resp) = ui.allocate_exact_size(
+            vec2(ball_size, total_height),
+            Sense::click(),
+        );
 
-                    if nav_btn(ui,"UP") {
-                        state.up();
-                    }
+        let icon = ui_state.icon_cache.get_or_load(ui, label, bytes, Color32::WHITE);
 
-                    if nav_btn(ui,"⟳") {
-                        state.refresh();
-                    }
+        let icon_size = vec2(16.0, 16.0);
+        let icon_pos = rect.left_center() - vec2(-10.0, icon_size.y / 2.0);
+        let icon_rect = Rect::from_min_size(icon_pos, icon_size);
 
-                    ui.separator();
+        ui.painter().image(
+            icon.id(),
+            icon_rect,
+            Rect::from_min_max(pos2(0.0, 0.0),
+            pos2(1.0, 1.0)),
+            Color32::WHITE,
+        );
 
-                    // === BREADCRUMB EN BLOQUES ===
-                    let cwd = state.motor.borrow_mut().active_tab().cwd.clone();
-                    let components: Vec<_> = cwd.components().collect();
+        if resp.clicked() {
+            callback();
+        }
 
-                    let mut current_path = PathBuf::new();
-
-                    ui.horizontal_centered(|ui| {
-                        for (i, component) in components.iter().enumerate() {
-                            let name = component.as_os_str().to_string_lossy().to_string();
-                            if name.is_empty() { continue; }
-
-                            current_path.push(component);
-
-                            let is_last = i == components.len() - 1;
-
-                            let button = egui::Button::new(
-                                RichText::new(name)
-                                    .color(if is_last { Color32::WHITE } else { Color32::LIGHT_GRAY })
-                                    .strong()
-                            )
-                            .frame(true)
-                            .fill(if is_last {
-                                Color32::from_rgb(120, 80, 200) // morado más claro para el último
-                            } else {
-                                Color32::TRANSPARENT
-                            })
-                            .stroke(Stroke::NONE)
-                            .corner_radius(CornerRadius::same(6.0 as u8))
-                            .min_size(egui::vec2(0.0, 28.0));
-
-                            let response = ui.add(button);
-
-                            if response.clicked() && !is_last {
-                                state.navigate_to(current_path.clone());
-                            }
-
-                            // Separador ">"
-                            if !is_last {
-                                ui.label(RichText::new("›").color(Color32::GRAY).size(16.0));
-                            }
-                        }
-                    });
-
-                    // Espacio flexible
-                    let remaining = ui.available_width();
-                    ui.add_space(remaining - 36.0); // 36 = ancho aprox del botón CO
-                    if ui.small_button("CO").clicked() { /* ... */}
-                });
-
-                ui.add_space(20.0);
-            });
-        });
+        if resp.hovered() {
+            ui.set_cursor_icon(egui::CursorIcon::PointingHand);
+        }
+    });
 }
 
 
-pub fn toolbar_component_old(ctx: &egui::Context, state: &mut BlazeCoreState) {
+pub fn toolbar_component(ui: &mut Ui, state: &mut BlazeCoreState, ui_state: &mut BlazeUiState) {
+    Panel::top("toolbar")
+        .frame(Frame::new().fill(Color32::from_rgb(16, 21, 25)).inner_margin(10))
+        .exact_size(80.0)
+        .show_separator_line(false)
+        .show_inside(ui, |ui| {
+            let total_height = 35.0;
+            let spacing = 8.0;
 
-    TopBottomPanel::top("Toolbar")
-        .min_height(30.0)
-        .show(ctx, |ui|{
-            ui.spacing();
-        
-            ui.horizontal(|ui|{
-                
-                if ui.button("<").clicked() {
-                    state.back();
-                }
-                if ui.button(">").clicked() {
-                    state.forward();
-                }
-                if ui.button("up").clicked() {
-                    state.up();
-                }
-                if ui.button("refresh").clicked() {
-                    state.refresh();
-                }
+            ui.horizontal_centered(|ui| {
+                ui.spacing_mut().item_spacing.x = spacing;
+
+                let cwd = state.cwd.clone();
+
+                Frame::new()
+                .corner_radius(20)
+                .inner_margin(Margin::same(10))
+                .fill(Color32::from_rgb(27, 31, 35))
+                .show(ui, |ui|{
+                    ui.set_height(total_height);
+                    ui.set_width(ui.available_width());
+
+                    render_bar_button(ui, total_height, "<", icons::ICON_ARROW_LEFT, ui_state, || state.back());
+
+                    render_bar_button(ui, total_height, ">", icons::ICON_ARROW_RIGHT, ui_state, || state.forward());
+
+                    render_bar_button(ui, total_height, "UP", icons::ICON_ARROW_UP, ui_state, || state.up());
+
+                    render_bar_button(ui, total_height, "⚙️", icons::ICON_SETTINGS, ui_state, || {
+                        if let Some(sender) = state.sender().cloned() {
+                            sender.send_ui_event(
+                                UiEvent::OpenConfigs
+                            ).ok();
+                        }
+                    });
+                    
+                    
+                    Frame::new()
+                        .fill(Color32::from_rgb(80, 40, 140))
+                        .corner_radius(CornerRadius::same(20))
+                        .show(ui, |ui| {
+                            ui.set_width(ui.available_width());
+                            ui.set_height(total_height);
 
 
-                let response = ui.text_edit_singleline(&mut state.cwd_input);
-                if response.lost_focus() && ui.input(|i| i.key_pressed(Key::Enter)) {
-                    let path = PathBuf::from(&state.cwd_input);
-                    if path.is_dir() {
-                        state.navigate_to(path);
-                    }
-                }
+                            ui.horizontal_centered(|ui| {
+                                    ui.add_space(15.0);
 
-                if !response.has_focus() {
-                    state.cwd_input = state.motor.borrow().tabs[state.motor.borrow().active_tab_index]
-                        .cwd.to_string_lossy().to_string();
-                }
 
+                                    let components: Vec<_> = cwd.components().collect();
+
+                                    let mut current_path = PathBuf::new();
+
+                                    for (i, component) in components.iter().enumerate() {
+                                        let name = component.as_os_str().to_string_lossy().to_string();
+                                        if name.is_empty() { continue; }
+
+                                        current_path.push(component);
+
+                                        let is_last = i == components.len() - 1;
+
+                                        let button = egui::Button::new(
+                                            RichText::new(name)
+                                                .color(if is_last { Color32::WHITE } else { Color32::LIGHT_GRAY })
+                                                .strong()
+                                        )
+                                        .frame(true)
+                                        .fill(if is_last {
+                                            Color32::from_rgb(120, 80, 200)
+                                        } else {
+                                            Color32::TRANSPARENT
+                                        })
+                                        .stroke(Stroke::NONE)
+                                        .corner_radius(CornerRadius::same(6.0 as u8))
+                                        .min_size(egui::vec2(0.0, 28.0));
+
+                                        let response = ui.add(button);
+
+                                        if response.clicked() && !is_last {
+                                            state.navigate_to(current_path.clone());
+                                        }
+
+                                        // Separador ">"
+                                        if !is_last {
+                                            ui.label(RichText::new("›").color(Color32::GRAY).size(16.0));
+                                        }
+                                    }
+                                
+
+                            });
+
+                            
+                            let remaining = ui.available_width();
+                            ui.add_space(remaining - 36.0);
+                            if ui.small_button("📋").clicked() {
+                                ui.copy_text(cwd.to_string_lossy().to_string());
+                            }
+
+                        });
+                });
             });
-
-    });
-
-} 
+        });
+}

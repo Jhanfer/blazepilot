@@ -22,7 +22,7 @@ use fuzzy_matcher::{FuzzyMatcher, skim::SkimMatcherV2};
 use tracing::{debug, error, info, warn};
 use tokio::sync::Mutex as TokioMutex;
 use uuid::Uuid;
-use crate::{core::{configs::config_state::{OrderingMode, with_configs}, files::motor::{BlazeMotor, FileEntry, FileLoadingMessage, MOTOR, RecursiveMessages}, system::{clipboard::{GlobalClipboard, TOKIO_RUNTIME}, fileopener_module::{FileOpenerManager, GLOBAL_FILE_OPENER}, sizer_manager::{self, sizer_manager::SizerManager}, terminal_opener::terminal_manager::{self, GLOBAL_TERMINAL_MANAGER, TerminalManager}, updater::updater::Updater}}, ui::task_manager::task_manager::TaskManager, utils::channel_pool::{FileOperation, NotifyingSender, with_active_sender_for, with_channel_pool}};
+use crate::{core::{configs::config_state::{OrderingMode, with_configs}, files::motor::{BlazeMotor, FileEntry, FileLoadingMessage, MOTOR, RecursiveMessages}, system::{clipboard::{GlobalClipboard, TOKIO_RUNTIME}, extended_info::extended_info_manager::ExtendedInfoManager, fileopener_module::{FileOpenerManager, GLOBAL_FILE_OPENER}, sizer_manager::{self, sizer_manager::SizerManager}, terminal_opener::terminal_manager::{self, GLOBAL_TERMINAL_MANAGER, TerminalManager}, updater::updater::Updater, zip_manager::zip_manager::ZipManager}}, ui::task_manager::task_manager::TaskManager, utils::channel_pool::{FileOperation, NotifyingSender, with_active_sender_for, with_channel_pool}};
 
 pub struct RubberBand {
     pub rubber_band_start: Option<egui::Pos2>,
@@ -80,6 +80,11 @@ pub struct BlazeCoreState {
     pub cwd_input: String,
     pub test: bool,
     pub terminal_manager: Arc<TokioMutex<TerminalManager>>,
+    pub extended_info_manager: ExtendedInfoManager,
+    pub calculating_extended_info: HashSet<PathBuf>,
+    pub calculated_extended_info: HashSet<PathBuf>,
+    pub zip_manager: ZipManager,
+    pub cwd: PathBuf,
 }
 
 impl BlazeCoreState {
@@ -147,10 +152,21 @@ impl BlazeCoreState {
             cwd_input: String::new(),
             test: false,
             terminal_manager,
+            extended_info_manager: ExtendedInfoManager::new(),
+            calculating_extended_info: HashSet::new(),
+            calculated_extended_info: HashSet::new(),
+            zip_manager: ZipManager::new(),
+            cwd: PathBuf::new(),
         };
 
         if let Some(sender) = state.sender().cloned() {
-            state.motor.borrow_mut().active_tab().load_path(true, sender.clone());
+            let new_cwd = {
+                let mut motor = state.motor.borrow_mut();
+                let tab = motor.active_tab_mut();
+                tab.load_path(true, sender.clone());
+                tab.cwd.clone()
+            };
+            state.cwd = new_cwd;
             state.updater.check_for_update(sender);
         }
 
@@ -173,6 +189,7 @@ impl BlazeCoreState {
                     let key = &a.full_path.to_string_lossy();
                     self.sizer_manager.cache_manager.size_cache
                         .read()
+                        .unwrap()
                         .get(key.as_ref())
                         .map(|c| c.size)
                         .unwrap_or(0)
@@ -184,6 +201,7 @@ impl BlazeCoreState {
                     let key = &b.full_path.to_string_lossy();
                     self.sizer_manager.cache_manager.size_cache
                         .read()
+                        .unwrap()
                         .get(key.as_ref())
                         .map(|c| c.size)
                         .unwrap_or(0)
@@ -316,11 +334,12 @@ impl BlazeCoreState {
         self.cached_sender.as_ref()
     }
 
-    pub fn invalidate_seder(&mut self) {
+    pub fn invalidate_sender(&mut self) {
         self.cached_sender = None;
     }
 
     pub fn navigate_to(&mut self, path: PathBuf) {
+        info!("navigate_to");
         self.motor.borrow_mut().active_tab_mut().navigate_to(path);
         self.refresh();
     }
@@ -342,11 +361,17 @@ impl BlazeCoreState {
 
     pub fn refresh(&mut self) {
         if let Some(sender) = self.sender().cloned() {
-            self.motor.borrow_mut().active_tab_mut().load_path(false, sender);
+            let new_cwd = {
+                let mut motor = self.motor.borrow_mut();
+                let tab = motor.active_tab_mut();
+                tab.load_path(false, sender);
+                tab.cwd.clone()
+            };
+            self.calculating_dir_sizes.clear();
+            self.calculated_dir_sizes.clear();
+            self.deselect_all();
+            self.cwd = new_cwd;
         }
-        self.calculating_dir_sizes.clear();
-        self.calculated_dir_sizes.clear();
-        self.deselect_all();
     }
 
 
@@ -517,10 +542,21 @@ impl BlazeCoreState {
 
     pub fn open_terminal_here(&self) {
         let cwd = self.motor.borrow_mut().active_tab().cwd.clone();
+
+        let preferred_terminal = with_configs(|c| {
+            if c.configs.default_terminal.trim().is_empty() {
+                None
+            } else {
+                Some(c.configs.default_terminal.clone())
+            }
+        });
+
         let tm_manager = self.terminal_manager.clone();
         TOKIO_RUNTIME.spawn(async move {
             let mut tm_manager = tm_manager.lock().await;
-            tm_manager.request_open_terminal(&cwd).await
+            if let Err(e) = tm_manager.request_open_terminal(&cwd, preferred_terminal).await {
+                error!("No se pudo abrir la terminal: {}", e);
+            }
         });
     }
     
@@ -572,7 +608,9 @@ impl BlazeCoreState {
             self.sender().unwrap().clone()
         };
 
-        self.sizer_manager.process_messages(active_id, sender);
+        self.sizer_manager.process_messages(active_id, sender.clone());
+
+        self.extended_info_manager.process_messages(active_id, sender);
         
         let file_messages: Vec<FileLoadingMessage> = with_channel_pool(|pool|{
             let mut msgs = Vec::new();
@@ -701,12 +739,7 @@ impl BlazeCoreState {
 
         for msg in fileops_events {
             match msg {
-                FileOperation::Copy { files, dest } => {
-
-                }, 
-
-
-
+                FileOperation::Copy { files, dest } => {}, 
                 FileOperation::Delete { files } => {
                     let files: Vec<Arc<FileEntry>> = self.motor.borrow_mut()
                         .active_tab()
@@ -742,6 +775,11 @@ impl BlazeCoreState {
                     }
                 },
 
+                FileOperation::ExtendedInfoReady { full_path, tab_id } => {
+                    self.calculating_extended_info.remove(&full_path);
+                    self.calculated_extended_info.insert(full_path);
+                },
+
                 FileOperation::RestoreDeletedFiles { file_names } => {
                     let trash_path = self.motor.borrow_mut().get_trash_dir(None).unwrap_or_default();
                     
@@ -751,6 +789,13 @@ impl BlazeCoreState {
                         }
                     }
                 },
+
+
+                FileOperation::ExtractHere {entry, dest_dir} => {
+                    info!("Solicitando extracción de: [{}] -> [{:?}]", entry.name, dest_dir);
+                    let res = self.zip_manager.extract(&entry, &dest_dir);
+                    res.map_err(|e| warn!("Error: {}", e)).ok();
+                }
             }
         }
 

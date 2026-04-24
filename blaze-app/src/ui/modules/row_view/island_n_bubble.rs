@@ -1,18 +1,18 @@
 use std::{path::PathBuf, sync::Arc};
 
-use egui::{Align2, Area, Button, Color32, Context, CornerRadius, FontId, Frame, Label, Margin, Rect, RichText, ScrollArea, Sense, TextFormat, pos2, text::{LayoutJob, TextWrapping}, vec2};
+use egui::{Align2, Area, Button, Color32, Context, CornerRadius, FontId, Frame, Label, Margin, Rect, RichText, ScrollArea, Sense, TextFormat, Ui, pos2, text::{LayoutJob, TextWrapping}, vec2};
 use libc::stat;
 use tracing::info;
 use crate::{core::{blaze_state::BlazeCoreState, files::motor::FileEntry}, ui::{blaze_ui_state::BlazeUiState, icons_cache::icons, task_manager::task_manager::TaskStatus}, utils::formating::format_size};
 
-pub fn render_island_bubble(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, files: &Vec<Arc<FileEntry>>, ctx: &Context, bottom_padding: i8, tabs_height: i8) {
+pub fn render_island_bubble(ui: &mut Ui, state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, files: &Vec<Arc<FileEntry>>, bottom_padding: i8, tabs_height: i8) {
 
     const ISLAND_GAP: f32 = 30.0;
 
     let island_rect = Area::new("blaze_island".into())
         .anchor(Align2::CENTER_BOTTOM, [0.0, -(bottom_padding as f32 + tabs_height as f32 + ISLAND_GAP)])
         .order(egui::Order::Middle)
-        .show(ctx, |ui| {
+        .show(ui, |ui| {
 
             Frame::NONE
                 .inner_margin(egui::Margin::same(10))
@@ -28,7 +28,7 @@ pub fn render_island_bubble(state: &mut BlazeCoreState, ui_state: &mut BlazeUiSt
                             let icon_size = egui::vec2(14.0, 14.0);
                             let (icon_rect, _) = ui.allocate_exact_size(icon_size, Sense::hover());
                             let (icon_name, icon_bytes) = ("file", icons::ICON_FILE);
-                            let icon = ui_state.icon_cache.get_or_load(ctx, icon_name, icon_bytes, Color32::GRAY);
+                            let icon = ui_state.icon_cache.get_or_load(ui, icon_name, icon_bytes, Color32::GRAY);
                             
                             ui.painter().image(
                                 icon.id(),
@@ -49,7 +49,7 @@ pub fn render_island_bubble(state: &mut BlazeCoreState, ui_state: &mut BlazeUiSt
                             let (icon_rect, _) = ui.allocate_exact_size(icon_size, Sense::hover());
 
                             let (icon_name, icon_bytes) = ("list", icons::ICON_LIST);
-                            let icon = ui_state.icon_cache.get_or_load(ctx, icon_name, icon_bytes, Color32::GRAY);
+                            let icon = ui_state.icon_cache.get_or_load(ui, icon_name, icon_bytes, Color32::GRAY);
 
                             ui.painter().image(
                                 icon.id(),
@@ -84,7 +84,7 @@ pub fn render_island_bubble(state: &mut BlazeCoreState, ui_state: &mut BlazeUiSt
                             
                             let (icon_rect, _) = ui.allocate_exact_size(icon_size, Sense::hover());
                             let (icon_name, icon_bytes) = ("server", icons::ICON_SERVER);
-                            let icon = ui_state.icon_cache.get_or_load(ctx, icon_name, icon_bytes, Color32::GRAY);
+                            let icon = ui_state.icon_cache.get_or_load(ui, icon_name, icon_bytes, Color32::GRAY);
                             
                             ui.painter().image(
                                 icon.id(),
@@ -111,7 +111,7 @@ pub fn render_island_bubble(state: &mut BlazeCoreState, ui_state: &mut BlazeUiSt
         let tasks = state.task_manager.get_tasks();
         let has_tasks = !tasks.is_empty();
 
-        let anim = ctx.animate_bool_with_time(
+        let anim = ui.animate_bool_with_time(
             egui::Id::new("processing_bubble"), 
             has_tasks, 
             0.2
@@ -133,7 +133,7 @@ pub fn render_island_bubble(state: &mut BlazeCoreState, ui_state: &mut BlazeUiSt
         Area::new("processing_bubble".into())
             .fixed_pos(pivot + vec2(-current_w / 2.0, offset_y))
             .order(egui::Order::Background)
-            .show(ctx, |ui| {
+            .show(ui, |ui| {
 
                 Frame::NONE
                     .inner_margin(egui::Margin::same(10))
@@ -198,10 +198,10 @@ pub fn render_island_bubble(state: &mut BlazeCoreState, ui_state: &mut BlazeUiSt
         });
 
 
-        let screen_size = ctx.content_rect();
+        let screen_size = ui.content_rect();
         let dist_from_bottom = screen_size.bottom() - island_rect.bottom();
 
-        let tabs_width = ctx.viewport_rect().width() / 3.0;
+        let tabs_width = ui.viewport_rect().width() / 3.0;
 
         let enabled = state.motor.borrow_mut().tabs.len() > 1;
 
@@ -209,7 +209,7 @@ pub fn render_island_bubble(state: &mut BlazeCoreState, ui_state: &mut BlazeUiSt
             let tabs_bar = Area::new("tabs_bar".into())
                 .anchor(Align2::CENTER_BOTTOM, [0.0, -(dist_from_bottom - 80.0)])
                 .order(egui::Order::Middle)
-                .show(ctx, |ui|{
+                .show(ui, |ui|{
                     Frame::new()
                         .inner_margin(Margin::symmetric(10, 4))
                         .fill(Color32::from_rgb(36, 42, 47))
@@ -269,7 +269,7 @@ pub fn render_island_bubble(state: &mut BlazeCoreState, ui_state: &mut BlazeUiSt
                                             );
                                             let (icon_n, icon_b) = ("tab-icon", icons::ICON_TAB_ICON);
                                             
-                                            let icon = ui_state.icon_cache.get_or_load(ctx, icon_n, icon_b, Color32::GRAY);
+                                            let icon = ui_state.icon_cache.get_or_load(ui, icon_n, icon_b, Color32::GRAY);
                                             
                                             ui.painter().image(
                                                 icon.id(),
@@ -320,7 +320,7 @@ pub fn render_island_bubble(state: &mut BlazeCoreState, ui_state: &mut BlazeUiSt
 
                                             let (icon_n, icon_b) = ("x", icons::ICON_X);
                                             
-                                            let icon = ui_state.icon_cache.get_or_load(ctx, icon_n, icon_b, Color32::GRAY);
+                                            let icon = ui_state.icon_cache.get_or_load(ui, icon_n, icon_b, Color32::GRAY);
                                             
                                             ui.painter().image(
                                                 icon.id(),
@@ -332,7 +332,7 @@ pub fn render_island_bubble(state: &mut BlazeCoreState, ui_state: &mut BlazeUiSt
 
 
                                             if resp.hovered() || resp_x.hovered() {
-                                                ctx.set_cursor_icon(egui::CursorIcon::PointingHand);
+                                                ui.set_cursor_icon(egui::CursorIcon::PointingHand);
                                             }
                                             
                                             let middle_clicked = ui.input(|i| {
@@ -368,7 +368,7 @@ pub fn render_island_bubble(state: &mut BlazeCoreState, ui_state: &mut BlazeUiSt
                     tabs_bar.right() + gap,
                     tabs_bar.center().y - 16.0,
                 ))
-                .show(ctx, |ui|{
+                .show(ui, |ui|{
                     Frame::new()
                         .corner_radius(CornerRadius::same(20))
                         .fill(Color32::from_rgba_unmultiplied(100, 100, 255, 90))
@@ -389,7 +389,7 @@ pub fn render_island_bubble(state: &mut BlazeCoreState, ui_state: &mut BlazeUiSt
 
                             let (icon_n, icon_b) = ("plus", icons::ICON_PLUS);
                             
-                            let icon = ui_state.icon_cache.get_or_load(ctx, icon_n, icon_b, Color32::GRAY);
+                            let icon = ui_state.icon_cache.get_or_load(ui, icon_n, icon_b, Color32::GRAY);
 
 
                             ui.painter().image(
@@ -402,7 +402,7 @@ pub fn render_island_bubble(state: &mut BlazeCoreState, ui_state: &mut BlazeUiSt
 
 
                             if resp.hovered() {
-                                ctx.set_cursor_icon(egui::CursorIcon::PointingHand);
+                                ui.set_cursor_icon(egui::CursorIcon::PointingHand);
                             }
 
 

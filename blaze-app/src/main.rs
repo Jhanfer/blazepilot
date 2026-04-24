@@ -14,7 +14,7 @@
 
 
 
-use eframe::HardwareAcceleration;
+use eframe::{HardwareAcceleration, NativeOptions};
 use tracing_subscriber::{fmt, EnvFilter};
 mod app;
 mod core;
@@ -23,7 +23,12 @@ mod utils;
 use app::BlazeApp;
 use mimalloc::MiMalloc;
 
-use crate::{core::{blaze_state::BlazeCoreState, configs::config_state::with_configs, system::clipboard::TOKIO_RUNTIME}, ui::blaze_ui_state::BlazeUiState};
+#[cfg(target_os = "linux")]
+use winit::platform::x11::EventLoopBuilderExtX11;
+#[cfg(target_os = "linux")]
+use winit::platform::wayland::EventLoopBuilderExtWayland;
+
+use crate::{core::{blaze_state::BlazeCoreState, configs::config_state::with_configs, system::clipboard::TOKIO_RUNTIME}, ui::{blaze_ui_state::BlazeUiState}};
 
 #[global_allocator]
 static GLOBAL: MiMalloc = MiMalloc;
@@ -38,10 +43,14 @@ fn main() {
         .init();
 
 
-    with_configs(|cfg| cfg.load_or_init_cofigs().unwrap());
+    let backend = with_configs(|c| {
+        c.load_or_init_cofigs().unwrap();
+
+        c.configs.display_backend.clone()
+    });
 
 
-    let options = eframe::NativeOptions {
+    let mut options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_inner_size([1280.0, 720.0])
             .with_min_inner_size([800.0, 500.0])
@@ -54,6 +63,18 @@ fn main() {
         ..Default::default()
     };
 
+    #[cfg(target_os = "linux")]
+    {
+        options.event_loop_builder = Some(Box::new(move |builder| {
+            use crate::core::configs::config_state::DisplayBackend;
+            match backend {
+                DisplayBackend::X11 => builder.with_x11(),
+                DisplayBackend::Wayland => builder.with_wayland(),
+                _ => builder,
+            };
+        }));
+    }
+
     let state = TOKIO_RUNTIME.block_on(BlazeCoreState::new());
     let ui_state = BlazeUiState::new();
 
@@ -63,8 +84,10 @@ fn main() {
     };
 
     eframe::run_native(
-        "BlazePilot", 
-        options, 
-        Box::new(|_cc| Ok(Box::new(blazeapp))),
+        "BlazePilot",
+        options,
+        Box::new(|_cc| {
+            Ok(Box::new(blazeapp))
+        }),
     ).unwrap();
 }

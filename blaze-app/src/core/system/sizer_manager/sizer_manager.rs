@@ -15,10 +15,9 @@
 
 
 
-use std::{collections::HashSet, os::unix::fs::MetadataExt, path::{Path, PathBuf}, sync::{Arc, atomic::{AtomicU64, Ordering}}, time::{SystemTime, UNIX_EPOCH}};
+use std::{collections::HashSet, os::unix::fs::MetadataExt, path::{Path, PathBuf}, sync::{Arc, atomic::{AtomicU64, Ordering}}, time::{UNIX_EPOCH}};
 use jwalk::{Parallelism, WalkDir};
 use tokio::sync::{Mutex, Semaphore};
-use tracing::{debug, info};
 use uuid::Uuid;
 use crate::{core::{system::{cache::cache_manager::CacheManager, clipboard::TOKIO_RUNTIME}}, utils::channel_pool::{FileOperation, NotifyingSender, with_channel_pool}};
 
@@ -72,7 +71,7 @@ impl SizerManager {
                     let cache_valid = if force {
                         false
                     } else {
-                        let guard = cm.size_cache.read();
+                        let guard = cm.size_cache.read().unwrap();
                         guard.get(key.as_ref())
                             .map(|c| c.modified == current_mtime)
                             .unwrap_or(false)

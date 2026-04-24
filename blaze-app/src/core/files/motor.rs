@@ -15,10 +15,13 @@
 
 
 
+use cfg_if::cfg_if;
 
-use std::collections::HashSet;
-use std::fs::Metadata;
+#[cfg(unix)]
 use std::os::unix::fs::MetadataExt;
+#[cfg(windows)]
+use std::os::windows::fs::MetadataExt;
+
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime};
 use std::{fs, thread, vec};
@@ -28,7 +31,7 @@ use jwalk::{Parallelism, WalkDir};
 use once_cell::sync::Lazy;
 use tokio::sync::Semaphore;
 use tracing::{debug, error, info, warn};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::RwLock; 
 use lru::LruCache;
@@ -115,32 +118,31 @@ pub struct FileEntry {
     pub size: u64,
     pub modified: u64,
     pub created: u64,
-    pub readonly: bool,
     pub is_hidden: bool,
     pub is_dir: bool,
     pub full_path: PathBuf,
     pub unique_id: Option<FileId>,
+
+    pub accessed: u64,
+    pub permissions: u32,
+
+    #[cfg(unix)]
+    pub inode: u64,
+    #[cfg(unix)]
+    pub nlink: u64,
+    #[cfg(unix)]
+    pub device: u64,
+
+    #[cfg(windows)]
+    pub attributes: u32,
 }
 
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub enum FileKind {
-    #[default]File,
+    #[default]
+    File,
     Dir,
     Symlink
-}
-
-
-pub struct ExtendedInfo {
-    _permissions: Option<u32>,
-    _owner: Option<String>,
-    _symlink_target: Option<PathBuf>,
-    _dimensions: Option<(u32, u32)>,
-    _git_status: Option<GitStatus>
-}
-
-enum GitStatus {
-    _Changed,
-    _Updated,
 }
 
 #[derive(Default)]
@@ -402,9 +404,9 @@ impl TabState {
                     let name_os = entry.file_name();
                     let name = name_os.to_string_lossy().into_owned().into_boxed_str();
                     
-                    let Ok(m) = entry.metadata().await else {
-                        continue;
-                    };
+                    let Ok(m) = entry.metadata().await else { continue };
+
+                    let file_type = m.file_type();
 
                     let kind = if m.file_type().is_symlink() {
                         FileKind::Symlink
@@ -432,13 +434,27 @@ impl TabState {
                         .unwrap_or_default()
                         .as_secs();
 
-                    let readonly = m.permissions().readonly();
+                    let accessed = m.accessed()
+                        .unwrap_or(SystemTime::UNIX_EPOCH)
+                        .duration_since(SystemTime::UNIX_EPOCH)
+                        .unwrap_or_default()
+                        .as_secs();
+
+
+                    #[cfg(unix)]
+                    let (inode, nlink, device, permissions) = (
+                        m.ino(),
+                        m.nlink(),
+                        m.dev(),
+                        m.mode(),
+                    );
+
+                    #[cfg(windows)]
+                    let attributes = m.file_attributes();
 
                     let is_hidden = name.starts_with(".");
 
-                    let is_dir = entry.file_type().await
-                    .map(|t| t.is_dir())
-                    .unwrap_or(false);
+                    let is_dir = file_type.is_dir();
                 
                     let extension = FileExtension::from_path(&entry.path());
 
@@ -453,10 +469,17 @@ impl TabState {
                             size,
                             modified, 
                             created,
-                            readonly,
                             is_hidden,
                             full_path: entry.path(),
                             unique_id,
+                            accessed,
+                            permissions,
+                            inode,
+                            nlink,
+                            device,
+
+                            #[cfg(windows)]
+                            attributes,
                         }
                     );
 
@@ -646,9 +669,9 @@ impl TabState {
         });
     }
 
-    fn create_file_entry(name: String, metadata: Metadata, path: PathBuf) -> Arc<FileEntry> {
-        let is_dir = metadata.is_dir();
-        let kind = if metadata.file_type().is_symlink() {
+    fn create_file_entry(name: String, m: std::fs::Metadata, path: PathBuf) -> Arc<FileEntry> {
+        let is_dir = m.is_dir();
+        let kind = if m.file_type().is_symlink() {
             FileKind::Symlink
         } else if is_dir {
             FileKind::Dir
@@ -656,17 +679,35 @@ impl TabState {
             FileKind::File
         };
 
-        let modified = metadata.modified()
+        let modified = m.modified()
             .unwrap_or(std::time::SystemTime::UNIX_EPOCH)
             .duration_since(std::time::SystemTime::UNIX_EPOCH)
             .unwrap_or_default()
             .as_secs();
 
-        let created = metadata.created()
+        let created = m.created()
             .unwrap_or(std::time::SystemTime::UNIX_EPOCH)
             .duration_since(std::time::SystemTime::UNIX_EPOCH)
             .unwrap_or_default()
             .as_secs();
+
+        let accessed = m.accessed()
+            .unwrap_or(SystemTime::UNIX_EPOCH)
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+
+
+        #[cfg(unix)]
+        let (inode, nlink, device, permissions) = (
+            m.ino(),
+            m.nlink(),
+            m.dev(),
+            m.mode(),
+        );
+
+        #[cfg(windows)]
+        let attributes = m.file_attributes();
 
         let extension = FileExtension::from_path(&path);
 
@@ -677,13 +718,19 @@ impl TabState {
             is_dir,
             extension,
             kind,
-            size: metadata.len(),
+            size: m.len(),
             modified,
             created,
-            readonly: metadata.permissions().readonly(),
             is_hidden: name.starts_with("."),
             full_path: path,
             unique_id,
+            accessed,
+            permissions,
+            inode,
+            nlink,
+            device,
+            #[cfg(windows)]
+            attributes,
         })
     }
 

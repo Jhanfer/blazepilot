@@ -19,7 +19,8 @@
             "env": {
                 "RUST_LOG": "blaze=debug",
                 "SLINT_LOG": "info",
-                "SLINT_LIVE_RELOAD": "1"
+                "SLINT_LIVE_RELOAD": "1",
+                "RUST_BACKTRACE": "1"
             },
             "args": [],
             "cwd": "${workspaceFolder}/blazer-app"

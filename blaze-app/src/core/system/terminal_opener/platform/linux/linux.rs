@@ -16,17 +16,15 @@
 
 
 
-use std::{collections::{HashMap, HashSet}, ffi::OsString, fs, num::NonZeroUsize, path::{Path, PathBuf}, process::Command, sync::Arc};
+use std::{path::Path, process::Command, sync::Arc};
 use once_cell::sync::Lazy;
-use tokio::sync::{Mutex, RwLock};
-use tracing::{warn, info};
-use uuid::Uuid;
-use crate::{core::system::fileopener_module::{AppAssociation, platform::linux::{appassociation::AssociationManager, mimeapps::MimeApps}}, utils::channel_pool::{NotifyingSender, UiEvent}};
+use tokio::sync::Mutex;
+use tracing::warn;
 
 
 
-pub static LINUX_TERMINAL_OPENER: Lazy<Arc<tokio::sync::Mutex<LinuxTerminalOpener>>> = Lazy::new(|| {
-    Arc::new(tokio::sync::Mutex::new(LinuxTerminalOpener::init()))
+pub static LINUX_TERMINAL_OPENER: Lazy<Arc<Mutex<LinuxTerminalOpener>>> = Lazy::new(|| {
+    Arc::new(Mutex::new(LinuxTerminalOpener::init()))
 });
 
 pub struct LinuxTerminalOpener {
@@ -44,9 +42,7 @@ impl LinuxTerminalOpener {
 
     pub fn load_terminals(&self) -> Vec<String> {
         let target_terminals = vec![
-            "gnome-terminal", "konsole", "xfce4-terminal", "terminator",
-            "alacritty", "kitty", "rxvt", "urxvt", "st", "termite",
-            "lxterminal", "mate-terminal", "xterm", "wezterm", "foot"
+            "kitty", "alacritty", "wezterm", "terminator", "st", "termite", "rxvt", "urxvt", "xterm", "foot", "gnome-terminal", "konsole", "xfce4-terminal", "mate-terminal", "lxterminal"
         ];
 
         target_terminals
@@ -64,7 +60,21 @@ impl LinuxTerminalOpener {
             .collect()
     }
 
-    pub fn open_terminal(&self, path: &Path) -> std::io::Result<()> {
+    pub fn open_terminal(&self, path: &Path, preferred_terminal: Option<&str>) -> std::io::Result<()> {
+        if let Some(term) = preferred_terminal {
+            if !term.trim().is_empty() {
+                if let Ok(status) = Command::new(term)
+                    .current_dir(path)
+                    .spawn()
+                {
+                    if status.id() != 0 { 
+                        return Ok(());
+                    }
+                }
+                warn!("Terminal preferido '{}' no se pudo lanzar, usando fallback", term);
+            }
+        }
+
         if let Ok(term) = std::env::var("TERMINAL") {
             return Command::new(term)
                 .current_dir(path)

@@ -21,7 +21,6 @@ use std::{ffi::CString, path::PathBuf};
 use std::collections::HashMap;
 use tokio::sync::Mutex as TokioMutex;
 use tracing::{warn, info};
-use uuid::Uuid;
 use zbus::{Connection, MatchRule, MessageStream};
 use crate::core::system::disk_reader::disk::Disk;
 use crate::core::system::disk_reader::disk_manager::{DiskManager};
@@ -155,12 +154,10 @@ impl LinuxDisks {
                 }
             }
 
-            if let Some(mp) = &mountpoint {
-                let system_paths = [ "/boot", "/boot/efi", "/var", "/etc"];
-                if system_paths.contains(&mp.as_str()) {
-                    continue;
-                }
-            }
+            let system_paths = ["/", "/home", "/boot", "/boot/efi", "/var", "/etc", "/tmp", "/usr"];
+            let is_system = mountpoint.as_deref().map_or(false, |mp| {
+                system_paths.contains(&mp) || mp.starts_with("/snap/")
+            });
 
             if idtype_opt.as_deref() == Some("swap") || device.starts_with("/dev/loop") || device.starts_with("/dev/zram") || size < 1_048_576 || (idtype_opt.is_none() && mountpoint.is_none()) {
                 continue;
@@ -172,20 +169,23 @@ impl LinuxDisks {
                 .or_else(|| mountpoint.clone())
                 .unwrap_or_else(|| device.clone());
 
-            self.partitions.push(Disk {
-                display_name,
-                device: Some(device),
-                idtype: idtype_opt,
-                label: label_opt,
-                uuid: uuid_opt,
-                mountpoint,
-                available,
-                total,
-                used_percent,
-                is_removable,
-                is_partition,
-                size,
-            });
+            self.partitions.push(
+                Disk {
+                    display_name,
+                    device: Some(device),
+                    idtype: idtype_opt,
+                    label: label_opt,
+                    uuid: uuid_opt,
+                    mountpoint,
+                    available,
+                    total,
+                    used_percent,
+                    is_removable,
+                    is_partition,
+                    size,
+                    is_system,
+                }
+            );
         }
 
         self.partitions.sort_by_key(|d| d.device.clone().unwrap_or_default());

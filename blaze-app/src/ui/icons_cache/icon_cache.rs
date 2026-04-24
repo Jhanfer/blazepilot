@@ -17,7 +17,7 @@
 
 
 use std::collections::HashMap;
-use egui::{ColorImage, Context, TextureHandle, vec2};
+use egui::{ColorImage, Context, TextureHandle, Ui, vec2};
 use resvg::usvg::Options;
 
 pub struct IconCache {
@@ -29,13 +29,13 @@ impl IconCache {
         Self { cache: HashMap::new() }
     }
 
-    pub fn get_or_load(&mut self, ctx: &Context, name: &str, svg_bytes: &[u8], tint: egui::Color32) -> &TextureHandle {
+    pub fn get_or_load(&mut self, ui: &mut Ui, name: &str, svg_bytes: &[u8], tint: egui::Color32) -> &TextureHandle {
         let tint_key = format!("{:02X}{:02X}{:02X}", tint.r(), tint.g(), tint.b());
         let full_key = format!("{}-{}", name, tint_key);
 
         self.cache.entry(full_key).or_insert_with(|| {
             let image = rasterize_svg(svg_bytes, 16, 16, tint);
-            ctx.load_texture(name, image, egui::TextureOptions::LINEAR)
+            ui.load_texture(name, image, egui::TextureOptions::LINEAR)
         })
     }
 }

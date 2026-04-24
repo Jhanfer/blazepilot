@@ -17,9 +17,9 @@
 use std::path::PathBuf;
 
 use dirs::{desktop_dir, document_dir, download_dir, home_dir, picture_dir};
-use egui::{Color32, CornerRadius, FontId, Frame, Margin, Rect, ScrollArea, Sense, SidePanel, Ui, pos2, scroll_area::ScrollSource, vec2};
+use egui::{Color32, CornerRadius, FontId, Frame, Margin, Panel, Rect, ScrollArea, Sense, SidePanel, Ui, pos2, scroll_area::ScrollSource, vec2};
 use tracing::info;
-use crate::{core::{blaze_state::BlazeCoreState, configs::config_state::{FavoriteLinks, with_configs}, system::{clipboard::TOKIO_RUNTIME, disk_reader::disk::Disk}}, ui::{blaze_ui_state::BlazeUiState, icons_cache::icons::{ICON_ARCHIVE, ICON_DESKTOP, ICON_DOWNLOADS, ICON_HOME, ICON_POLAROID, ICON_SERVER, ICON_STAR, ICON_TRASH, ICON_USER}}};
+use crate::{core::{blaze_state::BlazeCoreState, configs::config_state::{FavoriteLinks, with_configs}, system::{clipboard::TOKIO_RUNTIME, disk_reader::disk::Disk}}, ui::{blaze_ui_state::BlazeUiState, icons_cache::icons::{ICON_ARCHIVE, ICON_DESKTOP, ICON_DEVICE_PC, ICON_DOWNLOADS, ICON_HOME, ICON_POLAROID, ICON_SERVER, ICON_STAR, ICON_TRASH, ICON_USB, ICON_USER}, modules::custom_context_menu::context_state::ContextMenuKind}};
 
 
 
@@ -49,8 +49,8 @@ fn get_herader_icon(label: &str) -> (&'static str, &'static [u8]) {
 }
 
 
-pub fn render_icon(ui_state: &mut BlazeUiState, ctx: &egui::Context, icon_name: &str, color: Color32, icon_bytes: &[u8], ui: &mut Ui, rect: Rect) {
-    let icon = ui_state.icon_cache.get_or_load(ctx, icon_name, icon_bytes, color);
+pub fn render_icon(ui: &mut Ui, ui_state: &mut BlazeUiState, icon_name: &str, color: Color32, icon_bytes: &[u8], rect: Rect) {
+    let icon = ui_state.icon_cache.get_or_load(ui, icon_name, icon_bytes, color);
 
     let icon_size = vec2(16.0, 16.0);
     let icon_pos = rect.left_center() - vec2(-10.0, icon_size.y / 2.0);
@@ -66,7 +66,7 @@ pub fn render_icon(ui_state: &mut BlazeUiState, ctx: &egui::Context, icon_name: 
 }
 
 
-pub fn render_local_buttons(label:&str, path: PathBuf, state: &mut BlazeCoreState, ui: &mut Ui, ui_state: &mut BlazeUiState, ctx: &egui::Context) {
+pub fn render_local_buttons(label:&str, path: PathBuf, state: &mut BlazeCoreState, ui: &mut Ui, ui_state: &mut BlazeUiState) {
     let (rect, response) = ui.allocate_exact_size(
         egui::vec2(ui.available_width(), 30.0),
         Sense::click_and_drag()
@@ -89,12 +89,11 @@ pub fn render_local_buttons(label:&str, path: PathBuf, state: &mut BlazeCoreStat
     let color = Color32::WHITE;
 
     render_icon(
-        ui_state, 
-        ctx, 
+        ui,
+        ui_state,
         icon_name,
         color,
         icon_bytes,
-        ui,
         rect
     );
 
@@ -110,7 +109,7 @@ pub fn render_local_buttons(label:&str, path: PathBuf, state: &mut BlazeCoreStat
 }
 
 
-pub fn render_fav_buttons(fav: FavoriteLinks, state: &mut BlazeCoreState, ui: &mut Ui, ui_state: &mut BlazeUiState, ctx: &egui::Context) {
+pub fn render_fav_buttons(ui: &mut Ui, fav: FavoriteLinks, state: &mut BlazeCoreState, ui_state: &mut BlazeUiState) {
     let (rect, response) = ui.allocate_exact_size(
         egui::vec2(ui.available_width(), 30.0),
         Sense::click()
@@ -160,13 +159,12 @@ pub fn render_fav_buttons(fav: FavoriteLinks, state: &mut BlazeCoreState, ui: &m
     let color = Color32::YELLOW;
 
     render_icon(
-        ui_state, 
-        ctx, 
+        ui,
+        ui_state,
         "star",
         color,
         ICON_STAR,
-        ui,
-        rect
+        rect,
     );
 
     ui.painter().with_clip_rect(rect)
@@ -175,11 +173,10 @@ pub fn render_fav_buttons(fav: FavoriteLinks, state: &mut BlazeCoreState, ui: &m
             galley,
             ui.visuals().text_color()
         );
-
 }
 
 
-pub fn render_drives_button(state: &mut BlazeCoreState, ui: &mut Ui, drive: Disk, ui_state: &mut BlazeUiState, ctx: &egui::Context) {
+pub fn render_drives_button(ui: &mut Ui, state: &mut BlazeCoreState, drive: Disk, ui_state: &mut BlazeUiState) {
     let (rect, response) = ui.allocate_exact_size(
         egui::vec2(ui.available_width(), 30.0),
         Sense::click_and_drag()
@@ -188,51 +185,25 @@ pub fn render_drives_button(state: &mut BlazeCoreState, ui: &mut Ui, drive: Disk
     if response.clicked() && !drive.mountpoint.is_none() {
         let path_string = drive.mountpoint.clone().unwrap_or_default();
         let path = PathBuf::from(path_string);
-        state.motor.borrow_mut().active_tab().navigate_to(path);
-        state.refresh();
+        state.navigate_to(path);
     }
 
-    response.context_menu(|ui|{
-        if drive.mountpoint.is_none() {
-            if ui.button("Montar").clicked() {
-                let manager = state.motor.borrow_mut().disk_manager.clone();
-                TOKIO_RUNTIME.block_on(async {
-                    let mut manager = manager.lock().await;
-                    manager.mount_disk(&drive).await.ok();
-                });
-            }
-        } else {
-            if ui.button("Abrir").clicked() {
-                let path_string = drive.mountpoint.clone().unwrap_or_default();
-                let path = PathBuf::from(path_string);
-                state.motor.borrow_mut().active_tab().navigate_to(path);
-                state.refresh();
-            }
-        }
 
-        if drive.is_removable && drive.mountpoint.is_none() {
-            ui.separator();
-            if ui.button("Expulsar").clicked() {
-                let manager = state.motor.borrow_mut().disk_manager.clone();
-                TOKIO_RUNTIME.block_on(async {
-                    let mut manager = manager.lock().await;
-                    manager.eject_disk(&drive).await.ok();
-                });
-            }
-        }
+    let root_symbol = "/".to_string();
+    let display_name = if drive.mountpoint == Some(root_symbol.clone()) {
+        root_symbol
+    } else {
+        drive.display_name.clone()
+    };
 
-        if !drive.mountpoint.is_none() {
-            ui.separator();
+    let is_removable = drive.is_removable;
+    let is_system = drive.is_system;
 
-            if ui.button("Desmontar").clicked() {
-                let manager = state.motor.borrow_mut().disk_manager.clone();
-                TOKIO_RUNTIME.block_on(async {
-                    let mut manager = manager.lock().await;
-                    manager.unmount_disk(&drive).await.ok();
-                });
-            }
-        }
-    });
+    if response.secondary_clicked() {
+        ui_state.context_menu_state.handle_response(&response);
+        ui_state.context_menu_state.kind = ContextMenuKind::DrivesPanel;
+        ui_state.context_menu_state.target_drive = Some(drive);
+    }
 
 
     let bg_color = if response.hovered() {
@@ -246,22 +217,24 @@ pub fn render_drives_button(state: &mut BlazeCoreState, ui: &mut Ui, drive: Disk
 
     let color = Color32::WHITE;
 
+    let (icon, bytes) = if is_system {
+        ("system", ICON_DEVICE_PC)
+    } else if is_removable {
+        ("usb", ICON_USB)
+    } else {
+        ("server", ICON_SERVER)
+    };
+
+
     render_icon(
-        ui_state, 
-        ctx, 
-        "server",
-        color,
-        ICON_SERVER,
         ui,
+        ui_state,
+        icon,
+        color,
+        bytes,
         rect
     );
 
-    let root_symbol = "/".to_string();
-    let display_name = if drive.mountpoint == Some(root_symbol.clone()) {
-        root_symbol
-    } else {
-        drive.display_name
-    };
 
     ui.painter().text(
         rect.left_center() + vec2(34.0, 0.0),
@@ -270,10 +243,11 @@ pub fn render_drives_button(state: &mut BlazeCoreState, ui: &mut Ui, drive: Disk
         FontId::default(),
         ui.visuals().text_color(),
     );
+
 }
 
 
-pub fn render_header_text(label: &str,ui: &mut Ui, ui_state: &mut BlazeUiState, ctx: &egui::Context) {
+pub fn render_header_text(label: &str,ui: &mut Ui, ui_state: &mut BlazeUiState) {
     let (rect, _resp) = ui.allocate_exact_size(
         vec2(ui.available_width(), 24.0),
         Sense::hover(),
@@ -284,12 +258,11 @@ pub fn render_header_text(label: &str,ui: &mut Ui, ui_state: &mut BlazeUiState, 
     let color = Color32::WHITE;
 
     render_icon(
-        ui_state, 
-        ctx, 
+        ui,
+        ui_state,
         icon_name,
         color,
         icon_bytes,
-        ui,
         rect
     );
 
@@ -303,17 +276,22 @@ pub fn render_header_text(label: &str,ui: &mut Ui, ui_state: &mut BlazeUiState, 
 }
 
 
-pub fn sidebar_left_component(ctx: &egui::Context, state: &mut BlazeCoreState, ui_state: &mut BlazeUiState) {
+pub fn sidebar_left_component(ui: &mut Ui, state: &mut BlazeCoreState, ui_state: &mut BlazeUiState) {
     let custom_frame = Frame::NONE
         .fill(Color32::from_rgb(16, 21, 25))
-        .inner_margin(Margin::same(10));
+        .inner_margin(Margin {
+            left: 5,
+            right: 0,
+            top: 0,
+            bottom: 10,
+        });
 
-    SidePanel::left("LeftSidePanel")
+    Panel::left("LeftSidePanel")
+    .show_separator_line(false)
     .resizable(false)
     .frame(custom_frame)
-    .show(ctx, |ui| {
-        
-        ui.add_space(10.0);
+    .show_inside(ui, |ui| {
+
 
         Frame::NONE
         .inner_margin(egui::Margin::same(10))
@@ -321,7 +299,7 @@ pub fn sidebar_left_component(ctx: &egui::Context, state: &mut BlazeCoreState, u
         .corner_radius(CornerRadius::same(20))
         .show(ui, |ui|{
 
-            render_header_text("Locales", ui, ui_state, ctx);
+            render_header_text("Locales", ui, ui_state);
 
             ui.add_space(10.0);
 
@@ -336,7 +314,7 @@ pub fn sidebar_left_component(ctx: &egui::Context, state: &mut BlazeCoreState, u
 
             for (label, path) in dirs {
                 if let Some(path) = path {
-                    render_local_buttons(label, path, state, ui, ui_state, ctx);
+                    render_local_buttons(label, path, state, ui, ui_state);
                 }
             }
 
@@ -346,7 +324,7 @@ pub fn sidebar_left_component(ctx: &egui::Context, state: &mut BlazeCoreState, u
         
 
             ui.add_space(10.0);
-            render_header_text("Favoritos", ui, ui_state, ctx);
+            render_header_text("Favoritos", ui, ui_state);
             ui.add_space(10.0);
 
             ScrollArea::vertical()
@@ -364,7 +342,7 @@ pub fn sidebar_left_component(ctx: &egui::Context, state: &mut BlazeCoreState, u
                     }
 
                     for fav in favorites.clone() {
-                        render_fav_buttons(fav, state, ui, ui_state, ctx);
+                        render_fav_buttons(ui, fav, state, ui_state);
                     }
             });
 
@@ -374,7 +352,7 @@ pub fn sidebar_left_component(ctx: &egui::Context, state: &mut BlazeCoreState, u
             ui.separator();
 
             ui.add_space(10.0);
-            render_header_text("Discos", ui, ui_state, ctx);
+            render_header_text("Discos", ui, ui_state);
             ui.add_space(10.0);
 
             let manager = state.motor.borrow_mut().disk_manager.clone();
@@ -384,8 +362,16 @@ pub fn sidebar_left_component(ctx: &egui::Context, state: &mut BlazeCoreState, u
             });
 
             for drive in drives {
-                render_drives_button(state, ui, drive, ui_state, ctx);
+                render_drives_button(ui, state, drive, ui_state);
             }
+
+            let mut ctx_menu = std::mem::take(&mut ui_state.context_menu_state);
+            
+            match ctx_menu.kind {
+                ContextMenuKind::DrivesPanel => ctx_menu.render_drives_context(ui, state, ui_state),
+                _ => {}
+            }
+            ui_state.context_menu_state = ctx_menu;
 
         });
 

@@ -1,10 +1,8 @@
-use std::{path::PathBuf, sync::Arc};
-use egui::{ Key, Modifiers, PointerButton, Ui};
-use notify::Event;
-use tracing::info;
-use crate::{core::{blaze_state::{BlazeCoreState, NewItemType}, files::motor::FileEntry, system::{cache::cache_manager::CacheManager, clipboard::TOKIO_RUNTIME, sizer_manager::sizer_manager::SizerMessages}}, utils::channel_pool::{FileOperation, SureTo, UiEvent}};
+use std::{sync::Arc};
+use egui::{ Key, PointerButton, Ui};
+use crate::{core::{blaze_state::{BlazeCoreState, NewItemType}, files::motor::FileEntry, system::cache::cache_manager::CacheManager}, ui::blaze_ui_state::BlazeUiState, utils::channel_pool::{SureTo, UiEvent}};
 
-pub fn hot_keys_logic(state: &mut BlazeCoreState, files: &Vec<Arc<FileEntry>>, ui: &mut Ui, total_rows: usize) {
+pub fn hot_keys_logic(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, files: &Vec<Arc<FileEntry>>, ui: &mut Ui, _total_rows: usize) {
     let input = ui.input(|i| i.clone());
     let disable_keys = state.renaming_file.is_none() && state.creating_new.is_none();
     let has_clipboard = state.clipboard.clipboard_has_files();
@@ -113,7 +111,7 @@ pub fn hot_keys_logic(state: &mut BlazeCoreState, files: &Vec<Arc<FileEntry>>, u
     //eliminar 
     if input.key_pressed(Key::Delete) && disable_keys {
         let sources = state.get_selected_paths(files);
-        let cwd = state.motor.borrow_mut().active_tab().cwd.clone();
+        let cwd = state.cwd.clone();
         let trash = state.motor.borrow_mut().get_trash_dir(None).unwrap_or_default();
 
         if trash == cwd && !sources.is_empty() {
@@ -159,7 +157,7 @@ pub fn hot_keys_logic(state: &mut BlazeCoreState, files: &Vec<Arc<FileEntry>>, u
 
     //pegar
     if do_paste && disable_keys && has_clipboard { 
-        let cwd = state.motor.borrow_mut().active_tab().cwd.clone();
+        let cwd = state.cwd.clone();
         state.paste(cwd);
     }
     
@@ -207,47 +205,59 @@ pub fn hot_keys_logic(state: &mut BlazeCoreState, files: &Vec<Arc<FileEntry>>, u
     }
 
     // cambiar de pestaña y encender búsqueda
-    for event in &input.events {
-        match event {
-            egui::Event::Key { key, pressed, modifiers , ..} => {
-                if !pressed {
-                    return;
-                }
 
-                match key {
-                    Key::Tab => {
-                        if modifiers.shift {
-                            state.prev_tab();
-                            state.refresh();
-                        } else {
-                            state.next_tab();
-                            state.refresh();
-                        }
+    let text_edit_focused = ui.memory(|m| m.focused().is_some());
+    if !text_edit_focused {
+        for event in &input.events {
+            match event {
+                egui::Event::Key { key, pressed, modifiers , ..} => {
+                    if !pressed {
+                        return;
                     }
-                    Key::Num1 if modifiers.ctrl => {state.switch_to_tab(0); state.refresh();},
-                    Key::Num2 if modifiers.ctrl => {state.switch_to_tab(1); state.refresh();},
-                    Key::Num3 if modifiers.ctrl => {state.switch_to_tab(2); state.refresh();},
-                    Key::Num4 if modifiers.ctrl => {state.switch_to_tab(3); state.refresh();},
-                    Key::Num5 if modifiers.ctrl => {state.switch_to_tab(4); state.refresh();},
 
-                    Key::A | Key::B | Key::C | Key::D | Key::E | Key::F | Key::G | Key::H | Key::I |
-                    Key::J | Key::K | Key::L | Key::M | Key::N | Key::O | Key::P | Key::Q | Key::R |
-                    Key::S | Key::T | Key::U | Key::V | Key::W | Key::X | Key::Y | Key::Z 
-                    if !modifiers.ctrl && !modifiers.shift && !modifiers.alt => {
-                        if state.search_filter.is_empty() || !ui.memory(|m| m.has_focus("search_bar".into())) {
-                            state.set_search(key.name().to_lowercase());
-                            
-                            ui.ctx().memory_mut(|mem| {
-                                mem.request_focus("search_bar".into());
-                            });
+                    match key {
+                        Key::Tab => {
+                            if modifiers.shift {
+                                state.prev_tab();
+                                state.refresh();
+                            } else {
+                                state.next_tab();
+                                state.refresh();
+                            }
                         }
-                    },
-                    _ => {}
-                }
-            },
-            _ => {},
+                        Key::Num1 if modifiers.ctrl => {state.switch_to_tab(0); state.refresh();},
+                        Key::Num2 if modifiers.ctrl => {state.switch_to_tab(1); state.refresh();},
+                        Key::Num3 if modifiers.ctrl => {state.switch_to_tab(2); state.refresh();},
+                        Key::Num4 if modifiers.ctrl => {state.switch_to_tab(3); state.refresh();},
+                        Key::Num5 if modifiers.ctrl => {state.switch_to_tab(4); state.refresh();},
+
+                        Key::A | Key::B | Key::C | Key::D | Key::E | Key::F | Key::G | Key::H | Key::I |
+                        Key::J | Key::K | Key::L | Key::M | Key::N | Key::O | Key::P | Key::Q | Key::R |
+                        Key::S | Key::T | Key::U | Key::V | Key::W | Key::X | Key::Y | Key::Z 
+                        if !modifiers.ctrl && !modifiers.shift && !modifiers.alt => {
+
+                            let config_search_has_focus = ui.memory(|m| m.has_focus(egui::Id::new("config_search_bar")));
+
+                            let context_menu_open = ui_state.context_menu_state.open;
+
+                            if !config_search_has_focus
+                            && !context_menu_open
+                            && (state.search_filter.is_empty() || !ui.memory(|m| m.has_focus("search_bar".into())))
+                            {
+                                state.set_search(key.name().to_lowercase());
+                                
+                                ui.ctx().memory_mut(|mem| {
+                                    mem.request_focus("search_bar".into());
+                                });
+                            }
+                        },
+                        _ => {}
+                    }
+                },
+                _ => {},
+            }
+            
         }
-        
     }
 
     if input.pointer.button_pressed(PointerButton::Middle) {

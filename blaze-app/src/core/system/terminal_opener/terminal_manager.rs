@@ -72,12 +72,12 @@ impl TerminalManager {
     }
 
     //lanzar la terminal
-    pub async fn request_open_terminal(&mut self, path: &Path) -> std::io::Result<()> {
+    pub async fn request_open_terminal(&mut self, path: &Path, preferred_terminal: Option<String>) -> std::io::Result<()> {
         match &mut self.terminal_opener {
             #[cfg(target_os = "linux")]
             PlatformTerminal::Linux(tm) => {
                 let guard = tm.lock().await;
-                guard.open_terminal(path)
+                guard.open_terminal(path, preferred_terminal.as_deref())
             },
         }
     }

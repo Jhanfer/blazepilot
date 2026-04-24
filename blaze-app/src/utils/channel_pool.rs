@@ -22,8 +22,10 @@ use once_cell::sync::Lazy;
 use uuid::Uuid;
 use std::sync::Mutex;
 use crossbeam_channel::{Receiver, SendError, Sender, unbounded};
-use crate::core::files::motor::{RecursiveMessages, with_motor};
+use crate::core::files::motor::{FileEntry, RecursiveMessages, with_motor};
 use crate::core::files::{motor::FileLoadingMessage};
+use crate::core::system::extended_info;
+use crate::core::system::extended_info::extended_info_manager::ExtendedInfoMessages;
 use crate::core::system::fileopener_module::AppAssociation;
 use crate::core::system::fileopener_module::platform::linux::linux::AppsIconData;
 use crate::core::system::sizer_manager::sizer_manager::SizerMessages;
@@ -70,7 +72,16 @@ pub enum FileOperation {
     },
     RestoreDeletedFiles {
         file_names: Vec<String>,
-    }
+    },
+    ExtendedInfoReady {
+        full_path: PathBuf,
+        tab_id: Uuid,
+    },
+
+    ExtractHere {
+        entry: Arc<FileEntry>, 
+        dest_dir: PathBuf,
+    },
 }
 
 #[derive(Debug)]
@@ -117,6 +128,8 @@ pub enum UiEvent {
         folder_id: FileId,
     },
 
+    OpenConfigs,
+
     RefreshList,
 }
 
@@ -130,6 +143,7 @@ pub struct NotifyingSender {
     ui_event_sender: Sender<UiEvent>,
     file_operation_sender: Sender<FileOperation>,
     sizer_sender: Sender<SizerMessages>,
+    extended_info_sender: Sender<ExtendedInfoMessages>,
 
     notifier: Arc<dyn Fn() + Send + Sync>,
 }
@@ -171,6 +185,12 @@ impl NotifyingSender {
         result
     }
 
+    pub fn send_extended_info(&self, msg: ExtendedInfoMessages) -> Result<(), SendError<ExtendedInfoMessages>> {
+        let result = self.extended_info_sender.send(msg);
+        if result.is_ok() {(self.notifier)();}
+        result
+    }
+
 
 }
 
@@ -181,6 +201,7 @@ pub struct ChannelPool {
     ui_event_channels: HashMap<Uuid, Arc<(Sender<UiEvent>, Receiver<UiEvent>)>>,
     fileops_channels: HashMap<Uuid, Arc<(Sender<FileOperation>, Receiver<FileOperation>)>>,
     sizer_channels: HashMap<Uuid, Arc<(Sender<SizerMessages>, Receiver<SizerMessages>)>>,
+    extended_info_channels: HashMap<Uuid, Arc<(Sender<ExtendedInfoMessages>, Receiver<ExtendedInfoMessages>)>>,
 
     ui_notifier: HashMap<Uuid, Arc<dyn Fn() + Send + Sync>>,
 }
@@ -211,7 +232,7 @@ impl ChannelPool {
             ui_event_channels: HashMap::new(),
             fileops_channels: HashMap::new(),
             sizer_channels: HashMap::new(),
-
+            extended_info_channels: HashMap::new(),
             ui_notifier: HashMap::new(),
         }
     }
@@ -235,6 +256,7 @@ impl ChannelPool {
         let ui_event_sender = self.get_ui_event_channels_sender(tab_id);
         let file_operation_sender = self.get_fileop_sender(tab_id);
         let sizer_sender = self.get_sizer_sender(tab_id);
+        let extended_info_sender = self.get_extended_info_sender(tab_id);
 
         let Some(notifier) = self.ui_notifier.get(&tab_id) else {
             warn!(tab_id = %tab_id, "NO HAY NOTIFIER para tab_id");
@@ -251,7 +273,7 @@ impl ChannelPool {
                 ui_event_sender,
                 file_operation_sender,
                 sizer_sender,
-
+                extended_info_sender,
                 notifier: notifier.clone() 
             }
         )
@@ -303,6 +325,14 @@ impl ChannelPool {
             self.sizer_channels.insert(tab_id, (tx, rx).into());
         }
         self.sizer_channels.get(&tab_id).unwrap().0.clone()
+    }
+
+    pub fn get_extended_info_sender(&mut self, tab_id: Uuid) -> Sender<ExtendedInfoMessages> {
+        if !self.extended_info_channels.contains_key(&tab_id) {
+            let (tx, rx) = unbounded();
+            self.extended_info_channels.insert(tab_id, (tx, rx).into());
+        }
+        self.extended_info_channels.get(&tab_id).unwrap().0.clone()
     }
 
     pub fn process_file_messages<F>(&self, tab_id: Uuid, mut processor: F) -> bool
@@ -398,6 +428,20 @@ impl ChannelPool {
             process_any
         }
 
+    pub fn process_extended_info_events<F>(&self, tab_id: Uuid, mut processor: F) -> bool 
+        where 
+            F: FnMut(ExtendedInfoMessages) -> bool 
+        {
+            let mut process_any = false;
+            if let Some(arc_pair) = self.extended_info_channels.get(&tab_id) {
+                while let Ok(msg) = arc_pair.1.try_recv() {
+                    if processor(msg) {
+                        process_any = true;
+                    }
+                }
+            }
+            process_any
+        }
 
     pub fn drain_file_loading_messages(&mut self, tab_id: Uuid) {
         if let Some(arc_pair) = self.file_channels.get(&tab_id) {

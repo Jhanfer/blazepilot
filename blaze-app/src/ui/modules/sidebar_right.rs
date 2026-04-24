@@ -17,26 +17,30 @@
 
 
 use std::sync::Arc;
-use egui::{Button, Color32, Context, CornerRadius, Frame, Id, Margin, SidePanel, TextEdit, Window};
+use egui::{Button, Color32, CornerRadius, Frame, Margin, Panel, TextEdit, Ui};
 
 use crate::core::files::motor::FileEntry;
+use crate::core::system::extended_info::extended_info_manager::ExtendedInfo;
 use crate::core::{blaze_state::BlazeCoreState, configs::config_state::{OrderingMode, with_configs}};
 use crate::utils::formating::{format_date, format_size};
 
-pub fn sidebar_right_component(state: &mut BlazeCoreState, files: &Vec<Arc<FileEntry>>, ctx: &Context) {
+pub fn sidebar_right_component(ui: &mut Ui, state: &mut BlazeCoreState, files: &Vec<Arc<FileEntry>>) {
 
     let custom_frame = Frame::NONE
         .fill(Color32::from_rgb(16, 21, 25))
-        .inner_margin(Margin::same(10));
+        .inner_margin(Margin {
+            left: 5,
+            right: 5,
+            top: 0,
+            bottom: 0,
+        });
 
-    SidePanel::right("info_panel")
+    Panel::right("info_panel")
         .resizable(false)
-        .exact_width(230.0)
+        .exact_size(230.0)
         .frame(custom_frame)
         .show_separator_line(false)
-        .show(ctx,|ui| {
-
-        ui.add_space(10.0);
+        .show_inside(ui,|ui| {
 
 
         Frame::NONE
@@ -148,6 +152,43 @@ pub fn sidebar_right_component(state: &mut BlazeCoreState, files: &Vec<Arc<FileE
                         ui.label(format!("Tipo: {:?}", file.extension));
                         ui.label(format!("Tamaño: {:?}", format_size(file.size)));
                     }
+
+                    let extended_info = if state.calculating_extended_info.contains(&file.full_path) {
+                        None
+                    } else if state.calculated_extended_info.contains(&file.full_path) {
+                        state.extended_info_manager.info_map.read().unwrap().get(&file.full_path).cloned()
+                    } else {
+                        state.extended_info_manager.cache_manager
+                            .get_cached_extended_info(&file.full_path)
+                            .map(|c| ExtendedInfo {
+                                owner: c.owner,
+                                group_name: c.group_name,
+                                symlink_target: c.symlink_target,
+                                dimensions: c.dimensions,
+                                git_status: c.git_status,
+                            })
+                    };
+
+                    if let Some(extended_info) = extended_info {
+
+                        if let Some(owner) = extended_info.owner {
+                            ui.label(format!("Owner: {}", owner));
+                        }
+                        if let Some(group_name) = extended_info.group_name {
+                            ui.label(format!("Group name: {}", group_name));
+                        }
+                        if let Some(symlink_target) = extended_info.symlink_target {
+                            ui.label(format!("Tipo: {:?}", symlink_target));
+                        }
+                        if let Some(dimensions) = extended_info.dimensions {
+                            ui.label(format!("Dimensión: {:?} x {:?}", dimensions.0, dimensions.1));
+                        }
+                        if let Some(git_status) = extended_info.git_status {
+                            ui.label(format!("GitStatus: {:?}", git_status));
+                        }
+                    }
+
+
                 }
             });
     });
