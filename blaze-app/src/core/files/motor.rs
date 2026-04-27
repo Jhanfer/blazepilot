@@ -529,7 +529,7 @@ impl TabState {
         self.start_watching(sender_clone);
     }
 
-    pub fn _cancel_loading(&mut self) {
+    pub fn cancel_loading(&mut self) {
         self.loading_flag.store(false, Ordering::Relaxed);
 
         if self.loading_handles.is_empty() {
@@ -537,21 +537,15 @@ impl TabState {
         }
 
         let start = std::time::Instant::now();
-        let mut all_finished ;
-
         while start.elapsed() < Duration::from_millis(50) {
-            all_finished = self.loading_handles.iter().all(|h|h.is_finished());
-            if all_finished {
-                info!("\n Thread terminado \n");
+            if self.loading_handles.iter().all(|h| h.is_finished()) {
                 break;
             }
             thread::sleep(Duration::from_millis(10));
         }
         for handle in self.loading_handles.drain(..) {
-            if handle.is_finished() {
-                let _ = handle.abort();
-            } else {
-                info!("Hilo abandonado tab_id={}", self.id);
+            if !handle.is_finished() {
+                handle.abort();
             }
         }
     }

@@ -401,11 +401,14 @@ impl BlazeCoreState {
             let new_cwd = {
                 let mut motor = self.motor.borrow_mut();
                 let tab = motor.active_tab_mut();
+                tab.cancel_loading();
                 tab.load_path(false, sender);
                 tab.cwd.clone()
             };
             self.calculating_dir_sizes.clear();
             self.calculated_dir_sizes.clear();
+            self.calculating_extended_info.clear();
+            self.calculated_extended_info.clear();
             self.deselect_all();
             self.cwd = new_cwd;
         }
