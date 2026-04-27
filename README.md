@@ -8,6 +8,7 @@ Un gestor de archivos gráfico moderno, ligero y altamente personalizable. Naveg
 ![egui](https://img.shields.io/badge/egui-FF9900?logo=egui&logoColor=white)
 ![License](https://img.shields.io/badge/License-Apache%202.0-blue)
 [![Latest Release](https://img.shields.io/github/v/release/Jhanfer/blazepilot)](https://github.com/Jhanfer/blazepilot/releases/latest)
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/Jhanfer/blazepilot)
 
 ## ✨ Características
 
@@ -24,9 +25,9 @@ Un gestor de archivos gráfico moderno, ligero y altamente personalizable. Naveg
 
 Solo descarga el binario (no requiere instalación ni dependencias):
 
-    1. Ve a la página de **[Releases](https://github.com/Jhanfer/blazepilot/releases/latest)**
-    2. Descarga el binario para tu sistema operativo (actualmente solo linux soportado)
-    3. Abre una terminal en la carpeta descargada y dale permisos (Linux):
+1. Ve a la página de **[Releases](https://github.com/Jhanfer/blazepilot/releases/latest)**
+2. Descarga el binario para tu sistema operativo (actualmente solo linux soportado)
+3. Abre una terminal en la carpeta descargada y dale permisos (Linux):
 
 ```bash
 chmod +x blazepilot
