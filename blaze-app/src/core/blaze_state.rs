@@ -637,7 +637,7 @@ impl BlazeCoreState {
 
     pub fn process_messages(&mut self) {
         let active_id = {
-            let mut motor = self.motor.borrow_mut();
+            let motor = self.motor.borrow();
             let tab = motor.active_tab();
             tab.id
         };
@@ -645,7 +645,8 @@ impl BlazeCoreState {
         self.task_manager.process_message(active_id);
 
         let sender = {
-            self.sender().unwrap().clone()
+            let Some(s) = self.sender() else {return;};
+            s.clone()
         };
 
         self.sizer_manager.process_messages(active_id, sender.clone());
@@ -685,7 +686,7 @@ impl BlazeCoreState {
             match msg {
                 FileLoadingMessage::Batch(gene, batch) => {
                     let mut motor = self.motor.borrow_mut();
-                    let tab = motor.active_tab();
+                    let tab = motor.active_tab_mut();
 
 
                     debug!("Batch recibido: generation={}, tamaño={}", gene, batch.len());
@@ -707,7 +708,7 @@ impl BlazeCoreState {
 
                 FileLoadingMessage::RecursiveBatch { generation, batch, source_dir:_ } => {
                     let mut motor = self.motor.borrow_mut();
-                    let tab = motor.active_tab();
+                    let tab = motor.active_tab_mut();
 
                     if generation == tab.loading_generation {
                         tab.recursive_entries.extend(batch);
@@ -716,7 +717,7 @@ impl BlazeCoreState {
 
                 FileLoadingMessage::Finished(gene) => {
                     let mut motor = self.motor.borrow_mut();
-                    let tab = motor.active_tab();
+                    let tab = motor.active_tab_mut();
 
                     debug!("Finished recibido: generation={}", gene);
                     if gene == tab.loading_generation {
@@ -782,7 +783,7 @@ impl BlazeCoreState {
                 FileOperation::Copy { files, dest } => {}, 
                 FileOperation::Delete { files } => {
                     let files: Vec<Arc<FileEntry>> = self.motor.borrow_mut()
-                        .active_tab()
+                        .active_tab_mut()
                         .files
                         .iter()
                         .filter(|f| files.contains(&f.full_path))
@@ -848,7 +849,7 @@ impl BlazeCoreState {
                     if let Some(sender) = self.sender().cloned() {
                         self.calculating_dir_sizes.clear();
                         self.calculated_dir_sizes.clear();
-                        self.motor.borrow_mut().active_tab().load_path(true, sender);
+                        self.motor.borrow_mut().active_tab_mut().load_path(true, sender);
                     }
                 }
             }

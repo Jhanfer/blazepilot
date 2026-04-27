@@ -859,6 +859,10 @@ impl BlazeMotor {
         &mut self.tabs[self.active_tab_index]
     }
 
+    pub fn active_tab(&self) -> &TabState {
+        &self.tabs[self.active_tab_index]
+    }
+
     pub fn switch_to_tab(&mut self, index:usize) {
         if index < self.tabs.len() {
             self.active_tab_index = index;
@@ -930,10 +934,6 @@ impl BlazeMotor {
         .to_owned()
     }
 
-
-    pub fn active_tab(&mut self) -> &mut TabState {
-        &mut self.tabs[self.active_tab_index]
-    }
 
     pub fn add_tab(&mut self, path: PathBuf) {
         let tab_id = Uuid::new_v4();
