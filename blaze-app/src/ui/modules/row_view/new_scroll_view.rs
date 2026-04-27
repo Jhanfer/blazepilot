@@ -211,10 +211,6 @@ pub fn new_render_scrollview(ui: &mut Ui, files: &Vec<Arc<FileEntry>>, state: &m
 
     let name_w = name_w.min(available - date_w - size_w - 20.0).max(80.0);
 
-
-    let date_w: f32     = ui.data(|d| d.get_temp(id_date_w).unwrap_or(110.0));
-    let size_w: f32     = ui.data(|d| d.get_temp(id_size_w).unwrap_or(70.0));
-
     let header_height = 24.0;
     let (header_rect, _) = ui.allocate_exact_size(
         egui::vec2(ui.available_width(), header_height),
