@@ -741,19 +741,21 @@ impl Clipboard {
 
         for item in &items {
             let source_path = current_cwd.join(&*item.name);
-            let trash_root = match with_motor(|m| m.get_trash_dir(Some(&source_path))) {
+            let trash_files_dir = match with_motor(|m| m.get_trash_dir(Some(&source_path))) {
                 Some(dir) => dir,
-                None => {
-                    with_motor(|m| m.get_trash_dir(None))
-                    .unwrap_or_else(|| dirs::home_dir().unwrap_or_default().join(".local/share/Trash"))
-                }
+                None => with_motor(|m| m.get_trash_dir(None))
+                    .unwrap_or_else(|| dirs::home_dir()
+                        .unwrap_or_default()
+                        .join(".local/share/Trash/files")
+                    )
             };
 
-            let trash_files_dir = trash_root.join("files");
-            let trash_info_dir = trash_root.join("info");
+            let trash_root = trash_files_dir.parent()
+                .unwrap_or(&trash_files_dir)
+                .to_path_buf();
 
             std::fs::create_dir_all(&trash_files_dir).ok();
-            std::fs::create_dir_all(&trash_info_dir).ok();
+            std::fs::create_dir_all(trash_root.join("info")).ok();
 
             items_with_trash.push((item.clone(), source_path, trash_files_dir));
         }
@@ -784,7 +786,7 @@ impl Clipboard {
                     if let Err(e) = trash::delete(&source_path) {
                         if item.size > 256_000_000 {
                             let dest_path = Self::generate_unique_trash_path(&source_path, &trash_files_dir);
-                            let info_dir = trash_files_dir.parent().unwrap_or(&trash_files_dir).join("trashinfo");
+                            let info_dir = trash_files_dir.parent().unwrap_or(&trash_files_dir).join("info");
 
                             if let Err(e) = std::fs::create_dir_all(&info_dir) {
                                 errors.push(format!("Error creando directorio info: {}", e));
