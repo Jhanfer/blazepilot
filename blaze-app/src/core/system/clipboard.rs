@@ -353,7 +353,7 @@ impl Clipboard {
                     return Ok(());
                 },
                 Err(e) => {
-                    if e.raw_os_error() != Some(18) && e.kind() == std::io::ErrorKind::CrossesDevices {
+                    if e.raw_os_error() != Some(18) {
                         warn!("rename falló (no es cross-device): {}", e);
                     }
                 },
