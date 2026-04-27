@@ -71,9 +71,10 @@ impl SizerManager {
                     let cache_valid = if force {
                         false
                     } else {
-                        let guard = cm.size_cache.read().unwrap();
-                        guard.get(key.as_ref())
-                            .map(|c| c.modified == current_mtime)
+                        cm.size_cache
+                            .try_read()
+                            .ok()
+                            .and_then(|g| g.get(key.as_ref()).map(|c| c.modified == current_mtime))
                             .unwrap_or(false)
                     };
 
@@ -115,9 +116,6 @@ impl SizerManager {
                                 size: calculated_size,
                                 tab_id,
                             }).ok();
-
-
-                            cm.save_size_cache().await;
                         });
                     }
                 },

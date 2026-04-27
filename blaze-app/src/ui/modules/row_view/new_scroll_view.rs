@@ -308,23 +308,31 @@ pub fn new_render_scrollview(ui: &mut Ui, files: &Vec<Arc<FileEntry>>, state: &m
         state.row_view.last_visible = row_range.end;
 
         let info_snapshot: HashMap<PathBuf, ExtendedInfo> = {
-            let map = state.extended_info_manager.info_map.read().unwrap();
-            row_range.clone()
-                .filter_map(|i| {
-                    let path = &files[i].full_path;
-                    map.get(path).map(|v| (path.clone(), v.clone()))
-                })
-                .collect()
+            match state.extended_info_manager.info_map.try_read() {
+                Ok(map) => {
+                    row_range.clone()
+                        .filter_map(|i| {
+                            let path = &files[i].full_path;
+                            map.get(path).map(|v| (path.clone(), v.clone()))
+                        })
+                        .collect()
+                },
+                Err(_) => HashMap::new(),
+            }
         };
 
         let color_snapshot: HashMap<FileId, Color32> = {
-            let guard = ui_state.folder_color_manager.cache_manager.color_cache.read().unwrap();
-            row_range.clone()
-                .filter_map(|i| {
-                    files[i].unique_id.as_ref()
-                        .and_then(|id| guard.get(id).map(|c| (id.clone(), c.color)))
-                })
-                .collect()
+            match ui_state.folder_color_manager.cache_manager.color_cache.try_read() {
+                Ok(guard) => {
+                    row_range.clone()
+                        .filter_map(|i|{
+                            files[i].unique_id.as_ref()
+                                .and_then(|id| guard.get(id).map(|c| (id.clone(), c.color)))
+                        })
+                        .collect()
+                },
+                Err(_) => HashMap::new(),
+            }
         };
 
         for i in row_range.clone() {

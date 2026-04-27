@@ -16,13 +16,18 @@
 
 
 
-use std::{cell::RefCell, collections::{HashMap, HashSet}, path::PathBuf, rc::Rc, sync::{Arc, atomic::Ordering}, time::Instant};
+use std::{cell::RefCell, collections::{HashMap, HashSet}, path::PathBuf, rc::Rc, sync::{Arc, atomic::{AtomicU64, Ordering}}, time::{Instant, SystemTime, UNIX_EPOCH}};
 use bitvec::vec::BitVec;
 use fuzzy_matcher::{FuzzyMatcher, skim::SkimMatcherV2};
 use tracing::{debug, error, info, warn};
 use tokio::sync::Mutex as TokioMutex;
 use uuid::Uuid;
-use crate::{core::{configs::config_state::{OrderingMode, with_configs}, files::motor::{BlazeMotor, FileEntry, FileLoadingMessage, MOTOR, RecursiveMessages}, system::{clipboard::{GlobalClipboard, TOKIO_RUNTIME}, extended_info::extended_info_manager::ExtendedInfoManager, fileopener_module::{FileOpenerManager, GLOBAL_FILE_OPENER}, sizer_manager::{self, sizer_manager::SizerManager}, terminal_opener::terminal_manager::{self, GLOBAL_TERMINAL_MANAGER, TerminalManager}, updater::updater::Updater, zip_manager::zip_manager::ZipManager}}, ui::task_manager::task_manager::TaskManager, utils::channel_pool::{FileOperation, NotifyingSender, with_active_sender_for, with_channel_pool}};
+use crate::{core::{configs::config_state::{OrderingMode, with_configs}, files::motor::{BlazeMotor, FileEntry, FileLoadingMessage, MOTOR, RecursiveMessages}, system::{cache::cache_manager::CacheManager, clipboard::{GlobalClipboard, TOKIO_RUNTIME}, extended_info::extended_info_manager::ExtendedInfoManager, fileopener_module::{FileOpenerManager, GLOBAL_FILE_OPENER}, sizer_manager::{self, sizer_manager::SizerManager}, terminal_opener::terminal_manager::{self, GLOBAL_TERMINAL_MANAGER, TerminalManager}, updater::updater::Updater, zip_manager::zip_manager::ZipManager}}, ui::task_manager::task_manager::TaskManager, utils::channel_pool::{FileOperation, NotifyingSender, with_active_sender_for, with_channel_pool}};
+
+
+// Para el guardado en caché
+static LAST_SAVE_REQUEST: AtomicU64 = AtomicU64::new(0);
+
 
 pub struct RubberBand {
     pub rubber_band_start: Option<egui::Pos2>,
@@ -188,10 +193,11 @@ impl BlazeCoreState {
                 let size_a = if a.is_dir {
                     let key = &a.full_path.to_string_lossy();
                     self.sizer_manager.cache_manager.size_cache
-                        .read()
-                        .unwrap()
-                        .get(key.as_ref())
-                        .map(|c| c.size)
+                        .try_read()
+                        .ok()
+                        .and_then(|g|{
+                            g.get(key.as_ref()).map(|c| c.size)
+                        })
                         .unwrap_or(0)
                 } else {
                     a.size
@@ -200,10 +206,11 @@ impl BlazeCoreState {
                 let size_b = if b.is_dir {
                     let key = &b.full_path.to_string_lossy();
                     self.sizer_manager.cache_manager.size_cache
-                        .read()
-                        .unwrap()
-                        .get(key.as_ref())
-                        .map(|c| c.size)
+                        .try_read()
+                        .ok()
+                        .and_then(|g|{
+                            g.get(key.as_ref()).map(|c| c.size)
+                        })
                         .unwrap_or(0)
                 } else {
                     b.size
@@ -338,25 +345,55 @@ impl BlazeCoreState {
         self.cached_sender = None;
     }
 
+    pub fn save_caches(&self, force: bool) {
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+
+        LAST_SAVE_REQUEST.store(now, Ordering::Relaxed);
+
+        TOKIO_RUNTIME.spawn(async move {
+            tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
+
+            let stored = LAST_SAVE_REQUEST.load(Ordering::Relaxed);
+
+            let current = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_secs();
+
+            if current - stored >= 3 || force {
+                let cm = CacheManager::global();
+                cm.save_extended_info_cache().await;
+                cm.save_size_cache().await;
+                cm.save_color_cache().await
+            }
+        });
+    }
+
     pub fn navigate_to(&mut self, path: PathBuf) {
-        info!("navigate_to");
         self.motor.borrow_mut().active_tab_mut().navigate_to(path);
         self.refresh();
+        self.save_caches(false);
     }
 
     pub fn up(&mut self) {
         self.motor.borrow_mut().active_tab_mut().up();
         self.refresh();
+        self.save_caches(false);
     }
 
     pub fn back(&mut self) {
         self.motor.borrow_mut().active_tab_mut().back();
         self.refresh();
+        self.save_caches(false);
     }
 
     pub fn forward(&mut self) {
         self.motor.borrow_mut().active_tab_mut().foward();
         self.refresh();
+        self.save_caches(false);
     }
 
     pub fn refresh(&mut self) {

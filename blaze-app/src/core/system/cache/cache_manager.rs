@@ -22,7 +22,7 @@ use file_id::FileId;
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use tracing::{error};
 use crate::core::system::{cache::color_cache::color_cache::ColorCache, extended_info::extended_info_manager::ExtendedInfoCache};
-
+use tokio::sync::RwLock as AsyncRwLock;
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
 pub struct SizeCache {
@@ -35,11 +35,11 @@ pub struct SizeCache {
 static CACHE_MANAGER: OnceLock<CacheManager> = OnceLock::new();
 pub struct CacheManager {
     pub cache_dir: PathBuf,
-    pub size_cache: RwLock<HashMap<String, SizeCache>>,
+    pub size_cache: AsyncRwLock<HashMap<String, SizeCache>>,
     pub invalidated: RwLock<HashSet<String>>,
 
-    pub extended_info_cache: RwLock<HashMap<String, ExtendedInfoCache>>,
-    pub color_cache: RwLock<HashMap<FileId, ColorCache>>,
+    pub extended_info_cache: AsyncRwLock<HashMap<String, ExtendedInfoCache>>,
+    pub color_cache: AsyncRwLock<HashMap<FileId, ColorCache>>,
 }
 
 impl CacheManager {
@@ -52,9 +52,9 @@ impl CacheManager {
             Self {
                 cache_dir,
                 invalidated: RwLock::new(HashSet::new()),
-                size_cache: RwLock::new(HashMap::new()),
-                color_cache: RwLock::new(HashMap::new()),
-                extended_info_cache: RwLock::new(HashMap::new()),
+                size_cache: AsyncRwLock::new(HashMap::new()),
+                color_cache: AsyncRwLock::new(HashMap::new()),
+                extended_info_cache: AsyncRwLock::new(HashMap::new()),
             }
         })
     }
@@ -132,30 +132,24 @@ impl CacheManager {
     ///------ Pesos ----
     pub async fn load_size_cache(&self) {
         if let Some(cache) = self.load_cache::<String, SizeCache>("cache_sizes.bin").await {
-            let mut guard = self.size_cache.write().unwrap();
+            let mut guard = self.size_cache.write().await;
             *guard = cache;
         }
     }
 
 
     pub async fn save_size_cache(&self) {
-        let data_to_save = self.size_cache.read().ok().map(|g| g.clone());
-        
-        if let Some(data) = data_to_save {
-            self.save_cache("cache_sizes.bin", &data).await;
-        }
+        let data_to_save = self.size_cache.read().await.clone();
+        self.save_cache("cache_sizes.bin", &data_to_save).await;
     }
 
     pub async fn update_cache_size(&self, path: String, size: u64, modified: u64) {
-        {
-            let mut guard = self.size_cache.write().unwrap();
-            guard.insert(path, SizeCache { size, modified });
-        }
+        self.size_cache.write().await.insert(path, SizeCache { size, modified });
     }
 
     pub fn get_cached_size(&self, path: &PathBuf) -> Option<u64> {
         let key = path.to_string_lossy();
-        self.size_cache.read().ok()?
+        self.size_cache.try_read().ok()?
             .get(key.as_ref())
             .map(|c| c.size)
     }
@@ -165,7 +159,7 @@ impl CacheManager {
     pub async fn reload_color_cache(&self) {
         match self.load_cache::<FileId, ColorCache>("color_cache.bin").await {
             Some(new_cache) => {
-                let mut guard = self.color_cache.write().unwrap();
+                let mut guard = self.color_cache.write().await;
                 let previous_count = guard.len();
                 *guard = new_cache;
                 tracing::info!("Color cache recargado correctamente. Entradas: {} → {}", 
@@ -179,30 +173,26 @@ impl CacheManager {
     
     pub async fn load_color_cache(&self) {
         if let Some(cache) = self.load_cache::<FileId, ColorCache>("color_cache.bin").await {
-            let mut guard = self.color_cache.write().unwrap();
+            let mut guard = self.color_cache.write().await;
             *guard = cache;
         }
     }
 
     pub async fn save_color_cache(&self) {
         let data_to_save = {
-            let guard = self.color_cache.read().unwrap();
+            let guard = self.color_cache.read().await;
             guard.clone()
         };
         self.save_cache("color_cache.bin", &data_to_save).await;
     }
 
     pub async fn update_color_cache(&self, file_id: FileId, new_color: Color32) {
-        {
-            let mut guard = self.color_cache.write().unwrap();
-            guard.insert(file_id, ColorCache { color: new_color });
-        }
-        self.save_color_cache().await;
+        self.color_cache.write().await.insert(file_id, ColorCache { color: new_color });
     }
 
     pub fn get_cached_color(&self, file_id: &FileId) -> Color32 {
-        self.color_cache.read().ok()
-            .and_then(|g| g.get(file_id).map(|c| c.color))
+        self.color_cache.try_read().ok()
+            .and_then(|guard| guard.get(file_id).map(|c| c.color))
             .unwrap_or(Color32::YELLOW)
     }
 
@@ -212,31 +202,26 @@ impl CacheManager {
     ///------ Info extendida ----
     pub async fn load_extended_info_cache(&self) {
         if let Some(cache) = self.load_cache::<String, ExtendedInfoCache>("cache_extended_info.bin").await {
-            let mut guard = self.extended_info_cache.write().unwrap();
+            let mut guard = self.extended_info_cache.write().await;
             *guard = cache;
         }
     }
 
     pub async fn save_extended_info_cache(&self) {
         let data_to_save = {
-            let guard = self.extended_info_cache.read().unwrap();
+            let guard = self.extended_info_cache.read().await;
             guard.clone()
         };
-
         self.save_cache("cache_extended_info.bin", &data_to_save).await;
     }
 
     pub async fn update_extended_info_cache(&self, path: String, info: ExtendedInfoCache) {
-        {
-            let mut guard = self.extended_info_cache.write().unwrap();
-            guard.insert(path, info);
-        }
-        self.save_extended_info_cache().await;
+        self.extended_info_cache.write().await.insert(path, info);
     }
 
     pub fn get_cached_extended_info(&self, path: &PathBuf) -> Option<ExtendedInfoCache> {
         let key = path.to_string_lossy();
-        self.extended_info_cache.read().ok()?
+        self.extended_info_cache.try_read().ok()?
             .get(key.as_ref())
             .cloned()
     }

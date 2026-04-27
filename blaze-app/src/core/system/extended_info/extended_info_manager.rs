@@ -134,10 +134,13 @@ impl ExtendedInfoManager {
                     let sender_clone = sender.clone();
                     let tab_id = sender.tab_id;
 
-                    let guard = cm.extended_info_cache.read().unwrap();
-                    let cache_valid = guard.get(key.as_ref())
-                        .map(|c| c.modified == current_mtime)
-                        .unwrap_or(false);
+                    
+                    let cache_valid= cm.extended_info_cache.try_read()
+                        .ok()
+                        .and_then(|g|{
+                            g.get(key.as_ref())
+                                .map(|c| c.modified == current_mtime)
+                        }).unwrap_or(false);
 
                     if cache_valid {
                         if let Some(cached) = cm.get_cached_extended_info(&path_buf) {

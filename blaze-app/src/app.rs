@@ -92,4 +92,8 @@ impl eframe::App for BlazeApp {
             ui.request_repaint_after(std::time::Duration::from_millis(100));
         }
     }
+
+    fn on_exit(&mut self) {
+        self.state.save_caches(true);
+    }
 }
