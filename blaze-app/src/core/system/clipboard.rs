@@ -406,10 +406,12 @@ impl Clipboard {
         let mut last_update = std::time::Instant::now();
 
         loop {
-            let bytes_read = reader.read(&mut buffer).await.unwrap();
+            let bytes_read = reader.read(&mut buffer).await
+                .map_err(|e| format!("Error leyendo {:?}: {}", src.file_name(), e))?;
             if bytes_read == 0 { break; }
             
-            writer.write(&buffer[..bytes_read]).await.unwrap();
+            writer.write_all(&buffer[..bytes_read]).await
+                .map_err(|e| format!("Error escribiendo {:?}: {}", dest.file_name(), e))?;
 
             copied_global.fetch_add(bytes_read as u64, Ordering::Relaxed);
 
