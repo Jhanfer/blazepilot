@@ -171,7 +171,7 @@ pub struct TabState {
 }
 
 pub static FILE_CACHE: Lazy<RwLock<LruCache<PathBuf, Vec<Arc<FileEntry>>>>> = Lazy::new(|| {
-    RwLock::new(LruCache::new(NonZeroUsize::new(2).unwrap()))
+    RwLock::new(LruCache::new(NonZeroUsize::new(50).unwrap()))
 });
 
 impl TabState {
