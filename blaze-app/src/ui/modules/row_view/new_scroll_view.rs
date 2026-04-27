@@ -444,13 +444,13 @@ pub fn new_render_scrollview(ui: &mut Ui, files: &Vec<Arc<FileEntry>>, state: &m
                 let dot_rect = Rect::from_center_size(dot_center, vec2(dot_size, dot_size));
                 if let Some(git_status) = git {
                     let label = match git_status {
-                        GitStatus::Modified  => "Modified",
-                        GitStatus::Staged    => "Staged",
-                        GitStatus::Untracked => "Untracked",
-                        GitStatus::Ignored   => "Ignored",
-                        GitStatus::Conflict  => "Conflict",
-                        GitStatus::Deleted   => "Deleted",
-                        GitStatus::Clean     => "Clean",
+                        GitStatus::Modified  => "Modificado",
+                        GitStatus::Staged    => "Preparado",
+                        GitStatus::Untracked => "No rastreado",
+                        GitStatus::Ignored   => "Ignorado",
+                        GitStatus::Conflict  => "Conflicto",
+                        GitStatus::Deleted   => "Eliminado",
+                        GitStatus::Clean     => "Limpio",
                     };
                     ui.interact(dot_rect, ui.id().with(("dot", i)), Sense::hover())
                         .on_hover_text(label);
@@ -458,7 +458,7 @@ pub fn new_render_scrollview(ui: &mut Ui, files: &Vec<Arc<FileEntry>>, state: &m
             }
 
             // Nombre
-            let mut motor = state.motor.borrow_mut();
+            let motor = state.motor.borrow_mut();
             let display_name = if motor.active_tab().is_recursive_active {
                 file.full_path.strip_prefix(&motor.active_tab().cwd)
                     .unwrap_or(&file.full_path).to_string_lossy().to_string()
