@@ -241,7 +241,9 @@ impl TabState {
             while watching.load(Ordering::Relaxed) {
                 if let Ok(event) = fs_rx.recv_timeout(Duration::from_millis(100)) {
                     match event.kind {
-                        EventKind::Create(CreateKind::File) => {
+                        EventKind::Create(CreateKind::Folder) |
+                        EventKind::Create(CreateKind::File) |
+                        EventKind::Create(CreateKind::Any) => {
                             // Archivo creado
                             if let Some(path) = event.paths.first() {
                                 let name = path.file_name()
