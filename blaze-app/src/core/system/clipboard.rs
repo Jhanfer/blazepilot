@@ -531,7 +531,7 @@ impl Clipboard {
 
         loop {
             let new_name = match ext {
-                Some(e) => format!("{} ({}) .{}", stem, counter, e),
+                Some(e) => format!("{} ({}).{}", stem, counter, e),
                 None => format!("{} ({})", stem, counter),
             };
 
