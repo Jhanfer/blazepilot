@@ -1,11 +1,29 @@
+// Copyright 2026 Jhanfer
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+
+
+
 use std::path::{Path, PathBuf};
 use crate::core::files::{file_extension::{ArchiveType, FileExtension}, motor::FileEntry};
 use thiserror::Error;
+use bzip2::read::BzDecoder;
 
 //Manejo de errores
 #[derive(Debug, Error)]
 pub enum ZipError {
-    #[error("")]
+    #[error("Error ZIP: {0}")]
     Zip(#[from] zip::result::ZipError),
     
     #[error("I/O error: {0}")]
@@ -66,10 +84,10 @@ impl ArchiveExtractor for TarExtractor {
         let file = std::fs::File::open(archive)?;
 
         let reader: Box<dyn std::io::Read> = match self.kind {
-            ArchiveType::TarGz => Box::new(flate2::read::GzDecoder::new(file)),
-            ArchiveType::TarXz => Box::new(xz2::read::XzDecoder::new(file)),
-            ArchiveType::TarBz2 => Box::new(flate2::read::GzDecoder::new(file)),
-            ArchiveType::Tar => Box::new(file),
+            ArchiveType::TarGz  => Box::new(flate2::read::GzDecoder::new(file)),
+            ArchiveType::TarXz  => Box::new(xz2::read::XzDecoder::new(file)),
+            ArchiveType::TarBz2 => Box::new(BzDecoder::new(file)),
+            ArchiveType::Tar    => Box::new(file),
             _ => unreachable!(),
         };
 
