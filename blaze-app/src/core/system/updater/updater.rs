@@ -15,7 +15,7 @@
 
 
 
-use std::error::Error;
+use std::{error::Error, sync::{Arc, atomic::{AtomicBool, Ordering}}};
 use self_update::cargo_crate_version;
 use tracing::{error, info};
 use uuid::Uuid;
@@ -39,7 +39,7 @@ pub struct Updater {
     pub version: String,
     pub owner: String,
     pub repo: String,
-    pub is_updating: bool,
+    is_updating: Arc<AtomicBool>,
 }
 
 impl Updater {
@@ -48,7 +48,7 @@ impl Updater {
             version: cargo_crate_version!().to_string(),
             owner: "Jhanfer".to_string(),
             repo:"blazepilot".to_string(),
-            is_updating: false,
+            is_updating: Arc::new(AtomicBool::new(false)),
         }
     }
 
@@ -120,11 +120,16 @@ impl Updater {
 
 
     pub fn start_update_process(&mut self) {
-        self.is_updating = true;
+        if self.is_updating.load(Ordering::SeqCst) {
+            return;
+        }
+        self.is_updating.store(true, Ordering::SeqCst);
+
         let version = self.version.clone();
         let owner = self.owner.clone();
         let repo = self.repo.clone();
 
+        let flag = self.is_updating.clone();
         std::thread::spawn(move || {
             let status = self_update::backends::github::Update::configure()
                     .repo_owner(&owner)
@@ -146,8 +151,12 @@ impl Updater {
 
                 Err(e) => error!("Error al actualizar: {}", e),
             }
-        });
 
-        self.is_updating = false;
+            flag.store(false, Ordering::SeqCst);
+        });
+    }
+
+    fn is_updating(&self) -> bool {
+        self.is_updating.load(Ordering::SeqCst)
     }
 }
