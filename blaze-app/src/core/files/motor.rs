@@ -796,7 +796,7 @@ impl TabState {
         }
     }
 
-    pub fn foward(&mut self) {
+    pub fn forward(&mut self) {
         if let Some(next) = self.future.pop() {
             self.history.push(self.cwd.clone());
             self.cwd = next;

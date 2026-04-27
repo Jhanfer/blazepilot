@@ -391,7 +391,7 @@ impl BlazeCoreState {
     }
 
     pub fn forward(&mut self) {
-        self.motor.borrow_mut().active_tab_mut().foward();
+        self.motor.borrow_mut().active_tab_mut().forward();
         self.refresh();
         self.save_caches(false);
     }
