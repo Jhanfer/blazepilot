@@ -14,7 +14,7 @@
 
 
 
-use eframe::{HardwareAcceleration, NativeOptions};
+use eframe::{HardwareAcceleration};
 use tracing_subscriber::{fmt, EnvFilter};
 mod app;
 mod core;

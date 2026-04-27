@@ -15,11 +15,11 @@
 
 
 
-use std::path::PathBuf;
-use egui::{Area, Context, Order, Sense};
+use std::{collections::{HashMap, HashSet}, path::PathBuf};
+use egui::{Area, Context, Order, Sense, TextureHandle};
 use file_id::FileId;
 use uuid::Uuid;
-use crate::{core::{files::{self, motor::with_motor}, system::{cache::color_cache::color_cache::FolderColorManager, fileopener_module::{AppAssociation, platform::linux::linux::AppsIconData}, updater::updater::UpdateMessages}}, ui::{dialogs::{configs_dialog::ConfigDialog, error_dialog::ErrorDialog, folder_color_selector_dialog::FolderColorSelector, selector_dialog::AppSelectorDialog, sure_to_delete::SureToDeleteDialog, sure_to_move_to::SureToMoveToDialog, update_dialog::UpdateDialog}, icons_cache::icon_cache::IconCache, modules::custom_context_menu::context_state::ContextMenuState}, utils::channel_pool::{FileConflict, SureTo, UiEvent, with_channel_pool}};
+use crate::{core::{files::{self, motor::with_motor}, system::{cache::color_cache::color_cache::FolderColorManager, fileopener_module::{AppAssociation, platform::linux::linux::AppsIconData}, updater::updater::UpdateMessages}}, ui::{dialogs::{configs_dialog::ConfigDialog, error_dialog::ErrorDialog, folder_color_selector_dialog::FolderColorSelector, selector_dialog::AppSelectorDialog, sure_to_delete::SureToDeleteDialog, sure_to_move_to::SureToMoveToDialog, update_dialog::UpdateDialog}, icons_cache::{icon_cache::IconCache, thumbnails::thumbnails_manager::ThumbnailManager}, modules::custom_context_menu::context_state::ContextMenuState}, utils::channel_pool::{FileConflict, NotifyingSender, SureTo, UiEvent, with_active_sender_for, with_channel_pool}};
 use tracing::{debug, info};
 
 
@@ -133,6 +133,12 @@ pub struct BlazeUiState {
     pub icon_cache: IconCache,
     pub folder_color_manager: FolderColorManager,
     pub context_menu_state: ContextMenuState,
+    pub thumb_texture_cache: HashMap<PathBuf, TextureHandle>,
+    pub thumbnail_manager: ThumbnailManager,
+    pub calculating_thumbnails: HashSet<PathBuf>,
+    pub calculated_thumbnails: HashSet<PathBuf>,
+    pub cached_sender: Option<NotifyingSender>,
+    cached_sender_tab_id: Option<Uuid>,
 }
 
 
@@ -144,11 +150,36 @@ impl BlazeUiState {
             icon_cache: IconCache::new(),
             folder_color_manager: FolderColorManager::new(),
             context_menu_state: ContextMenuState::new(),
+            thumb_texture_cache: HashMap::new(),
+            thumbnail_manager: ThumbnailManager::new(),
+            calculating_thumbnails: HashSet::new(),
+            calculated_thumbnails: HashSet::new(),
+            cached_sender: None,
+            cached_sender_tab_id: None,
         }
     }
 
+    pub fn sender(&mut self) -> Option<&NotifyingSender> {
+        let active_tab_id = with_motor(|m| m.active_tab().id);
+
+        if self.cached_sender_tab_id != Some(active_tab_id) {
+            self.cached_sender = with_active_sender_for(active_tab_id, |s| s.clone());
+            self.cached_sender_tab_id = Some(active_tab_id);
+        }
+        self.cached_sender.as_ref()
+    }
+    
+    pub fn invalidate_sender(&mut self) {
+        self.cached_sender = None;
+    }
+
     pub fn process_events(&mut self) {
-        let active_id = with_motor(|m| m.active_tab().id);
+        let sender = {
+            let Some(sender) = self.sender() else {return;};
+            sender.clone()
+        };
+        let active_id = sender.tab_id;
+
         let events: Vec<UiEvent> = with_channel_pool(|pool| {
             let  mut msgs = Vec::new();
             pool.process_ui_events(active_id, |msg|{
@@ -157,6 +188,10 @@ impl BlazeUiState {
             });
             msgs
         });
+
+
+        self.thumbnail_manager.process_messages(active_id, sender.clone());
+
 
         for envent in events {
             match envent {
@@ -212,6 +247,11 @@ impl BlazeUiState {
                 UiEvent::OpenConfigs => {
                     self.dialog_manager.open_configs();
                 },
+
+                UiEvent::ThumbnailReady { full_path, tab_id } => {
+                    self.calculating_thumbnails.remove(&full_path);
+                    self.calculated_thumbnails.insert(full_path);
+                }
             }
         }
     }

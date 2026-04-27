@@ -18,11 +18,12 @@
 
 use std::{cell::RefCell, collections::{HashMap, HashSet}, path::PathBuf, rc::Rc, sync::{Arc, atomic::{AtomicU64, Ordering}}, time::{Instant, SystemTime, UNIX_EPOCH}};
 use bitvec::vec::BitVec;
+use egui::TextureHandle;
 use fuzzy_matcher::{FuzzyMatcher, skim::SkimMatcherV2};
 use tracing::{debug, error, info, warn};
 use tokio::sync::Mutex as TokioMutex;
 use uuid::Uuid;
-use crate::{core::{configs::config_state::{OrderingMode, with_configs}, files::motor::{BlazeMotor, FileEntry, FileLoadingMessage, MOTOR, RecursiveMessages}, system::{cache::cache_manager::CacheManager, clipboard::{GlobalClipboard, TOKIO_RUNTIME}, extended_info::extended_info_manager::ExtendedInfoManager, fileopener_module::{FileOpenerManager, GLOBAL_FILE_OPENER}, sizer_manager::{self, sizer_manager::SizerManager}, terminal_opener::terminal_manager::{self, GLOBAL_TERMINAL_MANAGER, TerminalManager}, updater::updater::Updater, zip_manager::zip_manager::ZipManager}}, ui::task_manager::task_manager::TaskManager, utils::channel_pool::{FileOperation, NotifyingSender, with_active_sender_for, with_channel_pool}};
+use crate::{core::{configs::config_state::{OrderingMode, with_configs}, files::motor::{BlazeMotor, FileEntry, FileLoadingMessage, MOTOR, RecursiveMessages}, system::{cache::cache_manager::CacheManager, clipboard::{GlobalClipboard, TOKIO_RUNTIME}, extended_info::extended_info_manager::ExtendedInfoManager, fileopener_module::{FileOpenerManager, GLOBAL_FILE_OPENER}, sizer_manager::{self, sizer_manager::SizerManager}, terminal_opener::terminal_manager::{self, GLOBAL_TERMINAL_MANAGER, TerminalManager}, updater::updater::Updater, zip_manager::zip_manager::ZipManager}}, ui::{icons_cache::thumbnails::thumbnails_manager::ThumbnailManager, task_manager::task_manager::TaskManager}, utils::channel_pool::{FileOperation, NotifyingSender, with_active_sender_for, with_channel_pool}};
 
 
 // Para el guardado en caché
@@ -651,7 +652,7 @@ impl BlazeCoreState {
 
         self.sizer_manager.process_messages(active_id, sender.clone());
 
-        self.extended_info_manager.process_messages(active_id, sender);
+        self.extended_info_manager.process_messages(active_id, sender.clone());
         
         let file_messages: Vec<FileLoadingMessage> = with_channel_pool(|pool|{
             let mut msgs = Vec::new();
@@ -836,7 +837,7 @@ impl BlazeCoreState {
                     info!("Solicitando extracción de: [{}] -> [{:?}]", entry.name, dest_dir);
                     let res = self.zip_manager.extract(&entry, &dest_dir);
                     res.map_err(|e| warn!("Error: {}", e)).ok();
-                }
+                },
             }
         }
 

@@ -1,0 +1,1 @@
+pub mod thumbnails_manager;

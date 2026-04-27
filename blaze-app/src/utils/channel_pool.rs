@@ -24,12 +24,12 @@ use std::sync::Mutex;
 use crossbeam_channel::{Receiver, SendError, Sender, unbounded};
 use crate::core::files::motor::{FileEntry, RecursiveMessages, with_motor};
 use crate::core::files::{motor::FileLoadingMessage};
-use crate::core::system::extended_info;
 use crate::core::system::extended_info::extended_info_manager::ExtendedInfoMessages;
 use crate::core::system::fileopener_module::AppAssociation;
 use crate::core::system::fileopener_module::platform::linux::linux::AppsIconData;
 use crate::core::system::sizer_manager::sizer_manager::SizerMessages;
 use crate::core::system::updater::updater::UpdateMessages;
+use crate::ui::icons_cache::thumbnails::thumbnails_manager::ThumbnailMessages;
 use crate::ui::task_manager::task_manager::TaskMessage;
 use tracing::{info, warn};
 use std::sync::RwLock;
@@ -116,6 +116,11 @@ pub enum UiEvent {
         show_all_apps: bool,
     },
 
+    ThumbnailReady {
+        full_path: PathBuf,
+        tab_id: Uuid,
+    },
+
     SureTo(SureTo),
 
     UpdateMessages(UpdateMessages),
@@ -144,6 +149,7 @@ pub struct NotifyingSender {
     file_operation_sender: Sender<FileOperation>,
     sizer_sender: Sender<SizerMessages>,
     extended_info_sender: Sender<ExtendedInfoMessages>,
+    thumbnails_sender: Sender<ThumbnailMessages>,
 
     notifier: Arc<dyn Fn() + Send + Sync>,
 }
@@ -191,6 +197,12 @@ impl NotifyingSender {
         result
     }
 
+    pub fn send_thumbnails(&self, msg: ThumbnailMessages) -> Result<(), SendError<ThumbnailMessages>> {
+        let result = self.thumbnails_sender.send(msg);
+        if result.is_ok() {(self.notifier)();}
+        result
+    }
+
 
 }
 
@@ -202,6 +214,7 @@ pub struct ChannelPool {
     fileops_channels: HashMap<Uuid, Arc<(Sender<FileOperation>, Receiver<FileOperation>)>>,
     sizer_channels: HashMap<Uuid, Arc<(Sender<SizerMessages>, Receiver<SizerMessages>)>>,
     extended_info_channels: HashMap<Uuid, Arc<(Sender<ExtendedInfoMessages>, Receiver<ExtendedInfoMessages>)>>,
+    thumbnails_channels: HashMap<Uuid, Arc<(Sender<ThumbnailMessages>, Receiver<ThumbnailMessages>)>>,
 
     ui_notifier: HashMap<Uuid, Arc<dyn Fn() + Send + Sync>>,
 }
@@ -233,6 +246,7 @@ impl ChannelPool {
             fileops_channels: HashMap::new(),
             sizer_channels: HashMap::new(),
             extended_info_channels: HashMap::new(),
+            thumbnails_channels: HashMap::new(),
             ui_notifier: HashMap::new(),
         }
     }
@@ -257,6 +271,7 @@ impl ChannelPool {
         let file_operation_sender = self.get_fileop_sender(tab_id);
         let sizer_sender = self.get_sizer_sender(tab_id);
         let extended_info_sender = self.get_extended_info_sender(tab_id);
+        let thumbnails_sender = self.get_thumbnails_sender(tab_id);
 
         let Some(notifier) = self.ui_notifier.get(&tab_id) else {
             warn!(tab_id = %tab_id, "NO HAY NOTIFIER para tab_id");
@@ -274,6 +289,7 @@ impl ChannelPool {
                 file_operation_sender,
                 sizer_sender,
                 extended_info_sender,
+                thumbnails_sender,
                 notifier: notifier.clone() 
             }
         )
@@ -333,6 +349,14 @@ impl ChannelPool {
             self.extended_info_channels.insert(tab_id, (tx, rx).into());
         }
         self.extended_info_channels.get(&tab_id).unwrap().0.clone()
+    }
+
+    pub fn get_thumbnails_sender(&mut self, tab_id: Uuid) -> Sender<ThumbnailMessages> {
+        if !self.thumbnails_channels.contains_key(&tab_id) {
+            let (tx, rx) = unbounded();
+            self.thumbnails_channels.insert(tab_id, (tx, rx).into());
+        }
+        self.thumbnails_channels.get(&tab_id).unwrap().0.clone()
     }
 
     pub fn process_file_messages<F>(&self, tab_id: Uuid, mut processor: F) -> bool
@@ -434,6 +458,21 @@ impl ChannelPool {
         {
             let mut process_any = false;
             if let Some(arc_pair) = self.extended_info_channels.get(&tab_id) {
+                while let Ok(msg) = arc_pair.1.try_recv() {
+                    if processor(msg) {
+                        process_any = true;
+                    }
+                }
+            }
+            process_any
+        }
+
+    pub fn process_thumbnail_events<F>(&self, tab_id: Uuid, mut processor: F) -> bool 
+        where 
+            F: FnMut(ThumbnailMessages) -> bool 
+        {
+            let mut process_any = false;
+            if let Some(arc_pair) = self.thumbnails_channels.get(&tab_id) {
                 while let Ok(msg) = arc_pair.1.try_recv() {
                     if processor(msg) {
                         process_any = true;

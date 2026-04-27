@@ -2,7 +2,7 @@ use std::{collections::HashMap, path::PathBuf, sync::Arc};
 use egui::{Color32, CursorIcon, FontId, Key, PointerButton, Rect, RichText, ScrollArea, Sense, Ui, pos2, scroll_area::ScrollSource, vec2};
 use file_id::FileId;
 use tracing::{error, info};
-use crate::{core::{blaze_state::BlazeCoreState, configs::config_state::{OrderingMode, with_configs}, files::{file_extension::{DocType, FileExtension}, motor::FileEntry}, system::{extended_info::extended_info_manager::{ExtendedInfo, GitStatus}}}, ui::{blaze_ui_state::BlazeUiState, icons_cache::icons, modules::custom_context_menu::context_state::ContextMenuKind}, utils::{channel_pool::{SureTo, UiEvent}, formating::{format_date, format_size}}};
+use crate::{core::{blaze_state::BlazeCoreState, configs::config_state::{OrderingMode, with_configs}, files::{file_extension::{DocType, FileExtension}, motor::FileEntry}, system::{cache::cache_manager::CacheManager, extended_info::extended_info_manager::{ExtendedInfo, GitStatus}}}, ui::{blaze_ui_state::BlazeUiState, icons_cache::{icons, thumbnails::thumbnails_manager::Thumbnail}, modules::custom_context_menu::context_state::ContextMenuKind}, utils::{channel_pool::{SureTo, UiEvent}, formating::{format_date, format_size}}};
 
 
 
@@ -335,6 +335,19 @@ pub fn new_render_scrollview(ui: &mut Ui, files: &Vec<Arc<FileEntry>>, state: &m
             }
         };
 
+        let thumbnail_snapshot: HashMap<PathBuf, Thumbnail> = {
+            if let Ok(guard) = ui_state.thumbnail_manager.thumb_map.try_read() {
+                row_range.clone()
+                .filter_map(|i| {
+                        let p = &files[i].full_path;
+                        guard.get(p).cloned().map(|t| (p.clone(), t))
+                    })
+                .collect()
+            } else {
+                HashMap::new()
+            }
+        };
+
         for i in row_range.clone() {
             let file = &files[i];
             let is_renaming = state.renaming_file.as_deref() == Some(&file.full_path);
@@ -427,15 +440,42 @@ pub fn new_render_scrollview(ui: &mut Ui, files: &Vec<Arc<FileEntry>>, state: &m
             let name_start_x = rect.min.x + icon_size + dot_size + icon_spacing * 2.0;
             let name_end_x   = rect.min.x + name_w;
 
-            let (icon_name, icon_bytes, color) = resolve_icon(file, &color_snapshot);
-            let icon = ui_state.icon_cache.get_or_load(ui, &icon_name, icon_bytes, color);
 
             let icon_rect = Rect::from_min_size(
                 pos2(rect.min.x, rect.center().y - icon_size / 2.0),
                 vec2(icon_size, icon_size),
             );
-            ui.painter().image(icon.id(), icon_rect,
-                Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)), Color32::WHITE);
+
+
+            if let Some(thumb) = thumbnail_snapshot.get(&file.full_path) {
+                let tex = ui_state.thumb_texture_cache
+                .entry(file.full_path.clone())
+                .or_insert_with(|| {
+                        let image = egui::ColorImage::from_rgba_unmultiplied(
+                            [thumb.width as usize, thumb.height as usize],
+                            &thumb.pixels,
+                        );
+                        ui.ctx().load_texture(
+                            file.full_path.to_string_lossy().to_string(),
+                            image,
+                            egui::TextureOptions::LINEAR, // escala 64→16 suave
+                        )
+                    });
+
+                ui.painter().image(
+                    tex.id(),
+                    icon_rect,
+                    Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
+                    Color32::WHITE,
+                );
+            } else {
+                let (icon_name, icon_bytes, color) = resolve_icon(file, &color_snapshot);
+                let icon = ui_state.icon_cache.get_or_load(ui, &icon_name, icon_bytes, color);
+            
+                ui.painter().image(icon.id(), icon_rect,
+                    Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)), Color32::WHITE);
+            }
+
 
             // Dot git
             let dot_center = pos2(rect.min.x + icon_size + icon_spacing + dot_size / 2.0, rect.center().y);
