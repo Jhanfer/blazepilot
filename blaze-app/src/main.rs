@@ -44,7 +44,7 @@ fn main() {
 
 
     let backend = with_configs(|c| {
-        c.load_or_init_cofigs().unwrap();
+        c.load_or_init_configs().unwrap();
 
         c.configs.display_backend.clone()
     });

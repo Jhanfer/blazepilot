@@ -278,7 +278,7 @@ impl ConfigHandler {
     }
     
 
-    pub fn load_or_init_cofigs(&mut self) -> Result<(), String> {
+    pub fn load_or_init_configs(&mut self) -> Result<(), String> {
         let path = self.configs.config_file_path.clone();
 
         debug!("{:?}", path.clone());
