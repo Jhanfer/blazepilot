@@ -16,10 +16,9 @@
 
 
 
-use egui::{Color32, Context, CornerRadius, Frame, Margin, Order, Window};
+use egui::{Color32, Ui, CornerRadius, Frame, Margin, Order, Window};
 use file_id::FileId;
-use tracing::info;
-use crate::{core::system::{cache::cache_manager, clipboard::TOKIO_RUNTIME}, ui::blaze_ui_state::ModalDialog, utils::channel_pool::{FileOperation, with_active_sender}};
+use crate::{core::system::{cache::cache_manager, clipboard::TOKIO_RUNTIME}, ui::blaze_ui_state::ModalDialog};
 
 
 pub struct FolderColorSelector {
@@ -31,7 +30,7 @@ pub struct FolderColorSelector {
 impl ModalDialog for FolderColorSelector {
     fn is_open(&self) -> bool { self.show_modal }
     fn close(&mut self) { self.close() }
-    fn render(&mut self, ctx: &Context) { self.render_dialog(ctx); }
+    fn render(&mut self, ui: &mut Ui) { self.render_dialog(ui); }
 }
 
 impl FolderColorSelector {
@@ -57,7 +56,7 @@ impl FolderColorSelector {
     }
 
 
-    pub fn render_dialog(&mut self, ctx: &Context) {
+    pub fn render_dialog(&mut self, ui: &mut Ui) {
         let mut should_close = false;
 
         let Some(folder_id) = self.folder_id.as_ref() else { return; };
@@ -75,7 +74,7 @@ impl FolderColorSelector {
             .resizable(false)
             .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
             .open(&mut self.show_modal)
-            .show(ctx, |ui|{
+            .show(ui, |ui|{
                 ui.set_min_width(250.0);
                 ui.set_min_height(100.0);
 

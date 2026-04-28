@@ -17,10 +17,8 @@
 
 
 use core::f32;
-use egui::{Align2, Area, CentralPanel, Color32, ComboBox, Context, CornerRadius, Frame, Layout, Margin, OpenUrl, Order, Panel, RichText, TextEdit, Ui, Window, pos2};
-use tracing::info;
-use tracing_subscriber::fmt::format;
-use crate::{core::{configs::config_state::{DisplayBackend, with_configs}, system::{cache::cache_manager::CacheManager, clipboard::TOKIO_RUNTIME, terminal_opener::terminal_manager::GLOBAL_TERMINAL_MANAGER}}, ui::blaze_ui_state::ModalDialog, utils::sysinfo::get_stats};
+use egui::{Area, CentralPanel, Color32, ComboBox, Ui, CornerRadius, Frame, Margin, OpenUrl, Order, Panel, RichText, TextEdit, Window, pos2};
+use crate::{core::{configs::config_state::{DisplayBackend, with_configs}, system::{clipboard::TOKIO_RUNTIME, terminal_opener::terminal_manager::GLOBAL_TERMINAL_MANAGER}}, ui::blaze_ui_state::ModalDialog};
 
 #[derive(PartialEq, Clone, Copy)]
 enum CurrentConfigTab {
@@ -61,7 +59,7 @@ impl CurrentConfigTab {
 
             CurrentConfigTab::Backend => [
                 "backend", "gpu", "cpu", "render", "vulkan", "opengl",
-                "directx", "metal", "renderer", "aceleración", "protocolo de pantalla",
+                "direui", "metal", "renderer", "aceleración", "protocolo de pantalla",
             ].iter().any(|&k| k.contains(&q) || q.contains(k)),
 
             CurrentConfigTab::Appearance => [
@@ -92,7 +90,7 @@ pub struct ConfigDialog {
 impl ModalDialog for ConfigDialog {
     fn is_open(&self) -> bool { self.show_modal }
     fn close(&mut self) { self.close() }
-    fn render(&mut self, ctx: &Context) { self.render_dialog(ctx); }
+    fn render(&mut self, ui: &mut Ui) { self.render_dialog(ui); }
 }
 
 impl ConfigDialog {
@@ -190,7 +188,7 @@ impl ConfigDialog {
     }
 
 
-    fn render_general_settings(&self, ui: &mut Ui, query: &str, frame: Frame) {
+    fn render_general_settings(&self, ui: &mut Ui, _query: &str, frame: Frame) {
         ui.add_space(10.0);
         frame.show(ui, |ui|{
             ui.vertical(|ui|{
@@ -212,11 +210,11 @@ impl ConfigDialog {
                 
                 ui.horizontal(|ui| {
                     if ui.link("GitHub").clicked() {
-                        ui.ctx().open_url(OpenUrl::new_tab("https://github.com/Jhanfer/blazepilot"));
+                        ui.open_url(OpenUrl::new_tab("https://github.com/Jhanfer/blazepilot"));
                     }
                     ui.label("•");
                     if ui.link("Reportar bug").clicked() {
-                        ui.ctx().open_url(OpenUrl::new_tab("https://github.com/Jhanfer/blazepilot/issues"));
+                        ui.open_url(OpenUrl::new_tab("https://github.com/Jhanfer/blazepilot/issues"));
                     }
                 });
                 
@@ -255,7 +253,7 @@ impl ConfigDialog {
     }
 
 
-    fn render_terminal_settings(&mut self, ui: &mut Ui, query: &str, frame: Frame) {
+    fn render_terminal_settings(&mut self, ui: &mut Ui, _query: &str, frame: Frame) {
         ui.add_space(10.0);
         if self.available_terminals.is_empty() && !self.loading_terminals {
             self.loading_terminals = true;
@@ -320,7 +318,7 @@ impl ConfigDialog {
 
 
 
-    fn render_backend_settings(&mut self, ui: &mut Ui, query: &str, frame: Frame) {
+    fn render_backend_settings(&mut self, ui: &mut Ui, _query: &str, frame: Frame) {
         ui.add_space(10.0);
         frame.show(ui, |ui|{
             ui.vertical(|ui|{
@@ -361,7 +359,7 @@ impl ConfigDialog {
 
 
 
-    pub fn render_dialog(&mut self, ctx: &Context) {
+    pub fn render_dialog(&mut self, ui: &mut Ui) {
         let mut config_open = self.show_modal;
 
         if !self.show_modal {
@@ -373,7 +371,7 @@ impl ConfigDialog {
             .corner_radius(CornerRadius::same(10))
             .inner_margin(Margin::same(10));                
         
-        let screen_rect = ctx.viewport_rect();
+        let screen_rect = ui.viewport_rect();
         let desired_width = screen_rect.width() * 0.68;
         let desired_height = screen_rect.height() * 0.65;
 
@@ -392,7 +390,7 @@ impl ConfigDialog {
             .resizable(false)
             .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
             .open(&mut config_open)
-            .show(ctx, |ui|{
+            .show(ui, |ui|{
                 
                 
                 ui.set_width(ui.available_width());

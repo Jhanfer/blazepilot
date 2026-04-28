@@ -75,7 +75,7 @@ impl eframe::App for BlazeApp {
 
         self.state.process_messages();
         
-        self.ui_state.dialog_manager.render_area(ui.ctx());
+        self.ui_state.dialog_manager.render_area(ui);
         self.ui_state.process_events();
 
         let mut files = self.state.active_files();

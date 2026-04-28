@@ -30,6 +30,7 @@ use crate::core::system::fileopener_module::platform::linux::linux::AppsIconData
 use crate::core::system::sizer_manager::sizer_manager::SizerMessages;
 use crate::core::system::updater::updater::UpdateMessages;
 use crate::ui::icons_cache::thumbnails::thumbnails_manager::ThumbnailMessages;
+use crate::ui::image_preview::image_preview::ImagePreviewState;
 use crate::ui::task_manager::task_manager::TaskMessage;
 use tracing::{info, warn};
 use std::sync::RwLock;
@@ -106,7 +107,7 @@ pub enum FileConflict {
     }
 }
 
-#[derive(Debug)]
+
 pub enum UiEvent {
     OpenWithSelector {
         path: PathBuf,
@@ -119,6 +120,12 @@ pub enum UiEvent {
     ThumbnailReady {
         full_path: PathBuf,
         tab_id: Uuid,
+    },
+
+
+    ShowImagePvw {
+        pvw: Option<ImagePreviewState>,
+
     },
 
     SureTo(SureTo),

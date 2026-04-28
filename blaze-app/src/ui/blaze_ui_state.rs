@@ -16,17 +16,17 @@
 
 
 use std::{collections::{HashMap, HashSet}, path::PathBuf};
-use egui::{Area, Context, Order, Sense, TextureHandle};
+use egui::{Area, Order, Sense, TextureHandle, Ui};
 use file_id::FileId;
 use uuid::Uuid;
-use crate::{core::{files::{self, motor::with_motor}, system::{cache::color_cache::color_cache::FolderColorManager, fileopener_module::{AppAssociation, platform::linux::linux::AppsIconData}, updater::updater::UpdateMessages}}, ui::{dialogs::{configs_dialog::ConfigDialog, error_dialog::ErrorDialog, folder_color_selector_dialog::FolderColorSelector, selector_dialog::AppSelectorDialog, sure_to_delete::SureToDeleteDialog, sure_to_move_to::SureToMoveToDialog, update_dialog::UpdateDialog}, icons_cache::{icon_cache::IconCache, thumbnails::thumbnails_manager::ThumbnailManager}, modules::custom_context_menu::context_state::ContextMenuState}, utils::channel_pool::{FileConflict, NotifyingSender, SureTo, UiEvent, with_active_sender_for, with_channel_pool}};
+use crate::{core::{files::motor::with_motor, system::{cache::color_cache::color_cache::FolderColorManager, fileopener_module::{AppAssociation, platform::linux::linux::AppsIconData}, updater::updater::UpdateMessages}}, ui::{dialogs::{configs_dialog::ConfigDialog, error_dialog::ErrorDialog, folder_color_selector_dialog::FolderColorSelector, image_preview_dialog::ImagePreviewDialog, selector_dialog::AppSelectorDialog, sure_to_delete::SureToDeleteDialog, sure_to_move_to::SureToMoveToDialog, update_dialog::UpdateDialog}, icons_cache::{icon_cache::IconCache, thumbnails::thumbnails_manager::ThumbnailManager}, image_preview::image_preview::ImagePreviewState, modules::custom_context_menu::context_state::ContextMenuState}, utils::channel_pool::{FileConflict, NotifyingSender, SureTo, UiEvent, with_active_sender_for, with_channel_pool}};
 use tracing::{debug, info};
 
 
 pub trait ModalDialog {
     fn is_open(&self) -> bool;
     fn close(&mut self);
-    fn render(&mut self, ctx: &Context);
+    fn render(&mut self, ui: &mut Ui);
 }
 
 
@@ -38,6 +38,7 @@ pub struct DialogManager {
     pub sure_to_delete_dialog: SureToDeleteDialog,
     pub folder_color_dialog: FolderColorSelector,
     pub config_dialog: ConfigDialog,
+    pub img_pvw_dialog: ImagePreviewDialog,
 }
 
 impl DialogManager {
@@ -50,6 +51,7 @@ impl DialogManager {
             sure_to_delete_dialog: SureToDeleteDialog::new(),
             folder_color_dialog: FolderColorSelector::new(),
             config_dialog: ConfigDialog::new(),
+            img_pvw_dialog: ImagePreviewDialog::new(),
         }
     }
 
@@ -81,7 +83,11 @@ impl DialogManager {
         self.config_dialog.open();
     }
 
-    pub fn render_area(&mut self, ctx: &Context) {
+    pub fn open_img_pvw_dialog(&mut self, imp_pvw: ImagePreviewState) {
+        self.img_pvw_dialog.open(imp_pvw);
+    }
+
+    pub fn render_area(&mut self, ui: &mut Ui) {
         let dialogs: Vec<&mut dyn ModalDialog> = vec![
             &mut self.selector_dialog,
             &mut self.sure_to_dialog,
@@ -90,6 +96,7 @@ impl DialogManager {
             &mut self.sure_to_delete_dialog,
             &mut self.folder_color_dialog,
             &mut self.config_dialog,
+            &mut self.img_pvw_dialog,
         ];
 
         let open_dialog = dialogs.into_iter().find(|d| d.is_open());
@@ -102,7 +109,7 @@ impl DialogManager {
                 .order(Order::Middle)
                 .sense(Sense::click())
                 .interactable(true)
-                .show(ctx, |ui|{
+                .show(ui, |ui|{
                     let screen_rect = ui.ctx().content_rect();
                     ui.painter().rect_filled(
                         screen_rect,
@@ -119,7 +126,7 @@ impl DialogManager {
                 dialog.close();
             }
 
-            dialog.render(ctx);
+            dialog.render(ui);
         }
     }
 
@@ -248,9 +255,15 @@ impl BlazeUiState {
                     self.dialog_manager.open_configs();
                 },
 
-                UiEvent::ThumbnailReady { full_path, tab_id } => {
+                UiEvent::ThumbnailReady { full_path, tab_id:_ } => {
                     self.calculating_thumbnails.remove(&full_path);
                     self.calculated_thumbnails.insert(full_path);
+                },
+
+                UiEvent::ShowImagePvw { pvw } => {
+                    if let Some(img_pvw) = pvw {
+                        self.dialog_manager.open_img_pvw_dialog(img_pvw);
+                    }
                 }
             }
         }

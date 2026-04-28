@@ -17,10 +17,9 @@
 
 
 use std::path::PathBuf;
-use egui::{Color32, Context, CornerRadius, Frame, Margin, Order, RichText, Window};
-use tracing::info;
+use egui::{Color32, CornerRadius, Frame, Margin, Order, RichText, Ui, Window};
 use uuid::Uuid;
-use crate::{core::files, ui::blaze_ui_state::ModalDialog, utils::channel_pool::{FileOperation, with_active_sender}};
+use crate::{ui::blaze_ui_state::ModalDialog, utils::channel_pool::{FileOperation, with_active_sender}};
 
 
 pub struct SureToDeleteDialog {
@@ -32,7 +31,7 @@ pub struct SureToDeleteDialog {
 impl ModalDialog for SureToDeleteDialog {
     fn is_open(&self) -> bool { self.show_modal }
     fn close(&mut self) { self.close() }
-    fn render(&mut self, ctx: &Context) { self.render_dialog(ctx); }
+    fn render(&mut self, ui: &mut Ui) { self.render_dialog(ui); }
 }
 
 impl SureToDeleteDialog {
@@ -55,7 +54,7 @@ impl SureToDeleteDialog {
     }
 
 
-    pub fn render_dialog(&mut self, ctx: &Context) {
+    pub fn render_dialog(&mut self, ui: &mut Ui) {
         let mut should_close = false;
 
         let (Some(sources), Some(_)) = (self.sources.as_ref(), self.tab_id.as_ref()) else { return; };
@@ -72,7 +71,7 @@ impl SureToDeleteDialog {
             .resizable(false)
             .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
             .open(&mut self.show_modal)
-            .show(ctx, |ui|{
+            .show(ui, |ui|{
                 ui.set_min_width(250.0);
                 ui.set_min_height(100.0);
                 

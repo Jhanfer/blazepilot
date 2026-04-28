@@ -104,7 +104,6 @@ fn background_response_logic(state: &mut BlazeCoreState, ui_state: &mut BlazeUiS
             ui_state.context_menu_state.target_sender = Some(sender);
         }
     } else {
-        
         if bg_response.secondary_clicked() {
             state.deselect_all();
             state.resize_selection(files.len());

@@ -53,6 +53,7 @@ pub enum TaskMessage {
         task_id: u64,
         success: bool,
         task_type: TaskType,
+        #[allow(unused)]
         text: String
     }
 }
@@ -85,7 +86,7 @@ impl TaskManager {
         });
     }
 
-    pub fn update_task(&self, task_id: u64, progress: f32, text: String, task_kind: TaskType) {
+    pub fn update_task(&self, task_id: u64, progress: f32, text: String, _task_kind: TaskType) {
         let mut tasks = self.tasks.lock().unwrap();
         if let Some(task) = tasks.get_mut(&task_id) {
             task.progress = progress;
@@ -93,7 +94,7 @@ impl TaskManager {
         }
     }
 
-    pub fn finish_task(&self, task_id: u64, success: bool, task_kind: TaskType) {
+    pub fn finish_task(&self, task_id: u64, success: bool, _task_kind: TaskType) {
         let mut tasks = self.tasks.lock().unwrap();
         if let Some(task) = tasks.get_mut(&task_id) {
             task.status = if success {
@@ -147,7 +148,7 @@ impl TaskManager {
                 TaskMessage::Progress { task_id, progress, text, task_type } => {
                     self.update_task(task_id, progress, text, task_type);
                 },
-                TaskMessage::Finished { task_id, success,task_type, text } => {
+                TaskMessage::Finished { task_id, success,task_type, text:_ } => {
                     self.finish_task(task_id, success, task_type);
                 }
             }

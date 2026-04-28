@@ -17,7 +17,7 @@
 
 
 use std::path::PathBuf;
-use egui::{Color32, ColorImage, Context, Frame, Margin, Order, RichText, ScrollArea, TextureOptions, Window, scroll_area::ScrollSource};
+use egui::{Color32, ColorImage, Ui, Frame, Margin, Order, RichText, ScrollArea, TextureOptions, Window, scroll_area::ScrollSource};
 use tracing::info;
 
 use crate::{core::system::{clipboard::TOKIO_RUNTIME, fileopener_module::{AppAssociation, GLOBAL_FILE_OPENER, platform::linux::linux::AppsIconData}}, ui::blaze_ui_state::ModalDialog};
@@ -39,7 +39,7 @@ pub struct AppSelectorDialog {
 impl ModalDialog for AppSelectorDialog {
     fn is_open(&self) -> bool { self.show_modal }
     fn close(&mut self) { self.close() }
-    fn render(&mut self, ctx: &Context) { self.render_app_selector(ctx); }
+    fn render(&mut self, ui: &mut Ui) { self.render_app_selector(ui); }
 }
 
 impl AppSelectorDialog {
@@ -71,7 +71,7 @@ impl AppSelectorDialog {
         self.show_modal = true;
     }
 
-    fn load_textures(&mut self, ctx: &Context) {
+    fn load_textures(&mut self, ui: &mut Ui) {
         let Some(app_icon_data) = &mut self.selector_data else {return;};
         
         for (i, icon) in app_icon_data.icon_data.iter().enumerate(){
@@ -82,7 +82,7 @@ impl AppSelectorDialog {
             if let AppsIconData::Rgba { data, width, height } = icon {
                 let color_image = ColorImage::from_rgba_unmultiplied([*width as usize, *height as usize], &data);
 
-                let texture = ctx.load_texture(
+                let texture = ui.load_texture(
                     format!("icon_{}", app_icon_data.apps[i].id),
                     color_image, 
                     TextureOptions::NEAREST,
@@ -151,12 +151,12 @@ impl AppSelectorDialog {
     }
 
 
-    pub fn render_app_selector(&mut self, ctx: &Context) {
+    pub fn render_app_selector(&mut self, ui: &mut Ui) {
         if self.selector_data.is_none() {return;}
 
         let mut should_close = false;
 
-        self.load_textures(ctx);
+        self.load_textures(ui);
 
         let Some(data) = &mut self.selector_data else { return; };
         
@@ -177,7 +177,7 @@ impl AppSelectorDialog {
             .min_size([400.0, 300.0])
             .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
             .open(&mut self.show_modal)
-            .show(ctx, |ui|{
+            .show(ui, |ui|{
                 ui.heading("Seleccionar aplicación");
                 ui.separator();
 
@@ -226,7 +226,6 @@ impl AppSelectorDialog {
             });
 
         if should_close {
-            info!("Se cierra");
             self.close();
         }
     }
