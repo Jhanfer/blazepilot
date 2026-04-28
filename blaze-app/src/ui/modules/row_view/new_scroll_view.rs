@@ -1,5 +1,5 @@
 use std::{collections::HashMap, path::PathBuf, sync::Arc};
-use egui::{Color32, CursorIcon, FontId, Key, PointerButton, Rect, RichText, ScrollArea, Sense, Ui, pos2, scroll_area::ScrollSource, vec2};
+use egui::{Color32, ColorImage, CursorIcon, FontId, Key, PointerButton, Rect, RichText, ScrollArea, Sense, Ui, pos2, scroll_area::ScrollSource, vec2};
 use file_id::FileId;
 use tracing::{error, info};
 use crate::{core::{blaze_state::BlazeCoreState, configs::config_state::{OrderingMode, with_configs}, files::{file_extension::{DocType, FileExtension}, motor::FileEntry}, system::{ extended_info::extended_info_manager::{ExtendedInfo, GitStatus}}}, ui::{blaze_ui_state::BlazeUiState, icons_cache::{icons, thumbnails::thumbnails_manager::Thumbnail}, modules::custom_context_menu::context_state::ContextMenuKind}, utils::{channel_pool::{SureTo, UiEvent}, formating::{format_date, format_size}}};
@@ -304,6 +304,8 @@ pub fn new_render_scrollview(ui: &mut Ui, files: &Vec<Arc<FileEntry>>, state: &m
         .vertical_scroll_offset(state.scroll_offset);
 
     let scroll_output = scroll_area.show_rows(ui, row_height, total_rows, |ui, row_range| {
+        let mut should_repaint = false;
+
         ui.spacing_mut().item_spacing.y = 0.0;
 
         state.row_view.first_visible = row_range.start.clone();
@@ -338,15 +340,19 @@ pub fn new_render_scrollview(ui: &mut Ui, files: &Vec<Arc<FileEntry>>, state: &m
         };
 
         let thumbnail_snapshot: HashMap<PathBuf, Thumbnail> = {
-            if let Ok(guard) = ui_state.thumbnail_manager.thumb_map.try_read() {
-                row_range.clone()
-                .filter_map(|i| {
-                        let p = &files[i].full_path;
-                        guard.get(p).cloned().map(|t| (p.clone(), t))
-                    })
-                .collect()
-            } else {
-                HashMap::new()
+            match ui_state.thumbnail_manager.thumb_map.try_read() {
+                Ok(guard) => {
+                    row_range.clone()
+                        .filter_map(|i| {
+                            let p = &files[i].full_path;
+                            guard.get(p).cloned().map(|t| (p.clone(), t))
+                        })
+                        .collect()
+                }
+                Err(_) => {
+                    ui_state.needs_repaint = true;
+                    HashMap::new()
+                }
             }
         };
 
@@ -451,16 +457,19 @@ pub fn new_render_scrollview(ui: &mut Ui, files: &Vec<Arc<FileEntry>>, state: &m
 
             if let Some(thumb) = thumbnail_snapshot.get(&file.full_path) {
                 let tex = ui_state.thumb_texture_cache
-                .entry(file.full_path.clone())
-                .or_insert_with(|| {
-                        let image = egui::ColorImage::from_rgba_unmultiplied(
+                    .entry(file.full_path.clone())
+                    .or_insert_with_key(|path|{
+                        let color_image = ColorImage::from_rgba_unmultiplied(
                             [thumb.width as usize, thumb.height as usize],
                             &thumb.pixels,
                         );
-                        ui.ctx().load_texture(
-                            file.full_path.to_string_lossy().to_string(),
-                            image,
-                            egui::TextureOptions::LINEAR, // escala 64→16 suave
+
+                        should_repaint = true;
+
+                        ui.load_texture(
+                            format!("thumb:{}", path.to_string_lossy()), 
+                            color_image,
+                            egui::TextureOptions::LINEAR,
                         )
                     });
 
@@ -470,12 +479,17 @@ pub fn new_render_scrollview(ui: &mut Ui, files: &Vec<Arc<FileEntry>>, state: &m
                     Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
                     Color32::WHITE,
                 );
+            } else if ui_state.newly_calculated_thumbnails.contains(&file.full_path) {
+                should_repaint = true;
             } else {
                 let (icon_name, icon_bytes, color) = resolve_icon(file, &color_snapshot);
                 let icon = ui_state.icon_cache.get_or_load(ui, &icon_name, icon_bytes, color);
             
-                ui.painter().image(icon.id(), icon_rect,
-                    Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)), Color32::WHITE);
+                ui.painter().image(
+                    icon.id(), 
+                    icon_rect,
+                    Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)), Color32::WHITE
+                );
             }
 
 
@@ -578,7 +592,17 @@ pub fn new_render_scrollview(ui: &mut Ui, files: &Vec<Arc<FileEntry>>, state: &m
         }
         ui_state.context_menu_state = ctx_menu;
         
+
+        if ui_state.needs_repaint || should_repaint {
+            ui.ctx().request_repaint();
+            ui_state.needs_repaint = false;
+        }
+
+        if !ui_state.newly_calculated_thumbnails.is_empty() {
+            ui_state.newly_calculated_thumbnails.clear();
+        }
     });
+    
 
     if !state.rubber_band.is_rubber_banding {
         state.scroll_offset = scroll_output.state.offset.y;

@@ -1,6 +1,6 @@
 use std::sync::Arc;
 use egui::{CentralPanel, Color32, CornerRadius, Frame, Key, Margin, Rect, TextEdit, Ui};
-use tracing::{error, info};
+use tracing::{error};
 use crate::{core::{blaze_state::{BlazeCoreState, NewItemType}, files::motor::FileEntry, system::{extended_info::extended_info_manager::ExtendedInfoMessages, sizer_manager::sizer_manager::SizerMessages}}, ui::{blaze_ui_state::BlazeUiState, icons_cache::thumbnails::thumbnails_manager::ThumbnailMessages, modules::{custom_context_menu::context_state::ContextMenuKind, row_view::{drag_drop_logic::drag_files, hot_keys::hot_keys_logic, island_n_bubble::render_island_bubble, new_scroll_view::new_render_scrollview, render_drag::render_drag_files, rubber_band_logic::render_rubberband, tools_view::tools}}}};
 
 
@@ -223,12 +223,20 @@ pub fn render_row_view(ui: &mut Ui, files: &Vec<Arc<FileEntry>>, state: &mut Bla
                     }
                 }
 
+                //disparador de thumbnails
                 if let Some(sender) = state.sender().cloned() {
                     for i in state.row_view.first_visible..state.row_view.last_visible.min(files.len()) {
                         let file = &files[i];
-                        if !ui_state.calculating_thumbnails.contains(&file.full_path) && !ui_state.calculated_thumbnails.contains(&file.full_path) {
-                            ui_state.calculating_thumbnails.insert(file.full_path.clone());
-                            sender.send_thumbnails(ThumbnailMessages::RequestThumb(file.full_path.clone())).ok();
+
+                        let img_vid = file.extension.is_image() || file.extension.is_video();
+
+                        if !ui_state.calculating_thumbnails.contains(&file.full_path) && !ui_state.calculated_thumbnails.contains(&file.full_path) && img_vid {
+                            let sent = sender.send_thumbnails(
+                                ThumbnailMessages::RequestThumb(file.full_path.clone())
+                            ).is_ok();
+                            if sent {
+                                ui_state.calculating_thumbnails.insert(file.full_path.clone());
+                            }
                         }
                     }
                 }

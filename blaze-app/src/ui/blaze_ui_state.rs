@@ -146,6 +146,8 @@ pub struct BlazeUiState {
     pub calculated_thumbnails: HashSet<PathBuf>,
     pub cached_sender: Option<NotifyingSender>,
     cached_sender_tab_id: Option<Uuid>,
+    pub needs_repaint: bool,
+    pub newly_calculated_thumbnails: HashSet<PathBuf>,
 }
 
 
@@ -163,6 +165,8 @@ impl BlazeUiState {
             calculated_thumbnails: HashSet::new(),
             cached_sender: None,
             cached_sender_tab_id: None,
+            needs_repaint: false,
+            newly_calculated_thumbnails: HashSet::new(),
         }
     }
 
@@ -176,7 +180,7 @@ impl BlazeUiState {
         self.cached_sender.as_ref()
     }
     
-    pub fn invalidate_sender(&mut self) {
+    pub fn _invalidate_sender(&mut self) {
         self.cached_sender = None;
     }
 
@@ -257,7 +261,9 @@ impl BlazeUiState {
 
                 UiEvent::ThumbnailReady { full_path, tab_id:_ } => {
                     self.calculating_thumbnails.remove(&full_path);
-                    self.calculated_thumbnails.insert(full_path);
+                    self.calculated_thumbnails.insert(full_path.clone());
+                    self.newly_calculated_thumbnails.insert(full_path);
+                    self.needs_repaint = true;
                 },
 
                 UiEvent::ShowImagePvw { pvw } => {

@@ -15,6 +15,7 @@
 use std::{collections::HashMap, path::PathBuf, sync::Arc, time::UNIX_EPOCH};
 use sha2::{Digest, Sha256};
 use tokio::sync::{RwLock, Semaphore};
+use tracing::warn;
 use uuid::Uuid;
 use crate::{core::system::{cache::cache_manager::CacheManager, clipboard::TOKIO_RUNTIME}, utils::channel_pool::{ NotifyingSender, UiEvent, with_channel_pool}};
 
@@ -99,6 +100,24 @@ impl ThumbnailManager {
 
 
 
+    fn is_cache_valid(cache_path: &PathBuf, current_mtime: u64) -> bool {
+        if !cache_path.exists() {
+            return false;
+        }
+
+        let meta_path = cache_path.with_extension("meta");
+        let Ok(content) = std::fs::read_to_string(&meta_path) else {
+            return false;
+        };
+
+        let mut lines = content.lines();
+        let cached_mtime: u64 = lines.next()
+            .and_then(|s| s.trim().parse().ok())
+            .unwrap_or(0);
+
+        cached_mtime == current_mtime
+    }
+
 
     pub fn process_messages(&self, active_id: Uuid, sender: NotifyingSender) {
         let messages: Vec<ThumbnailMessages> = with_channel_pool(|pool| {
@@ -113,11 +132,8 @@ impl ThumbnailManager {
         for msg in messages {
             match msg {
                 ThumbnailMessages::RequestThumb(path) => {
+                    warn!("ThumbnailManager procesando: {:?}", path);
                     if path.starts_with(Self::thumb_cache_dir()) {
-                        continue;
-                    }
-
-                    if !Self::is_image(&path) && !Self::is_svg(&path) && !Self::is_video(&path) {
                         continue;
                     }
 
@@ -127,56 +143,27 @@ impl ThumbnailManager {
                         continue;
                     }
 
-                    let current_mtime = Self::get_real_mtime(&path);
-                    let cache_path = Self::cache_path_for(&path);
-
-                    let cache_valid = if cache_path.exists() {
-                        //guardando el mtime en un archivo llamado meta
-                        let meta_path = cache_path.with_extension("meta");
-                        std::fs::read_to_string(&meta_path)
-                            .ok()
-                            .and_then(|s| s.lines().next()?.trim().parse::<u64>().ok())
-                            .map(|cached_mtime| cached_mtime == current_mtime)
-                            .unwrap_or(false)
-                    } else {
-                        false
-                    };
-
                     let thumb_map = self.thumb_map.clone();
                     let sender_clone = sender.clone();
                     let tab_id = sender.tab_id;
                     let sem = self.semaphore.clone();
 
-                    if cache_valid {
+                    let current_mtime = Self::get_real_mtime(&path);
+                    let cache_path = Self::cache_path_for(&path);
+
+                    if Self::is_cache_valid(&cache_path, current_mtime) {
+                        let thumb_map = thumb_map.clone();
                         TOKIO_RUNTIME.spawn(async move {
                             let _permit = sem.acquire_owned().await.unwrap();
                             //lee la imagen en cache
-                            if let Ok(bytes) = tokio::fs::read(&cache_path).await {
-
-                                if bytes.len() > 8 {
-                                    //carga la imagen y genera el thumnail
-                                    let w = u32::from_le_bytes(bytes[0..4].try_into().unwrap());
-                                    let h = u32::from_le_bytes(bytes[4..8].try_into().unwrap());
-                                    let pixels = bytes[8..].to_vec();
-
-                                    let thumb = Thumbnail {
-                                        pixels: Arc::new(pixels),
-                                        width: w,
-                                        height: h,
-                                    };
-
-                                    //lo guarda
-                                    if let Ok(mut map) = thumb_map.try_write() {
-                                        map.insert(path.clone(), thumb);
-                                    }
-
-                                    //envia el mensaje al state
-                                    sender_clone.send_ui_event(UiEvent::ThumbnailReady {
-                                        full_path: path,
-                                        tab_id,
-                                    }).ok();
-                                }
+                            if let Some(thumb) = Self::load_from_cache(&cache_path).await {
+                                thumb_map.write().await.insert(path.clone(), thumb);
+                                sender_clone.send_ui_event(UiEvent::ThumbnailReady {
+                                    full_path: path,
+                                    tab_id,
+                                }).ok();
                             }
+
                         });
                     } else {
                         TOKIO_RUNTIME.spawn(async move {
@@ -192,43 +179,71 @@ impl ThumbnailManager {
                             };
 
                             if let Some(thumb) = thumb {
-                                // Guardar en disco
-                                if let Some(parent) = cache_path.parent() {
-                                    tokio::fs::create_dir_all(parent).await.ok();
-                                }
+                                // Guardar en cache
+                                Self::save_to_cache(&cache_path, &thumb, current_mtime, &path).await;
 
-                                // Guardar binario
-                                let pixels = thumb.pixels.clone();
-                                let (w, h) = (thumb.width, thumb.height);
-                                let cache_path_clone = cache_path.clone();
-                                tokio::task::spawn_blocking(move || {
-                                    let mut buf = Vec::with_capacity(8 + pixels.len());
-                                    buf.extend_from_slice(&w.to_le_bytes());
-                                    buf.extend_from_slice(&h.to_le_bytes());
-                                    buf.extend_from_slice(&pixels);
-                                    std::fs::write(&cache_path_clone, buf).ok()
-                                }).await.ok();
-
-                                // Guardar mtime en .meta
-                                let meta_path = cache_path.with_extension("meta");
-
-                                // al guardar el thumbnail
-                                let meta_content = format!("{}\n{}", current_mtime, path.to_string_lossy());
-                                tokio::fs::write(&meta_path, meta_content).await.ok();
-
-                                if let Ok(mut map) = thumb_map.try_write() {
-                                    map.insert(path.clone(), thumb);
-                                }
+                                thumb_map.write().await.insert(path.clone(), thumb);
                                 sender_clone.send_ui_event(UiEvent::ThumbnailReady {
                                     full_path: path,
                                     tab_id,
                                 }).ok();
+
                             }
                         });
                     }
                 },
             }
         }
+    }
+
+    async fn load_from_cache(cache_path: &PathBuf) -> Option<Thumbnail>  {
+        let bytes = tokio::fs::read(cache_path).await.ok()?;
+
+        if bytes.len() < 8 {
+            return None;
+        }
+
+        let w = u32::from_le_bytes(bytes[0..4].try_into().ok()?);
+        let h = u32::from_le_bytes(bytes[4..8].try_into().ok()?);
+
+        if w == 0 || h == 0 || bytes.len() < 8 + (w as usize * h as usize * 4) {
+            return None;
+        }
+
+        let pixels = bytes[8..].to_vec();
+
+        Some(
+            Thumbnail {
+                pixels: Arc::new(pixels),
+                width: w,
+                height: h,
+            }
+        )
+    }
+
+
+    async fn save_to_cache(cache_path: &PathBuf, thumb: &Thumbnail, mtime: u64, original_path: &PathBuf) {
+        if let Some(parent) = cache_path.parent() {
+            tokio::fs::create_dir_all(parent).await.ok();
+        }
+
+        let pixels = thumb.pixels.clone();
+        let (w, h) = (thumb.width, thumb.height);
+        let cache_path_clone = cache_path.clone();
+
+        //guardar binario
+        tokio::task::spawn_blocking(move || {
+            let mut buf = Vec::with_capacity(8 + pixels.len());
+            buf.extend_from_slice(&w.to_le_bytes());
+            buf.extend_from_slice(&h.to_le_bytes());
+            buf.extend_from_slice(&pixels);
+            std::fs::write(&cache_path_clone, buf).ok();
+        }).await.ok();
+
+        // Guardar meta
+        let meta_path = cache_path.with_extension("meta");
+        let meta_content = format!("{}\n{}", mtime, original_path.to_string_lossy());
+        tokio::fs::write(&meta_path, meta_content).await.ok();
     }
 
 
