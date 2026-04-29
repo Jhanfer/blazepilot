@@ -199,6 +199,10 @@ fn git_dot_color(git: Option<&GitStatus>) -> Option<Color32> {
 
 
 pub fn new_render_scrollview(ui: &mut Ui, files: &Vec<Arc<FileEntry>>, state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, row_height: f32, total_rows: usize, content_rect: Rect) {
+
+    ui_state.evict_thumbnail_cache_if_dir_changed(&state.cwd);
+    ui_state.enforce_texture_cache_limit(500);
+
     let current_order = with_configs(|c| c.configs.app_ordering_mode.clone());
 
     // --- Header manual ---

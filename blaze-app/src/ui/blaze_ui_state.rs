@@ -15,7 +15,8 @@
 
 
 
-use std::{collections::{HashMap, HashSet}, path::PathBuf};
+use std::{collections::{HashMap, HashSet}, path::{Path, PathBuf}};
+use eframe::wgpu::CurrentSurfaceTexture;
 use egui::{Area, Order, Sense, TextureHandle, Ui};
 use file_id::FileId;
 use uuid::Uuid;
@@ -148,6 +149,7 @@ pub struct BlazeUiState {
     cached_sender_tab_id: Option<Uuid>,
     pub needs_repaint: bool,
     pub newly_calculated_thumbnails: HashSet<PathBuf>,
+    last_thumb_cache_dir: Option<PathBuf>,
 }
 
 
@@ -167,6 +169,7 @@ impl BlazeUiState {
             cached_sender_tab_id: None,
             needs_repaint: false,
             newly_calculated_thumbnails: HashSet::new(),
+            last_thumb_cache_dir: None,
         }
     }
 
@@ -183,6 +186,35 @@ impl BlazeUiState {
     pub fn _invalidate_sender(&mut self) {
         self.cached_sender = None;
     }
+
+
+    pub fn evict_thumbnail_cache_if_dir_changed(&mut self, cwd: &Path) {
+        let changed = self.last_thumb_cache_dir
+            .as_deref()
+            .map_or(true, |prev| prev != cwd);
+
+        if changed {
+            self.thumb_texture_cache.clear();
+            self.calculating_thumbnails.clear();
+            self.calculated_thumbnails.clear();
+            self.last_thumb_cache_dir = Some(cwd.to_path_buf());
+        }
+    }
+
+    pub fn enforce_texture_cache_limit(&mut self, max_entries: usize) {
+        if self.thumb_texture_cache.len() > max_entries {
+            let to_remove = self.thumb_texture_cache.len() - max_entries;
+            let keys: Vec<PathBuf> = self.thumb_texture_cache
+                .keys()
+                .take(to_remove)
+                .cloned()
+                .collect();
+            for key in keys {
+                self.thumb_texture_cache.remove(&key);
+            }
+        }
+    }
+
 
     pub fn process_events(&mut self) {
         let sender = {
