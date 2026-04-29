@@ -1,6 +1,6 @@
 use std::{sync::Arc};
 use egui::{ Key, PointerButton, Ui};
-use crate::{core::{blaze_state::{BlazeCoreState, NewItemType}, files::motor::FileEntry, system::cache::cache_manager::CacheManager}, ui::blaze_ui_state::BlazeUiState, utils::channel_pool::{SureTo, UiEvent}};
+use crate::{core::{blaze_state::{BlazeCoreState, NewItemType}, files::blaze_motor::motor_structs::FileEntry, system::cache::cache_manager::CacheManager}, ui::blaze_ui_state::BlazeUiState, utils::channel_pool::{SureTo, UiEvent}};
 
 pub fn hot_keys_logic(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, files: &Vec<Arc<FileEntry>>, ui: &mut Ui, _total_rows: usize) {
     let input = ui.input(|i| i.clone());

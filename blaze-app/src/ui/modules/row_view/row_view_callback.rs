@@ -1,7 +1,7 @@
 use std::sync::Arc;
 use egui::{CentralPanel, Color32, CornerRadius, Frame, Key, Margin, Rect, TextEdit, Ui};
 use tracing::{error};
-use crate::{core::{blaze_state::{BlazeCoreState, NewItemType}, files::motor::FileEntry, system::{extended_info::extended_info_manager::ExtendedInfoMessages, sizer_manager::sizer_manager::SizerMessages}}, ui::{blaze_ui_state::BlazeUiState, icons_cache::thumbnails::thumbnails_manager::ThumbnailMessages, modules::{custom_context_menu::context_state::ContextMenuKind, row_view::{drag_drop_logic::drag_files, hot_keys::hot_keys_logic, island_n_bubble::render_island_bubble, new_scroll_view::new_render_scrollview, render_drag::render_drag_files, rubber_band_logic::render_rubberband, tools_view::tools}}}};
+use crate::{core::{blaze_state::{BlazeCoreState, NewItemType}, files::blaze_motor::motor_structs::FileEntry, system::{extended_info::extended_info_manager::ExtendedInfoMessages, sizer_manager::sizer_manager::SizerMessages}}, ui::{blaze_ui_state::BlazeUiState, icons_cache::thumbnails::thumbnails_manager::ThumbnailMessages, modules::{custom_context_menu::context_state::ContextMenuKind, row_view::{drag_drop_logic::drag_files, hot_keys::hot_keys_logic, island_n_bubble::render_island_bubble, new_scroll_view::new_render_scrollview, render_drag::render_drag_files, rubber_band_logic::render_rubberband, tools_view::tools}}}};
 
 
 fn new_ff_logic(state: &mut BlazeCoreState, ui: &mut Ui) {

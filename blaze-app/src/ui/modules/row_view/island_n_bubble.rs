@@ -1,9 +1,7 @@
-use std::{path::PathBuf, sync::Arc};
+use std::sync::Arc;
 
-use egui::{Align2, Area, Button, Color32, Context, CornerRadius, FontId, Frame, Label, Margin, Rect, RichText, ScrollArea, Sense, TextFormat, Ui, pos2, text::{LayoutJob, TextWrapping}, vec2};
-use libc::stat;
-use tracing::info;
-use crate::{core::{blaze_state::BlazeCoreState, files::motor::FileEntry}, ui::{blaze_ui_state::BlazeUiState, icons_cache::icons, task_manager::task_manager::TaskStatus}, utils::formating::format_size};
+use egui::{Align2, Area, Color32, CornerRadius, FontId, Frame, Margin, Rect, ScrollArea, Sense, TextFormat, Ui, pos2, text::{LayoutJob, TextWrapping}, vec2};
+use crate::{core::{blaze_state::BlazeCoreState, files::blaze_motor::motor_structs::FileEntry}, ui::{blaze_ui_state::BlazeUiState, icons_cache::icons, task_manager::task_manager::TaskStatus}, utils::formating::format_size};
 
 pub fn render_island_bubble(ui: &mut Ui, state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, files: &Vec<Arc<FileEntry>>, bottom_padding: i8, tabs_height: i8) {
 

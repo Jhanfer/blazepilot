@@ -1,6 +1,6 @@
 use std::sync::Arc;
-use egui::{Color32, Context, Rect, Sense, Ui, pos2};
-use crate::{core::{blaze_state::{BlazeCoreState, NewItemType}, configs::config_state::with_configs, files::motor::FileEntry}, ui::{blaze_ui_state::BlazeUiState, icons_cache::icons}, utils::channel_pool::{SureTo, UiEvent}};
+use egui::{Color32, Rect, Sense, Ui, pos2};
+use crate::{core::{blaze_state::{BlazeCoreState, NewItemType}, configs::config_state::with_configs, files::blaze_motor::motor_structs::FileEntry}, ui::{blaze_ui_state::BlazeUiState, icons_cache::icons}, utils::channel_pool::{SureTo, UiEvent}};
 
 pub fn tools(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, files: &Vec<Arc<FileEntry>>, ui: &mut Ui) {
     ui.horizontal(|ui|{

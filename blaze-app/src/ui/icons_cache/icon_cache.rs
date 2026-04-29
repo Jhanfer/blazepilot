@@ -17,7 +17,7 @@
 
 
 use std::collections::HashMap;
-use egui::{ColorImage, Context, TextureHandle, Ui, vec2};
+use egui::{ColorImage, TextureHandle, Ui, vec2};
 use resvg::usvg::Options;
 
 pub struct IconCache {

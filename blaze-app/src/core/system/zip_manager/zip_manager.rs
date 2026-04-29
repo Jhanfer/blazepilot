@@ -16,7 +16,7 @@
 
 
 use std::path::{Path, PathBuf};
-use crate::core::files::{file_extension::{ArchiveType, FileExtension}, motor::FileEntry};
+use crate::core::files::{blaze_motor::motor_structs::FileEntry, file_extension::{ArchiveType, FileExtension}};
 use thiserror::Error;
 use bzip2::read::BzDecoder;
 

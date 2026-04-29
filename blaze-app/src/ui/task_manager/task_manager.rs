@@ -16,7 +16,7 @@
 
 use std::{collections::HashMap, sync::{Mutex, OnceLock}, time::{Duration, Instant}};
 use uuid::Uuid;
-use crate::{core::files::motor::TaskType, utils::channel_pool::with_channel_pool};
+use crate::{core::files::blaze_motor::motor_structs::TaskType, utils::channel_pool::with_channel_pool};
 
 #[derive(Clone, Debug)]
 pub enum TaskStatus {

@@ -1,6 +1,6 @@
 use std::sync::Arc;
 use egui::{Color32, Painter, Rect, Ui, vec2};
-use crate::core::{blaze_state::BlazeCoreState, files::motor::FileEntry};
+use crate::core::{blaze_state::BlazeCoreState, files::blaze_motor::motor_structs::FileEntry};
 
 pub fn drag_files(ui: &mut Ui, state: &mut BlazeCoreState, files: &[Arc<FileEntry>], clipped_painter: &Painter, content_rect: Rect, row_height: f32) {
     if let Some(pos) = state.row_view.drag_ghost_pos {

@@ -16,14 +16,13 @@
 
 
 
-use std::{cell::RefCell, collections::{HashMap, HashSet}, path::PathBuf, rc::Rc, sync::{Arc, atomic::{AtomicU64, Ordering}}, time::{Instant, SystemTime, UNIX_EPOCH}};
+use std::{cell::RefCell, collections::{HashSet}, path::PathBuf, rc::Rc, sync::{Arc, atomic::{AtomicU64, Ordering}}, time::{Instant, SystemTime, UNIX_EPOCH}};
 use bitvec::vec::BitVec;
-use egui::TextureHandle;
 use fuzzy_matcher::{FuzzyMatcher, skim::SkimMatcherV2};
 use tracing::{debug, error, info, warn};
 use tokio::sync::Mutex as TokioMutex;
 use uuid::Uuid;
-use crate::{core::{configs::config_state::{OrderingMode, with_configs}, files::motor::{BlazeMotor, FileEntry, FileLoadingMessage, MOTOR, RecursiveMessages}, system::{cache::cache_manager::CacheManager, clipboard::{GlobalClipboard, TOKIO_RUNTIME}, extended_info::extended_info_manager::ExtendedInfoManager, fileopener_module::{FileOpenerManager, GLOBAL_FILE_OPENER}, sizer_manager::{self, sizer_manager::SizerManager}, terminal_opener::terminal_manager::{self, GLOBAL_TERMINAL_MANAGER, TerminalManager}, updater::updater::Updater, zip_manager::zip_manager::ZipManager}}, ui::{icons_cache::thumbnails::thumbnails_manager::ThumbnailManager, task_manager::task_manager::TaskManager}, utils::channel_pool::{FileOperation, NotifyingSender, with_active_sender_for, with_channel_pool}};
+use crate::{core::{configs::config_state::{OrderingMode, with_configs}, files::blaze_motor::{motor::{BlazeMotor, MOTOR}, motor_structs::{FileEntry, FileLoadingMessage, RecursiveMessages}}, system::{cache::cache_manager::CacheManager, clipboard::{GlobalClipboard, TOKIO_RUNTIME}, extended_info::extended_info_manager::ExtendedInfoManager, fileopener_module::{FileOpenerManager, GLOBAL_FILE_OPENER}, sizer_manager::sizer_manager::SizerManager, terminal_opener::terminal_manager::{GLOBAL_TERMINAL_MANAGER, TerminalManager}, updater::updater::Updater, zip_manager::zip_manager::ZipManager}}, ui::task_manager::task_manager::TaskManager, utils::channel_pool::{FileOperation, NotifyingSender, with_active_sender_for, with_channel_pool}};
 
 
 // Para el guardado en caché
@@ -169,7 +168,9 @@ impl BlazeCoreState {
             let new_cwd = {
                 let mut motor = state.motor.borrow_mut();
                 let tab = motor.active_tab_mut();
-                tab.load_path(true, sender.clone());
+                if let Err(e) = tab.load_path(true, sender.clone()) {
+                    warn!("Ha ocurrido un error al cargar los archivos: {}", e);
+                }
                 tab.cwd.clone()
             };
             state.cwd = new_cwd;
@@ -402,8 +403,9 @@ impl BlazeCoreState {
             let new_cwd = {
                 let mut motor = self.motor.borrow_mut();
                 let tab = motor.active_tab_mut();
-                tab.cancel_loading();
-                tab.load_path(false, sender);
+                if let Err(e) = tab.load_path(false, sender.clone()) {
+                    warn!("Ha ocurrido un error al cargar los archivos: {}", e);
+                }
                 tab.cwd.clone()
             };
             self.calculating_dir_sizes.clear();

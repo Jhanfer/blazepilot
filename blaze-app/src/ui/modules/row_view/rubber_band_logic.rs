@@ -1,6 +1,6 @@
 use std::sync::Arc;
 use egui::{Color32, Painter, Rect, Stroke, pos2, vec2};
-use crate::core::{blaze_state::BlazeCoreState, files::motor::FileEntry};
+use crate::core::{blaze_state::BlazeCoreState, files::blaze_motor::motor_structs::FileEntry};
 
 
 pub fn render_rubberband(state: &mut BlazeCoreState, files: &Vec<Arc<FileEntry>>, clipped_painter: &Painter, panel_top: f32, content_rect: Rect, row_height: f32) {

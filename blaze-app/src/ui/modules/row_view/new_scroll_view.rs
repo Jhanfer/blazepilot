@@ -2,7 +2,7 @@ use std::{collections::HashMap, path::PathBuf, sync::Arc};
 use egui::{Color32, ColorImage, CursorIcon, FontId, Key, PointerButton, Rect, RichText, ScrollArea, Sense, Ui, pos2, scroll_area::ScrollSource, vec2};
 use file_id::FileId;
 use tracing::{error, info};
-use crate::{core::{blaze_state::BlazeCoreState, configs::config_state::{OrderingMode, with_configs}, files::{file_extension::{DocType, FileExtension}, motor::FileEntry}, system::{ extended_info::extended_info_manager::{ExtendedInfo, GitStatus}}}, ui::{blaze_ui_state::BlazeUiState, icons_cache::{icons, thumbnails::thumbnails_manager::Thumbnail}, modules::custom_context_menu::context_state::ContextMenuKind}, utils::{channel_pool::{SureTo, UiEvent}, formating::{format_date, format_size}}};
+use crate::{core::{blaze_state::BlazeCoreState, configs::config_state::{OrderingMode, with_configs}, files::{file_extension::{DocType, FileExtension}, blaze_motor::motor_structs::FileEntry}, system::{ extended_info::extended_info_manager::{ExtendedInfo, GitStatus}}}, ui::{blaze_ui_state::BlazeUiState, icons_cache::{icons, thumbnails::thumbnails_manager::Thumbnail}, modules::custom_context_menu::context_state::ContextMenuKind}, utils::{channel_pool::{SureTo, UiEvent}, formating::{format_date, format_size}}};
 
 
 

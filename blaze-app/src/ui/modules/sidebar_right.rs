@@ -19,7 +19,7 @@
 use std::sync::Arc;
 use egui::{Button, Color32, CornerRadius, Frame, Margin, Panel, TextEdit, Ui};
 
-use crate::core::files::motor::FileEntry;
+use crate::core::files::blaze_motor::motor_structs::FileEntry;
 use crate::core::system::extended_info::extended_info_manager::ExtendedInfo;
 use crate::core::{blaze_state::BlazeCoreState, configs::config_state::{OrderingMode, with_configs}};
 use crate::utils::formating::{format_date, format_size};

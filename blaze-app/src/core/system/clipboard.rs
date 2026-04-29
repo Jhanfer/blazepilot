@@ -7,15 +7,13 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use once_cell::sync::Lazy;
 use tokio::runtime::Runtime;
 use tokio::sync::Semaphore;
-use uuid::Uuid;
-use zbus::zvariant::Str;
-
-use crate::core::files::motor::{FileEntry, with_motor, new_task_id, TaskType};
+use crate::core::files::blaze_motor::motor::{new_task_id, with_motor};
+use crate::core::files::blaze_motor::motor_structs::{FileEntry, TaskType};
 use crate::ui::task_manager::task_manager::TaskMessage;
 use std::sync::{Arc, Mutex};
 use std::sync::OnceLock;
-use crate::utils::channel_pool::{FileConflict, NotifyingSender, UiEvent, with_channel_pool};
-use tracing::{info, warn, error, debug};
+use crate::utils::channel_pool::{FileConflict, NotifyingSender, UiEvent};
+use tracing::{info, warn, debug};
 
 pub static TOKIO_RUNTIME: Lazy<Runtime> = Lazy::new(|| {
     tokio::runtime::Builder::new_multi_thread()

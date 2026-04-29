@@ -3,7 +3,7 @@ use std::{cell::Cell, path::PathBuf, sync::Arc};
 use egui::{Align2, Area, Color32, CursorIcon, FontId, Frame, Id, Key, Order, Pos2, Rect, Response, Sense, Stroke, TextEdit, Ui, UiBuilder, pos2, vec2};
 use tracing::{info, warn};
 
-use crate::{core::{blaze_state::{BlazeCoreState, NewItemType}, configs::config_state::with_configs, files::motor::FileEntry, system::{clipboard::TOKIO_RUNTIME, disk_reader::disk::Disk}}, ui::{blaze_ui_state::BlazeUiState, icons_cache::icons, image_preview::image_preview::ImagePreviewState}, utils::channel_pool::{FileOperation, NotifyingSender, SureTo, UiEvent}};
+use crate::{core::{blaze_state::{BlazeCoreState, NewItemType}, configs::config_state::with_configs, files::blaze_motor::motor_structs::FileEntry, system::{clipboard::TOKIO_RUNTIME, disk_reader::disk::Disk}}, ui::{blaze_ui_state::BlazeUiState, icons_cache::icons, image_preview::image_preview::ImagePreviewState}, utils::channel_pool::{FileOperation, NotifyingSender, SureTo, UiEvent}};
 
 
 #[derive(Default, PartialEq)]
