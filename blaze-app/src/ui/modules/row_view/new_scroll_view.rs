@@ -344,8 +344,8 @@ pub fn new_render_scrollview(ui: &mut Ui, files: &Vec<Arc<FileEntry>>, state: &m
         };
 
         let thumbnail_snapshot: HashMap<PathBuf, Thumbnail> = {
-            match ui_state.thumbnail_manager.thumb_map.try_read() {
-                Ok(guard) => {
+            match ui_state.thumbnail_manager.thumb_map.try_write() {
+                Ok(mut guard) => {
                     row_range.clone()
                         .filter_map(|i| {
                             let p = &files[i].full_path;

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::{collections::HashMap, path::PathBuf, sync::Arc, time::UNIX_EPOCH};
+use std::{path::PathBuf, sync::Arc, time::UNIX_EPOCH};
 use ffmpeg_sidecar::{download::auto_download, paths::ffmpeg_path};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
@@ -20,7 +20,11 @@ use tokio::sync::{RwLock, Semaphore};
 use tracing::{error};
 use uuid::Uuid;
 use crate::{core::system::{cache::cache_manager::CacheManager, clipboard::TOKIO_RUNTIME}, utils::channel_pool::{ NotifyingSender, UiEvent, with_channel_pool}};
+use lru::LruCache;
+use std::num::NonZeroUsize;
 
+
+const DEFAULT_THUMB_CACHE_CAPACITY: usize = 400;
 
 
 #[derive(Debug, Error)]
@@ -61,16 +65,13 @@ pub struct Thumbnail {
 
 
 pub struct ThumbnailManager {
-    pub thumb_map: Arc<RwLock<HashMap<PathBuf, Thumbnail>>>,
+    pub thumb_map: Arc<RwLock<LruCache<PathBuf, Thumbnail>>>,
     pub semaphore: Arc<Semaphore>,
 }
 
 impl ThumbnailManager {
     pub fn new() -> Self {
-        let manager = Self {
-            thumb_map: Arc::new(RwLock::new(HashMap::new())), 
-            semaphore: Arc::new(Semaphore::new(4)), 
-        };
+        let manager = Self::with_capacity(DEFAULT_THUMB_CACHE_CAPACITY);
 
         TOKIO_RUNTIME.spawn(async {
             if let Err(e) = ThumbnailManager::cleanup_orphans().await {
@@ -79,6 +80,20 @@ impl ThumbnailManager {
         });
 
         manager
+    }
+
+    fn with_capacity(cap: usize) -> Self {
+        let def_cap: NonZeroUsize = match NonZeroUsize::new(400) {
+            Some(n) => n,
+            None => unreachable!(),
+        };
+        let cap = NonZeroUsize::new(cap)
+            .unwrap_or(def_cap);
+
+        Self {
+            thumb_map: Arc::new(RwLock::new(LruCache::new(cap))),
+            semaphore: Arc::new(Semaphore::new(4)), 
+        }
     }
 
     fn thumb_cache_dir() -> PathBuf {
@@ -190,7 +205,7 @@ impl ThumbnailManager {
 
                             //lee la imagen en cache
                             if let Ok(thumb) = Self::load_from_cache(&cache_path).await {
-                                thumb_map.write().await.insert(path.clone(), thumb);
+                                thumb_map.write().await.put(path.clone(), thumb);
                                 sender_clone.send_ui_event(UiEvent::ThumbnailReady {
                                     full_path: path,
                                     tab_id,
@@ -231,7 +246,7 @@ impl ThumbnailManager {
                                     )).ok();
                                 }
 
-                                thumb_map.write().await.insert(path.clone(), thumb);
+                                thumb_map.write().await.put(path.clone(), thumb);
                                 sender_clone.send_ui_event(UiEvent::ThumbnailReady {
                                     full_path: path,
                                     tab_id,
