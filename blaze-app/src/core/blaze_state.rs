@@ -22,7 +22,7 @@ use fuzzy_matcher::{FuzzyMatcher, skim::SkimMatcherV2};
 use tracing::{debug, error, info, warn};
 use tokio::sync::Mutex as TokioMutex;
 use uuid::Uuid;
-use crate::{core::{configs::config_state::{OrderingMode, with_configs}, files::blaze_motor::{motor::{BlazeMotor, MOTOR}, motor_structs::{FileEntry, FileLoadingMessage, RecursiveMessages}}, system::{cache::cache_manager::CacheManager, clipboard::{GlobalClipboard, TOKIO_RUNTIME}, extended_info::extended_info_manager::ExtendedInfoManager, fileopener_module::{FileOpenerManager, GLOBAL_FILE_OPENER}, sizer_manager::sizer_manager::SizerManager, terminal_opener::terminal_manager::{GLOBAL_TERMINAL_MANAGER, TerminalManager}, updater::updater::Updater, zip_manager::zip_manager::ZipManager}}, ui::task_manager::task_manager::TaskManager, utils::channel_pool::{FileOperation, NotifyingSender, with_active_sender_for, with_channel_pool}};
+use crate::{core::{configs::config_state::{OrderingMode, with_configs}, files::blaze_motor::{motor::{BlazeMotor, MOTOR}, motor_structs::{FileEntry, FileLoadingMessage, RecursiveMessages}}, system::{cache::cache_manager::CacheManager, clipboard::{GlobalClipboard, TOKIO_RUNTIME}, extended_info::extended_info_manager::{ExtendedInfoManager, ExtendedInfoMessages}, fileopener_module::{FileOpenerManager, GLOBAL_FILE_OPENER}, sizer_manager::sizer_manager::SizerManager, terminal_opener::terminal_manager::{GLOBAL_TERMINAL_MANAGER, TerminalManager}, updater::updater::Updater, zip_manager::zip_manager::ZipManager}}, ui::task_manager::task_manager::TaskManager, utils::channel_pool::{FileOperation, NotifyingSender, with_active_sender_for, with_channel_pool}};
 
 
 // Para el guardado en caché
@@ -375,25 +375,33 @@ impl BlazeCoreState {
     }
 
     pub fn navigate_to(&mut self, path: PathBuf) {
+        let prev_dir = self.cwd.clone();
         self.motor.borrow_mut().active_tab_mut().navigate_to(path);
+        self.extended_info_manager.clear_directory(&prev_dir);
         self.refresh();
         self.save_caches(false);
     }
 
     pub fn up(&mut self) {
+        let prev_dir = self.cwd.clone();
         self.motor.borrow_mut().active_tab_mut().up();
+        self.extended_info_manager.clear_directory(&prev_dir);
         self.refresh();
         self.save_caches(false);
     }
 
     pub fn back(&mut self) {
+        let prev_dir = self.cwd.clone();
         self.motor.borrow_mut().active_tab_mut().back();
+        self.extended_info_manager.clear_directory(&prev_dir);
         self.refresh();
         self.save_caches(false);
     }
 
     pub fn forward(&mut self) {
+        let prev_dir = self.cwd.clone();
         self.motor.borrow_mut().active_tab_mut().forward();
+        self.extended_info_manager.clear_directory(&prev_dir);
         self.refresh();
         self.save_caches(false);
     }
@@ -764,6 +772,22 @@ impl BlazeCoreState {
                     self.last_fs_event = Some(std::time::Instant::now());
                 },
 
+                FileLoadingMessage::GitStatusChanged => {
+                    let paths: Vec<PathBuf> = self.motor.borrow()
+                        .active_tab()
+                        .files
+                        .iter()
+                        .map(|f| f.full_path.clone())
+                        .collect();
+
+                    if let Some(sender) = self.sender() {
+                        for path in paths {
+                            sender.send_extended_info(
+                                ExtendedInfoMessages::ForceScan(path)
+                            );
+                        }
+                    }
+                }
             }
         }
 

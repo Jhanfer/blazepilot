@@ -503,6 +503,7 @@ impl ChannelPool {
                     FileLoadingMessage::FileAdded {..} |
                     FileLoadingMessage::FileRemoved {..} |
                     FileLoadingMessage::FileModified {..} |
+                    FileLoadingMessage::GitStatusChanged {..} |
                     FileLoadingMessage::FullRefresh => {
                         pending.push(msg);
                     },

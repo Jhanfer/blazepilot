@@ -18,6 +18,7 @@
 
 use std::sync::Arc;
 use egui::{Button, Color32, CornerRadius, Frame, Margin, Panel, TextEdit, Ui};
+use tracing::error;
 
 use crate::core::files::blaze_motor::motor_structs::FileEntry;
 use crate::core::system::extended_info::extended_info_manager::ExtendedInfo;
@@ -153,10 +154,19 @@ pub fn sidebar_right_component(ui: &mut Ui, state: &mut BlazeCoreState, files: &
                         ui.label(format!("Tamaño: {:?}", format_size(file.size)));
                     }
 
-                    let extended_info = if state.calculating_extended_info.contains(&file.full_path) {
+                    let extended_info = if state.calculating_extended_info
+                        .contains(&file.full_path) {
                         None
                     } else if state.calculated_extended_info.contains(&file.full_path) {
-                        state.extended_info_manager.info_map.read().unwrap().get(&file.full_path).cloned()
+                        match state.extended_info_manager
+                            .info_map
+                            .write() {
+                                Ok(mut map) => map.get(&file.full_path).cloned(),
+                                Err(e) => {
+                                    error!("Ha ocurrio un error intentando leer ExtendedInfo: {}", e);
+                                    None
+                                },
+                            }
                     } else {
                         state.extended_info_manager.cache_manager
                             .get_cached_extended_info(&file.full_path)

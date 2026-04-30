@@ -20,7 +20,7 @@ use std::{sync::{Arc, atomic::{AtomicBool, Ordering}}};
 use notify::{Event, EventKind, RecursiveMode, Watcher};
 use tracing::error;
 use std::path::Path;
-use crate::{core::{files::blaze_motor::{error::MotorResult, motor_structs::FileLoadingMessage}, system::clipboard::TOKIO_RUNTIME}, utils::channel_pool::NotifyingSender};
+use crate::{core::{files::blaze_motor::{error::MotorResult, motor_structs::FileLoadingMessage}, system::{clipboard::TOKIO_RUNTIME}}, utils::channel_pool::NotifyingSender};
 
 
 
@@ -78,11 +78,22 @@ impl FileWatcher {
             },
 
             EventKind::Modify(_) => {
-                Self::handle_event_match(&event, |name| {
-                    let _ = sender.send_files_batch(
-                        FileLoadingMessage::FileModified { name: name.to_owned() }
-                    );
+
+                let is_git_change = event.paths.iter().any(|p|{
+                    p.components().any(|c| c.as_os_str() == ".git")
                 });
+
+                if is_git_change {
+                    if let Err(e) = sender.send_files_batch(FileLoadingMessage::GitStatusChanged) {
+                        error!("Error enviando GitStatusChanged: {}", e);
+                    }
+                } else {
+                    Self::handle_event_match(&event, |name| {
+                        let _ = sender.send_files_batch(
+                            FileLoadingMessage::FileModified { name: name.to_owned() }
+                        );
+                    });
+                }
             }
 
             _ => {},

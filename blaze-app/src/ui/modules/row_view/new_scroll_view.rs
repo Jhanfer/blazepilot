@@ -316,8 +316,8 @@ pub fn new_render_scrollview(ui: &mut Ui, files: &Vec<Arc<FileEntry>>, state: &m
         state.row_view.last_visible = row_range.end;
 
         let info_snapshot: HashMap<PathBuf, ExtendedInfo> = {
-            match state.extended_info_manager.info_map.try_read() {
-                Ok(map) => {
+            match state.extended_info_manager.info_map.write() {
+                Ok(mut map) => {
                     row_range.clone()
                         .filter_map(|i| {
                             let path = &files[i].full_path;

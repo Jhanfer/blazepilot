@@ -35,7 +35,9 @@ pub enum FileLoadingMessage {
         generation: u64,
         batch: Vec<Arc<FileEntry>>,
         source_dir: PathBuf,
-    }
+    },
+
+    GitStatusChanged
 }
 
 
