@@ -16,7 +16,6 @@
 
 
 use std::{collections::{HashMap, HashSet}, path::{Path, PathBuf}};
-use eframe::wgpu::CurrentSurfaceTexture;
 use egui::{Area, Order, Sense, TextureHandle, Ui};
 use file_id::FileId;
 use uuid::Uuid;

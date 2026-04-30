@@ -155,22 +155,7 @@ impl CacheManager {
     }
 
 
-    ///------ Colores ----
-    pub async fn reload_color_cache(&self) {
-        match self.load_cache::<FileId, ColorCache>("color_cache.bin").await {
-            Some(new_cache) => {
-                let mut guard = self.color_cache.write().await;
-                let previous_count = guard.len();
-                *guard = new_cache;
-                tracing::info!("Color cache recargado correctamente. Entradas: {} → {}", 
-                            previous_count, guard.len());
-            }
-            None => {
-                tracing::warn!("No se pudo cargar el color_cache.bin. Manteniendo cache en memoria.");
-            }
-        }
-    }
-    
+    ///------ Colores ----    
     pub async fn load_color_cache(&self) {
         if let Some(cache) = self.load_cache::<FileId, ColorCache>("color_cache.bin").await {
             let mut guard = self.color_cache.write().await;

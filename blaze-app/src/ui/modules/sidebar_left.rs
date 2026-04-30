@@ -17,7 +17,7 @@
 use std::path::PathBuf;
 
 use dirs::{desktop_dir, document_dir, download_dir, home_dir, picture_dir};
-use egui::{Color32, CornerRadius, FontId, Frame, Margin, Panel, Rect, ScrollArea, Sense, SidePanel, Ui, pos2, scroll_area::ScrollSource, vec2};
+use egui::{Color32, CornerRadius, FontId, Frame, Margin, Panel, Rect, ScrollArea, Sense, Ui, pos2, scroll_area::ScrollSource, vec2};
 use tracing::info;
 use crate::{core::{blaze_state::BlazeCoreState, configs::config_state::{FavoriteLinks, with_configs}, system::{clipboard::TOKIO_RUNTIME, disk_reader::disk::Disk}}, ui::{blaze_ui_state::BlazeUiState, icons_cache::icons::{ICON_ARCHIVE, ICON_DESKTOP, ICON_DEVICE_PC, ICON_DOWNLOADS, ICON_HOME, ICON_POLAROID, ICON_SERVER, ICON_STAR, ICON_TRASH, ICON_USB, ICON_USER}, modules::custom_context_menu::context_state::ContextMenuKind}};
 

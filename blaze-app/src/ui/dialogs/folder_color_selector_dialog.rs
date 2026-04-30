@@ -116,7 +116,7 @@ impl FolderColorSelector {
 
                         TOKIO_RUNTIME.spawn(async move {
                             cm.update_color_cache(folder_id, temp_color).await;
-                            cm.reload_color_cache().await;
+                            cm.save_color_cache().await;
                         });
                         
 

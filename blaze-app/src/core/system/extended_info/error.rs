@@ -12,9 +12,6 @@ pub enum ExtendedInfoError {
     #[error("Error en thread Tokio: {0}")]
     ThreadError(#[from] tokio::task::JoinError),
 
-    #[error("Error leyendo metadatos de archivo")]
-    MetadataError,
-
     #[error("Error obteniendo estado git: {0}")]
     GitError(#[from] GitErr),
 

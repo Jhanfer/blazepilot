@@ -662,7 +662,9 @@ impl BlazeCoreState {
 
         self.sizer_manager.process_messages(active_id, sender.clone());
 
-        self.extended_info_manager.process_messages(active_id, sender.clone());
+        if let Err(e) = self.extended_info_manager.process_messages(active_id, sender.clone()) {
+            warn!("Error procesando mensajes de ExtendedInfo: {}",e);
+        }
         
         let file_messages: Vec<FileLoadingMessage> = with_channel_pool(|pool|{
             let mut msgs = Vec::new();
@@ -784,7 +786,7 @@ impl BlazeCoreState {
                         for path in paths {
                             sender.send_extended_info(
                                 ExtendedInfoMessages::ForceScan(path)
-                            );
+                            ).ok();
                         }
                     }
                 }

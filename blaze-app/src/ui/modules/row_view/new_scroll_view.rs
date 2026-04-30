@@ -155,7 +155,7 @@ fn resolve_icon(file: &Arc<FileEntry>, color_snapshot: &HashMap<FileId, Color32>
             } else {
                 (Color32::YELLOW, "folder-unknown".to_string())
             };
-        return (cache_key, icons::ICON_FOLDER, color);
+        return (cache_key, icons::ICON_FOLDER_OPEN, color);
     } else {
         match &file.extension {
             FileExtension::Image(_) => ("image".to_string(), icons::ICON_IMAGE,    Color32::from_rgb(100, 200, 255)),
