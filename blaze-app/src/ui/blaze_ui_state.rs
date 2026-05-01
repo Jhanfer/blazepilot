@@ -19,7 +19,7 @@ use std::{collections::{HashMap, HashSet}, path::{Path, PathBuf}};
 use egui::{Area, Order, Sense, TextureHandle, Ui};
 use file_id::FileId;
 use uuid::Uuid;
-use crate::{core::{files::blaze_motor::motor::with_motor, system::{cache::color_cache::color_cache::FolderColorManager, fileopener_module::{AppAssociation, platform::linux::linux::AppsIconData}, updater::updater::UpdateMessages}}, ui::{dialogs::{configs_dialog::ConfigDialog, error_dialog::ErrorDialog, folder_color_selector_dialog::FolderColorSelector, image_preview_dialog::ImagePreviewDialog, selector_dialog::AppSelectorDialog, sure_to_delete::SureToDeleteDialog, sure_to_move_to::SureToMoveToDialog, update_dialog::UpdateDialog}, icons_cache::{icon_cache::IconCache, thumbnails::thumbnails_manager::ThumbnailManager}, image_preview::image_preview::ImagePreviewState, modules::custom_context_menu::context_state::ContextMenuState}, utils::channel_pool::{FileConflict, NotifyingSender, SureTo, UiEvent, with_active_sender_for, with_channel_pool}};
+use crate::{core::{files::blaze_motor::motor::with_motor, runtime::{bus_structs::{FileConflict, SureTo, UiEvent}, event_bus::{with_event_bus}}, system::{cache::color_cache::color_cache::FolderColorManager, fileopener_module::{AppAssociation, platform::linux::linux::AppsIconData}, updater::updater::UpdateMessages}}, ui::{dialogs::{configs_dialog::ConfigDialog, error_dialog::ErrorDialog, folder_color_selector_dialog::FolderColorSelector, image_preview_dialog::ImagePreviewDialog, selector_dialog::AppSelectorDialog, sure_to_delete::SureToDeleteDialog, sure_to_move_to::SureToMoveToDialog, update_dialog::UpdateDialog}, icons_cache::{icon_cache::IconCache, thumbnails::thumbnails_manager::ThumbnailManager}, image_preview::image_preview::ImagePreviewState, modules::custom_context_menu::context_state::ContextMenuState}};
 use tracing::{debug, info};
 
 
@@ -144,8 +144,6 @@ pub struct BlazeUiState {
     pub thumbnail_manager: ThumbnailManager,
     pub calculating_thumbnails: HashSet<PathBuf>,
     pub calculated_thumbnails: HashSet<PathBuf>,
-    pub cached_sender: Option<NotifyingSender>,
-    cached_sender_tab_id: Option<Uuid>,
     pub needs_repaint: bool,
     pub newly_calculated_thumbnails: HashSet<PathBuf>,
     last_thumb_cache_dir: Option<PathBuf>,
@@ -164,28 +162,11 @@ impl BlazeUiState {
             thumbnail_manager: ThumbnailManager::new(),
             calculating_thumbnails: HashSet::new(),
             calculated_thumbnails: HashSet::new(),
-            cached_sender: None,
-            cached_sender_tab_id: None,
             needs_repaint: false,
             newly_calculated_thumbnails: HashSet::new(),
             last_thumb_cache_dir: None,
         }
     }
-
-    pub fn sender(&mut self) -> Option<&NotifyingSender> {
-        let active_tab_id = with_motor(|m| m.active_tab().id);
-
-        if self.cached_sender_tab_id != Some(active_tab_id) {
-            self.cached_sender = with_active_sender_for(active_tab_id, |s| s.clone());
-            self.cached_sender_tab_id = Some(active_tab_id);
-        }
-        self.cached_sender.as_ref()
-    }
-    
-    pub fn _invalidate_sender(&mut self) {
-        self.cached_sender = None;
-    }
-
 
     pub fn evict_thumbnail_cache_if_dir_changed(&mut self, cwd: &Path) {
         let changed = self.last_thumb_cache_dir
@@ -216,23 +197,19 @@ impl BlazeUiState {
 
 
     pub fn process_events(&mut self) {
-        let sender = {
-            let Some(sender) = self.sender() else {return;};
-            sender.clone()
-        };
-        let active_id = sender.tab_id;
+        let active_id = with_motor(|m|m.active_tab().id.clone());
+        let dispatcher = with_event_bus(|e| e.dispatcher(active_id));
 
-        let events: Vec<UiEvent> = with_channel_pool(|pool| {
-            let  mut msgs = Vec::new();
-            pool.process_ui_events(active_id, |msg|{
+        let events: Vec<UiEvent> = with_event_bus(|pool| {
+            let mut msgs = Vec::new();
+            pool.drain(active_id, |msg|{
                 msgs.push(msg);
                 true
             });
             msgs
         });
 
-
-        self.thumbnail_manager.process_messages(active_id, sender.clone());
+        self.thumbnail_manager.process_messages(active_id, dispatcher.clone());
 
 
         for envent in events {

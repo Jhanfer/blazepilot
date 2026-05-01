@@ -21,10 +21,9 @@ use image::imageops;
 use lru::LruCache;
 use once_cell::sync::Lazy;
 use resvg::usvg;
-use tokio::sync::{Mutex, RwLock};
+use tokio::sync::RwLock;
 use tracing::{warn, info};
-use uuid::Uuid;
-use crate::{core::system::fileopener_module::{AppAssociation, platform::linux::{appassociation::AssociationManager, mimeapps::MimeApps}}, utils::channel_pool::{NotifyingSender, UiEvent}};
+use crate::core::{runtime::{bus_structs::UiEvent, event_bus::Dispatcher}, system::fileopener_module::{AppAssociation, platform::linux::{appassociation::AssociationManager, mimeapps::MimeApps}}};
 
 
 #[derive(Debug, Clone)]
@@ -403,7 +402,7 @@ impl LinuxOpener {
     }
 
 
-    pub async fn open_file_with_linux(&mut self, path: PathBuf, sender: NotifyingSender) {
+    pub async fn open_file_with_linux(&mut self, path: PathBuf, sender: Dispatcher) {
         let mime = self.get_mime(&path).unwrap_or_else(|| "application/octet-stream".to_string());
 
         let available_apps = self.get_all_apps_for_open_with(&mime).await;
@@ -465,7 +464,7 @@ impl LinuxOpener {
         env
     }
 
-    pub async fn open_file_linux(&mut self, path: PathBuf, sender: NotifyingSender) {
+    pub async fn open_file_linux(&mut self, path: PathBuf, sender: Dispatcher) {
         info!("Abriendo con open file linux");
 
         if let Some(_app_image_type) = self.detect_appimage(&path) {
@@ -655,7 +654,7 @@ impl LinuxOpener {
     
 
 
-    async fn show_selector_linux(&mut self, path: PathBuf, mime: String, apps: Vec<AppAssociation>, show_all_apps: bool, sender: NotifyingSender)  {
+    async fn show_selector_linux(&mut self, path: PathBuf, mime: String, apps: Vec<AppAssociation>, show_all_apps: bool, sender: Dispatcher)  {
         self.pending_path = Some(path.clone());
         self.pending_mime = Some(mime.clone());
 
@@ -664,7 +663,7 @@ impl LinuxOpener {
             self.load_icons_async(&apps)
         ).await.unwrap_or_else(|_| vec![AppsIconData::None; apps.len()]);
 
-        sender.send_ui_event(
+        sender.send(
             UiEvent::OpenWithSelector { path, mime, apps, icon_data, show_all_apps }
         ).ok();
     }

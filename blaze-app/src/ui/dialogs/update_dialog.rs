@@ -19,7 +19,7 @@
 
 use egui::{Color32, CornerRadius, Frame, Margin, Order, Ui, Window};
 use uuid::Uuid;
-use crate::{ui::blaze_ui_state::ModalDialog, utils::channel_pool::{FileOperation, with_active_sender}};
+use crate::{core::runtime::{bus_structs::FileOperation, event_bus::Dispatcher}, ui::blaze_ui_state::ModalDialog};
 
 
 pub struct UpdateDialog {
@@ -104,9 +104,7 @@ impl UpdateDialog {
                     ui.add_space(spacing);
                     if ui.button("Aceptar").clicked() {
 
-                        with_active_sender(|sender| {
-                            sender.send_fileop(FileOperation::Update).ok();
-                        });
+                        Dispatcher::current().send(FileOperation::Update).ok();
 
                         should_close = true;
                     }

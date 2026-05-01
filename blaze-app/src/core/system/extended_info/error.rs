@@ -1,7 +1,7 @@
 use git2::Error as GitErr;
 use thiserror::Error;
 
-use crate::utils::channel_pool::FileOperation;
+use crate::core::runtime::bus_structs::FileOperation;
 
 
 #[derive(Error, Debug)]

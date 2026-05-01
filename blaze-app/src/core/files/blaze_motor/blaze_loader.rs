@@ -26,7 +26,7 @@ use tracing::warn;
 use crate::core::files::blaze_motor::error::{MotorError, MotorResult};
 use crate::core::files::blaze_motor::motor_structs::{FileEntry, FileLoadingMessage};
 use crate::core::system::clipboard::TOKIO_RUNTIME;
-use crate::utils::channel_pool::NotifyingSender;
+use crate::core::runtime::event_bus::Dispatcher;
 use crate::core::files::blaze_motor::utilities::build_entry;
 
 
@@ -122,7 +122,7 @@ impl BlazeLoader {
     }
 
 
-    pub fn load_path(&mut self, path: &PathBuf, sender: NotifyingSender, generation: u64) -> MotorResult<()> {
+    pub fn load_path(&mut self, path: &PathBuf, sender: Dispatcher, generation: u64) -> MotorResult<()> {
         //cancelar la carga anterior
         self.cancel();
 
@@ -154,7 +154,7 @@ impl BlazeLoader {
         let disp_cancel = cancel.clone();
         let handle2 = TOKIO_RUNTIME.spawn(async move {
             if Self::dispatcher(buffer, sender, generation, disp_cancel, done_rx).await.is_err() {
-                warn!("Erro en el dispatcher.");
+                warn!("Error en el dispatcher.");
             };
         });
 
@@ -200,7 +200,7 @@ impl BlazeLoader {
 
 
 
-    async fn dispatcher(buffer: Arc<Mutex<EventBuffer>>, sender: NotifyingSender, generation: u64, cancel: Arc<AtomicBool>, mut done_rx: tokio::sync::oneshot::Receiver<MotorResult<()>>) -> MotorResult<()> {
+    async fn dispatcher(buffer: Arc<Mutex<EventBuffer>>, sender: Dispatcher, generation: u64, cancel: Arc<AtomicBool>, mut done_rx: tokio::sync::oneshot::Receiver<MotorResult<()>>) -> MotorResult<()> {
         let mut interval = tokio::time::interval(Duration::from_millis(50));
         let mut scan_done = false;
 
@@ -217,7 +217,7 @@ impl BlazeLoader {
                     scan_done = true;
                     Self::flush_buffer(&buffer, &sender, generation).await?;
 
-                    sender.send_files_batch(FileLoadingMessage::Finished(generation))
+                    sender.send(FileLoadingMessage::Finished(generation))
                         .map_err(|e| MotorError::SendFileBatchError(e))?;
                     break;
                 }
@@ -227,7 +227,7 @@ impl BlazeLoader {
         Ok(())
     }
 
-    async fn flush_buffer(buffer: &Arc<Mutex<EventBuffer>>, sender: &NotifyingSender, generation: u64) -> MotorResult<()> {
+    async fn flush_buffer(buffer: &Arc<Mutex<EventBuffer>>, sender: &Dispatcher, generation: u64) -> MotorResult<()> {
         let batch = {
             let mut buf = buffer.lock().await;
             if buf.is_empty() {
@@ -250,13 +250,13 @@ impl BlazeLoader {
                         .map(|n| n.to_string_lossy().into_owned())
                         .unwrap_or_default();
                     if !name.is_empty() {
-                        sender.send_files_batch(FileLoadingMessage::FileRemoved { name })
+                        sender.send(FileLoadingMessage::FileRemoved { name })
                             .map_err(|e| MotorError::SendFileBatchError(e))?;
                     }
                 },
 
                 FileOp::Modify(_) => {
-                    sender.send_files_batch(FileLoadingMessage::FullRefresh)
+                    sender.send(FileLoadingMessage::FullRefresh)
                         .map_err(|e| MotorError::SendFileBatchError(e))?;
                 },
 
@@ -264,7 +264,7 @@ impl BlazeLoader {
         }
 
         if !adds.is_empty() {
-            sender.send_files_batch(FileLoadingMessage::Batch(generation, adds))
+            sender.send(FileLoadingMessage::Batch(generation, adds))
                 .map_err(|e| MotorError::SendFileBatchError(e))?;
         }
 

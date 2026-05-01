@@ -24,7 +24,6 @@ use crate::ui::blaze_ui_state::BlazeUiState;
 use crate::ui::modules::ui_callback::connect_ui_components_callback;
 
 
-
 pub struct BlazeApp {
     pub state: BlazeCoreState, //motor, archivos, mover
     pub ui_state: BlazeUiState, //visuales (qué item está hovereado, etc)
@@ -55,7 +54,6 @@ impl BlazeApp {
 
 impl eframe::App for BlazeApp {
     fn ui(&mut self, ui: &mut Ui, _frame: &mut Frame) {
-
         self.set_up_custom_font(ui);
 
         //Dropeo de archivos

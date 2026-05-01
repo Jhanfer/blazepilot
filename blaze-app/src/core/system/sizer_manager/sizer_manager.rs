@@ -19,7 +19,7 @@ use std::{collections::HashSet, os::unix::fs::MetadataExt, path::{Path, PathBuf}
 use jwalk::{Parallelism, WalkDir};
 use tokio::sync::{Mutex, Semaphore};
 use uuid::Uuid;
-use crate::{core::{system::{cache::cache_manager::CacheManager, clipboard::TOKIO_RUNTIME}}, utils::channel_pool::{FileOperation, NotifyingSender, with_channel_pool}};
+use crate::core::{runtime::{bus_structs::FileOperation, event_bus::{Dispatcher, with_event_bus}}, system::{cache::cache_manager::CacheManager, clipboard::TOKIO_RUNTIME}};
 
 
 
@@ -47,10 +47,10 @@ impl SizerManager {
             .unwrap_or(0)
     }
 
-    pub fn process_messages(&mut self, active_id: Uuid, sender: NotifyingSender) {
-        let sizer_messages: Vec<SizerMessages> = with_channel_pool(|pool|{
+    pub fn process_messages(&mut self, active_id: Uuid, sender: Dispatcher) {
+        let sizer_messages: Vec<SizerMessages> = with_event_bus(|pool|{
             let mut msgs = Vec::new();
-            pool.process_sizer_events(active_id, |msg|{
+            pool.drain(active_id, |msg|{
                 msgs.push(msg);
                 true
             });
@@ -80,7 +80,7 @@ impl SizerManager {
 
                     if cache_valid {
                         if let Some(cached_size) = cm.get_cached_size(&path_buf) {
-                            sender.send_fileop(
+                            sender.send(
                                 FileOperation::UpdateDirSize {
                                     full_path: path_buf,
                                     size: cached_size,
@@ -111,7 +111,7 @@ impl SizerManager {
                                 mtime_to_task,
                                 ).await;
 
-                            sender_clone.send_fileop(FileOperation::UpdateDirSize {
+                            sender_clone.send(FileOperation::UpdateDirSize {
                                 full_path: path_buf,
                                 size: calculated_size,
                                 tab_id,
@@ -124,7 +124,7 @@ impl SizerManager {
     }
 
 
-    pub async fn get_recursive_size(root: impl AsRef<Path>, max_concurrency: usize, sender: NotifyingSender, path_buf: PathBuf, tab_id: Uuid) -> u64 {
+    pub async fn get_recursive_size(root: impl AsRef<Path>, max_concurrency: usize, sender: Dispatcher, path_buf: PathBuf, tab_id: Uuid) -> u64 {
         let total_size = Arc::new(AtomicU64::new(0));
         let seen_inodes = Arc::new(Mutex::new(HashSet::new()));
         let semaphore = Arc::new(Semaphore::new(max_concurrency));
@@ -171,7 +171,7 @@ impl SizerManager {
                                     last, new_total,
                                     Ordering::Relaxed, Ordering::Relaxed
                                 ).is_ok() {
-                                    sender_task.send_fileop(
+                                    sender_task.send(
                                         FileOperation::UpdateDirSize {
                                             full_path: path_task,
                                             size: new_total,

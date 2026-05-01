@@ -17,9 +17,9 @@ use ffmpeg_sidecar::{download::auto_download, paths::ffmpeg_path};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 use tokio::sync::{RwLock, Semaphore};
-use tracing::{error};
+use tracing::error;
 use uuid::Uuid;
-use crate::{core::system::{cache::cache_manager::CacheManager, clipboard::TOKIO_RUNTIME}, utils::channel_pool::{ NotifyingSender, UiEvent, with_channel_pool}};
+use crate::core::{runtime::{bus_structs::UiEvent, event_bus::{ Dispatcher, with_event_bus}}, system::{cache::cache_manager::CacheManager, clipboard::TOKIO_RUNTIME}};
 use lru::LruCache;
 use std::num::NonZeroUsize;
 
@@ -162,10 +162,10 @@ impl ThumbnailManager {
     }
 
 
-    pub fn process_messages(&self, active_id: Uuid, sender: NotifyingSender) {
-        let messages: Vec<ThumbnailMessages> = with_channel_pool(|pool| {
+    pub fn process_messages(&self, active_id: Uuid, sender: Dispatcher) {
+        let messages: Vec<ThumbnailMessages> = with_event_bus(|pool| {
             let mut msgs = Vec::new();
-            pool.process_thumbnail_events(active_id, |msg| {
+            pool.drain(active_id, |msg| {
                 msgs.push(msg);
                 true
             });
@@ -206,7 +206,7 @@ impl ThumbnailManager {
                             //lee la imagen en cache
                             if let Ok(thumb) = Self::load_from_cache(&cache_path).await {
                                 thumb_map.write().await.put(path.clone(), thumb);
-                                sender_clone.send_ui_event(UiEvent::ThumbnailReady {
+                                sender_clone.send(UiEvent::ThumbnailReady {
                                     full_path: path,
                                     tab_id,
                                 }).ok();
@@ -241,13 +241,13 @@ impl ThumbnailManager {
                                 ).await {
                                     let err = format!("Error en el caché de miniaturas: {}", e);
                                     error!(err);
-                                    sender_clone.send_ui_event(UiEvent::ShowError(
+                                    sender_clone.send(UiEvent::ShowError(
                                         err
                                     )).ok();
                                 }
 
                                 thumb_map.write().await.put(path.clone(), thumb);
-                                sender_clone.send_ui_event(UiEvent::ThumbnailReady {
+                                sender_clone.send(UiEvent::ThumbnailReady {
                                     full_path: path,
                                     tab_id,
                                 }).ok();

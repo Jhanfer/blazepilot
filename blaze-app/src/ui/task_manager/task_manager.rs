@@ -16,7 +16,7 @@
 
 use std::{collections::HashMap, sync::{Mutex, OnceLock}, time::{Duration, Instant}};
 use uuid::Uuid;
-use crate::{core::files::blaze_motor::motor_structs::TaskType, utils::channel_pool::with_channel_pool};
+use crate::{core::files::blaze_motor::motor_structs::TaskType, core::runtime::event_bus::with_event_bus};
 
 #[derive(Clone, Debug)]
 pub enum TaskStatus {
@@ -131,9 +131,9 @@ impl TaskManager {
 
     pub fn process_message(&self, active_id: Uuid) {
 
-        let tasks_messages: Vec<TaskMessage> = with_channel_pool(|pool|{
+        let tasks_messages: Vec<TaskMessage> = with_event_bus(|pool|{
             let mut msgs = Vec::new();
-            pool.process_task_messages(active_id, |msg|{
+            pool.drain(active_id, |msg|{
                 msgs.push(msg);
                 true
             });

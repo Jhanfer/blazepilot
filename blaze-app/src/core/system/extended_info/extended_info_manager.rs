@@ -21,7 +21,7 @@ use tokio::sync::Semaphore;
 use tracing::{error, warn};
 use users::{get_group_by_gid, get_user_by_uid};
 use uuid::Uuid;
-use crate::{core::system::{cache::cache_manager::CacheManager, clipboard::TOKIO_RUNTIME, extended_info::error::{ExtendedInfoError, ExtendedInfoResult}}, utils::channel_pool::{FileOperation, NotifyingSender, with_channel_pool}};
+use crate::{core::runtime::event_bus::with_event_bus, core::{runtime::{bus_structs::FileOperation, event_bus::Dispatcher}, system::{cache::cache_manager::CacheManager, clipboard::TOKIO_RUNTIME, extended_info::error::{ExtendedInfoError, ExtendedInfoResult}}}};
 use lru::LruCache;
 use std::num::NonZeroUsize;
 
@@ -146,7 +146,7 @@ impl ExtendedInfoManager {
     }
 
 
-    fn requst_scan(&self, path_buf: PathBuf, current_mtime: u64, sender: &NotifyingSender, tab_id: Uuid) {
+    fn requst_scan(&self, path_buf: PathBuf, current_mtime: u64, sender: &Dispatcher, tab_id: Uuid) {
         let info_map = self.info_map.clone();
         let path_to_task = path_buf.clone();
         let sem = self.semaphore.clone();
@@ -183,7 +183,7 @@ impl ExtendedInfoManager {
                     ).await;
 
 
-                    if let Err(e) = sender.send_fileop(FileOperation::ExtendedInfoReady {
+                    if let Err(e) = sender.send(FileOperation::ExtendedInfoReady {
                         full_path: path_buf,
                         tab_id,
                     }) {
@@ -199,10 +199,10 @@ impl ExtendedInfoManager {
     }
 
 
-    pub fn process_messages(&self, active_id: Uuid, sender: NotifyingSender) -> ExtendedInfoResult<()> {
-        let messages: Vec<ExtendedInfoMessages> = with_channel_pool(|pool| {
+    pub fn process_messages(&self, active_id: Uuid, sender: Dispatcher) -> ExtendedInfoResult<()> {
+        let messages: Vec<ExtendedInfoMessages> = with_event_bus(|pool| {
             let mut msgs = Vec::new();
-            pool.process_extended_info_events(active_id, |msg| {
+            pool.drain(active_id, |msg| {
                 msgs.push(msg);
                 true
             });
@@ -243,7 +243,7 @@ impl ExtendedInfoManager {
                                 },
                             }
 
-                            sender.send_fileop(FileOperation::ExtendedInfoReady {
+                            sender.send(FileOperation::ExtendedInfoReady {
                                 full_path: path_buf,
                                 tab_id,
                             }).map_err(|e| ExtendedInfoError::SendError(e))?;

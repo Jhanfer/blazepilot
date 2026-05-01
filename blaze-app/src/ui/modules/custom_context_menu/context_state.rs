@@ -3,7 +3,7 @@ use std::{cell::Cell, path::PathBuf, sync::Arc};
 use egui::{Align2, Area, Color32, CursorIcon, FontId, Frame, Id, Key, Order, Pos2, Rect, Response, Sense, Stroke, TextEdit, Ui, UiBuilder, pos2, vec2};
 use tracing::{info, warn};
 
-use crate::{core::{blaze_state::{BlazeCoreState, NewItemType}, configs::config_state::with_configs, files::blaze_motor::motor_structs::FileEntry, system::{clipboard::TOKIO_RUNTIME, disk_reader::disk::Disk}}, ui::{blaze_ui_state::BlazeUiState, icons_cache::icons, image_preview::image_preview::ImagePreviewState}, utils::channel_pool::{FileOperation, NotifyingSender, SureTo, UiEvent}};
+use crate::{core::{blaze_state::{BlazeCoreState, NewItemType}, configs::config_state::with_configs, files::blaze_motor::motor_structs::FileEntry, runtime::{bus_structs::{FileOperation, SureTo, UiEvent}, event_bus::{Dispatcher, with_event_bus}}, system::{clipboard::TOKIO_RUNTIME, disk_reader::disk::Disk}}, ui::{blaze_ui_state::BlazeUiState, icons_cache::icons, image_preview::image_preview::ImagePreviewState}};
 
 
 #[derive(Default, PartialEq)]
@@ -23,7 +23,7 @@ pub struct ContextMenuState {
     pub position: Pos2,
     pub kind: ContextMenuKind,
     pub target_file: Option<Arc<FileEntry>>,
-    pub target_sender: Option<NotifyingSender>,
+    pub target_sender: Option<Dispatcher>,
     pub target_drive: Option<Disk>,
     just_opened: bool,
 }
@@ -431,7 +431,7 @@ impl ContextMenuState {
 
                 match action.get() {
                     Some(0) => {
-                        sender.send_fileop(
+                        sender.send(
                             FileOperation::RestoreDeletedFiles {
                                 file_names
                             }
@@ -458,7 +458,7 @@ impl ContextMenuState {
 
                 match action.get() {
                     Some(0) => {
-                        sender.send_ui_event(
+                        sender.send(
                             UiEvent::SureTo(
                                 SureTo::SureToDelete {
                                     files: sources, 
@@ -699,7 +699,7 @@ impl ContextMenuState {
 
                 match action.get() {
                     Some(0) => {
-                        sender.send_fileop(
+                        sender.send(
                             FileOperation::RestoreDeletedFiles {
                                 file_names
                             }
@@ -729,7 +729,7 @@ impl ContextMenuState {
 
                 match action.get() {
                     Some(0) => {
-                        sender.send_ui_event(
+                        sender.send(
                             UiEvent::SureTo(
                                 SureTo::SureToDelete { 
                                     files: sources, 
@@ -795,7 +795,7 @@ impl ContextMenuState {
                                 all_images
                             );
 
-                            sender.send_ui_event(
+                            sender.send(
                                 UiEvent::ShowImagePvw { pvw: Some(pvw) }
                             ).ok();
 
@@ -990,8 +990,7 @@ impl ContextMenuState {
                     match action.get() {
                         Some(0) => {
                             let cwd = state.cwd.clone();
-                            let Some(sender) = state.sender() else {return;};
-                            sender.send_fileop(
+                            sender.send(
                                 FileOperation::ExtractHere { 
                                     entry: file.clone(), 
                                     dest_dir: cwd,
@@ -1028,12 +1027,13 @@ impl ContextMenuState {
 
                     match action.get() {
                         Some(0) => {
-                            if let Some(sender) = state.sender() {
-                                let Some(folder_id) = file.unique_id else { return; };
-                                sender.send_ui_event(
-                                    UiEvent::ShowFolderColorSelector { folder_id: folder_id }
-                                ).ok();
-                            }
+                            let tab_id = state.active_id;
+                            let dispatcher = with_event_bus(|e| e.dispatcher(tab_id));
+                            let Some(folder_id) = file.unique_id else { return; };
+                            dispatcher.send(
+                                UiEvent::ShowFolderColorSelector { folder_id: folder_id }
+                            ).ok();
+                            
                             should_close = true;
                         }
                         _ => {}

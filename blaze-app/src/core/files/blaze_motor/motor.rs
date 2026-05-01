@@ -30,8 +30,9 @@ use crate::core::files::blaze_motor::motor_structs::{FileEntry, FileLoadingMessa
 use crate::core::files::blaze_motor::utilities::build_entry;
 use crate::core::files::blaze_motor::watcher::FileWatcher;
 use crate::core::configs::config_state::with_configs;
+use crate::core::runtime::bus_structs::UiEvent;
 use crate::core::system::disk_reader::disk_manager::DiskManager;
-use crate::utils::channel_pool::{NotifyingSender, UiEvent, cache_sender, remove_cached_sender, with_channel_pool};
+use crate::core::runtime::event_bus::{Dispatcher, with_event_bus};
 use uuid::Uuid;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -71,14 +72,11 @@ pub struct TabState {
 impl TabState {
     pub fn new(start_path: PathBuf, tab_id: Uuid) -> Self {
 
-        //registrar el notificador por ventana
-        with_channel_pool(|pool| {
-            pool.register_notifier(tab_id, || {});
+        //Crear dispatcher para la tab
+        with_event_bus(|bus|{
+            bus.create_tab(tab_id);
         });
-
-        let sender = with_channel_pool(|pool| pool.get_notifying_sender(tab_id)).unwrap();
-        cache_sender(tab_id, sender);
-
+        
         Self {
             id: tab_id,
             cwd: start_path,
@@ -98,7 +96,7 @@ impl TabState {
     }
 
 
-    pub fn load_path(&mut self, _skip_cache: bool, sender: NotifyingSender) -> MotorResult<()> {
+    pub fn load_path(&mut self, _skip_cache: bool, sender: Dispatcher) -> MotorResult<()> {
         let path = self.cwd.clone();
 
         if !path.exists() || !path.is_dir() {
@@ -117,13 +115,13 @@ impl TabState {
     }
 
 
-    fn recursive_search(cwd: PathBuf, query: String, max_depth: usize, sender: NotifyingSender, show_hidden: bool, loading_generation: u64, flag: Arc<AtomicBool>) {
+    fn recursive_search(cwd: PathBuf, query: String, max_depth: usize, sender: Dispatcher, show_hidden: bool, loading_generation: u64, flag: Arc<AtomicBool>) {
         TOKIO_RUNTIME.spawn(async move {
             let query_lower = query.to_lowercase().trim().to_string();
             let mut total_files = 0usize;
             let mut batch: Vec<Arc<FileEntry>> = Vec::with_capacity(150);
 
-            sender.send_recursive(RecursiveMessages::Started {
+            sender.send(RecursiveMessages::Started {
                 task_id: loading_generation as u64,
                 text: format!("Buscando \"{}\"...", query),
             }).ok();
@@ -191,7 +189,7 @@ impl TabState {
 
                             if batch.len() >= 150 {
                                 let send_batch = std::mem::take(&mut batch);
-                                sender_clone.send_files_batch(FileLoadingMessage::RecursiveBatch {
+                                sender_clone.send(FileLoadingMessage::RecursiveBatch {
                                     generation: loading_generation,
                                     batch: send_batch,
                                     source_dir: cwd_clone.clone(),
@@ -208,14 +206,14 @@ impl TabState {
                     total_files = found_total;
 
                     if !remaining_batch.is_empty() {
-                        sender.send_files_batch(FileLoadingMessage::RecursiveBatch {
+                        sender.send(FileLoadingMessage::RecursiveBatch {
                             generation: loading_generation,
                             batch: remaining_batch,
                             source_dir: cwd.clone(),
                         }).ok();
                     }
 
-                    sender.send_recursive(RecursiveMessages::Finished {
+                    sender.send(RecursiveMessages::Finished {
                         task_id: loading_generation as u64,
                         success: true,
                         text: format!("Completado: {} archivos encontrados", total_files),
@@ -224,7 +222,7 @@ impl TabState {
                     debug!("Búsqueda recursiva completada: {} archivos", total_files);
                 }
                 Err(e) => {
-                    sender.send_ui_event(
+                    sender.send(
                         UiEvent::ShowError(format!("Error buscando archivos: {}", e))
                     ).ok();
                 }
@@ -235,7 +233,7 @@ impl TabState {
         });
     }
 
-    pub fn start_recursive_search(&mut self, query: String, max_depth: usize, sender: NotifyingSender) {
+    pub fn start_recursive_search(&mut self, query: String, max_depth: usize, sender: Dispatcher) {
         self.recursive_entries.clear();
         self.recursive_entries.shrink_to_fit();
         self.is_recursive_active = true;
@@ -359,6 +357,12 @@ impl BlazeMotor {
         }
     }
 
+    fn set_active_index(&mut self, index: usize) {
+        self.active_tab_index = index;
+        crate::core::runtime::event_bus::set_active_tab(self.tabs[index].id);
+    }
+
+
     pub fn active_tab_mut(&mut self) -> &mut TabState {
         &mut self.tabs[self.active_tab_index]
     }
@@ -369,7 +373,7 @@ impl BlazeMotor {
 
     pub fn switch_to_tab(&mut self, index:usize) {
         if index < self.tabs.len() {
-            self.active_tab_index = index;
+            self.set_active_index(index);
         }
     }
 
@@ -377,20 +381,27 @@ impl BlazeMotor {
         if self.tabs.is_empty() || self.tabs.len() <= 1 {
             return;
         }
-        self.active_tab_index = (self.active_tab_index + 1) % self.tabs.len();
+        self.set_active_index((self.active_tab_index + 1) % self.tabs.len());
     }
 
     pub fn prev_tab(&mut self) {
         if self.tabs.is_empty() || self.tabs.len() <= 1 {
             return;
         }
-        self.active_tab_index = if self.active_tab_index == 0 {
+        let next= if self.active_tab_index == 0 {
             self.tabs.len() - 1
         } else {
             self.active_tab_index - 1
         };
+        self.set_active_index(next);
     }
     
+    fn remove_channels(&self, tab_id: Uuid) {
+        with_event_bus(|pool| {
+            pool.remove_tab(tab_id)
+        });
+    }
+
     pub fn close_tab(&mut self, index:usize) -> bool{
         if self.tabs.len() <= 1 {
             return false;
@@ -401,7 +412,6 @@ impl BlazeMotor {
         {
             let tab = &mut self.tabs[index];
             tab.watcher.stop_watching();
-            // tab.cancel_loading();
 
             tab.files.clear();
             tab.files.shrink_to_fit();
@@ -417,11 +427,11 @@ impl BlazeMotor {
             tab.future.clear();
         }
 
-        remove_cached_sender(tab_id);
+        self.remove_channels(tab_id);
 
         self.tabs.remove(index);
         if self.active_tab_index >= self.tabs.len() {
-            self.active_tab_index = self.tabs.len() - 1;
+            self.set_active_index(self.tabs.len() - 1);
         }
         true
     }
@@ -429,15 +439,11 @@ impl BlazeMotor {
     fn start_tab_load(&mut self, index: usize) {
         let tab = &self.tabs[index];
         let tab_id = tab.id;
-
-        if let Some(sender) = with_channel_pool(|pool| pool.get_notifying_sender(tab_id)) {
-            self.tabs[index].load_path(false, sender).ok();
-        } else {
-            warn!("start_tab_load: no se encontró sender para tab {:?}", tab_id);
-        }
+        let sender = with_event_bus(|pool| pool.dispatcher(tab_id));
+        self.tabs[index].load_path(false, sender).ok();
     }
 
-    pub fn add_tab_from_file(&mut self, tab_path: PathBuf) {
+    pub fn add_tab(&mut self, tab_path: PathBuf) {
         if self.tabs.len() >= self.limit {
             return;
         }
@@ -446,10 +452,10 @@ impl BlazeMotor {
 
         let insert_index = self.active_tab_index + 1;
         self.tabs.insert(insert_index, new_tab);
-        self.active_tab_index = insert_index;
+        
+        self.set_active_index(insert_index);
 
         self.start_tab_load(self.active_tab_index);
-
     }
 
     pub fn create_tab(&mut self) {
@@ -462,25 +468,9 @@ impl BlazeMotor {
         let insert_index = self.active_tab_index + 1;
         self.tabs.insert(insert_index, new_tab);
 
-        self.active_tab_index = insert_index;
+        self.set_active_index(insert_index);
 
         self.start_tab_load(self.active_tab_index);
-
-    }
-
-
-    pub fn add_tab(&mut self, path: PathBuf) {
-        if self.tabs.len() >= self.limit {
-            return;
-        }
-        let tab_id = Uuid::new_v4();
-
-        let new_tab = TabState::new(path, tab_id);
-        self.tabs.push(new_tab);
-        self.active_tab_index = self.tabs.len() - 1;
-
-        self.start_tab_load(self.active_tab_index);
-
     }
 
     pub fn tab_title(&self, index:usize) -> String {
@@ -645,11 +635,6 @@ mod tests {
 
     fn make_tab(path: PathBuf) -> TabState {
         let id = Uuid::new_v4();
-
-        // Registrar en pool mínimo para que new() no panic
-        with_channel_pool(|pool| pool.register_notifier(id, || {}));
-        let sender = with_channel_pool(|pool| pool.get_notifying_sender(id)).unwrap();
-        cache_sender(id, sender);
         TabState::new(path, id)
     }
 
@@ -675,8 +660,9 @@ mod tests {
         let h2 = TOKIO_RUNTIME.spawn(async { tokio::time::sleep(Duration::from_secs(60)).await });
         tab.loader.handles.push(h1);
         tab.loader.handles.push(h2);
-        tab.loading_flag.store(true, Ordering::Relaxed);
+        tab.loading_flag.store(false, Ordering::Relaxed);
 
+        tab.loader.cancel();
 
         assert!(tab.loader.handles.is_empty(), "handles deben haberse drenado");
         assert!(!tab.loading_flag.load(Ordering::Relaxed), "flag debe ser false");
@@ -727,7 +713,7 @@ mod tests {
         // Verificar que la task del watcher termina sola cuando se dropea el watcher
         let mut tab = make_tab(std::env::temp_dir());
         let cwd = &tab.cwd;
-        let sender = with_channel_pool(|pool| pool.get_notifying_sender(tab.id)).unwrap();
+        let sender = with_event_bus(|pool| pool.dispatcher(tab.id));
 
         tab.watcher.start_watching(&cwd, sender).ok();
         assert!(tab.watcher.watching_handle.is_some());

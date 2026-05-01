@@ -16,13 +16,13 @@
 
 
 
-use std::{cell::RefCell, collections::{HashSet}, path::PathBuf, rc::Rc, sync::{Arc, atomic::{AtomicU64, Ordering}}, time::{Instant, SystemTime, UNIX_EPOCH}};
+use std::{cell::{RefCell, RefMut}, collections::HashSet, path::PathBuf, rc::Rc, sync::{Arc, atomic::{AtomicU64, Ordering}}, time::{Instant, SystemTime, UNIX_EPOCH}};
 use bitvec::vec::BitVec;
 use fuzzy_matcher::{FuzzyMatcher, skim::SkimMatcherV2};
 use tracing::{debug, error, info, warn};
 use tokio::sync::Mutex as TokioMutex;
 use uuid::Uuid;
-use crate::{core::{configs::config_state::{OrderingMode, with_configs}, files::blaze_motor::{motor::{BlazeMotor, MOTOR}, motor_structs::{FileEntry, FileLoadingMessage, RecursiveMessages}}, system::{cache::cache_manager::CacheManager, clipboard::{GlobalClipboard, TOKIO_RUNTIME}, extended_info::extended_info_manager::{ExtendedInfoManager, ExtendedInfoMessages}, fileopener_module::{FileOpenerManager, GLOBAL_FILE_OPENER}, sizer_manager::sizer_manager::SizerManager, terminal_opener::terminal_manager::{GLOBAL_TERMINAL_MANAGER, TerminalManager}, updater::updater::Updater, zip_manager::zip_manager::ZipManager}}, ui::task_manager::task_manager::TaskManager, utils::channel_pool::{FileOperation, NotifyingSender, with_active_sender_for, with_channel_pool}};
+use crate::{core::{configs::config_state::{OrderingMode, with_configs}, files::blaze_motor::{motor::{BlazeMotor, MOTOR}, motor_structs::{FileEntry, FileLoadingMessage, RecursiveMessages}}, runtime::{bus_structs::FileOperation, event_bus::with_event_bus}, system::{cache::cache_manager::CacheManager, clipboard::{GlobalClipboard, TOKIO_RUNTIME}, extended_info::extended_info_manager::{ExtendedInfoManager, ExtendedInfoMessages}, fileopener_module::{FileOpenerManager, GLOBAL_FILE_OPENER}, sizer_manager::sizer_manager::SizerManager, terminal_opener::terminal_manager::{GLOBAL_TERMINAL_MANAGER, TerminalManager}, updater::updater::Updater, zip_manager::zip_manager::ZipManager}}, ui::task_manager::task_manager::TaskManager};
 
 
 // Para el guardado en caché
@@ -54,6 +54,7 @@ pub enum NewItemType {
 }
 
 pub struct BlazeCoreState {
+    pub active_id: Uuid,
     pub is_loading: bool,
     pub search_filter: String,
     pub clipboard: GlobalClipboard,
@@ -72,9 +73,7 @@ pub struct BlazeCoreState {
     pub rename_buffer: String,
     pub creating_new: Option<NewItemType>,
     pub new_item_buffer: String,
-    pub focus_requested: bool, 
-    pub cached_sender: Option<NotifyingSender>,
-    cached_sender_tab_id: Option<Uuid>,
+    pub focus_requested: bool,
     pub updater: Updater,
     pub calculated_dir_sizes: HashSet<PathBuf>,
     pub calculating_dir_sizes: HashSet<PathBuf>,
@@ -82,8 +81,7 @@ pub struct BlazeCoreState {
     pub task_manager: &'static TaskManager,
     pub sizer_manager: SizerManager,
     pub needs_sort: bool,
-    pub cwd_input: String,
-    pub test: bool,
+    pub _cwd_input: String,
     pub terminal_manager: Arc<TokioMutex<TerminalManager>>,
     pub extended_info_manager: ExtendedInfoManager,
     pub calculating_extended_info: HashSet<PathBuf>,
@@ -95,6 +93,10 @@ pub struct BlazeCoreState {
 impl BlazeCoreState {
     pub async fn new() -> Self {
         let motor = Rc::new(RefCell::new(BlazeMotor::new().await));
+        let active_id = motor.borrow().active_tab().id.clone();
+
+        //Asignar el id de la ventana inicial al active_id
+        crate::core::runtime::event_bus::set_active_tab(active_id);
 
         MOTOR.with(|m|{
             *m.borrow_mut() = Some(motor.clone());
@@ -126,6 +128,7 @@ impl BlazeCoreState {
         let terminal_manager = GLOBAL_TERMINAL_MANAGER.clone();
 
         let mut state = Self {
+            active_id,
             motor,
             is_loading: false,
             search_filter: String::new(),
@@ -144,8 +147,6 @@ impl BlazeCoreState {
             creating_new: None,
             new_item_buffer: String::new(),
             focus_requested: false,
-            cached_sender: None,
-            cached_sender_tab_id: None,
             updater: Updater::init(),
             calculating_dir_sizes: HashSet::new(),
             calculated_dir_sizes: HashSet::new(),
@@ -154,8 +155,7 @@ impl BlazeCoreState {
             task_manager,
             sizer_manager,
             needs_sort: false,
-            cwd_input: String::new(),
-            test: false,
+            _cwd_input: String::new(),
             terminal_manager,
             extended_info_manager: ExtendedInfoManager::new(),
             calculating_extended_info: HashSet::new(),
@@ -164,18 +164,20 @@ impl BlazeCoreState {
             cwd: PathBuf::new(),
         };
 
-        if let Some(sender) = state.sender().cloned() {
-            let new_cwd = {
-                let mut motor = state.motor.borrow_mut();
-                let tab = motor.active_tab_mut();
-                if let Err(e) = tab.load_path(true, sender.clone()) {
-                    warn!("Ha ocurrido un error al cargar los archivos: {}", e);
-                }
-                tab.cwd.clone()
-            };
-            state.cwd = new_cwd;
-            state.updater.check_for_update(sender);
-        }
+
+        let new_cwd = {
+            let mut motor = state.motor.borrow_mut();
+            let tab = motor.active_tab_mut();
+            let dispatcher = with_event_bus(|e| e.dispatcher(active_id));
+
+            if let Err(e) = tab.load_path(true, dispatcher.clone()) {
+                warn!("Ha ocurrido un error al cargar los archivos: {}", e);
+            }
+            state.updater.check_for_update(dispatcher.clone());
+            tab.cwd.clone()
+        };
+
+        state.cwd = new_cwd;
 
         state
     }
@@ -332,21 +334,6 @@ impl BlazeCoreState {
         }
     }
 
-
-    pub fn sender(&mut self) -> Option<&NotifyingSender> {
-        let active_tab_id = self.motor.borrow_mut().active_tab().id;
-
-        if self.cached_sender_tab_id != Some(active_tab_id) {
-            self.cached_sender = with_active_sender_for(active_tab_id, |s| s.clone());
-            self.cached_sender_tab_id = Some(active_tab_id);
-        }
-        self.cached_sender.as_ref()
-    }
-
-    pub fn invalidate_sender(&mut self) {
-        self.cached_sender = None;
-    }
-
     pub fn save_caches(&self, force: bool) {
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -407,47 +394,46 @@ impl BlazeCoreState {
     }
 
     pub fn refresh(&mut self) {
-        if let Some(sender) = self.sender().cloned() {
-            let new_cwd = {
-                let mut motor = self.motor.borrow_mut();
-                let tab = motor.active_tab_mut();
-                if let Err(e) = tab.load_path(false, sender.clone()) {
-                    warn!("Ha ocurrido un error al cargar los archivos: {}", e);
-                }
-                tab.cwd.clone()
-            };
-            self.calculating_dir_sizes.clear();
-            self.calculated_dir_sizes.clear();
-            self.calculating_extended_info.clear();
-            self.calculated_extended_info.clear();
-            self.deselect_all();
-            self.cwd = new_cwd;
-        }
+        let dispatcher = with_event_bus(|e| e.dispatcher(self.active_id));
+        let new_cwd = {
+            let mut motor = self.motor.borrow_mut();
+            let tab = motor.active_tab_mut();
+            if let Err(e) = tab.load_path(false, dispatcher.clone()) {
+                warn!("Ha ocurrido un error al cargar los archivos: {}", e);
+            }
+            tab.cwd.clone()
+        };
+        self.calculating_dir_sizes.clear();
+        self.calculated_dir_sizes.clear();
+        self.calculating_extended_info.clear();
+        self.calculated_extended_info.clear();
+        self.deselect_all();
+        self.cwd = new_cwd;
     }
 
 
-        pub fn selected_as_entries(&self, files: &[Arc<FileEntry>]) -> Vec<Arc<FileEntry>> {
-            if files.is_empty() {
-                return  vec![];
-            }
-
-            let mut result = Vec::with_capacity(files.len() / 2);
-
-            if self.select_all_mode {
-                for (i, file) in files.iter().enumerate() {
-                    if !self.selection.get(i).map(|b| *b).unwrap_or(false) {
-                        result.push(file.clone());
-                    }
-                }
-            } else {
-                for (i, file) in files.iter().enumerate() {
-                    if self.selection.get(i).map(|b| *b).unwrap_or(false) {
-                        result.push(file.clone());
-                    }
-                }
-            }
-            result
+    pub fn selected_as_entries(&self, files: &[Arc<FileEntry>]) -> Vec<Arc<FileEntry>> {
+        if files.is_empty() {
+            return  vec![];
         }
+
+        let mut result = Vec::with_capacity(files.len() / 2);
+
+        if self.select_all_mode {
+            for (i, file) in files.iter().enumerate() {
+                if !self.selection.get(i).map(|b| *b).unwrap_or(false) {
+                    result.push(file.clone());
+                }
+            }
+        } else {
+            for (i, file) in files.iter().enumerate() {
+                if self.selection.get(i).map(|b| *b).unwrap_or(false) {
+                    result.push(file.clone());
+                }
+            }
+        }
+        result
+    }
 
     pub fn _get_file_entry(&self, path: &PathBuf) -> Option<Arc<FileEntry>> {
         self.motor.borrow_mut()
@@ -474,29 +460,25 @@ impl BlazeCoreState {
     pub fn move_to_trash(&mut self, files: &Vec<Arc<FileEntry>>) {
         let cwd = self.motor.borrow().tabs[self.motor.borrow().active_tab_index].cwd.clone();
         let items = self.selected_as_entries(files);
-        if let Some(sender) = self.sender().cloned() {
-            self.clipboard.move_to_trash(items, cwd, sender).ok();
-        }
+        let dispatcher = with_event_bus(|e| e.dispatcher(self.active_id));
+        self.clipboard.move_to_trash(items, cwd,&dispatcher).ok();
     }
 
     fn move_to_trash_event_only(&mut self, items: Vec<Arc<FileEntry>>) {
         let cwd = self.motor.borrow().tabs[self.motor.borrow().active_tab_index].cwd.clone();
-        if let Some(sender) = self.sender().cloned() {
-            self.clipboard.move_to_trash(items, cwd, sender).ok();
-        }
+        let dispatcher = with_event_bus(|e| e.dispatcher(self.active_id));
+        self.clipboard.move_to_trash(items, cwd, &dispatcher).ok();
     }
 
     pub fn move_files(&mut self, files: Vec<PathBuf>, dest: PathBuf) {
-        if let Some(sender) = self.sender().cloned() {
-            self.clipboard.move_files(files, dest, sender).ok();
-        }
+        let dispatcher = with_event_bus(|e| e.dispatcher(self.active_id));
+        self.clipboard.move_files(files, dest, &dispatcher).ok();
     }
 
     pub fn paste(&mut self, path: PathBuf) {
         self.clipboard.set_dest(path);
-        if let Some(sender) = self.sender().cloned() {
-            self.clipboard.paste(sender).ok();
-        }
+        let dispatcher = with_event_bus(|e| e.dispatcher(self.active_id));
+        self.clipboard.paste(&dispatcher).ok();
     }
 
 
@@ -543,9 +525,8 @@ impl BlazeCoreState {
         if is_recursive {
             let clean = query.replacen("rec:", "", 1);
             if clean.len() >= 2 && clean != self.search_filter.replacen("rec:", "", 1) {
-                if let Some(sender) = self.sender().cloned() {
-                    self.motor.borrow_mut().active_tab_mut().start_recursive_search(clean, 30, sender);
-                }
+                let dispatcher = with_event_bus(|e| e.dispatcher(self.active_id));
+                self.motor.borrow_mut().active_tab_mut().start_recursive_search(clean, 30, dispatcher);
             }
         }
 
@@ -556,11 +537,11 @@ impl BlazeCoreState {
     pub fn open_file_by_path(&mut self, path: PathBuf) {
         let manager_arc = self.file_opener_manager.clone();
 
-        let Some(sender) = self.sender().cloned() else {return;};
+        let dispatcher = with_event_bus(|e| e.dispatcher(self.active_id));
         TOKIO_RUNTIME.spawn(async move {
             info!("intentando abrir");
             let mut manager = manager_arc.lock().await;
-            manager.request_open_file(path, sender).await;
+            manager.request_open_file(path, dispatcher).await;
         });
     }
 
@@ -568,12 +549,12 @@ impl BlazeCoreState {
         let path = file.full_path.clone();
         let manager_arc = self.file_opener_manager.clone();
         
-        let Some(sender) = self.sender().cloned() else {return;};
+        let dispatcher = with_event_bus(|e| e.dispatcher(self.active_id));
 
         TOKIO_RUNTIME.spawn(async move {
             info!("intentando abrir");
             let mut manager = manager_arc.lock().await;
-            manager.request_open_file(path, sender).await;
+            manager.request_open_file(path, dispatcher).await;
         });
     }
 
@@ -581,12 +562,12 @@ impl BlazeCoreState {
         let path = file.full_path.clone();
         let manager_arc = self.file_opener_manager.clone();
         
-        let Some(sender) = self.sender().cloned() else {return;};
+        let dispatcher = with_event_bus(|e| e.dispatcher(self.active_id));
         TOKIO_RUNTIME.spawn(async move {
             info!("intentando abrir");
             let mut manager = manager_arc.lock().await;
 
-            manager.request_open_file_with(path, sender).await;
+            manager.request_open_file_with(path, dispatcher).await;
         });
     }
 
@@ -612,37 +593,67 @@ impl BlazeCoreState {
     }
     
 
+    pub fn motor_mut(&mut self) -> RefMut<'_, BlazeMotor> {
+        self.motor.borrow_mut()
+    }
 
-    pub fn switch_to_tab(&mut self, index:usize) {
-        self.motor.borrow_mut().switch_to_tab(index);
+
+    pub fn switch_to_tab(&mut self, index: usize) {
+        let new_id = {
+            let mut motor = self.motor_mut();
+            motor.switch_to_tab(index);
+            motor.active_tab().id
+        };
+        self.active_id = new_id;
     }
 
     pub fn next_tab(&mut self) {
-        self.motor.borrow_mut().next_tab();
+        let new_id = {
+            let mut motor = self.motor_mut();
+            motor.next_tab();
+            motor.active_tab().id
+        };
+        self.active_id = new_id;
     }
 
     pub fn prev_tab(&mut self) {
-        self.motor.borrow_mut().prev_tab();
+        let new_id = {
+            let mut motor = self.motor_mut();
+            motor.prev_tab();
+            motor.active_tab().id
+        };
+        self.active_id = new_id;
     }
     
     pub fn close_tab(&mut self, index:usize) -> bool {
-        self.motor.borrow_mut().close_tab(index)
+        let (new_id, closed) = {
+            let mut motor = self.motor_mut();
+            (motor.active_tab().id, motor.close_tab(index))
+        };
+        self.active_id = new_id;
+        closed
     }
 
     pub fn add_tab_from_file(&mut self, tab_path: PathBuf) {
-        self.motor.borrow_mut().add_tab_from_file(tab_path);
+        let new_id = {
+            let mut motor = self.motor_mut();
+            motor.add_tab(tab_path);
+            motor.active_tab().id
+        };
+        self.active_id = new_id;
     }
 
     pub fn create_tab(&mut self) {
-        self.motor.borrow_mut().create_tab();
+        let new_id = {
+            let mut motor = self.motor_mut();
+            motor.create_tab();
+            motor.active_tab().id
+        };
+        self.active_id = new_id;
     }
 
-    pub fn tab_title(&self, index:usize) -> String {
-        self.motor.borrow_mut().tab_title(index)
-    }
-
-    pub fn add_tab(&mut self, path: PathBuf) {
-        self.motor.borrow_mut().add_tab(path);
+    pub fn tab_title(&mut self, index:usize) -> String {
+        self.motor_mut().tab_title(index)
     }
 
 
@@ -655,20 +666,17 @@ impl BlazeCoreState {
 
         self.task_manager.process_message(active_id);
 
-        let sender = {
-            let Some(s) = self.sender() else {return;};
-            s.clone()
-        };
+        let dispatcher = with_event_bus(|e| e.dispatcher(self.active_id));
 
-        self.sizer_manager.process_messages(active_id, sender.clone());
+        self.sizer_manager.process_messages(active_id, dispatcher.clone());
 
-        if let Err(e) = self.extended_info_manager.process_messages(active_id, sender.clone()) {
+        if let Err(e) = self.extended_info_manager.process_messages(active_id, dispatcher.clone()) {
             warn!("Error procesando mensajes de ExtendedInfo: {}",e);
         }
         
-        let file_messages: Vec<FileLoadingMessage> = with_channel_pool(|pool|{
+        let file_messages: Vec<FileLoadingMessage> = with_event_bus(|pool|{
             let mut msgs = Vec::new();
-            pool.process_file_messages(active_id, |msg|{
+            pool.drain(active_id, |msg|{
                 msgs.push(msg);
                 true
             });
@@ -676,18 +684,18 @@ impl BlazeCoreState {
         });
 
 
-        let recursive_messages: Vec<RecursiveMessages> = with_channel_pool(|pool| {
+        let recursive_messages: Vec<RecursiveMessages> = with_event_bus(|pool| {
             let mut msgs = Vec::new();
-            pool.process_recursive_messages(active_id, |msg| {
+            pool.drain(active_id, |msg|{
                 msgs.push(msg);
                 true
             });
             msgs
         });
 
-        let fileops_events: Vec<FileOperation> = with_channel_pool(|pool|{
+        let fileops_events: Vec<FileOperation> = with_event_bus(|pool|{
             let mut msgs = Vec::new();
-            pool.process_fileops_events(active_id, |msg|{
+            pool.drain(active_id, |msg|{
                 msgs.push(msg);
                 true
             });
@@ -782,13 +790,13 @@ impl BlazeCoreState {
                         .map(|f| f.full_path.clone())
                         .collect();
 
-                    if let Some(sender) = self.sender() {
-                        for path in paths {
-                            sender.send_extended_info(
-                                ExtendedInfoMessages::ForceScan(path)
-                            ).ok();
-                        }
+                    let dispatcher = with_event_bus(|e| e.dispatcher(self.active_id));
+                    for path in paths {
+                        dispatcher.send(
+                            ExtendedInfoMessages::ForceScan(path)
+                        ).ok();
                     }
+                
                 }
             }
         }
@@ -809,7 +817,7 @@ impl BlazeCoreState {
 
         for msg in fileops_events {
             match msg {
-                FileOperation::Copy { files, dest } => {}, 
+                FileOperation::Copy { files:_, dest:_ } => {}, 
                 FileOperation::Delete { files } => {
                     let files: Vec<Arc<FileEntry>> = self.motor.borrow_mut()
                         .active_tab_mut()
@@ -821,7 +829,7 @@ impl BlazeCoreState {
                     self.move_to_trash_event_only(files);
                 },
 
-                FileOperation::Move { files, dest, tab_id } => {
+                FileOperation::Move { files, dest, tab_id:_ } => {
                     info!("Se intenta mover");
                     self.move_files(files, dest);
                 },
@@ -845,7 +853,7 @@ impl BlazeCoreState {
                     }
                 },
 
-                FileOperation::ExtendedInfoReady { full_path, tab_id } => {
+                FileOperation::ExtendedInfoReady { full_path, tab_id:_ } => {
                     self.calculating_extended_info.remove(&full_path);
                     self.calculated_extended_info.insert(full_path);
                 },
@@ -854,9 +862,8 @@ impl BlazeCoreState {
                     let trash_path = self.motor.borrow_mut().get_trash_dir(None).unwrap_or_default();
                     
                     if let Some(trash_root) = trash_path.parent() {
-                        if let Some(sender) = self.sender().cloned() {
-                            self.clipboard.restore_from_trash(file_names, trash_root.to_path_buf(), sender).ok();
-                        }
+                        let dispatcher = with_event_bus(|e| e.dispatcher(self.active_id));
+                        self.clipboard.restore_from_trash(file_names, trash_root.to_path_buf(), dispatcher).ok();
                     }
                 },
 
@@ -875,11 +882,15 @@ impl BlazeCoreState {
             if last_event.elapsed() > std::time::Duration::from_millis(50) {
                 self.last_fs_event = None;
                 if self.active_tasks == 0 {
-                    if let Some(sender) = self.sender().cloned() {
-                        self.calculating_dir_sizes.clear();
-                        self.calculated_dir_sizes.clear();
-                        self.motor.borrow_mut().active_tab_mut().load_path(true, sender);
+                    
+                    let dispatcher = with_event_bus(|e| e.dispatcher(self.active_id));
+                    self.calculating_dir_sizes.clear();
+                    self.calculated_dir_sizes.clear();
+
+                    if let Err(e) = self.motor.borrow_mut().active_tab_mut().load_path(true, dispatcher) {
+                        warn!("Ha ocurrido un error al cargar los archivos: {}", e);
                     }
+                    
                 }
             }
         }

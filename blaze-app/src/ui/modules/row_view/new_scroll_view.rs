@@ -2,7 +2,7 @@ use std::{collections::HashMap, path::PathBuf, sync::Arc};
 use egui::{Color32, ColorImage, CursorIcon, FontId, Key, PointerButton, Rect, RichText, ScrollArea, Sense, Ui, pos2, scroll_area::ScrollSource, vec2};
 use file_id::FileId;
 use tracing::{error, info};
-use crate::{core::{blaze_state::BlazeCoreState, configs::config_state::{OrderingMode, with_configs}, files::{file_extension::{DocType, FileExtension}, blaze_motor::motor_structs::FileEntry}, system::{ extended_info::extended_info_manager::{ExtendedInfo, GitStatus}}}, ui::{blaze_ui_state::BlazeUiState, icons_cache::{icons, thumbnails::thumbnails_manager::Thumbnail}, modules::custom_context_menu::context_state::ContextMenuKind}, utils::{channel_pool::{SureTo, UiEvent}, formating::{format_date, format_size}}};
+use crate::{core::{blaze_state::BlazeCoreState, configs::config_state::{OrderingMode, with_configs}, files::{blaze_motor::motor_structs::FileEntry, file_extension::{DocType, FileExtension}}, runtime::{bus_structs::{SureTo, UiEvent}, event_bus::with_event_bus}, system::extended_info::extended_info_manager::{ExtendedInfo, GitStatus}}, ui::{blaze_ui_state::BlazeUiState, icons_cache::{icons, thumbnails::thumbnails_manager::Thumbnail}, modules::custom_context_menu::context_state::ContextMenuKind}, utils::formating::{format_date, format_size}};
 
 
 
@@ -51,13 +51,14 @@ fn handle_row_interactions(ui: &mut Ui, response: &egui::Response, i: usize, fil
         }
 
         if drop_in_file_area {
-            let Some(sender) = state.sender().cloned() else {return;};
+            let tab_id = state.active_id;
+            let dispatcher = with_event_bus(|e| e.dispatcher(tab_id));
             let tab_id = state.motor.borrow_mut().active_tab().id;
 
             if let Some(target) = state.row_view.drop_target.take() {
                 let sources = state.get_selected_paths(files);   
                 
-                sender.send_ui_event(UiEvent::SureTo(
+                dispatcher.send(UiEvent::SureTo(
                         SureTo::SureToMove { 
                             files: sources, 
                             dest: target,
@@ -73,7 +74,7 @@ fn handle_row_interactions(ui: &mut Ui, response: &egui::Response, i: usize, fil
                     return;
                 }
 
-                sender.send_ui_event(UiEvent::SureTo(SureTo::SureToMove { 
+                dispatcher.send(UiEvent::SureTo(SureTo::SureToMove { 
                     files: sources, 
                     dest: cwd,
                     tab_id
@@ -103,18 +104,20 @@ fn handle_row_interactions(ui: &mut Ui, response: &egui::Response, i: usize, fil
     let trash = state.motor.borrow_mut().get_trash_dir(None).unwrap_or_default();
 
     if trash == cwd {
-        let Some(sender) = state.sender().cloned() else {return;};
+        let tab_id = state.active_id;
+        let dispatcher = with_event_bus(|e| e.dispatcher(tab_id));
         if response.secondary_clicked() {
             ui_state.context_menu_state.handle_response(&response);
-            ui_state.context_menu_state.target_sender = Some(sender);
+            ui_state.context_menu_state.target_sender = Some(dispatcher);
             ui_state.context_menu_state.kind = ContextMenuKind::FileTrash;
         }
     } else {
-        let Some(sender) = state.sender().cloned() else {return;};
+        let tab_id = state.active_id;
+        let dispatcher = with_event_bus(|e| e.dispatcher(tab_id));
         if response.secondary_clicked() {
             ui_state.context_menu_state.handle_response(&response);
             ui_state.context_menu_state.target_file = Some(file.clone());
-            ui_state.context_menu_state.target_sender = Some(sender);
+            ui_state.context_menu_state.target_sender = Some(dispatcher);
             ui_state.context_menu_state.kind = ContextMenuKind::FileNormal;
         }
     }

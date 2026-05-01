@@ -20,7 +20,7 @@ use std::{sync::{Arc, atomic::{AtomicBool, Ordering}}};
 use notify::{Event, EventKind, RecursiveMode, Watcher};
 use tracing::error;
 use std::path::Path;
-use crate::{core::{files::blaze_motor::{error::MotorResult, motor_structs::FileLoadingMessage}, system::{clipboard::TOKIO_RUNTIME}}, utils::channel_pool::NotifyingSender};
+use crate::core::{files::blaze_motor::{error::MotorResult, motor_structs::FileLoadingMessage}, runtime::event_bus::Dispatcher, system::clipboard::TOKIO_RUNTIME};
 
 
 
@@ -59,11 +59,11 @@ impl FileWatcher {
         }
     }
 
-    fn handle_watcher_event(event: Event, sender: &NotifyingSender) {
+    fn handle_watcher_event(event: Event, sender: &Dispatcher) {
         match event.kind {
             EventKind::Create(_) => {
                 Self::handle_event_match(&event, |name|{
-                    if let Err(e) = sender.send_files_batch(FileLoadingMessage::FileAdded { name: name.to_owned() }) {
+                    if let Err(e) = sender.send(FileLoadingMessage::FileAdded { name: name.to_owned() }) {
                         error!("Error de enviado en watcher: {}", e);
                     }
                 });
@@ -71,7 +71,7 @@ impl FileWatcher {
 
             EventKind::Remove(_) => {
                 Self::handle_event_match(&event, |name|{
-                    if let Err(e) = sender.send_files_batch(FileLoadingMessage::FileRemoved { name: name.to_owned() }) {
+                    if let Err(e) = sender.send(FileLoadingMessage::FileRemoved { name: name.to_owned() }) {
                         error!("Error de enviado en watcher: {}", e);
                     }
                 });
@@ -84,12 +84,12 @@ impl FileWatcher {
                 });
 
                 if is_git_change {
-                    if let Err(e) = sender.send_files_batch(FileLoadingMessage::GitStatusChanged) {
+                    if let Err(e) = sender.send(FileLoadingMessage::GitStatusChanged) {
                         error!("Error enviando GitStatusChanged: {}", e);
                     }
                 } else {
                     Self::handle_event_match(&event, |name| {
-                        let _ = sender.send_files_batch(
+                        let _ = sender.send(
                             FileLoadingMessage::FileModified { name: name.to_owned() }
                         );
                     });
@@ -101,7 +101,7 @@ impl FileWatcher {
     }
 
 
-    pub fn start_watching(&mut self, path: &Path, sender: NotifyingSender) -> MotorResult<()> {
+    pub fn start_watching(&mut self, path: &Path, sender: Dispatcher) -> MotorResult<()> {
         self.stop_watching();
 
         let watching = Arc::new(AtomicBool::new(true));

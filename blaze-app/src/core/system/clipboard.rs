@@ -9,10 +9,11 @@ use tokio::runtime::Runtime;
 use tokio::sync::Semaphore;
 use crate::core::files::blaze_motor::motor::{new_task_id, with_motor};
 use crate::core::files::blaze_motor::motor_structs::{FileEntry, TaskType};
+use crate::core::runtime::bus_structs::{FileConflict, UiEvent};
 use crate::ui::task_manager::task_manager::TaskMessage;
 use std::sync::{Arc, Mutex};
 use std::sync::OnceLock;
-use crate::utils::channel_pool::{FileConflict, NotifyingSender, UiEvent};
+use crate::core::runtime::event_bus::Dispatcher;
 use tracing::{info, warn, debug};
 
 pub static TOKIO_RUNTIME: Lazy<Runtime> = Lazy::new(|| {
@@ -103,19 +104,19 @@ impl GlobalClipboard {
         Self::inner().cut_items(items, current_cwd);
     }
 
-    pub fn paste(&self, sender: NotifyingSender) -> Result<(), String> {
+    pub fn paste(&self, sender: &Dispatcher) -> Result<(), String> {
         Self::inner().pastex(sender)
     }
 
-    pub fn move_files(&self, items: Vec<PathBuf>, dest: PathBuf, sender: NotifyingSender) -> Result<(), String> {
+    pub fn move_files(&self, items: Vec<PathBuf>, dest: PathBuf, sender: &Dispatcher) -> Result<(), String> {
         Self::inner().move_files(items, dest, ConflictStrategy::Ask, sender)
     }
 
-    pub fn move_to_trash(&self, items: Vec<Arc<FileEntry>>, current_cwd: PathBuf, sender: NotifyingSender) -> Result<(), String> {
+    pub fn move_to_trash(&self, items: Vec<Arc<FileEntry>>, current_cwd: PathBuf, sender: &Dispatcher) -> Result<(), String> {
         Self::inner().move_to_trash(items, current_cwd, sender)
     }
 
-    pub fn restore_from_trash(&self, items: Vec<String>, trash_root: PathBuf, sender: NotifyingSender) -> Result<(), String>  {
+    pub fn restore_from_trash(&self, items: Vec<String>, trash_root: PathBuf, sender: Dispatcher) -> Result<(), String>  {
         Self::inner().restore_items(items, trash_root, sender)
     }
 
@@ -213,7 +214,7 @@ impl Clipboard {
     }
 
 
-    pub fn pastex(&self, sender: NotifyingSender) -> Result<(), String> {
+    pub fn pastex(&self, sender: &Dispatcher) -> Result<(), String> {
         let mut inner = self.inner.lock().unwrap();
         let Some(dest) = inner.dest_dir.take() else {
             warn!("No hay destio donde pegar.");
@@ -224,7 +225,7 @@ impl Clipboard {
         let mode = inner.mode.clone();
         let task_id = new_task_id();
 
-        sender.send_tasks(
+        sender.send(
             TaskMessage::Started {
                 task_id,
                 text: "Pegando archivos...".to_string(),
@@ -234,6 +235,7 @@ impl Clipboard {
 
         let inner = Arc::clone(&self.inner);
 
+        let sender = sender.clone();
         TOKIO_RUNTIME.spawn(async move {
             let mut total_bytes_global: u64 = 0;
             for item in &items {
@@ -297,7 +299,7 @@ impl Clipboard {
 
                         let needs_root = err_msg.to_lowercase().contains("permission denied") || err_msg.to_lowercase().contains("permiso denegado");
 
-                        sender.send_ui_event(
+                        sender.send(
                             UiEvent::ShowError(err_msg)
                         ).ok();
 
@@ -325,7 +327,7 @@ impl Clipboard {
             inner.dest_dir = None; 
             
             info!("Todos los items procesados, mandando Finished");
-            sender.send_tasks(
+            sender.send(
                 TaskMessage::Finished {
                     task_id,
                     success: !has_errors,
@@ -342,7 +344,7 @@ impl Clipboard {
 
 
 
-    async fn paste_item_with_progress(src: &PathBuf, dest: &PathBuf, task_id: u64, sender: &NotifyingSender, copied_global: &Arc<AtomicU64>, total_bytes_global: u64, is_cut: bool) -> Result<(), String> {
+    async fn paste_item_with_progress(src: &PathBuf, dest: &PathBuf, task_id: u64, sender: &Dispatcher, copied_global: &Arc<AtomicU64>, total_bytes_global: u64, is_cut: bool) -> Result<(), String> {
 
         if is_cut {
             match tokio::fs::rename(src, dest).await {
@@ -386,7 +388,7 @@ impl Clipboard {
     }
 
 
-    async fn copy_file_with_progress(src: &PathBuf, dest: &PathBuf, task_id: u64, sender: &NotifyingSender, copied_global: &Arc<AtomicU64>, total_bytes_global: u64) -> Result<(), String>{
+    async fn copy_file_with_progress(src: &PathBuf, dest: &PathBuf, task_id: u64, sender: &Dispatcher, copied_global: &Arc<AtomicU64>, total_bytes_global: u64) -> Result<(), String>{
         let mut reader = tokio::fs::File::open(src)
             .await
             .map_err(|e| format!("Error abriendo origen: {}", e))?;
@@ -418,7 +420,7 @@ impl Clipboard {
             if last_update.elapsed().as_millis() > 100 {
                 let copied = copied_global.load(Ordering::Relaxed);
                 let progress = if total_bytes_global > 0 { copied as f32 / total_bytes_global as f32 } else { 0.0 };
-                sender.send_tasks(
+                sender.send(
                     TaskMessage::Progress { 
                         task_id, 
                         progress, 
@@ -437,7 +439,7 @@ impl Clipboard {
 
 
 
-    async fn copy_dir_recursive_async(src: &PathBuf, dest: &PathBuf, task_id: u64, sender: &NotifyingSender, copied_global: &Arc<AtomicU64>, total_bytes_global: u64) -> Result<(), String> {
+    async fn copy_dir_recursive_async(src: &PathBuf, dest: &PathBuf, task_id: u64, sender: &Dispatcher, copied_global: &Arc<AtomicU64>, total_bytes_global: u64) -> Result<(), String> {
         tokio::fs::create_dir_all(dest)
             .await
             .map_err(|e| format!("No se pudo crear carpeta: {}", e))?;
@@ -573,15 +575,16 @@ impl Clipboard {
     }
 
 
-    pub fn move_files(&self, items: Vec<PathBuf>, dest: PathBuf, conflict: ConflictStrategy, sender: NotifyingSender) -> Result<(), String> {
+    pub fn move_files(&self, items: Vec<PathBuf>, dest: PathBuf, conflict: ConflictStrategy, sender: &Dispatcher) -> Result<(), String> {
         let task_id = new_task_id();
 
-        sender.send_tasks(TaskMessage::Started { 
+        sender.send(TaskMessage::Started { 
             task_id, 
             text: "Moviendo archivos...".to_string(), 
             task_type: TaskType::CopyPaste,
         }).ok();
 
+        let sender = sender.clone();
         TOKIO_RUNTIME.spawn(async move {
             let total = items.len();
             let mut errors = Vec::new();
@@ -602,7 +605,7 @@ impl Clipboard {
                         ConflictStrategy::Overwrite => target,
                         ConflictStrategy::Rename => Self::resolve_dest_path(&target),
                         ConflictStrategy::Skip => {
-                            sender.send_tasks(TaskMessage::Progress {
+                            sender.send(TaskMessage::Progress {
                                 task_id,
                                 progress: (done + 1) as f32 / total as f32,
                                 text: format!("Omitido: {}", file_name.to_string_lossy()),
@@ -612,7 +615,7 @@ impl Clipboard {
                         },
                         ConflictStrategy::Ask => {
                             
-                            sender.send_ui_event(
+                            sender.send(
                                 UiEvent::FileConflict(
                                     FileConflict::AlreadyExist {
                                         name: file_name.to_string_lossy().to_string(),
@@ -645,7 +648,7 @@ impl Clipboard {
                     errors.push(format!("Error moviendo '{:?}': {}", file_name, e));
                 }
 
-                sender.send_tasks(TaskMessage::Progress {
+                sender.send(TaskMessage::Progress {
                     task_id,
                     progress: (done + 1) as f32 / total as f32,
                     text: format!("Moviendo {}...", file_name.to_string_lossy()),
@@ -653,7 +656,7 @@ impl Clipboard {
                 }).ok();
             }
 
-            sender.send_tasks(TaskMessage::Finished {
+            sender.send(TaskMessage::Finished {
                 task_id,
                 success: errors.is_empty(),
                 task_type: TaskType::CopyPaste,
@@ -724,9 +727,9 @@ impl Clipboard {
         }
     }
 
-    pub fn move_to_trash(&self, items: Vec<Arc<FileEntry>>, current_cwd: PathBuf, sender: NotifyingSender) -> Result<(), String> {
+    pub fn move_to_trash(&self, items: Vec<Arc<FileEntry>>, current_cwd: PathBuf, sender: &Dispatcher) -> Result<(), String> {
         let task_id = new_task_id();
-        sender.send_tasks(
+        sender.send(
             TaskMessage::Started { 
                 task_id, 
                 text: "Moviendo a la papelera...".to_string(), 
@@ -758,6 +761,7 @@ impl Clipboard {
             items_with_trash.push((item.clone(), source_path, trash_files_dir));
         }
 
+        let sender = sender.clone();
 
         TOKIO_RUNTIME.spawn(async move {
             let total = items.len();
@@ -821,7 +825,7 @@ impl Clipboard {
                     }
                 }
 
-                sender.send_tasks(TaskMessage::Progress { 
+                sender.send(TaskMessage::Progress { 
                     task_id, 
                     progress: (done + 1) as f32 / total as f32, 
                     text: "Procesando...".to_string(),
@@ -829,7 +833,7 @@ impl Clipboard {
                 }).ok();
             }
 
-            sender.send_tasks(
+            sender.send(
                 TaskMessage::Finished {
                     task_id, 
                     success: errors.is_empty(),
@@ -893,10 +897,10 @@ impl Clipboard {
     }
 
 
-    pub fn restore_items(&self, items_to_restore: Vec<String>, trash_root: PathBuf, sender: NotifyingSender) -> Result<(), String> {
+    pub fn restore_items(&self, items_to_restore: Vec<String>, trash_root: PathBuf, sender: Dispatcher) -> Result<(), String> {
         let task_id = new_task_id();
 
-        sender.send_tasks(TaskMessage::Started {
+        sender.send(TaskMessage::Started {
             task_id,
             text: "Restaurando desde la papelera...".to_string(),
             task_type: TaskType::RestoreTrash,
@@ -919,7 +923,7 @@ impl Clipboard {
                     }
                 }
 
-                sender.send_tasks(TaskMessage::Progress {
+                sender.send(TaskMessage::Progress {
                     task_id,
                     progress: (done + 1) as f32 / total as f32,
                     text: "Restaurando...".to_string(),
@@ -927,7 +931,7 @@ impl Clipboard {
                 }).ok();
             }
 
-            sender.send_tasks(TaskMessage::Finished {
+            sender.send(TaskMessage::Finished {
                 task_id,
                 success: errors.is_empty(),
                 task_type: TaskType::RestoreTrash,

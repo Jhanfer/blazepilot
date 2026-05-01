@@ -146,6 +146,60 @@ pub enum UiEvent {
 }
 
 
+
+//Macro para evitar repeticion de código eliminando canales
+macro_rules! remove_arc_pair {
+    ($self:expr, $tab_id:expr, $($map:ident), *) => {{
+        let mut removed = false;
+        $(
+            if let Some(arc_pair) = $self.$map.remove($tab_id) {
+                while let Ok(_) = arc_pair.1.try_recv() {}
+                removed = true;
+            }
+        )*
+        removed
+    }};
+}
+
+
+macro_rules! get_sender {
+    ($self:expr, $channels:ident, $tab_id:expr) => {{
+        if let Some(sender) = $self.$channels.get(&$tab_id) {
+            sender.0.clone()
+        } else {
+            let (tx, rx) = unbounded();
+            $self.$channels.insert($tab_id.clone(), (tx, rx).into());
+            $self.$channels.get(&$tab_id).unwrap().0.clone()
+        }
+    }};
+}
+
+
+//trait y macro para el sender, ya no se usa una para cada una, send global
+pub trait Routable: Sized {
+    fn sender(pool: &NotifyingSender) -> &Sender<Self>;
+}
+
+macro_rules! route {
+    ($($ty:ty => $field:ident),* $(,)?) => {
+        $(impl Routable for $ty {
+            fn sender(p: &NotifyingSender) -> &Sender<Self> {&p.$field}
+        })*
+    };
+}
+
+route! {
+    FileLoadingMessage => file_sender,
+    TaskMessage => task_sender,
+    RecursiveMessages => recursive_search_sender,
+    UiEvent => ui_event_sender,
+    FileOperation => file_operation_sender,
+    SizerMessages => sizer_sender,
+    ExtendedInfoMessages => extended_info_sender,
+    ThumbnailMessages => thumbnails_sender,
+}
+
+
 #[derive(Clone)]
 pub struct NotifyingSender {
     pub tab_id: Uuid,
@@ -162,66 +216,22 @@ pub struct NotifyingSender {
 }
 
 impl NotifyingSender {
-    pub fn send_files_batch(&self, msg: FileLoadingMessage) -> Result<(), SendError<FileLoadingMessage>> {
-        let result = self.file_sender.send(msg);
-        if result.is_ok() {(self.notifier)();}result
+    pub fn send<M: Routable>(&self, msg: M) -> Result<(), SendError<M>> {
+        let res = M::sender(self).send(msg);
+        if res.is_ok() { (self.notifier)(); }
+        res
     }
-
-    pub fn send_tasks(&self, msg: TaskMessage) -> Result<(), SendError<TaskMessage>> {
-        let result = self.task_sender.send(msg);
-        if result.is_ok() {(self.notifier)();}
-        result
-    }
-
-    pub fn send_recursive(&self, msg: RecursiveMessages) -> Result<(), SendError<RecursiveMessages>> {
-        let result = self.recursive_search_sender.send(msg);
-        if result.is_ok() {(self.notifier)();}
-        result
-    }
-
-    pub fn send_ui_event(&self, msg: UiEvent) -> Result<(), SendError<UiEvent>> {
-        let result = self.ui_event_sender.send(msg);
-        if result.is_ok() {(self.notifier)();}
-        result
-    }
-
-
-    pub fn send_fileop(&self, msg: FileOperation) -> Result<(), SendError<FileOperation>> {
-        let result = self.file_operation_sender.send(msg);
-        if result.is_ok() {(self.notifier)();}
-        result
-    }
-
-    pub fn send_sizer(&self, msg: SizerMessages) -> Result<(), SendError<SizerMessages>> {
-        let result = self.sizer_sender.send(msg);
-        if result.is_ok() {(self.notifier)();}
-        result
-    }
-
-    pub fn send_extended_info(&self, msg: ExtendedInfoMessages) -> Result<(), SendError<ExtendedInfoMessages>> {
-        let result = self.extended_info_sender.send(msg);
-        if result.is_ok() {(self.notifier)();}
-        result
-    }
-
-    pub fn send_thumbnails(&self, msg: ThumbnailMessages) -> Result<(), SendError<ThumbnailMessages>> {
-        let result = self.thumbnails_sender.send(msg);
-        if result.is_ok() {(self.notifier)();}
-        result
-    }
-
-
 }
 
 pub struct ChannelPool {
-    file_channels: HashMap<Uuid, Arc<(Sender<FileLoadingMessage>, Receiver<FileLoadingMessage>)>>,
-    task_channels: HashMap<Uuid, Arc<(Sender<TaskMessage>, Receiver<TaskMessage>)>>,
-    recursive_channels: HashMap<Uuid, Arc<(Sender<RecursiveMessages>, Receiver<RecursiveMessages>)>>,
-    ui_event_channels: HashMap<Uuid, Arc<(Sender<UiEvent>, Receiver<UiEvent>)>>,
-    fileops_channels: HashMap<Uuid, Arc<(Sender<FileOperation>, Receiver<FileOperation>)>>,
-    sizer_channels: HashMap<Uuid, Arc<(Sender<SizerMessages>, Receiver<SizerMessages>)>>,
-    extended_info_channels: HashMap<Uuid, Arc<(Sender<ExtendedInfoMessages>, Receiver<ExtendedInfoMessages>)>>,
-    thumbnails_channels: HashMap<Uuid, Arc<(Sender<ThumbnailMessages>, Receiver<ThumbnailMessages>)>>,
+    pub file_channels: HashMap<Uuid, Arc<(Sender<FileLoadingMessage>, Receiver<FileLoadingMessage>)>>,
+    pub task_channels: HashMap<Uuid, Arc<(Sender<TaskMessage>, Receiver<TaskMessage>)>>,
+    pub recursive_channels: HashMap<Uuid, Arc<(Sender<RecursiveMessages>, Receiver<RecursiveMessages>)>>,
+    pub ui_event_channels: HashMap<Uuid, Arc<(Sender<UiEvent>, Receiver<UiEvent>)>>,
+    pub fileops_channels: HashMap<Uuid, Arc<(Sender<FileOperation>, Receiver<FileOperation>)>>,
+    pub sizer_channels: HashMap<Uuid, Arc<(Sender<SizerMessages>, Receiver<SizerMessages>)>>,
+    pub extended_info_channels: HashMap<Uuid, Arc<(Sender<ExtendedInfoMessages>, Receiver<ExtendedInfoMessages>)>>,
+    pub thumbnails_channels: HashMap<Uuid, Arc<(Sender<ThumbnailMessages>, Receiver<ThumbnailMessages>)>>,
 
     ui_notifier: HashMap<Uuid, Arc<dyn Fn() + Send + Sync>>,
 }
@@ -258,7 +268,7 @@ impl ChannelPool {
         }
     }
 
-    pub fn register_notifier<F>(&mut self, tab_id: Uuid, notifier: F) 
+    pub fn register_notifier<F>(&mut self, tab_id: Uuid, notifier: F)
         where 
             F: Fn() + Send + Sync + 'static {
                 self.ui_notifier.insert(tab_id, Arc::new(notifier));
@@ -271,14 +281,47 @@ impl ChannelPool {
     }
 
     pub fn get_notifying_sender(&mut self, tab_id: Uuid) -> Option<NotifyingSender> {
-        let file_sender = self.get_file_sender(tab_id);
-        let task_sender = self.get_task_sender(tab_id);
-        let recursive_search_sender = self.get_recursive_sender(tab_id);
-        let ui_event_sender = self.get_ui_event_channels_sender(tab_id);
-        let file_operation_sender = self.get_fileop_sender(tab_id);
-        let sizer_sender = self.get_sizer_sender(tab_id);
-        let extended_info_sender = self.get_extended_info_sender(tab_id);
-        let thumbnails_sender = self.get_thumbnails_sender(tab_id);
+        let file_sender = get_sender! {
+            self, 
+            file_channels, 
+            &tab_id
+        };
+        let task_sender = get_sender! {
+            self, 
+            task_channels, 
+            &tab_id
+        };
+        let recursive_search_sender = get_sender! {
+            self, 
+            recursive_channels, 
+            &tab_id
+        };
+        let ui_event_sender = get_sender! {
+            self, 
+            ui_event_channels, 
+            &tab_id
+        };
+        let file_operation_sender = get_sender! {
+            self, 
+            fileops_channels, 
+            &tab_id
+        };
+        let sizer_sender = get_sender! {
+            self, 
+            sizer_channels, 
+            &tab_id
+        };
+        let extended_info_sender = get_sender! {
+            self, 
+            extended_info_channels, 
+            &tab_id
+        };
+        let thumbnails_sender = get_sender! {
+            self, 
+            thumbnails_channels, 
+            &tab_id
+        };
+
 
         let Some(notifier) = self.ui_notifier.get(&tab_id) else {
             warn!(tab_id = %tab_id, "NO HAY NOTIFIER para tab_id");
@@ -287,7 +330,7 @@ impl ChannelPool {
 
         info!(tab_id = %tab_id, "Notifier encontrado para tab_id");
         Some(
-            NotifyingSender { 
+            NotifyingSender {
                 tab_id, 
                 file_sender, 
                 task_sender, 
@@ -302,191 +345,19 @@ impl ChannelPool {
         )
     }
 
-    pub fn get_file_sender(&mut self, tab_id: Uuid) -> Sender<FileLoadingMessage> {
-        if !self.file_channels.contains_key(&tab_id) {
-            let (tx, rx) = unbounded();
-            self.file_channels.insert(tab_id, (tx, rx).into());
-        }
-        self.file_channels.get(&tab_id).unwrap().0.clone()
-    }
-
-    pub fn get_task_sender(&mut self, tab_id: Uuid) -> Sender<TaskMessage> {
-        if !self.task_channels.contains_key(&tab_id) {
-            let (tx, rx) = unbounded();
-            self.task_channels.insert(tab_id, (tx, rx).into());
-        }
-        self.task_channels.get(&tab_id).unwrap().0.clone()
-    }
-
-    pub fn get_recursive_sender(&mut self, tab_id: Uuid) -> Sender<RecursiveMessages> {
-        if !self.recursive_channels.contains_key(&tab_id) {
-            let (tx, rx) = unbounded();
-            self.recursive_channels.insert(tab_id, (tx, rx).into());
-        }
-        self.recursive_channels.get(&tab_id).unwrap().0.clone()
-    }
-
-    pub fn get_ui_event_channels_sender(&mut self, tab_id: Uuid) -> Sender<UiEvent> {
-        if !self.ui_event_channels.contains_key(&tab_id) {
-            let (tx, rx) = unbounded();
-            self.ui_event_channels.insert(tab_id, (tx, rx).into());
-        }
-        self.ui_event_channels.get(&tab_id).unwrap().0.clone()
-    }
-
-    pub fn get_fileop_sender(&mut self, tab_id: Uuid) -> Sender<FileOperation> {
-        if !self.fileops_channels.contains_key(&tab_id) {
-            let (tx, rx) = unbounded();
-            self.fileops_channels.insert(tab_id, (tx, rx).into());
-        }
-        self.fileops_channels.get(&tab_id).unwrap().0.clone()
-    }
-
-    pub fn get_sizer_sender(&mut self, tab_id: Uuid) -> Sender<SizerMessages> {
-        if !self.sizer_channels.contains_key(&tab_id) {
-            let (tx, rx) = unbounded();
-            self.sizer_channels.insert(tab_id, (tx, rx).into());
-        }
-        self.sizer_channels.get(&tab_id).unwrap().0.clone()
-    }
-
-    pub fn get_extended_info_sender(&mut self, tab_id: Uuid) -> Sender<ExtendedInfoMessages> {
-        if !self.extended_info_channels.contains_key(&tab_id) {
-            let (tx, rx) = unbounded();
-            self.extended_info_channels.insert(tab_id, (tx, rx).into());
-        }
-        self.extended_info_channels.get(&tab_id).unwrap().0.clone()
-    }
-
-    pub fn get_thumbnails_sender(&mut self, tab_id: Uuid) -> Sender<ThumbnailMessages> {
-        if !self.thumbnails_channels.contains_key(&tab_id) {
-            let (tx, rx) = unbounded();
-            self.thumbnails_channels.insert(tab_id, (tx, rx).into());
-        }
-        self.thumbnails_channels.get(&tab_id).unwrap().0.clone()
-    }
-
-    pub fn process_file_messages<F>(&self, tab_id: Uuid, mut processor: F) -> bool
+    pub fn drain<M, F>(&self, channels: &HashMap<Uuid, Arc<(Sender<M>, Receiver<M>)>>,tab_id: Uuid, mut processor: F) -> bool
         where
-            F: FnMut(FileLoadingMessage) -> bool
-        {
-            let mut processed_any = false;
-            
-            if let Some(arc_pair) = self.file_channels.get(&tab_id) {
+            F: FnMut(M) -> bool {                
+            let mut any = false;
+
+            if let Some(arc_pair) = channels.get(&tab_id) {
                 while let Ok(msg) = arc_pair.1.try_recv() {
                     if processor(msg) {
-                        processed_any = true;
+                        any = true;
                     }
                 }
             }
-            processed_any
-    }
-
-    pub fn process_task_messages<F>(&self, tab_id: Uuid, mut processor: F) -> bool
-        where 
-            F: FnMut(TaskMessage) -> bool
-        {
-            let mut processed_any = false;
-            if let Some(arc_pair) = self.task_channels.get(&tab_id) {
-                while let Ok(msg) = arc_pair.1.try_recv() {
-                    if processor(msg) {
-                        processed_any = true;
-                    }
-                }
-            }
-            processed_any
-        }
-
-
-    pub fn process_recursive_messages<F>(&self, tab_id: Uuid, mut processor: F) -> bool
-        where 
-            F: FnMut(RecursiveMessages) -> bool
-        {
-            let mut processed_any = false;
-            if let Some(arc_pair) = self.recursive_channels.get(&tab_id) {
-                while let Ok(msg) = arc_pair.1.try_recv() {
-                    if processor(msg) {
-                        processed_any = true;
-                    }
-                }
-            }
-            processed_any
-        }
-
-    pub fn process_ui_events<F>(&self, tab_id: Uuid, mut processor: F) -> bool 
-        where 
-            F: FnMut(UiEvent) -> bool 
-        {
-            let mut process_any = false;
-            if let Some(arc_pair) = self.ui_event_channels.get(&tab_id) {
-                while let Ok(msg) = arc_pair.1.try_recv() {
-                    if processor(msg) {
-                        process_any = true;
-                    }
-                }
-            }
-            process_any
-        }
-
-
-    pub fn process_fileops_events<F>(&self, tab_id: Uuid, mut processor: F) -> bool 
-        where 
-            F: FnMut(FileOperation) -> bool 
-        {
-            let mut process_any = false;
-            if let Some(arc_pair) = self.fileops_channels.get(&tab_id) {
-                while let Ok(msg) = arc_pair.1.try_recv() {
-                    if processor(msg) {
-                        process_any = true;
-                    }
-                }
-            }
-            process_any
-        }
-
-    pub fn process_sizer_events<F>(&self, tab_id: Uuid, mut processor: F) -> bool 
-        where 
-            F: FnMut(SizerMessages) -> bool 
-        {
-            let mut process_any = false;
-            if let Some(arc_pair) = self.sizer_channels.get(&tab_id) {
-                while let Ok(msg) = arc_pair.1.try_recv() {
-                    if processor(msg) {
-                        process_any = true;
-                    }
-                }
-            }
-            process_any
-        }
-
-    pub fn process_extended_info_events<F>(&self, tab_id: Uuid, mut processor: F) -> bool 
-        where 
-            F: FnMut(ExtendedInfoMessages) -> bool 
-        {
-            let mut process_any = false;
-            if let Some(arc_pair) = self.extended_info_channels.get(&tab_id) {
-                while let Ok(msg) = arc_pair.1.try_recv() {
-                    if processor(msg) {
-                        process_any = true;
-                    }
-                }
-            }
-            process_any
-        }
-
-    pub fn process_thumbnail_events<F>(&self, tab_id: Uuid, mut processor: F) -> bool 
-        where 
-            F: FnMut(ThumbnailMessages) -> bool 
-        {
-            let mut process_any = false;
-            if let Some(arc_pair) = self.thumbnails_channels.get(&tab_id) {
-                while let Ok(msg) = arc_pair.1.try_recv() {
-                    if processor(msg) {
-                        process_any = true;
-                    }
-                }
-            }
-            process_any
+            any
         }
 
     pub fn drain_file_loading_messages(&mut self, tab_id: Uuid) {
@@ -517,63 +388,29 @@ impl ChannelPool {
     }
 
 
-
-    pub fn get_or_create_file_channel(&mut self, tab_id: Uuid) -> (Sender<FileLoadingMessage>, Receiver<FileLoadingMessage>) {
-        let arc_pair = self.file_channels
-            .entry(tab_id)
-            .or_insert_with(|| {
-                let (tx, rx) = unbounded();
-                Arc::new((tx, rx))
-            });
-        (arc_pair.0.clone(), arc_pair.1.clone())
-    }
-
-    pub fn get_or_create_task_channel(&mut self, tab_id: Uuid) -> (Sender<TaskMessage>, Receiver<TaskMessage>) {
-        let arc_pair = self.task_channels
-            .entry(tab_id)
-            .or_insert_with(||{
-                let (tx, rx) = unbounded();
-                Arc::new((tx, rx))
-            });
-        (arc_pair.0.clone(), arc_pair.1.clone())
-    }
-
-
     pub fn remove_tab(&mut self, tab_id: Uuid) -> bool {
         self.ui_notifier.remove(&tab_id);
 
-        let mut removed = false;
+        let removed;
 
-        if let Some(arc_pair) = self.file_channels.remove(&tab_id) {
-            while let Ok(_) = arc_pair.1.try_recv() {}
-            removed = true;
+        removed = remove_arc_pair! {
+            self,
+            &tab_id,
+            file_channels,
+            task_channels,
+            ui_event_channels,
+            fileops_channels,
+            sizer_channels,
+            extended_info_channels,
+            thumbnails_channels
         };
-
-        if let Some(arc_pair) = self.task_channels.remove(&tab_id) {
-            while let Ok(_) = arc_pair.1.try_recv() {}
-            removed = true;
-        };
-
-        if let Some(arc_pair) = self.recursive_channels.remove(&tab_id) {
-            while let Ok(_) = arc_pair.1.try_recv() {}
-            removed = true;
-        };
-
-        if let Some(arc_pair) = self.ui_event_channels.remove(&tab_id) {
-            while let Ok(_) = arc_pair.1.try_recv() {}
-            removed = true;
-        };
-
-        if let Some(arc_pair) = self.fileops_channels.remove(&tab_id) {
-            while let Ok(_) = arc_pair.1.try_recv() {}
-            removed = true;
-        };
-
+        
         if removed {
             info!(tab_id = %tab_id, "Tab y canales removidos");
         } else {
             warn!(tab_id = %tab_id, "Se intentó remover tab inexistente");
         }
+
         removed
     }
 

@@ -19,10 +19,8 @@
 use std::{path::PathBuf, sync::Arc};
 use once_cell::sync::Lazy;
 use serde::{Serialize, Deserialize};
-use cfg_if::cfg_if;
 use tokio::sync::Mutex;
-use tracing::{warn, error, debug, info};
-use uuid::Uuid;
+use tracing::{error, debug};
 
 
 #[cfg(target_os = "linux")]
@@ -33,7 +31,7 @@ use crate::core::system::fileopener_module::platform::macos::{MacosOpener, MACOS
 
 #[cfg(target_os = "windows")]
 use crate::core::system::fileopener_module::platform::windows::{WindowsOpener, WINDOWS_FILE_OPENER};
-use crate::utils::channel_pool::NotifyingSender;
+use crate::core::runtime::event_bus::Dispatcher;
 
 
 
@@ -96,7 +94,7 @@ impl FileOpenerManager {
     }
 
 
-    pub async fn request_open_file(&mut self, path: PathBuf, sender: NotifyingSender) {
+    pub async fn request_open_file(&mut self, path: PathBuf, sender: Dispatcher) {
         match &mut self.opener {
             #[cfg(target_os = "linux")]
             PlatformOpener::Linux(op) => {
@@ -116,7 +114,7 @@ impl FileOpenerManager {
         }
     }
 
-    pub async fn request_open_file_with(&mut self, path: PathBuf, sender: NotifyingSender) {
+    pub async fn request_open_file_with(&mut self, path: PathBuf, sender: Dispatcher) {
         match &mut self.opener {
             #[cfg(target_os = "linux")]
             PlatformOpener::Linux(op) => {

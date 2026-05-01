@@ -18,7 +18,7 @@
 
 use egui::{Color32, Ui, CornerRadius, Frame, Margin, Order, Window};
 use tracing::info;
-use crate::{ui::blaze_ui_state::ModalDialog, utils::channel_pool::{FileOperation, with_active_sender}};
+use crate::{core::{runtime::{bus_structs::FileOperation, event_bus::Dispatcher}}, ui::blaze_ui_state::ModalDialog};
 
 
 pub struct ErrorDialog {
@@ -87,9 +87,7 @@ impl ErrorDialog {
                     ui.add_space(spacing);
                     if ui.button("Aceptar").clicked() {
 
-                        with_active_sender(|sender| {
-                            sender.send_fileop(FileOperation::Update).ok();
-                        });
+                        Dispatcher::current().send(FileOperation::Update).ok();
 
                         should_close = true;
                     }

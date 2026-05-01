@@ -1,6 +1,6 @@
 use std::sync::Arc;
 use egui::{Color32, Rect, Sense, Ui, pos2};
-use crate::{core::{blaze_state::{BlazeCoreState, NewItemType}, configs::config_state::with_configs, files::blaze_motor::motor_structs::FileEntry}, ui::{blaze_ui_state::BlazeUiState, icons_cache::icons}, utils::channel_pool::{SureTo, UiEvent}};
+use crate::{core::{blaze_state::{BlazeCoreState, NewItemType}, configs::config_state::with_configs, files::blaze_motor::motor_structs::FileEntry, runtime::{bus_structs::{SureTo, UiEvent}, event_bus::with_event_bus}}, ui::{blaze_ui_state::BlazeUiState, icons_cache::icons}};
 
 pub fn tools(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, files: &Vec<Arc<FileEntry>>, ui: &mut Ui) {
     ui.horizontal(|ui|{
@@ -167,12 +167,12 @@ pub fn tools(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, files: &Ve
             let trash = state.motor.borrow_mut().get_trash_dir(None).unwrap_or_default();
 
             if trash == cwd {
-                let Some(sender) = state.sender().cloned() else {return;};
-                let tab_id = state.motor.borrow_mut().active_tab().id;
+                let tab_id = state.active_id;
+                let dispatcher = with_event_bus(|e| e.dispatcher(tab_id));
 
                 let sources = state.get_selected_paths(files);
 
-                sender.send_ui_event(
+                dispatcher.send(
                     UiEvent::SureTo(
                         SureTo::SureToDelete { 
                             files: sources, 

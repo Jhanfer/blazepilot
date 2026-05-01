@@ -20,7 +20,7 @@ use self_update::cargo_crate_version;
 use tracing::{error, info};
 use uuid::Uuid;
 
-use crate::utils::channel_pool::{NotifyingSender, UiEvent};
+use crate::core::runtime::{bus_structs::UiEvent, event_bus::Dispatcher};
 
 #[derive(Debug)]
 pub enum UpdateMessages {
@@ -65,7 +65,7 @@ impl Updater {
         newv > curr
     }
 
-    pub fn check_for_update(&mut self, sender: NotifyingSender) {
+    pub fn check_for_update(&mut self, sender: Dispatcher) {
         let version = self.version.clone();
         let owner = self.owner.clone();
         let repo = self.repo.clone();
@@ -91,7 +91,7 @@ impl Updater {
                     if let Some(new_ver) = new_ver {
                         let tab_id = sender.tab_id;
                         if Self::is_newer_version(&version, &new_ver) {
-                            sender.send_ui_event(
+                            sender.send(
                                     UiEvent::UpdateMessages(
                                         UpdateMessages::NewVersionAvailable { 
                                         current_version: version, 
@@ -101,7 +101,7 @@ impl Updater {
                                 )
                             ).ok();
                         } else {
-                            sender.send_ui_event(
+                            sender.send(
                                     UiEvent::UpdateMessages(
                                         UpdateMessages::UpToDate
                                 )

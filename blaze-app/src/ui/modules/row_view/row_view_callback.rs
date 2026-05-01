@@ -1,7 +1,7 @@
 use std::sync::Arc;
 use egui::{CentralPanel, Color32, CornerRadius, Frame, Key, Margin, Rect, TextEdit, Ui};
-use tracing::{error};
-use crate::{core::{blaze_state::{BlazeCoreState, NewItemType}, files::blaze_motor::motor_structs::FileEntry, system::{extended_info::extended_info_manager::ExtendedInfoMessages, sizer_manager::sizer_manager::SizerMessages}}, ui::{blaze_ui_state::BlazeUiState, icons_cache::thumbnails::thumbnails_manager::ThumbnailMessages, modules::{custom_context_menu::context_state::ContextMenuKind, row_view::{drag_drop_logic::drag_files, hot_keys::hot_keys_logic, island_n_bubble::render_island_bubble, new_scroll_view::new_render_scrollview, render_drag::render_drag_files, rubber_band_logic::render_rubberband, tools_view::tools}}}};
+use tracing::{error, warn};
+use crate::{core::{blaze_state::{BlazeCoreState, NewItemType}, files::blaze_motor::motor_structs::FileEntry, runtime::event_bus::with_event_bus, system::{extended_info::extended_info_manager::ExtendedInfoMessages, sizer_manager::sizer_manager::SizerMessages}}, ui::{blaze_ui_state::BlazeUiState, icons_cache::thumbnails::thumbnails_manager::ThumbnailMessages, modules::{custom_context_menu::context_state::ContextMenuKind, row_view::{drag_drop_logic::drag_files, hot_keys::hot_keys_logic, island_n_bubble::render_island_bubble, new_scroll_view::new_render_scrollview, render_drag::render_drag_files, rubber_band_logic::render_rubberband, tools_view::tools}}}};
 
 
 fn new_ff_logic(state: &mut BlazeCoreState, ui: &mut Ui) {
@@ -97,11 +97,12 @@ fn background_response_logic(state: &mut BlazeCoreState, ui_state: &mut BlazeUiS
     let trash = state.motor.borrow_mut().get_trash_dir(None).unwrap_or_default();
 
     if trash == cwd {
-        let Some(sender) = state.sender().cloned() else {return;};
+        let tab_id = state.active_id;
+        let dispatcher = with_event_bus(|e| e.dispatcher(tab_id));
         if bg_response.secondary_clicked() {
             ui_state.context_menu_state.handle_response(&bg_response);
             ui_state.context_menu_state.kind = ContextMenuKind::BackgroundTrash;
-            ui_state.context_menu_state.target_sender = Some(sender);
+            ui_state.context_menu_state.target_sender = Some(dispatcher);
         }
     } else {
         if bg_response.secondary_clicked() {
@@ -195,51 +196,55 @@ pub fn render_row_view(ui: &mut Ui, files: &Vec<Arc<FileEntry>>, state: &mut Bla
                 //Background
                 background_response_logic(state, ui_state, files, ui, panel_top, total_rows, row_height, content_rect);
 
-            
-                //Disparador de sizer
-                if let Some(sender) = state.sender().cloned() {
-                    for i in state.row_view.first_visible..state.row_view.last_visible.min(files.len()) {
-                        let file = &files[i];
+                
+                let tab_id = state.active_id;
+                let dispatcher = with_event_bus(|e| e.dispatcher(tab_id));
 
-                        if file.is_dir 
-                            && !state.calculating_dir_sizes.contains(&file.full_path) 
-                            && !state.calculated_dir_sizes.contains(&file.full_path) 
-                        {
-                            state.calculating_dir_sizes.insert(file.full_path.clone());
-                            sender.send_sizer(SizerMessages::StartCal(file.full_path.clone())).ok();
+                //Disparador de sizer
+                
+                for i in state.row_view.first_visible..state.row_view.last_visible.min(files.len()) {
+                    let file = &files[i];
+
+                    if file.is_dir 
+                        && !state.calculating_dir_sizes.contains(&file.full_path) 
+                        && !state.calculated_dir_sizes.contains(&file.full_path) 
+                    {
+                        state.calculating_dir_sizes.insert(file.full_path.clone());
+                        if let Err(e) = dispatcher.send(SizerMessages::StartCal(file.full_path.clone())) {
+                            warn!("Error enviando Sizer: {}", e);
                         }
                     }
                 }
-
+                
 
                 //Disparador de Info extendida
-                if let Some(sender) = state.sender().cloned() {
-                    for i in state.row_view.first_visible..state.row_view.last_visible.min(files.len()) {
-                        let file = &files[i];
-                        if !state.calculating_extended_info.contains(&file.full_path) && !state.calculated_extended_info.contains(&file.full_path) {
-                            state.calculating_extended_info.insert(file.full_path.clone());
-                            sender.send_extended_info(ExtendedInfoMessages::StartScan(file.full_path.clone())).ok();
+                for i in state.row_view.first_visible..state.row_view.last_visible.min(files.len()) {
+                    let file = &files[i];
+                    if !state.calculating_extended_info.contains(&file.full_path) && !state.calculated_extended_info.contains(&file.full_path) {
+                        state.calculating_extended_info.insert(file.full_path.clone());
+                        if let Err(e) = dispatcher.send(ExtendedInfoMessages::StartScan(file.full_path.clone())) {
+                            warn!("Error enviando Sizer: {}", e);
                         }
                     }
                 }
+                
 
                 //disparador de thumbnails
-                if let Some(sender) = state.sender().cloned() {
-                    for i in state.row_view.first_visible..state.row_view.last_visible.min(files.len()) {
-                        let file = &files[i];
+                for i in state.row_view.first_visible..state.row_view.last_visible.min(files.len()) {
+                    let file = &files[i];
 
-                        let img_vid = file.extension.is_image() || file.extension.is_video();
+                    let img_vid = file.extension.is_image() || file.extension.is_video();
 
-                        if !ui_state.calculating_thumbnails.contains(&file.full_path) && !ui_state.calculated_thumbnails.contains(&file.full_path) && img_vid {
-                            let sent = sender.send_thumbnails(
-                                ThumbnailMessages::RequestThumb(file.full_path.clone())
-                            ).is_ok();
-                            if sent {
-                                ui_state.calculating_thumbnails.insert(file.full_path.clone());
-                            }
+                    if !ui_state.calculating_thumbnails.contains(&file.full_path) && !ui_state.calculated_thumbnails.contains(&file.full_path) && img_vid {
+                        let sent = dispatcher.send(
+                            ThumbnailMessages::RequestThumb(file.full_path.clone())
+                        ).is_ok();
+                        if sent {
+                            ui_state.calculating_thumbnails.insert(file.full_path.clone());
                         }
                     }
                 }
+                
 
 
                 //Scrollview

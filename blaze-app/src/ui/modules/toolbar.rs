@@ -18,7 +18,7 @@
 
 use egui::{Color32, CornerRadius, Frame, Margin, Panel, Rect, RichText, Sense, Stroke, Ui, pos2, vec2};
 use std::path::PathBuf;
-use crate::{core::blaze_state::BlazeCoreState, ui::{blaze_ui_state::BlazeUiState, icons_cache::icons}, utils::channel_pool::UiEvent};
+use crate::{core::{blaze_state::BlazeCoreState, runtime::{bus_structs::UiEvent, event_bus::with_event_bus}}, ui::{blaze_ui_state::BlazeUiState, icons_cache::icons}};
 
 
 fn render_bar_button<F>(ui: &mut Ui, total_height: f32, label: &'static str, bytes: &[u8], ui_state: &mut BlazeUiState, mut callback: F)
@@ -91,11 +91,11 @@ pub fn toolbar_component(ui: &mut Ui, state: &mut BlazeCoreState, ui_state: &mut
                     render_bar_button(ui, total_height, "UP", icons::ICON_ARROW_UP, ui_state, || state.up());
 
                     render_bar_button(ui, total_height, "⚙️", icons::ICON_SETTINGS, ui_state, || {
-                        if let Some(sender) = state.sender().cloned() {
-                            sender.send_ui_event(
-                                UiEvent::OpenConfigs
-                            ).ok();
-                        }
+                        let tab_id = state.active_id;
+                        let dispatcher = with_event_bus(|e| e.dispatcher(tab_id));
+                        dispatcher.send(
+                            UiEvent::OpenConfigs
+                        ).ok();
                     });
                     
                     
