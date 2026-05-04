@@ -136,7 +136,7 @@ pub fn render_row_view(ui: &mut Ui, files: &Vec<Arc<FileEntry>>, state: &mut Bla
         0
     };
 
-    let bottom_padding = 20.0 as i8;
+    let bottom_padding = 10.0 as i8;
     
     let custom_frame = Frame::NONE
         .fill(Color32::from_rgb(16, 21, 25))

@@ -61,8 +61,6 @@ pub fn tools(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, files: &Ve
         });
 
 
-
-
         let has_selection = state.selected_count(files.len()) > 0;
         let has_clipboard = state.clipboard.clipboard_has_files();
 
@@ -162,7 +160,7 @@ pub fn tools(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, files: &Ve
             Color32::WHITE,
         );
 
-        if del_resp.clicked() {
+        if del_resp.clicked() && has_selection {
             let cwd = state.cwd.clone();
             let trash = state.motor.borrow_mut().get_trash_dir(None).unwrap_or_default();
 
@@ -183,7 +181,6 @@ pub fn tools(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, files: &Ve
             } else {
                 state.move_to_trash(files);
             }
-            
         }
 
         ui.add_space(8.0);

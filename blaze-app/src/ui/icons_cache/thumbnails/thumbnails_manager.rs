@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::{path::PathBuf, sync::Arc, time::UNIX_EPOCH};
+use std::{io::{BufReader, Read}, path::PathBuf, sync::Arc, time::UNIX_EPOCH};
 use ffmpeg_sidecar::{download::auto_download, paths::ffmpeg_path};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
@@ -37,6 +37,9 @@ pub enum ThumbError {
 
     #[error("Error cargando imagen")]
     ImageError,
+
+    #[error("Formato no soportado")]
+    UnsuportedFormat,
 
     #[error("Error procesando SVG")]
     SvgError,
@@ -333,9 +336,25 @@ impl ThumbnailManager {
     async fn generate_image_thumb(path: &PathBuf) -> Result<Thumbnail, ThumbError> {
         let path = path.clone();
         tokio::task::spawn_blocking(move || -> Result<Thumbnail, ThumbError> {
-            let img = image::open(&path)
+
+            let mut file = std::fs::File::open(path.clone())
+                .map_err(|e| ThumbError::Io(e))?;
+
+            let mut header = [0u8; 16];
+
+            let n = file.read(&mut header)
+                .map_err(|e| ThumbError::Io(e))?;
+
+            let real_format = image::guess_format(&header[..n])
+                .map_err(|_| ThumbError::UnsuportedFormat)?;
+
+            let file = std::fs::File::open(path.clone())
+                .map_err(|e| ThumbError::Io(e))?;
+
+            let dynamic_image = image::ImageReader::with_format(BufReader::new(file), real_format)
+                .decode()
                 .map_err(|_| ThumbError::ImageError)?;
-            let resized = img.thumbnail(64, 64);
+            let resized = dynamic_image.thumbnail(64, 64);
             let rgba = resized.to_rgba8();
             let (w, h) = rgba.dimensions();
 

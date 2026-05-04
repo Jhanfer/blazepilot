@@ -514,7 +514,10 @@ impl ContextMenuState {
 
                 let mut child_ui = ui.new_child(UiBuilder::new().max_rect(text_rect));
 
+                let search_id = egui::Id::new("search_ctx_menu");
+
                 let text_edit = TextEdit::singleline(&mut state.search_filter)
+                    .id(search_id)
                     .hint_text("Buscar...")
                     .font(FontId::proportional(13.0))
                     .desired_width(text_rect.width());
@@ -879,8 +882,7 @@ impl ContextMenuState {
                             should_close = true;
                         }
                         Some(1) => {
-                            state.motor.borrow_mut().add_tab(file.full_path.clone());
-                            state.refresh();
+                            state.add_tab_from_file(file.full_path.clone());
                             should_close = true;
                         }
                         _ => {}

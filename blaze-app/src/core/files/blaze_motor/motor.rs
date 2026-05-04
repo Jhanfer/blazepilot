@@ -443,9 +443,9 @@ impl BlazeMotor {
         self.tabs[index].load_path(false, sender).ok();
     }
 
-    pub fn add_tab(&mut self, tab_path: PathBuf) {
+    pub fn add_tab(&mut self, tab_path: PathBuf) -> Option<Uuid> {
         if self.tabs.len() >= self.limit {
-            return;
+            return None;
         }
         let tab_id = Uuid::new_v4();
         let new_tab = TabState::new(tab_path, tab_id);
@@ -456,11 +456,13 @@ impl BlazeMotor {
         self.set_active_index(insert_index);
 
         self.start_tab_load(self.active_tab_index);
+
+        Some(tab_id)
     }
 
-    pub fn create_tab(&mut self) {
+    pub fn create_tab(&mut self) -> Option<Uuid> {
         if self.tabs.len() >= self.limit {
-            return;
+            return None;
         }
         let path = home_dir().unwrap();
         let tab_id = Uuid::new_v4();
@@ -471,6 +473,8 @@ impl BlazeMotor {
         self.set_active_index(insert_index);
 
         self.start_tab_load(self.active_tab_index);
+
+        Some(tab_id)
     }
 
     pub fn tab_title(&self, index:usize) -> String {

@@ -15,10 +15,11 @@
 
 
 
-use std::path::PathBuf;
+use std::{io::{BufReader, Read}, path::{Path, PathBuf}};
 use crossbeam_channel::{Receiver, bounded};
 use egui::{ColorImage, TextureHandle, TextureOptions, Ui, Vec2};
-use crate::core::system::clipboard::TOKIO_RUNTIME;
+use tracing::warn;
+use crate::{core::system::clipboard::TOKIO_RUNTIME, ui::image_preview::error::{ImagePreviewError, ImagePreviewResult}};
 
 
 pub struct ImagePreviewState {
@@ -147,11 +148,29 @@ impl ImagePreviewState {
         }
     }
 
-    fn img_handler(path: PathBuf) -> Option<ColorImage> {
-        let img = image::open(&path).ok()?;
-        let rgba = img.to_rgba8();
+
+    fn img_handler(path: &Path) -> ImagePreviewResult<ColorImage> {
+        let mut file = std::fs::File::open(path)
+            .map_err(|e| ImagePreviewError::Io(e))?;
+
+        let mut header = [0u8; 16];
+
+        let n = file.read(&mut header)
+            .map_err(|e| ImagePreviewError::Io(e))?;
+
+        let real_format = image::guess_format(&header[..n])
+            .map_err(|_| ImagePreviewError::UnsuportedFormat)?;
+
+        let file = std::fs::File::open(path)
+            .map_err(|e| ImagePreviewError::Io(e))?;
+
+        let dynamic_image = image::ImageReader::with_format(BufReader::new(file), real_format)
+            .decode()
+            .map_err(|e| ImagePreviewError::ImageError(e))?;
+    
+        let rgba = dynamic_image.to_rgba8();
         let (w, h) = rgba.dimensions();
-        Some(
+        Ok(
             ColorImage::from_rgba_unmultiplied(
                 [w as usize, h as usize],
                 &rgba.into_raw(),
@@ -159,10 +178,10 @@ impl ImagePreviewState {
         )
     }
     
-    fn svg_handler(path: PathBuf) -> Option<ColorImage> {
-        let data = std::fs::read(&path).ok()?;
+    fn svg_handler(path: PathBuf) -> ImagePreviewResult<ColorImage> {
+        let data = std::fs::read(&path)?;
         let opt = resvg::usvg::Options::default();
-        let tree = resvg::usvg::Tree::from_data(&data, &opt).ok()?;
+        let tree = resvg::usvg::Tree::from_data(&data, &opt)?;
         let size = tree.size();
 
         const MAX_SIZE: u32 = 1024;
@@ -173,7 +192,8 @@ impl ImagePreviewState {
         let target_width = (size.width() * scale).ceil() as u32;
         let target_height = (size.height() * scale).ceil() as u32;
 
-        let mut pixmap = resvg::tiny_skia::Pixmap::new(target_width, target_height)?;
+        let mut pixmap = resvg::tiny_skia::Pixmap::new(target_width, target_height)
+            .ok_or_else(|| ImagePreviewError::DimensionError)?;
 
         let transform = resvg::tiny_skia::Transform::from_scale(scale, scale);
         
@@ -181,7 +201,7 @@ impl ImagePreviewState {
 
         let image_data = pixmap.take();
 
-        Some(
+        Ok(
             ColorImage::from_rgba_unmultiplied(
                 [target_width as usize, target_height as usize],
                 &image_data,
@@ -190,7 +210,8 @@ impl ImagePreviewState {
     }
 
     fn spawn_load(path: Option<PathBuf>, ui: &mut Ui,) -> Option<Receiver<Option<ColorImage>>> {
-        let path = path?;
+        let path = path
+            .unwrap_or_default();
         let ui_clone = ui.clone();
         let (tx, rx) = bounded(1);
         let ext = path.extension()
@@ -199,26 +220,39 @@ impl ImagePreviewState {
             .unwrap_or_default();
 
         TOKIO_RUNTIME.spawn(async move {
-            let result = tokio::task::spawn_blocking(move || {
-                let res = match ext.as_str() {
-                    "png" | "jpg" | "jpeg" | "webp" | "gif" | "bmp" | "tiff" => {
-                        Self::img_handler(path)
-                    },
+            let image = tokio::task::spawn_blocking(move || {
 
-                    "svg" => Self::svg_handler(path),
+                if ext.as_str() == "svg" {
+                    return Self::svg_handler(path);
+                }
 
-                    _ => {None},
-                };
+                let is_image_ext = matches!(ext.as_str(),
+                    "png" | "jpg" | "jpeg" | "webp" | "gif" | "bmp" | "tiff"
+                );
 
-                res
+                if is_image_ext {
+                    Self::img_handler(&path)
+                } else {
+                    Err(ImagePreviewError::UnsuportedFormat)
+                }
             })
-            .await
-            .ok()
-            .flatten();
+            .await;
 
-            tx.send(result).ok();
+            match image {
+                Ok(Ok(color_image)) => {
+                    if let Err(e) = tx.send(Some(color_image)) {
+                        warn!("Error enviando la preview: {:?}", e);
+                    };
+                }
+                Ok(Err(preview_error)) => {
+                    warn!("Error del handler: {:?}", preview_error);
+                }
+                Err(join_err) => {
+                    warn!("Panic en spawn_blocking: {join_err}");
+                }
+            }
+
             ui_clone.request_repaint();
-            Some(())
         });
 
         Some(rx)

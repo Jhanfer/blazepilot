@@ -99,8 +99,8 @@ pub fn set_active_tab(id: Uuid) {
     ACTIVE_TAB_ID.with(|c| c.set(id));
 }
 
-pub fn active_tab_id() -> Uuid {
-    ACTIVE_TAB_ID.with(|c| c.get())
+tokio::task_local! {
+    static TASK_TAB_ID: Uuid;
 }
 
 
@@ -112,7 +112,21 @@ pub struct Dispatcher {
 
 impl Dispatcher {
     pub fn current() -> Self {
-        Self { tab_id: active_tab_id() }
+        let tab_id = TASK_TAB_ID
+            .try_with(|id| *id)
+            .unwrap_or_else(|_|{
+                ACTIVE_TAB_ID.with(|c| c.get())
+            });
+
+        Self { tab_id }
+    }
+
+    pub fn _spawn_for_tab<F>(tab_id: Uuid, future: F) -> tokio::task::JoinHandle<F::Output> 
+        where 
+            F: std::future::Future + Send + 'static,
+            F::Output: Send + 'static,
+        {
+        tokio::spawn(TASK_TAB_ID.scope(tab_id, future))
     }
 
     pub fn send<M: Routable>(&self, msg: M) -> Result<(), SendError<M>> {

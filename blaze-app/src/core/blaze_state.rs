@@ -628,7 +628,9 @@ impl BlazeCoreState {
     pub fn close_tab(&mut self, index:usize) -> bool {
         let (new_id, closed) = {
             let mut motor = self.motor_mut();
-            (motor.active_tab().id, motor.close_tab(index))
+            let closed = motor.close_tab(index);
+            let new_id = motor.active_tab().id;
+            (new_id, closed)
         };
         self.active_id = new_id;
         closed
@@ -637,18 +639,19 @@ impl BlazeCoreState {
     pub fn add_tab_from_file(&mut self, tab_path: PathBuf) {
         let new_id = {
             let mut motor = self.motor_mut();
-            motor.add_tab(tab_path);
-            motor.active_tab().id
+            motor.add_tab(tab_path)
         };
+        let Some(new_id) = new_id else {return;};
         self.active_id = new_id;
+        self.refresh();
     }
 
     pub fn create_tab(&mut self) {
         let new_id = {
             let mut motor = self.motor_mut();
-            motor.create_tab();
-            motor.active_tab().id
+            motor.create_tab()
         };
+        let Some(new_id) = new_id else {return;};
         self.active_id = new_id;
     }
 

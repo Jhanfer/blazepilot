@@ -15,7 +15,7 @@
 
 
 
-use std::{path::{Path, PathBuf}, sync::{Arc, RwLock}, time::UNIX_EPOCH};
+use std::{io::BufReader, path::{Path, PathBuf}, sync::{Arc, RwLock}, time::UNIX_EPOCH};
 use serde::{Deserialize, Serialize};
 use tokio::sync::Semaphore;
 use tracing::{error, warn};
@@ -318,20 +318,15 @@ impl ExtendedInfoManager {
             
             if is_image {
                 let path_clone = path.clone();
+                let file = std::fs::File::open(&path_clone)?;
+                let reader = image::ImageReader::new(BufReader::new(file))
+                    .with_guessed_format()
+                    .map_err(|_| ExtendedInfoError::DimensionError)?;
 
-                Some(
-                    tokio::task::spawn(async move {
-                        match image::image_dimensions(&path_clone) {
-                            Ok(i) => Ok(i),
-                            Err(e) => {
-                                warn!("Error leyendo las dimensiones de la imagen: {}", e);
-                                return Err(ExtendedInfoError::DimensionError);
-                            }
-                        }
-                    })
-                    .await
-                    .map_err(ExtendedInfoError::ThreadError)??
-                )
+                let dims = reader.into_dimensions()
+                    .map_err(|_| ExtendedInfoError::DimensionError)?;
+
+                Some(dims)
             } else {
                 None
             }

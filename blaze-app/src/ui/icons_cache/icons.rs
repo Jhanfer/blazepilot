@@ -59,3 +59,4 @@ pub const ICON_OPEN_ARROW_UP: &[u8] = include_bytes!("../assets/icons/circle-ope
 pub const ICON_OPEN_ARROW_DOWN: &[u8] = include_bytes!("../assets/icons/circle-open-arrow-down.svg");
 pub const ICON_DEVICE_PC: &[u8] = include_bytes!("../assets/icons/devices-pc.svg");
 pub const ICON_EXTRACT: &[u8] = include_bytes!("../assets/icons/arrow-autofit-down.svg");
+pub const ICON_DATABASE: &[u8] = include_bytes!("../assets/icons/database.svg");

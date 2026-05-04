@@ -207,7 +207,7 @@ pub fn hot_keys_logic(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, f
 
     // cambiar de pestaña y encender búsqueda
 
-    let text_edit_focused = ui.memory(|m| m.focused().is_some());
+    let text_edit_focused = ui.memory(|m| m.has_focus("search_bar".into())) || ui.memory(|m| m.has_focus("search_ctx_menu".into()));
     if !text_edit_focused {
         for event in &input.events {
             match event {
@@ -231,6 +231,9 @@ pub fn hot_keys_logic(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, f
                         Key::Num3 if modifiers.ctrl => {state.switch_to_tab(2); state.refresh();},
                         Key::Num4 if modifiers.ctrl => {state.switch_to_tab(3); state.refresh();},
                         Key::Num5 if modifiers.ctrl => {state.switch_to_tab(4); state.refresh();},
+
+                        Key::ArrowLeft if modifiers.ctrl => {state.prev_tab();},
+                        Key::ArrowRight if modifiers.ctrl => {state.next_tab();},
 
                         Key::A | Key::B | Key::C | Key::D | Key::E | Key::F | Key::G | Key::H | Key::I |
                         Key::J | Key::K | Key::L | Key::M | Key::N | Key::O | Key::P | Key::Q | Key::R |
@@ -271,7 +274,6 @@ pub fn hot_keys_logic(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, f
         if let Some(file) = first {
             if file.is_dir {
                 state.add_tab_from_file(file.full_path.clone());
-                state.refresh();
             }
         }
     }

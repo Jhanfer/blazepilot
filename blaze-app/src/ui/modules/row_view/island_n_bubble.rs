@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use egui::{Align2, Area, Color32, CornerRadius, FontId, Frame, Margin, Rect, ScrollArea, Sense, TextFormat, Ui, pos2, text::{LayoutJob, TextWrapping}, vec2};
+use egui::{Align2, Area, Color32, CornerRadius, FontId, Frame, Margin, Rect, RichText, ScrollArea, Sense, TextFormat, Ui, pos2, text::{LayoutJob, TextWrapping}, vec2};
 use crate::{core::{blaze_state::BlazeCoreState, files::blaze_motor::motor_structs::FileEntry}, ui::{blaze_ui_state::BlazeUiState, icons_cache::icons, task_manager::task_manager::TaskStatus}, utils::formating::format_size};
 
 pub fn render_island_bubble(ui: &mut Ui, state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, files: &Vec<Arc<FileEntry>>, bottom_padding: i8, tabs_height: i8) {
@@ -81,7 +81,7 @@ pub fn render_island_bubble(ui: &mut Ui, state: &mut BlazeCoreState, ui_state: &
                             ui.add_space(5.0);
                             
                             let (icon_rect, _) = ui.allocate_exact_size(icon_size, Sense::hover());
-                            let (icon_name, icon_bytes) = ("server", icons::ICON_SERVER);
+                            let (icon_name, icon_bytes) = ("database", icons::ICON_DATABASE);
                             let icon = ui_state.icon_cache.get_or_load(ui, icon_name, icon_bytes, Color32::GRAY);
                             
                             ui.painter().image(
@@ -100,8 +100,6 @@ pub fn render_island_bubble(ui: &mut Ui, state: &mut BlazeCoreState, ui_state: &
                     });
                 });
         }).response.rect;
-
-
 
 
 
@@ -359,6 +357,32 @@ pub fn render_island_bubble(ui: &mut Ui, state: &mut BlazeCoreState, ui_state: &
                             });
                     });
             }).response.rect;
+
+
+            Area::new("hints".into())
+                .anchor(Align2::CENTER_BOTTOM, [0.0, -(dist_from_bottom - 45.0)])
+                .order(egui::Order::Background)
+                .show(ui, |ui|{
+                    Frame::new()
+                        .inner_margin(Margin::symmetric(10, 4))
+                        .fill(Color32::from_rgb(36, 42, 47))
+                        .corner_radius(CornerRadius {
+                                nw: 10,
+                                ne: 10,
+                                sw: 0,
+                                se: 0,
+                        })
+                        .show(ui, |ui|{
+                            ui.horizontal_centered(|ui| {
+                                ui.label(
+                                    RichText::new("Ctrl + 1-5, Ctrl + <-/->, Tab, Shift + Tab")
+                                    .size(10.0)
+                                );
+                            });
+                    });
+                });
+
+
 
             let gap = 8.0;
             Area::new("new_tab_btn".into()) 
