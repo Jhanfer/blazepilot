@@ -334,15 +334,20 @@ impl ExtendedInfoManager {
             None
         };
 
-
-        let git_status = {
+    
+        let git_status = if path.starts_with(".git") || path.to_string_lossy().contains(".git") {
             let path_clone = path.clone();
-            tokio::task::spawn(async move {
+            let res = tokio::task::spawn(async move {
+                
                 Self::get_git_status(&path_clone)
             })
             .await
-            .map_err(ExtendedInfoError::ThreadError)?
-        }?;
+            .map_err(ExtendedInfoError::ThreadError)??;
+
+            Some(res)
+        } else {
+            None
+        };
 
 
         Ok(
@@ -351,7 +356,7 @@ impl ExtendedInfoManager {
                 group_name,
                 symlink_target,
                 dimensions,
-                git_status: Some(git_status),
+                git_status: git_status,
             }
         )
     }

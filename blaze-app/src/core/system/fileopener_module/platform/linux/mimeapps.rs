@@ -1,34 +1,21 @@
-// Copyright 2026 Jhanfer
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
-
-
-
-
 use std::{env, fs, collections::HashSet, path::PathBuf};
-use crate::core::system::fileopener_module::platform::linux::mimeappsfile::MimeAppsFile;
-
+use crate::core::system::fileopener_module::{error::{OpenerError, OpenerResult}, platform::linux::mimeappsfile::MimeAppsFile};
 
 pub struct MimeApps {
-    files: Vec<PathBuf>,
+    _files: Vec<PathBuf>,
     parsed: Vec<MimeAppsFile>,
 }
 
 impl MimeApps {
-    pub fn load() -> Self {
-        let mut files = Vec::new();
+    pub fn empty() -> Self {
+        Self {
+            _files: Vec::new(),
+            parsed: Vec::new(),
+        }
+    }
 
+    pub fn load() -> OpenerResult<Self> {
+        let mut files = Vec::new();
 
         // XDG_CONFIG_HOME o ~/.config
         let config_home = env::var_os("XDG_CONFIG_HOME")
@@ -43,7 +30,6 @@ impl MimeApps {
         if user_mimeapps.is_file() {
             files.push(user_mimeapps);
         }
-
 
         // XDG_CONFIG_DIRS (p.ej. /etc/xdg)
         if let Some(config_dirs) = env::var_os("XDG_CONFIG_DIRS") {
@@ -61,7 +47,6 @@ impl MimeApps {
             }
         }
 
-
         // XDG_DATA_HOME/applications/mimeapps.list 
         let data_home = env::var_os("XDG_DATA_HOME")
             .map(PathBuf::from)
@@ -76,7 +61,6 @@ impl MimeApps {
         if data_home_mimeapps.is_file() {
             files.push(data_home_mimeapps);
         }
-
 
         // XDG_DATA_DIRS/applications/mimeapps.list (p.ej. /usr/share/applications)
         if let Some(data_dirs) = env::var_os("XDG_DATA_DIRS") {
@@ -98,15 +82,19 @@ impl MimeApps {
 
         let mut parsed = Vec::new();
         for path in &files {
-            if let Ok(content) = fs::read_to_string(path) {
-                let mf = MimeAppsFile::parse(&content);
-                parsed.push(mf);
+            match fs::read_to_string(path) {
+                Ok(content) => {
+                    let mf = MimeAppsFile::parse(&content);
+                    parsed.push(mf);
+                },
+                Err(e) => {
+                    return Err(OpenerError::Io { path: path.clone(), source: e });
+                }
             }
         }
 
-        Self { files, parsed }
+        Ok(Self { _files: files, parsed })
     }
-
 
     pub fn apps_for_mime(&self, mime: &str) -> Vec<String> {
         let mut result: Vec<String> = Vec::new();
@@ -148,21 +136,19 @@ impl MimeApps {
         None
     }
 
-
     pub fn is_removed(&self, mime: &str, desktop_id: &str) -> bool {
         self.parsed.iter().any(|mf| {
             mf.removed.get(mime)
-                .map(|v| v.iter().any(|d| d == desktop_id ))
+                .map(|v| v.iter().any(|d| d == desktop_id))
                 .unwrap_or(false)
         })
     }
 
-
-    pub fn files(&self) -> &[PathBuf] {
-        &self.files
+    pub fn _files(&self) -> &[PathBuf] {
+        &self._files
     }
 
-    pub fn parsed(&self) -> &[MimeAppsFile] {
+    pub fn _parsed(&self) -> &[MimeAppsFile] {
         &self.parsed
     }
 }

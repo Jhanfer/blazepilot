@@ -4,7 +4,7 @@ use file_id::FileId;
 use uuid::Uuid;
 use crate::core::files::blaze_motor::motor_structs::FileEntry;
 use crate::core::system::fileopener_module::AppAssociation;
-use crate::core::system::fileopener_module::platform::linux::linux::AppsIconData;
+use crate::core::system::fileopener_module::platform::linux::structs::AppsIconData;
 use crate::core::system::updater::updater::UpdateMessages;
 use crate::ui::image_preview::image_preview::ImagePreviewState;
 

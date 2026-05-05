@@ -16,7 +16,9 @@
 
 
 
-use crate::core::{configs::config_state::with_configs, system::fileopener_module::fileopener_manager::AppAssociation};
+use tracing::warn;
+
+use crate::core::{configs::config_state::with_configs, system::fileopener_module::{error::{OpenerError, OpenerResult}, fileopener_manager::AppAssociation}};
 use std::{fs, path::PathBuf, collections::HashMap};
 
 pub type UserAssociations = HashMap<String, AppAssociation>;
@@ -36,8 +38,8 @@ impl AssociationManager {
         let associations = if config_path.exists() {
             fs::read_to_string(&config_path)
                 .ok()
-                .and_then(|s| serde_json::from_str(&s).ok())
-                .unwrap_or_default()
+                .and_then(|assoc_str| serde_json::from_str(&assoc_str).ok())
+                .unwrap_or_else(UserAssociations::new)
         } else {
             UserAssociations::new()
         };
@@ -49,22 +51,30 @@ impl AssociationManager {
     }
 
 
-    pub fn get_associations(&mut self, mime: &str) -> Option<&AppAssociation> {
+    pub fn get_associations(&self, mime: &str) -> Option<&AppAssociation> {
         self.associations.get(mime)
     }
 
     pub fn set_association(&mut self, mime: &str, app: AppAssociation) {
         self.associations.insert(mime.to_string(), app);
-        self.save();
+        if let Err(e) = self.save() {
+            warn!("Error guardando la asociación de programas: {}", e)
+        }
     }
 
-    fn save(&self) {
+    fn save(&self) -> OpenerResult<()> {
         if let Some(parent) = self.config_path.parent() {
-            fs::create_dir_all(parent).ok();
+            fs::create_dir_all(parent)
+                .map_err(|e| OpenerError::Io { path: parent.to_owned(), source: e })?;
         }
-        if let Ok(json) = serde_json::to_string_pretty(&self.associations) {
-            fs::write(&self.config_path, json).ok();
-        }
+        
+        let json = serde_json::to_string_pretty(&self.associations)
+            .map_err(|e| OpenerError::SerdeError(e))?;
+
+        fs::write(&self.config_path, json)
+            .map_err(|e| OpenerError::Io { path: self.config_path.clone(), source: e })?;
+        
+        Ok(())
     }
 }
 

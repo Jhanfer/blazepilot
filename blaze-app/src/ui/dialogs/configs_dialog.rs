@@ -17,7 +17,7 @@
 
 
 use core::f32;
-use egui::{Area, CentralPanel, Color32, ComboBox, Ui, CornerRadius, Frame, Margin, OpenUrl, Order, Panel, RichText, TextEdit, Window, pos2};
+use egui::{Area, CentralPanel, Color32, ComboBox, CornerRadius, Frame, Key, Margin, OpenUrl, Order, Panel, RichText, TextEdit, Ui, Window, pos2};
 use crate::{core::{configs::config_state::{DisplayBackend, with_configs}, system::{clipboard::TOKIO_RUNTIME, terminal_opener::terminal_manager::GLOBAL_TERMINAL_MANAGER}}, ui::blaze_ui_state::ModalDialog};
 
 #[derive(PartialEq, Clone, Copy)]
@@ -380,6 +380,8 @@ impl ConfigDialog {
             .fill(Color32::from_rgb(16, 21, 25))
             .outer_margin(Margin::same(5));
 
+        let mut close_requested = false;
+
         Window::new("Configuraciones")
             .frame(custom_frame)
             .order(Order::Foreground)
@@ -438,12 +440,19 @@ impl ConfigDialog {
                     .show(ui, |ui|{
 
                         if ui.button("cerrar").clicked() {
-                            self.close();
+                            close_requested = true;
                         }
                 });
-
             });
 
         self.show_modal = config_open;
+        
+        let input = ui.input(|i| i.clone());
+
+        if input.key_pressed(Key::Escape) || close_requested {
+            self.close();
+        }
+
+        
     }
 }

@@ -20,7 +20,7 @@ use std::path::PathBuf;
 use egui::{Color32, ColorImage, Ui, Frame, Margin, Order, RichText, ScrollArea, TextureOptions, Window, scroll_area::ScrollSource};
 use tracing::info;
 
-use crate::{core::system::{clipboard::TOKIO_RUNTIME, fileopener_module::{AppAssociation, GLOBAL_FILE_OPENER, platform::linux::linux::AppsIconData}}, ui::blaze_ui_state::ModalDialog};
+use crate::{core::system::{clipboard::TOKIO_RUNTIME, fileopener_module::{AppAssociation, GLOBAL_FILE_OPENER, platform::linux::structs::AppsIconData}}, ui::blaze_ui_state::ModalDialog};
 
 pub struct SelectorData {
     pub path: PathBuf,
@@ -154,7 +154,7 @@ impl AppSelectorDialog {
     pub fn render_app_selector(&mut self, ui: &mut Ui) {
         if self.selector_data.is_none() {return;}
 
-        let mut should_close = false;
+        let mut should_close = self.show_modal;
 
         self.load_textures(ui);
 
@@ -168,6 +168,9 @@ impl AppSelectorDialog {
             .map(|f| f.to_string_lossy().into_owned())
             .unwrap_or_else(|| data.mime.clone());
 
+
+        let mut close_requested = false;
+
         Window::new(format!("Abrir «{}» con...", file_name))
             .frame(custom_frame)
             .order(Order::Foreground)
@@ -176,7 +179,7 @@ impl AppSelectorDialog {
             .default_size([480.0, 520.0])
             .min_size([400.0, 300.0])
             .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
-            .open(&mut self.show_modal)
+            .open(&mut should_close)
             .show(ui, |ui|{
                 ui.heading("Seleccionar aplicación");
                 ui.separator();
@@ -194,7 +197,7 @@ impl AppSelectorDialog {
 
                         for (i, app) in data.apps.iter().enumerate() {
                             if app.is_recommended {
-                                should_close |= Self::render_selector_button(ui, app, data, i);
+                                close_requested |= Self::render_selector_button(ui, app, data, i);
                             }
                         }
 
@@ -209,7 +212,7 @@ impl AppSelectorDialog {
 
                             for (i, app) in data.apps.iter().enumerate() {
                                 if !app.is_recommended {
-                                    should_close |= Self::render_selector_button(ui, &app, data, i);
+                                    close_requested |= Self::render_selector_button(ui, &app, data, i);
                                 }
                             }
                         }
@@ -220,13 +223,16 @@ impl AppSelectorDialog {
 
                 ui.horizontal(|ui| {
                     if ui.button("Cerrar").clicked() {
-                        should_close = true;
+                        close_requested = true;
                     }
                 });
             });
 
-        if should_close {
+
+        if close_requested {
             self.close();
         }
+
+        self.show_modal = should_close;
     }
 }
