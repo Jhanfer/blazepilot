@@ -17,7 +17,7 @@
 use std::path::PathBuf;
 
 use dirs::{desktop_dir, document_dir, download_dir, home_dir, picture_dir};
-use egui::{Color32, CornerRadius, FontId, Frame, Margin, Panel, Rect, ScrollArea, Sense, Ui, pos2, scroll_area::ScrollSource, vec2};
+use egui::{Align2, Color32, CornerRadius, FontId, Frame, Margin, Panel, Rect, ScrollArea, Sense, Ui, pos2, scroll_area::ScrollSource, vec2};
 use tracing::info;
 use crate::{core::{blaze_state::BlazeCoreState, configs::config_state::{FavoriteLinks, with_configs}, system::{clipboard::TOKIO_RUNTIME, disk_reader::disk::Disk}}, ui::{blaze_ui_state::BlazeUiState, icons_cache::icons::{ICON_ARCHIVE, ICON_DESKTOP, ICON_DEVICE_PC, ICON_DOWNLOADS, ICON_HOME, ICON_POLAROID, ICON_SERVER, ICON_STAR, ICON_TRASH, ICON_USB, ICON_USER}, modules::custom_context_menu::context_state::ContextMenuKind}};
 
@@ -177,27 +177,37 @@ pub fn render_fav_buttons(ui: &mut Ui, fav: FavoriteLinks, state: &mut BlazeCore
 
 
 pub fn render_drives_button(ui: &mut Ui, state: &mut BlazeCoreState, drive: Disk, ui_state: &mut BlazeUiState) {
+    let used = drive.used_percent as f32 / 100.0;
+    let is_mounted = !drive.mountpoint.is_none();
+    let used_percentage = format!("Usado {}%", drive.used_percent as i32);
+    let is_removable = drive.is_removable;
+    let is_system = drive.is_system;
+
+    let btn_h = if is_mounted {
+        50.0
+    } else {
+        30.0
+    };
+
     let (rect, response) = ui.allocate_exact_size(
-        egui::vec2(ui.available_width(), 30.0),
+        egui::vec2(ui.available_width(), btn_h),
         Sense::click_and_drag()
     );
 
-    if response.clicked() && !drive.mountpoint.is_none() {
+
+    if response.clicked() && is_mounted {
         let path_string = drive.mountpoint.clone().unwrap_or_default();
         let path = PathBuf::from(path_string);
         state.navigate_to(path);
     }
 
 
-    let root_symbol = "/".to_string();
-    let display_name = if drive.mountpoint == Some(root_symbol.clone()) {
-        root_symbol
+    let display_name = if drive.mountpoint == Some("/".to_owned()) {
+        "Root".to_owned()
     } else {
         drive.display_name.clone()
     };
 
-    let is_removable = drive.is_removable;
-    let is_system = drive.is_system;
 
     if response.secondary_clicked() {
         ui_state.context_menu_state.handle_response(&response);
@@ -213,7 +223,50 @@ pub fn render_drives_button(ui: &mut Ui, state: &mut BlazeCoreState, drive: Disk
         egui::Color32::from_rgba_unmultiplied(255, 255, 255, 15)
     };
 
-    ui.painter().rect_filled(rect, 5.0, bg_color);
+    ui.painter()
+        .rect_filled(rect, 5.0, bg_color);
+
+    response.on_hover_text(used_percentage);
+
+    if is_mounted {
+        let padding_x = 34.0;
+        let padding_y = 10.0;
+        let height = 6.0;
+
+        let progress_rect = Rect::from_min_size(
+            pos2(rect.min.x + padding_x, rect.min.y - height + rect.height() - padding_y),
+            vec2(rect.width() - (padding_x * 2.0), height),
+        );
+
+        //Fondo de la barra
+        ui.painter()
+            .rect_filled(progress_rect, 10.0, Color32::from_rgba_unmultiplied(255, 255, 255, 30));
+
+
+        let filled_width = progress_rect.width() * used.clamp(0.0, 1.0);
+        let filled_rect = Rect::from_min_size(
+            progress_rect.min,
+            vec2(filled_width, progress_rect.height()),
+        );
+
+
+        let progress_color = if used >= 0.90 {
+            Color32::from_rgb(239, 68, 68)
+        } else if used >= 0.75 {
+            Color32::from_rgb(249, 115, 22)
+        } else if used >= 0.50 {
+            Color32::from_rgb(250, 204, 21)
+        } else if used >= 0.25 {
+            Color32::from_rgb(56, 189, 248)
+        } else {
+            Color32::from_rgb(94, 234, 212)
+        };
+
+        //relleno
+        ui.painter().rect_filled(filled_rect, 10.0, progress_color);
+
+    }
+
 
     let color = Color32::WHITE;
 
@@ -236,9 +289,15 @@ pub fn render_drives_button(ui: &mut Ui, state: &mut BlazeCoreState, drive: Disk
     );
 
 
+    let y = if is_mounted {
+        -8.0
+    } else {
+        0.0
+    };
+
     ui.painter().text(
-        rect.left_center() + vec2(34.0, 0.0),
-        egui::Align2::LEFT_CENTER,
+        rect.left_center() + vec2(34.0, y), 
+        Align2::LEFT_CENTER,
         display_name,
         FontId::default(),
         ui.visuals().text_color(),

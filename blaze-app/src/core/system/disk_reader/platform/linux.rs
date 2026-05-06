@@ -28,7 +28,7 @@ use udisks2::{Client, filesystem::FilesystemProxy, block::BlockProxy};
 use zbus::zvariant::{ObjectPath, Value};
 use libc::statvfs64;
 use tokio_stream::StreamExt;
-
+use users::{get_current_uid, get_current_gid};
 
 pub struct LinuxDisks {
     partitions: Vec<Disk>,
@@ -51,6 +51,7 @@ impl LinuxDisks {
         self.partitions.clone()
     }
 
+
     pub async fn load_disks(&mut self) {
         self.partitions.clear();
         let manager = self.client.manager();
@@ -65,133 +66,141 @@ impl LinuxDisks {
 
         info!("UDisks2 devolvió {} block devices", block_paths.len());
 
+
         for path in block_paths {
-            let object_path_str = path.to_string();
-            let object = match self.client.object(path) {
-                Ok(o) => o,
-                Err(e) => {
-                    warn!("No se pudo obtener object para {}: {}", object_path_str, e);
-                    continue;
-                }
-            };
-
-            let block: BlockProxy = match object.block().await {
-                Ok(b) => b,
-                Err(e) => {
-                    warn!("No BlockProxy en {}: {}", object_path_str, e);
-                    continue;
-                }
-            };
-
-            if block.hint_ignore().await.unwrap_or(false) { continue; }
-
-            let dev_bytes = match block.device().await {
-                Ok(bytes) => bytes,
-                Err(_) => continue,
-            };
-
-            let device = String::from_utf8_lossy(&dev_bytes)
-                .trim_end_matches('\0')
-                .to_string();
-
-            if device.is_empty() || device == "/dev/" {
-                continue;
+            if let Some(disk) = self.process_block_device(path.into()).await {
+                self.partitions.push(disk);
             }
-
-            let size = block.size().await.unwrap_or(0);
-
-            if size < 1_048_576 || device.starts_with("/dev/loop") || device.starts_with("/dev/zram") {
-                continue;
-            }
-            
-            let label_opt = block.id_label().await.ok().filter(|s| !s.is_empty());
-            
-            let name = block.hint_name().await.ok().filter(|s| !s.is_empty());
-
-            let kernel_name = block.device().await.ok().and_then(|bytes|{
-                String::from_utf8(bytes).ok()
-                    .map(|p| p.trim_matches(char::from(0)).split("/").last().unwrap_or(&p).to_string())
-            });
-
-            let uuid_opt = block.id_uuid().await.ok().filter(|s| !s.is_empty());
-
-            let (is_removable, _) = match self.client.drive_for_block(&block).await {
-                Ok(drive) => {
-                    let removable = drive.removable().await.unwrap_or(false);
-                    let bus = drive.connection_bus().await.unwrap_or_default();
-                    (removable || bus == "usb" || bus == "ieee1394", bus)
-                }
-                Err(_) => (false, String::new()),
-            };
-
-            let idtype_opt = block.id_type().await.ok().filter(|s| !s.is_empty());
-
-            let ends_with_number = device.chars().rev().next().map_or(false, |c| c.is_numeric());
-            let has_partition_suffix = device.contains('p') || ends_with_number && device.matches(|c: char| c.is_numeric()).count() > 1;
-            let is_partition = idtype_opt.is_some() || has_partition_suffix;
-
-            if !is_partition && !is_removable {
-                continue;
-            }
-
-            let mut mountpoint: Option<String> = None;
-            let mut available: u64 = 0;
-            let mut total: u64 = size;
-            let mut used_percent: f32 = 0.0;
-
-            if let Ok(fs) = object.filesystem().await {
-                let mount_points = fs.mount_points().await.unwrap_or_default();
-                if let Some(mp_bytes) = mount_points.first() {
-                    let mp = String::from_utf8_lossy(mp_bytes).trim_end_matches('\0').to_string();
-                    if !mp.is_empty() {
-                        mountpoint = Some(mp.clone());
-                        if let Some((avail, tot, perc)) = self.get_fs_usage(&mp) {
-                            available = avail;
-                            total = tot.max(size);
-                            used_percent = perc;
-                        }
-                    }
-                }
-            }
-
-            let system_paths = ["/", "/home", "/boot", "/boot/efi", "/var", "/etc", "/tmp", "/usr"];
-            let is_system = mountpoint.as_deref().map_or(false, |mp| {
-                system_paths.contains(&mp) || mp.starts_with("/snap/")
-            });
-
-            if idtype_opt.as_deref() == Some("swap") || device.starts_with("/dev/loop") || device.starts_with("/dev/zram") || size < 1_048_576 || (idtype_opt.is_none() && mountpoint.is_none()) {
-                continue;
-            }
-
-            let display_name = label_opt.clone()
-                .or(name.clone())
-                .or(kernel_name)
-                .or_else(|| mountpoint.clone())
-                .unwrap_or_else(|| device.clone());
-
-            self.partitions.push(
-                Disk {
-                    display_name,
-                    device: Some(device),
-                    idtype: idtype_opt,
-                    label: label_opt,
-                    uuid: uuid_opt,
-                    mountpoint,
-                    available,
-                    total,
-                    used_percent,
-                    is_removable,
-                    is_partition,
-                    size,
-                    is_system,
-                }
-            );
         }
 
         self.partitions.sort_by_key(|d| d.device.clone().unwrap_or_default());
-
-        info!("Procesadas {} entradas válidas (particiones con filesystem)", self.partitions.len());
+        info!("Procesadas {} entradas válidas", self.partitions.len());
     }
+
+
+    async fn process_block_device(&self, path: ObjectPath<'_>) -> Option<Disk> {
+        let object = self.client.object(path).ok()?;
+        let block  = object.block().await.ok()?;
+
+
+        if block.hint_ignore().await.unwrap_or(false) {
+            return None;
+        }
+
+        let dev_bytes = block.device().await.ok()?;
+
+        let device = String::from_utf8_lossy(&dev_bytes)
+            .trim_end_matches('\0')
+            .to_string();
+
+        if device.is_empty() || device == "/dev/" 
+            || device.starts_with("/dev/loop") 
+            || device.starts_with("/dev/zram") {
+            return None;
+        }
+
+        let size = block.size().await.unwrap_or(0);
+        if size < 1_048_576 { return None; }
+        
+        let idtype_opt = block.id_type().await.ok().filter(|s| !s.is_empty());
+        if idtype_opt.as_deref() == Some("swap") { return None; }
+        
+        let label_opt= block.id_label().await.ok().filter(|s| !s.is_empty());
+        let name = block.hint_name().await.ok().filter(|s| !s.is_empty());
+        let uuid_opt = block.id_uuid().await.ok().filter(|s| !s.is_empty());
+        let kernel_name = Self::extract_kernel_name(&block).await;
+
+        let is_removable = Self::check_removable(&self.client, &block).await;
+        
+        let has_partition_table = object.partition_table().await.is_ok();
+
+        if has_partition_table {
+            return None;
+        }
+
+        let is_partition = object.partition().await.is_ok();
+
+        if !is_partition && !is_removable { return None; }
+
+        let (mountpoint, available, total, used_percent) = self.read_fs_info(&object, size).await;
+
+        let is_system = Self::check_is_system(mountpoint.as_deref());
+
+        let display_name = label_opt.clone()
+            .or(name.clone())
+            .or(kernel_name)
+            .or_else(|| mountpoint.clone())
+            .unwrap_or_else(|| device.clone());
+
+        Some(
+            Disk {
+                display_name,
+                device: Some(device),
+                idtype: idtype_opt,
+                label: label_opt,
+                uuid: uuid_opt,
+                mountpoint,
+                available,
+                total,
+                used_percent,
+                is_removable,
+                is_partition,
+                size,
+                is_system,
+            }
+        )
+    }
+
+
+    async fn extract_kernel_name(block: &BlockProxy<'_>) -> Option<String> {
+        block.device().await.ok().and_then(|bytes|{
+            String::from_utf8(bytes).ok()
+                .map(|p| p.trim_matches('\0').split("/").last().unwrap_or("").to_string())
+                .filter(|s| !s.is_empty())
+        })
+    }
+
+
+    async fn check_removable(client: &Client, block: &BlockProxy<'_>) -> bool {
+        match client.drive_for_block(block).await {
+            Ok(drive) => {
+                let removable = drive.removable().await.unwrap_or(false);
+                let bus = drive.connection_bus().await.unwrap_or_default();
+                removable || bus == "usb" || bus == "ieee1394"
+            }
+            Err(_) => false,
+        }
+    }
+
+
+    async fn read_fs_info(&self, object: &udisks2::Object, fallback_size: u64) -> (Option<String>, u64, u64, f32) {
+        let Ok(fs) = object.filesystem().await else {
+            return (None, 0, fallback_size, 0.0);
+        };
+
+        let mount_points = fs.mount_points().await.unwrap_or_default();
+        let Some(mp_bytes) = mount_points.first() else {
+            return (None, 0, fallback_size, 0.0);
+        };
+
+        let mp = String::from_utf8_lossy(&mp_bytes).trim_end_matches('\0').to_string();
+        if mp.is_empty() {
+            return (None, 0, fallback_size, 0.0);
+        }
+
+        let (avail, total, perc) = self.get_fs_usage(&mp).unwrap_or((0, fallback_size, 0.0));
+
+        (Some(mp), avail, total.max(fallback_size), perc)
+    }
+    
+
+    fn check_is_system(mountpoint: Option<&str>) -> bool {
+        const SYSTEM_PATHS: &[&str] = &["/", "/home", "/boot", "/boot/efi", "/var", "/etc", "/tmp", "/usr"];
+        mountpoint.map_or(false, |mp| {
+            SYSTEM_PATHS.contains(&mp) || mp.starts_with("/snap/")
+        })
+    }
+
 
 
     fn get_fs_usage(&self, mountpoint: &str) -> Option<(u64, u64, f32)> {
@@ -223,14 +232,26 @@ impl LinuxDisks {
     }
 
 
+    fn block_devices_path(&self, device: &str) -> anyhow::Result<ObjectPath<'static>> {
+        let dev_name = device.trim_start_matches("/dev/");
+        Ok(
+            ObjectPath::try_from(
+                format!(
+                    "/org/freedesktop/UDisks2/block_devices/{}", 
+                    dev_name
+                )
+            )?
+        )
+    }
+
+
     pub async fn mount(&self, disk: &Disk) -> anyhow::Result<String> {
-        use users::{get_current_uid, get_current_gid};
         let uid = get_current_uid();
         let gid = get_current_gid();
 
         let device = disk.device.as_ref().ok_or_else(|| anyhow::anyhow!("Sin device"))?;
 
-        let block_path = ObjectPath::try_from(format!("/org/freedesktop/UDisks2/block_devices{}", device.trim_start_matches("/dev")))?;
+        let block_path = self.block_devices_path(&device)?;
 
         let object = self.client.object(block_path)?;
         let fs: FilesystemProxy = object.filesystem().await?;
@@ -252,7 +273,8 @@ impl LinuxDisks {
         }
     
         let device = disk.device.as_ref().ok_or_else(|| anyhow::anyhow!("Sin device"))?;
-        let block_path = ObjectPath::try_from(format!("/org/freedesktop/UDisks2/block_devices{}", device.trim_start_matches("/dev")))?;
+
+        let block_path = self.block_devices_path(&device)?;
 
         let object = self.client.object(block_path)?;
         let fs: FilesystemProxy = object.filesystem().await?;
@@ -269,9 +291,8 @@ impl LinuxDisks {
     pub async fn eject(&self, disk: &Disk) -> anyhow::Result<String> {
         let device = disk.device.as_ref()
             .ok_or_else(|| anyhow::anyhow!("El disco no tiene un nodo de dispositivo asignado"))?;
-
-        let dev_name = device.trim_start_matches("/dev/");
-        let block_path = ObjectPath::try_from(format!("/org/freedesktop/UDisks2/block_devices/{}", dev_name))?;
+        
+        let block_path = self.block_devices_path(&device)?;
 
         let block_object = self.client.object(block_path)?;
         let block = block_object.block().await?;
@@ -288,7 +309,7 @@ impl LinuxDisks {
 
         options.insert("auth.no_user_interaction", Value::Bool(true));
 
-        drive.eject(options).await.ok();
+        drive.eject(options).await?;
 
         Ok(format!("Dispositivo {} expulsado de forma segura.", disk.display_name))
     }
