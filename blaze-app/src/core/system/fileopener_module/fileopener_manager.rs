@@ -135,40 +135,6 @@ impl FileOpenerManager {
     }
 
 
-    pub async fn take_pending_mime(&mut self) -> Option<String> {
-        match &mut self.opener {
-            #[cfg(target_os = "linux")]
-            PlatformOpener::Linux(op) => op.lock().await.pending_mime.take(),
-            #[cfg(target_os = "macos")]
-            PlatformOpener::Macos(op) => op.lock().await.pending_mime.take(),
-            #[cfg(target_os = "windows")]
-            PlatformOpener::Windows(op) => op.lock().await.pending_mime.take(),
-        }
-    }
-
-
-    pub async fn take_pending_path(&mut self) -> Option<PathBuf> {
-        match &mut self.opener {
-            #[cfg(target_os = "linux")]
-            PlatformOpener::Linux(op) => op.lock().await.pending_path.take(),
-            #[cfg(target_os = "macos")]
-            PlatformOpener::Macos(op) => op.lock().await.pending_path.take(),
-            #[cfg(target_os = "windows")]
-            PlatformOpener::Windows(op) => op.lock().await.pending_path.take(),
-        }
-    }
-
-    pub async fn take_pending_default_app_name(&mut self) -> Option<String> {
-        match &mut self.opener {
-            #[cfg(target_os = "linux")]
-            PlatformOpener::Linux(op) => op.lock().await.pending_default_app_name.take(),
-            #[cfg(target_os = "macos")]
-            PlatformOpener::Macos(op) => op.lock().await.pending_default_app_name.take(),
-            #[cfg(target_os = "windows")]
-            PlatformOpener::Windows(op) => op.lock().await.pending_default_app_name.take(),
-        }
-    }
-
     pub async fn set_association(&mut self, mime: &str, app: AppAssociation) {
         match &mut self.opener {
             #[cfg(target_os = "linux")]
@@ -177,26 +143,6 @@ impl FileOpenerManager {
             PlatformOpener::Macos(op) => op.lock().await.assoc_manager.set_association(mime, app),
             #[cfg(target_os = "windows")]
             PlatformOpener::Windows(op) => op.lock().await.assoc_manager.set_association(mime, app),
-        }
-    }
-
-    pub async fn set_pending(&mut self, path: PathBuf, mime: String) {
-        match &mut self.opener {
-            #[cfg(target_os = "linux")]
-            PlatformOpener::Linux(op) => {
-                op.lock().await.pending_path = Some(path);
-                op.lock().await.pending_mime = Some(mime);
-            },
-            #[cfg(target_os = "macos")]
-            PlatformOpener::Macos(op) => {
-                op.lock().await.pending_path = Some(path);
-                op.lock().await.pending_mime = Some(mime);
-            },
-            #[cfg(target_os = "windows")]
-            PlatformOpener::Windows(op) => {
-                op.lock().await.pending_path = Some(path);
-                op.lock().await.pending_mime = Some(mime);
-            }
         }
     }
 

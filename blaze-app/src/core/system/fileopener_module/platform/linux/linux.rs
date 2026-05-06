@@ -35,8 +35,6 @@ pub struct LinuxOpener {
     mimeapps: MimeApps,
     desktop_index: HashMap<String, PathBuf>,
     pub assoc_manager: AssociationManager,
-    pub pending_path: Option<PathBuf>, 
-    pub pending_mime: Option<String>,
     pub pending_default_app_name: Option<String>
 }
 
@@ -52,8 +50,6 @@ impl LinuxOpener {
             desktop_index,
             mimeapps,
             assoc_manager: AssociationManager::new(),
-            pending_path: None,
-            pending_mime: None,
             pending_default_app_name: None,
         }
     }
@@ -771,9 +767,6 @@ impl LinuxOpener {
 
 
     async fn show_selector_linux(&mut self, path: PathBuf, mime: String, apps: Vec<AppAssociation>, show_all_apps: bool, sender: Dispatcher)  {
-        self.pending_path = Some(path.clone());
-        self.pending_mime = Some(mime.clone());
-
         let icon_data = match tokio::time::timeout(
             std::time::Duration::from_secs(3),
             self.load_icons_async(&apps)
