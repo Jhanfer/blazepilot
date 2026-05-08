@@ -1,6 +1,6 @@
-use std::{sync::Arc};
+use std::sync::Arc;
 use egui::{ Key, PointerButton, Ui};
-use crate::{core::{blaze_state::{BlazeCoreState, NewItemType}, files::blaze_motor::motor_structs::FileEntry, runtime::{bus_structs::{SureTo, UiEvent}, event_bus::with_event_bus}, system::cache::cache_manager::CacheManager}, ui::blaze_ui_state::BlazeUiState};
+use crate::{core::{blaze_state::{BlazeCoreState, NewItemType}, files::blaze_motor::motor_structs::FileEntry, runtime::{bus_structs::{SureTo, UiEvent}, event_bus::with_event_bus}, system::{cache::cache_manager::CacheManager, trash_manager::trash_manager::get_backend}}, ui::blaze_ui_state::BlazeUiState};
 
 pub fn hot_keys_logic(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, files: &Vec<Arc<FileEntry>>, ui: &mut Ui, _total_rows: usize) {
     let input = ui.input(|i| i.clone());
@@ -112,9 +112,9 @@ pub fn hot_keys_logic(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, f
     if input.key_pressed(Key::Delete) && disable_keys {
         let sources = state.get_selected_paths(files);
         let cwd = state.cwd.clone();
-        let trash = state.motor.borrow_mut().get_trash_dir(None).unwrap_or_default();
+        let is_in_trash = get_backend().etched_in_trash_path(&cwd);
 
-        if trash == cwd && !sources.is_empty() {
+        if is_in_trash && !sources.is_empty() {
             let tab_id = state.active_id;
             let dispatcher = with_event_bus(|e| e.dispatcher(tab_id));
             let tab_id = state.motor.borrow_mut().active_tab().id;

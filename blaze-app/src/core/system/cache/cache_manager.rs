@@ -15,13 +15,12 @@
 
 
 
-use std::{collections::{HashMap, HashSet}, env, hash::Hash, path::PathBuf, sync::{OnceLock, RwLock}};
-use dirs::cache_dir;
+use std::{collections::{HashMap, HashSet}, hash::Hash, path::PathBuf, sync::{OnceLock, RwLock}};
 use egui::Color32;
 use file_id::FileId;
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use tracing::{error};
-use crate::core::system::{cache::color_cache::color_cache::ColorCache, extended_info::extended_info_manager::ExtendedInfoCache};
+use crate::core::system::{cache::color_cache::color_cache::ColorCache, extended_info::extended_info_manager::ExtendedInfoCache, knowndirs::knowndirs_manager::KnownDirsManager};
 use tokio::sync::RwLock as AsyncRwLock;
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
@@ -44,8 +43,8 @@ pub struct CacheManager {
 
 impl CacheManager {
     pub fn global() -> &'static Self {
-        let cache_dir = cache_dir()
-            .unwrap_or(env::temp_dir())
+        let sys_cache = &KnownDirsManager::get().sys_cache;
+        let cache_dir = sys_cache
             .join("blazepilot");
 
         CACHE_MANAGER.get_or_init(|| {

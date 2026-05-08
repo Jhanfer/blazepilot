@@ -1,6 +1,5 @@
 use std::path::Path;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::time::{SystemTime, UNIX_EPOCH};
 use std::vec;
 use std::{fs, path::PathBuf};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -10,6 +9,7 @@ use tokio::sync::Semaphore;
 use crate::core::files::blaze_motor::motor::{new_task_id, with_motor};
 use crate::core::files::blaze_motor::motor_structs::{FileEntry, TaskType};
 use crate::core::runtime::bus_structs::{FileConflict, UiEvent};
+use crate::core::system::trash_manager::trash_manager::{TrashBackend, TrashDestination, get_backend};
 use crate::ui::task_manager::task_manager::TaskMessage;
 use std::sync::{Arc, Mutex};
 use std::sync::OnceLock;
@@ -80,10 +80,6 @@ impl GlobalClipboard {
         Self::inner().clipboard_has_files()
     }
 
-    pub fn is_in_trash(&self, file_name: String) -> Option<bool> {
-        Self::inner().is_in_trash_ui(file_name)
-    }
-
     pub fn clear(&self) {
         Self::inner().clear();
     }
@@ -92,9 +88,6 @@ impl GlobalClipboard {
         Self::inner().set_dest(dest);
     }
 
-    pub fn is_clipboard_empty(&self) -> bool {
-        Self::inner().is_clipboard_empty()
-    }
 
     pub fn copy_items(&self, items: Vec<Arc<FileEntry>>, current_cwd: PathBuf) {
         Self::inner().copy_items(items, current_cwd);
@@ -153,27 +146,6 @@ impl Clipboard {
         !inner.items.is_empty()
     }
 
-    pub fn is_in_trash_ui(&self, file_name: String) -> Option<bool> {
-        let (trash_dir, cwd) = with_motor(|m| (m.get_trash_dir(None).unwrap(), m.active_tab().cwd.clone()));
-
-        let file_path = cwd.join(file_name);
-        if !file_path.exists() { return Some(false); }
-
-        file_path.canonicalize()
-        .ok()
-        .map(|canonical_path| canonical_path.starts_with(&*trash_dir))
-    }
-
-
-    fn is_in_trash(path: &Path) -> bool {
-        path.components().any(|c| {
-            let s = c.as_os_str().to_string_lossy();
-            s == ".Trash" || 
-            s.starts_with(".Trash-") ||
-            s == "Trash"
-        })
-    }
-
 
     pub fn clear(&self) {
         let mut inner = self.inner.lock().unwrap();
@@ -182,10 +154,6 @@ impl Clipboard {
         inner.dest_dir = None;
     }
 
-    pub fn is_clipboard_empty(&self) -> bool { 
-        let inner = self.inner.lock().unwrap();
-        inner.items.is_empty()
-    }
 
     pub fn copy_items(&self, items: Vec<Arc<FileEntry>>, current_cwd: PathBuf) {
         let mut inner = self.inner.lock().unwrap();
@@ -687,213 +655,77 @@ impl Clipboard {
     }
 
 
-    fn generate_unique_trash_path(original_path: &Path, trash_files_dir: &Path) -> PathBuf {
-        let stem = original_path.file_stem().and_then(|s| s.to_str()).unwrap_or("file");
-        let ext = original_path.extension().and_then(|s| s.to_str());
-
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_default();
-    
-        let base = format!("{}_{}{}", stem, now.as_secs(), now.subsec_nanos() / 1_000_000);
-        
-        let candidate = match ext {
-            Some(e) => format!("{}.{}", base, e),
-            None => base.clone(),
-        };
-
-        let mut new_path = trash_files_dir.join(candidate);
-        if !new_path.exists() {
-            return new_path;
-        }
-
-        let mut counter = 1u32;
-
-        loop {
-            let candidate = match ext {
-                Some(e) => format!("{}_{}.{}", base, counter, e),
-                None => format!("{}_{}", base, counter),
-            };
-
-            new_path = trash_files_dir.join(candidate);
-            if !new_path.exists() {
-                return new_path;
-            }
-            counter += 1;
-
-            if counter > 1000 {
-                return trash_files_dir.join(format!("{}_{}", stem, uuid::Uuid::new_v4().simple()));
-            }
-        }
-    }
-
-    pub fn move_to_trash(&self, items: Vec<Arc<FileEntry>>, current_cwd: PathBuf, sender: &Dispatcher) -> Result<(), String> {
+    fn move_to_trash(&self, items: Vec<Arc<FileEntry>>, current_cwd: PathBuf, sender: &Dispatcher) -> Result<(), String> {
         let task_id = new_task_id();
-        sender.send(
-            TaskMessage::Started { 
-                task_id, 
-                text: "Moviendo a la papelera...".to_string(), 
-                task_type: TaskType::MoveTrash,
-            }
-        ).ok();
-
-
-        let mut items_with_trash: Vec<(Arc<FileEntry>, PathBuf, PathBuf)> = Vec::new();
+        let backend = get_backend();
+        
+        let mut resolved: Vec<(Arc<FileEntry>, PathBuf, Option<TrashDestination>)> = Vec::new();
 
         for item in &items {
-            let source_path = current_cwd.join(&*item.name);
-            let trash_files_dir = match with_motor(|m| m.get_trash_dir(Some(&source_path))) {
-                Some(dir) => dir,
-                None => with_motor(|m| m.get_trash_dir(None))
-                    .unwrap_or_else(|| dirs::home_dir()
-                        .unwrap_or_default()
-                        .join(".local/share/Trash/files")
-                    )
-            };
+            let source = current_cwd.join(&*item.name);
+            
+            let destination = backend.resolve_destination(&source)
+                .inspect_err(|e| warn!("No se ha podido resolver papelera para {:?}: {}", source, e))
+            .ok();
 
-            let trash_root = trash_files_dir.parent()
-                .unwrap_or(&trash_files_dir)
-                .to_path_buf();
-
-            std::fs::create_dir_all(&trash_files_dir).ok();
-            std::fs::create_dir_all(trash_root.join("info")).ok();
-
-            items_with_trash.push((item.clone(), source_path, trash_files_dir));
+            resolved.push((item.clone(), source, destination));
         }
 
+        sender.send(TaskMessage::Started {
+            task_id,
+            text: "Moviendo a la papelera...".to_string(),
+            task_type: TaskType::MoveTrash,
+        }).ok();
+
+
         let sender = sender.clone();
-
         TOKIO_RUNTIME.spawn(async move {
-            let total = items.len();
-            let mut errors = Vec::new();
-
-            for (done, (item, source_path, trash_files_dir)) in items_with_trash.into_iter().enumerate() {
-                if Self::is_in_trash(&source_path) {
-                    let r = if source_path.is_dir() {
-                        std::fs::remove_dir_all(&source_path)
-                    } else {
-                        std::fs::remove_file(&source_path)
-                    };
-
-                    if let Err(e) = r {
-                        errors.push(format!("Error borrando '{}': {}", item.name, e));
-                    }
-
-                    let info_dir = trash_files_dir.parent().unwrap_or(&trash_files_dir).join("info");
-                    if let Some(name) = source_path.file_name() {
-                        let info_path = info_dir.join(format!("{}.trashinfo", name.to_string_lossy()));
-                        std::fs::remove_file(info_path).ok();
-                    }
-                } else {
-                    if let Err(e) = trash::delete(&source_path) {
-                        if item.size > 256_000_000 {
-                            let dest_path = Self::generate_unique_trash_path(&source_path, &trash_files_dir);
-                            let info_dir = trash_files_dir.parent().unwrap_or(&trash_files_dir).join("info");
-
-                            if let Err(e) = std::fs::create_dir_all(&info_dir) {
-                                errors.push(format!("Error creando directorio info: {}", e));
-                                continue;
-                            }
-
-                            let deletion_time = chrono::Local::now().to_rfc3339();
-                            let trash_info_content = format!(
-                                "[Trash Info]\nPath={}\nDeletionDate={}\n",
-                                source_path.to_string_lossy(),
-                                deletion_time
-                            );
-
-                            if let Err(e) = std::fs::rename(&source_path, &dest_path) {
-                                if e.kind() == std::io::ErrorKind::NotFound {
-                                    errors.push(format!("Archivo no encontrado: {:?}", source_path));
-                                } else {
-                                    std::fs::copy(&source_path, &dest_path)
-                                        .and_then(|_| std::fs::remove_file(&source_path)).ok();
-                                }
-                            }
-
-                            let info_filename = dest_path.file_name()
-                                .unwrap_or_else(|| std::ffi::OsStr::new("unknown"))
-                                .to_string_lossy();
-                            let info_path = info_dir.join(format!("{}.trashinfo", info_filename));
-
-                            if let Err(e) = std::fs::write(&info_path, trash_info_content) {
-                                errors.push(format!("Error escribiendo .trashinfo: {}", e));
-                            }
-                        } else {
-                            errors.push(format!("Error moviendo '{}' a la papelera: {}", item.name, e));
-                        }
-                    }
-                }
-
-                sender.send(TaskMessage::Progress { 
-                    task_id, 
-                    progress: (done + 1) as f32 / total as f32, 
-                    text: "Procesando...".to_string(),
-                    task_type: TaskType::MoveTrash,
-                }).ok();
-            }
-
-            sender.send(
-                TaskMessage::Finished {
-                    task_id, 
-                    success: errors.is_empty(),
-                    task_type: TaskType::MoveTrash,
-                    text: if errors.is_empty() {
-                        "Listo".to_string()
-                    } else {
-                        format!("Completado con {} errores", errors.len())
-                    },
-                }
-            ).ok();
+            Self::process_trash_operations(task_id, resolved, backend, &sender);
         });
-        
+
         Ok(())
     }
 
-    pub fn restore_from_trash(trashed_name: &str, trash_files_dir: &Path, trash_info_dir: &Path) -> Result<PathBuf, String> {
-        let trashed_path = trash_files_dir.join(trashed_name);
-        if !trashed_path.exists() {
-            return Err(format!("Archivo no encontrado en la papelera: {}", trashed_name));
-        }
 
-        let info_path = trash_info_dir.join(format!("{}.trashinfo", trashed_name));
-        if !info_path.exists() {
-            return Err(format!("No se encontró el archivo .trashinfo para {}", trashed_name));
-        }
+    fn process_trash_operations(task_id: u64, resolved: Vec<(Arc<FileEntry>, PathBuf, Option<TrashDestination>)>, backend: &dyn TrashBackend, sender: &Dispatcher) {
+        let total = resolved.len();
+        let mut errors: Vec<String> = Vec::new();
 
-        let content = std::fs::read_to_string(&info_path)
-            .map_err(|e| format!("Error leyendo .trashinfo: {}", e))?;
+        for (done, (item, source, _desination)) in resolved.into_iter().enumerate() {
 
-        let original_path_str = content
-            .lines()
-            .find(|line| line.starts_with("Path="))
-            .and_then(|line| line.strip_prefix("Path="))
-            .map(|s| s.trim())
-            .ok_or("No se encontró la línea 'Path=' en el .trashinfo")?;
+            let result = if backend.is_in_trash(&source) {
+                backend.permanently_delete(&source)
+                    .map_err(|e| format!("Error eliminando '{}': {}", item.name, e))
+            } else {
+                backend.move_to_trash(&source)
+                    .map(|_| ())
+                    .map_err(|e| format!("Error moviendo '{}' a la papelera: {}", item.name, e))
+            };
 
-        let mut original_path = PathBuf::from(original_path_str);
-
-        if let Some(parent) = original_path.parent() {
-            if !parent.exists() {
-                std::fs::create_dir_all(parent)
-                    .map_err(|e| format!("No se pudo crear la carpeta original: {}", e))?;
+            if let Err(e) = result {
+                warn!("{}", e);
+                errors.push(e);
             }
+
+            sender.send(TaskMessage::Progress {
+                task_id,
+                progress: (done + 1) as f32 / total as f32,
+                text: format!("Procesando {}/{}...", done + 1, total),
+                task_type: TaskType::MoveTrash,
+            }).ok();
         }
 
-        if original_path.exists() {
-            original_path = Self::generate_unique_path(&original_path);
-        }
+        sender.send(TaskMessage::Finished {
+            task_id,
+            success: errors.is_empty(),
+            task_type: TaskType::MoveTrash,
+            text: if errors.is_empty() {
+                "Listo".to_string()
+            } else {
+                format!("Completado con {} error(es)", errors.len())
+            },
+        }).ok();
 
-        std::fs::rename(&trashed_path, &original_path)
-            .or_else(|_| {
-                std::fs::copy(&trashed_path, &original_path)
-                    .and_then(|_| std::fs::remove_file(&trashed_path))
-            })
-            .map_err(|e| format!("Error restaurando '{}': {}", trashed_name, e))?;
-
-        std::fs::remove_file(&info_path).ok();
-
-        Ok(original_path)
     }
 
 
@@ -907,18 +739,21 @@ impl Clipboard {
         }).ok();
 
         let trash_files_dir = trash_root.join("files");
-        let trash_info_dir = trash_root.join("info");
+        let backend = get_backend();
+
 
         TOKIO_RUNTIME.spawn(async move {
             let total = items_to_restore.len();
             let mut errors = Vec::new();
 
             for (done, name) in items_to_restore.iter().enumerate() {
-                match Self::restore_from_trash(name, &trash_files_dir, &trash_info_dir) {
+                let tras_item_path = trash_files_dir.join(name);
+                match backend.restore_from_trash(&tras_item_path) {
                     Ok(final_path) => {
                         println!("Restaurado: {} → {:?}", name, final_path);
                     }
                     Err(e) => {
+                        warn!("Ha ocurrido error: {}", e);
                         errors.push(format!("{}: {}", name, e));
                     }
                 }

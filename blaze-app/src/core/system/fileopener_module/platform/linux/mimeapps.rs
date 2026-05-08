@@ -1,5 +1,5 @@
 use std::{env, fs, collections::HashSet, path::PathBuf};
-use crate::core::system::fileopener_module::{error::{OpenerError, OpenerResult}, platform::linux::mimeappsfile::MimeAppsFile};
+use crate::core::system::{fileopener_module::{error::{OpenerError, OpenerResult}, platform::linux::mimeappsfile::MimeAppsFile}, knowndirs::knowndirs_manager::KnownDirsManager};
 
 pub struct MimeApps {
     _files: Vec<PathBuf>,
@@ -21,9 +21,9 @@ impl MimeApps {
         let config_home = env::var_os("XDG_CONFIG_HOME")
             .map(PathBuf::from)
             .unwrap_or_else(|| {
-                let mut p = dirs::home_dir().unwrap_or_else(|| PathBuf::from("~"));
-                p.push(".config");
-                p
+                let mut home = KnownDirsManager::get().home.clone();
+                home.push(".config");
+                home
             });
 
         let user_mimeapps = config_home.join("mimeapps.list");
@@ -51,10 +51,10 @@ impl MimeApps {
         let data_home = env::var_os("XDG_DATA_HOME")
             .map(PathBuf::from)
             .unwrap_or_else(|| {
-                let mut p = dirs::home_dir().unwrap_or_else(|| PathBuf::from("~"));
-                p.push(".local");
-                p.push("share");
-                p
+                let mut home = KnownDirsManager::get().home.clone();
+                home.push(".local");
+                home.push("share");
+                home.to_owned()
             });
 
         let data_home_mimeapps = data_home.join("applications").join("mimeapps.list");

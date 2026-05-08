@@ -1,6 +1,6 @@
 use std::sync::Arc;
 use egui::{Color32, Rect, Sense, Ui, pos2};
-use crate::{core::{blaze_state::{BlazeCoreState, NewItemType}, configs::config_state::with_configs, files::blaze_motor::motor_structs::FileEntry, runtime::{bus_structs::{SureTo, UiEvent}, event_bus::with_event_bus}}, ui::{blaze_ui_state::BlazeUiState, icons_cache::icons}};
+use crate::{core::{blaze_state::{BlazeCoreState, NewItemType}, configs::config_state::with_configs, files::blaze_motor::motor_structs::FileEntry, runtime::{bus_structs::{SureTo, UiEvent}, event_bus::with_event_bus}, system::trash_manager::trash_manager::{get_backend}}, ui::{blaze_ui_state::BlazeUiState, icons_cache::icons}};
 
 pub fn tools(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, files: &Vec<Arc<FileEntry>>, ui: &mut Ui) {
     ui.horizontal(|ui|{
@@ -162,9 +162,9 @@ pub fn tools(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, files: &Ve
 
         if del_resp.clicked() && has_selection {
             let cwd = state.cwd.clone();
-            let trash = state.motor.borrow_mut().get_trash_dir(None).unwrap_or_default();
+            let is_in_trash = get_backend().etched_in_trash_path(&cwd);
 
-            if trash == cwd {
+            if is_in_trash {
                 let tab_id = state.active_id;
                 let dispatcher = with_event_bus(|e| e.dispatcher(tab_id));
 

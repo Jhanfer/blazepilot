@@ -22,7 +22,7 @@ use once_cell::sync::Lazy;
 use resvg::usvg;
 use tokio::sync::Semaphore;
 use tracing::{warn, info};
-use crate::core::{runtime::{bus_structs::UiEvent, event_bus::Dispatcher}, system::fileopener_module::{AppAssociation, error::{OpenerError, OpenerResult}, platform::linux::{appassociation::AssociationManager, mimeapps::MimeApps, structs::{APPS_ICON_CACHE, AppsIconData, DesktopEntry, OpenStrategy, OpenerFileKind}}}};
+use crate::core::{runtime::{bus_structs::UiEvent, event_bus::Dispatcher}, system::{fileopener_module::{AppAssociation, error::{OpenerError, OpenerResult}, platform::linux::{appassociation::AssociationManager, mimeapps::MimeApps, structs::{APPS_ICON_CACHE, AppsIconData, DesktopEntry, OpenStrategy, OpenerFileKind}}}, knowndirs::knowndirs_manager::KnownDirsManager}};
 
 
 
@@ -81,7 +81,8 @@ impl LinuxOpener {
 
         if let Some(xdg_data_home) = std::env::var_os("XDG_DATA_HOME") {
             dirs.push(PathBuf::from(xdg_data_home).join("applications"));
-        } else if let Some(home) = dirs::home_dir() {
+        } else {
+            let home = &KnownDirsManager::get().home;
             dirs.push(home.join(".local/share/applications"));
             dirs.push(home.join(".local/share/flatpak/exports/share/applications"));
         }

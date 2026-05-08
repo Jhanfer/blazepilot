@@ -15,6 +15,7 @@
 
 
 use eframe::{HardwareAcceleration};
+use tracing::warn;
 use tracing_subscriber::{fmt, EnvFilter};
 mod app;
 mod core;
@@ -28,10 +29,18 @@ use winit::platform::x11::EventLoopBuilderExtX11;
 #[cfg(target_os = "linux")]
 use winit::platform::wayland::EventLoopBuilderExtWayland;
 
-use crate::{core::{blaze_state::BlazeCoreState, configs::config_state::with_configs, system::clipboard::TOKIO_RUNTIME}, ui::{blaze_ui_state::BlazeUiState}};
+use crate::{core::{blaze_state::BlazeCoreState, configs::config_state::with_configs, system::{clipboard::TOKIO_RUNTIME, knowndirs::knowndirs_manager::KnownDirsManager, trash_manager::trash_manager::init_trash_backend}}, ui::blaze_ui_state::BlazeUiState};
 
 #[global_allocator]
 static GLOBAL: MiMalloc = MiMalloc;
+
+
+fn init_dir_trash() -> Result<(), Box<dyn std::error::Error>> {
+    KnownDirsManager::init();
+    init_trash_backend()?;
+    Ok(())
+}
+
 
 fn main() {
 
@@ -42,6 +51,8 @@ fn main() {
         .with_thread_ids(true)
         .init();
 
+    let _ = init_dir_trash()
+        .map_err(|e| warn!("Ha ocurrido un error inicializando: {}", e));
 
     let backend = with_configs(|c| {
         c.load_or_init_configs().unwrap();

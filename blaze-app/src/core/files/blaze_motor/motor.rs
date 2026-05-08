@@ -16,9 +16,8 @@
 
 
 
-use std::path::{Path, PathBuf};
-use std::{fs, vec};
-use dirs::{home_dir};
+use std::path::PathBuf;
+use std::vec;
 use file_id::{get_file_id};
 use jwalk::{Parallelism, WalkDir};
 use tracing::{debug, error, warn};
@@ -33,6 +32,7 @@ use crate::core::configs::config_state::with_configs;
 use crate::core::runtime::bus_structs::UiEvent;
 use crate::core::system::disk_reader::disk_manager::DiskManager;
 use crate::core::runtime::event_bus::{Dispatcher, with_event_bus};
+use crate::core::system::knowndirs::knowndirs_manager::KnownDirsManager;
 use uuid::Uuid;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -337,7 +337,8 @@ pub fn with_motor<F, R>(f: F) -> R
 impl BlazeMotor {
     pub async fn new() -> Self {
         let tab_id = Uuid::new_v4();
-        let fist_tab = TabState::new(home_dir().unwrap(), tab_id);
+        let home = &KnownDirsManager::get().home;
+        let fist_tab = TabState::new(home.to_owned(), tab_id);
 
         let disk_manager = Arc::new(tokio::sync::Mutex::new(DiskManager::new().await));
 
@@ -464,9 +465,9 @@ impl BlazeMotor {
         if self.tabs.len() >= self.limit {
             return None;
         }
-        let path = home_dir().unwrap();
+        let path = &KnownDirsManager::get().home;
         let tab_id = Uuid::new_v4();
-        let new_tab = TabState::new(path, tab_id);
+        let new_tab = TabState::new(path.to_owned(), tab_id);
         let insert_index = self.active_tab_index + 1;
         self.tabs.insert(insert_index, new_tab);
 
@@ -483,148 +484,6 @@ impl BlazeMotor {
         .and_then(|name|name.to_str())
         .unwrap_or("Home")
         .to_owned()
-    }
-
-
-
-
-
-    fn get_home_trash_dir(&mut self) -> Option<PathBuf> {
-        let data_home = std::env::var_os("XDG_DATA_HOME")
-            .map(PathBuf::from)
-            .filter(|p| p.is_absolute())
-            .or_else(|| home_dir().map(|h| h.join(".local/share")))
-            .unwrap();
-
-        let trash_root = data_home.join("Trash");
-        let files_dir = trash_root.join("files");
-        let info_dir = trash_root.join("info");
-
-        if !files_dir.exists() {
-            fs::create_dir_all(&files_dir).ok()?;
-            fs::create_dir_all(&info_dir).ok()?;
-        }
-
-        #[cfg(unix)]
-        {
-            if let Ok(metadata) = fs::metadata(&trash_root) {
-                let permissions = metadata.permissions();
-                if !permissions.readonly() {
-                    return files_dir.canonicalize().ok();
-                }
-            }
-        }
-
-        files_dir.canonicalize().ok()
-    } 
-
-
-
-    fn get_external_trash_dir(&mut self, _file_path: &PathBuf, mount_point: PathBuf) -> Option<PathBuf> {
-        let uid = unsafe {libc::getuid()};
-        let trash_dir_name = format!(".Trash-{}", uid);
-        let external_trash_root = mount_point.join(trash_dir_name);
-
-        let files_dir = external_trash_root.join("files");
-        let info_dir = external_trash_root.join("info");
-
-        if !files_dir.exists() {
-            fs::create_dir_all(&files_dir).ok()?;
-            fs::create_dir_all(&info_dir).ok()?;
-
-            #[cfg(unix)]
-            {
-                use std::os::unix::fs::PermissionsExt;
-
-                fs::set_permissions(&external_trash_root, fs::Permissions::from_mode(0o700)).ok()?;
-            }
-        }
-
-        files_dir.canonicalize().ok()
-    }
-
-
-    fn is_same_device(&mut self, path1: &Path, path2: &Path) -> bool {
-        #[cfg(unix)]
-        {
-            use std::os::linux::fs::MetadataExt;
-            if let (Ok(meta1), Ok(meta2)) = (fs::metadata(path1), fs::metadata(path2)) {
-                return meta1.st_dev() == meta2.st_dev();
-            }
-        }
-
-        false
-    }
-
-    fn is_mount_point(&mut self, path: &PathBuf) -> bool {
-        #[cfg(unix)]
-        {
-            if let (Ok(meta), Some(parent)) = (std::fs::metadata(path), path.parent()) {
-                if let Ok(parent_meta) = std::fs::metadata(parent) {
-                    use std::os::linux::fs::MetadataExt;
-                    return meta.st_dev() != parent_meta.st_dev(); 
-                }
-            }
-        }
-
-        path.to_str() == Some("/")
-    }
-
-    fn get_mount_point(&mut self, path: &PathBuf) -> Option<PathBuf> {
-        let mut current = path.canonicalize().ok()?;
-
-        loop {
-            if self.is_mount_point(&current) {
-                return Some(current);
-            }
-            
-            match current.parent() {
-                Some(parent) => current = parent.to_path_buf(),
-                None => return Some(PathBuf::from("/")),
-            }
-        }
-    }
-
-    pub fn get_trash_dir(&mut self, file_path: Option<&Path>) -> Option<PathBuf> {
-        #[cfg(target_os = "linux")]
-        {
-            match file_path {
-                None => {
-                    return self.get_home_trash_dir()
-                },
-
-                Some(path) => {
-                    let path_canonical = path.canonicalize().ok()?;
-                    
-                    if let Some(home) = home_dir() {
-                        if self.is_same_device(&path_canonical, &home) {
-                            return self.get_home_trash_dir();
-                        }
-                    }
-
-                    let mount_point = self.get_mount_point(&path_canonical)?;
-                    return self.get_external_trash_dir(&path_canonical, mount_point);
-                },
-            };
-        }
-
-        #[cfg(target_os = "windows")]
-        {
-            let drives = ["C", "D", "E", "F"];
-            for drive in drives.iter().chain(&["A", "Z", "H"]) {
-                let recycle = PathBuf::from(format!("{}:\\$Recycle.Bin", drive));
-                if recycle.exists() { return recycle.canonicalize().ok(); }
-            }
-        }
-
-        #[cfg(target_os = "macos")]
-        {
-            if let Some(home) = home_dir() {
-                let trash = home.join(".Trash");
-                if trash.exists() { return trash.canonicalize().ok(); }
-            }
-        }
-
     }
 
 }

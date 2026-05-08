@@ -2,7 +2,7 @@ use std::{collections::HashMap, path::PathBuf, sync::Arc};
 use egui::{Color32, ColorImage, CursorIcon, FontId, Key, PointerButton, Rect, RichText, ScrollArea, Sense, Ui, pos2, scroll_area::ScrollSource, vec2};
 use file_id::FileId;
 use tracing::{error, info};
-use crate::{core::{blaze_state::BlazeCoreState, configs::config_state::{OrderingMode, with_configs}, files::{blaze_motor::motor_structs::FileEntry, file_extension::{DocType, FileExtension}}, runtime::{bus_structs::{SureTo, UiEvent}, event_bus::with_event_bus}, system::extended_info::extended_info_manager::{ExtendedInfo, GitStatus}}, ui::{blaze_ui_state::BlazeUiState, icons_cache::{icons, thumbnails::thumbnails_manager::Thumbnail}, modules::custom_context_menu::context_state::ContextMenuKind}, utils::formating::{format_date, format_size}};
+use crate::{core::{blaze_state::BlazeCoreState, configs::config_state::{OrderingMode, with_configs}, files::{blaze_motor::motor_structs::FileEntry, file_extension::{DocType, FileExtension}}, runtime::{bus_structs::{SureTo, UiEvent}, event_bus::with_event_bus}, system::{extended_info::extended_info_manager::{ExtendedInfo, GitStatus}, trash_manager::trash_manager::{get_backend}}}, ui::{blaze_ui_state::BlazeUiState, icons_cache::{icons, thumbnails::thumbnails_manager::Thumbnail}, modules::custom_context_menu::context_state::ContextMenuKind}, utils::formating::{format_date, format_size}};
 
 
 
@@ -101,9 +101,9 @@ fn handle_row_interactions(ui: &mut Ui, response: &egui::Response, i: usize, fil
     }
 
     let cwd = state.cwd.clone();
-    let trash = state.motor.borrow_mut().get_trash_dir(None).unwrap_or_default();
+    let is_in_trash = get_backend().etched_in_trash_path(&cwd);
 
-    if trash == cwd {
+    if is_in_trash {
         let tab_id = state.active_id;
         let dispatcher = with_event_bus(|e| e.dispatcher(tab_id));
         if response.secondary_clicked() {
