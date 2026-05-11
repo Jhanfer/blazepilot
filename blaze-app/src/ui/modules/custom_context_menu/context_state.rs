@@ -316,7 +316,7 @@ impl ContextMenuState {
                         } else {
                             let path_string = drive.mountpoint.clone().unwrap_or_default();
                             let path = PathBuf::from(path_string);
-                            state.navigate_to(path);
+                            state.navigate_to(&*path);
                         }
                         should_close = true;
                     }
@@ -840,7 +840,9 @@ impl ContextMenuState {
                     match action.get() {
                         Some(0) => {
                             if file.is_dir {
-                                state.navigate_to(file.full_path.clone());
+                                state.navigate_to(&*file.full_path);
+                                state.deselect_all();
+                                state.resize_selection(files.len());
                             } else {
                                 state.open_file(&file);
                             }
@@ -878,11 +880,13 @@ impl ContextMenuState {
 
                     match action.get() {
                         Some(0) => {
-                            state.navigate_to(file.full_path.clone());
+                            state.navigate_to(&*file.full_path);
+                            state.deselect_all();
+                            state.resize_selection(files.len());
                             should_close = true;
                         }
                         Some(1) => {
-                            state.add_tab_from_file(file.full_path.clone());
+                            state.add_tab_from_file(&*file.full_path);
                             should_close = true;
                         }
                         _ => {}

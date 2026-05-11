@@ -1,45 +1,8 @@
 use std::sync::Arc;
-use egui::{CentralPanel, Color32, CornerRadius, Frame, Key, Margin, Rect, TextEdit, Ui};
-use tracing::{error, warn};
-use crate::{core::{blaze_state::{BlazeCoreState, NewItemType}, files::blaze_motor::motor_structs::FileEntry, runtime::event_bus::with_event_bus, system::{extended_info::extended_info_manager::ExtendedInfoMessages,sizer_manager::sizer_manager::SizerMessages, trash_manager::trash_manager::{get_backend}}}, ui::{blaze_ui_state::BlazeUiState, icons_cache::thumbnails::thumbnails_manager::ThumbnailMessages, modules::{custom_context_menu::context_state::ContextMenuKind, row_view::{drag_drop_logic::drag_files, hot_keys::hot_keys_logic, island_n_bubble::render_island_bubble, new_scroll_view::new_render_scrollview, render_drag::render_drag_files, rubber_band_logic::render_rubberband, tools_view::tools}}}};
+use egui::{CentralPanel, Color32, CornerRadius, Frame, Margin, Rect, Ui};
+use tracing::warn;
+use crate::{core::{blaze_state::BlazeCoreState, files::blaze_motor::motor_structs::FileEntry, runtime::event_bus::with_event_bus, system::{extended_info::extended_info_manager::ExtendedInfoMessages,sizer_manager::sizer_manager::SizerMessages, trash_manager::trash_manager::{get_backend}}}, ui::{blaze_ui_state::BlazeUiState, icons_cache::thumbnails::thumbnails_manager::ThumbnailMessages, modules::{custom_context_menu::context_state::ContextMenuKind, row_view::{drag_drop_logic::drag_files, hot_keys::hot_keys_logic, island_n_bubble::render_island_bubble, new_scroll_view::new_render_scrollview, render_drag::render_drag_files, rubber_band_logic::render_rubberband, tools_view::tools}}}};
 
-
-fn new_ff_logic(state: &mut BlazeCoreState, ui: &mut Ui) {
-    if let Some(item_type) = state.creating_new.clone() {
-        ui.horizontal(|ui|{
-            let response = ui.add(TextEdit::singleline(&mut state.new_item_buffer));
-
-            if !state.focus_requested {
-                response.request_focus();
-                state.focus_requested = true;
-            }
-
-            if ui.input(|i| i.key_pressed(Key::Enter)) && !state.new_item_buffer.trim().is_empty() {
-                let cwd = state.cwd.clone();
-
-                let result = match item_type {
-                    NewItemType::File => {state.clipboard.create_new_file(&state.new_item_buffer, cwd)},
-                    NewItemType::Folder => {state.clipboard.create_new_dir(&state.new_item_buffer, cwd)},
-                };
-
-                if let Err(e) = result {
-                    error!("Error creando: {}", e);
-                }
-
-                state.creating_new = None;
-                state.refresh();
-                state.focus_requested = false;
-            }
-
-
-            if ui.input(|i| i.key_pressed(egui::Key::Escape)) || (response.lost_focus() && !ui.input(|i| i.key_pressed(egui::Key::Enter))) {
-                state.creating_new = None;
-                state.focus_requested = false;
-            }
-
-        });
-    }
-}
 
 fn background_response_logic(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, files: &Vec<Arc<FileEntry>>, ui: &mut Ui, panel_top: f32, total_rows: usize, row_height: f32, content_rect: Rect) {
     let bg_id = ui.id().with("background_interact");
@@ -188,9 +151,6 @@ pub fn render_row_view(ui: &mut Ui, files: &Vec<Arc<FileEntry>>, state: &mut Bla
                 if !ui.memory(|m| m.focused().is_some()) {
                     ui.memory_mut(|m| m.request_focus(ui.id()));
                 }
-
-                //Creacion de carpetas nuevas
-                new_ff_logic(state, ui);
 
 
                 //Background

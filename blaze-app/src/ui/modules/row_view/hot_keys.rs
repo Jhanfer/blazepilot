@@ -2,6 +2,12 @@ use std::sync::Arc;
 use egui::{ Key, PointerButton, Ui};
 use crate::{core::{blaze_state::{BlazeCoreState, NewItemType}, files::blaze_motor::motor_structs::FileEntry, runtime::{bus_structs::{SureTo, UiEvent}, event_bus::with_event_bus}, system::{cache::cache_manager::CacheManager, trash_manager::trash_manager::get_backend}}, ui::blaze_ui_state::BlazeUiState};
 
+
+fn get_focus(ui: &mut Ui, id: &'static str) -> bool {
+    ui.memory(|m| m.has_focus(id.into()))
+}
+
+
 pub fn hot_keys_logic(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, files: &Vec<Arc<FileEntry>>, ui: &mut Ui, _total_rows: usize) {
     let input = ui.input(|i| i.clone());
     let disable_keys = state.renaming_file.is_none() && state.creating_new.is_none();
@@ -66,7 +72,7 @@ pub fn hot_keys_logic(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, f
             if idx < files.len() {
                 let file = &files[idx];
                 if file.is_dir {
-                    state.navigate_to(file.full_path.clone());
+                    state.navigate_to(&*file.full_path);
                 } else {
                     state.open_file(&file);
                 }
@@ -207,7 +213,8 @@ pub fn hot_keys_logic(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, f
 
     // cambiar de pestaña y encender búsqueda
 
-    let text_edit_focused = ui.memory(|m| m.has_focus("search_bar".into())) || ui.memory(|m| m.has_focus("search_ctx_menu".into()));
+    let text_edit_focused = get_focus(ui, "search_bar") || get_focus(ui, "search_ctx_menu") || get_focus(ui, "creating_new") || get_focus(ui, "rename_space");
+
     if !text_edit_focused {
         for event in &input.events {
             match event {
@@ -263,19 +270,4 @@ pub fn hot_keys_logic(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, f
             
         }
     }
-
-    if input.pointer.button_pressed(PointerButton::Middle) {
-        let first = files
-            .iter()
-            .enumerate()
-            .find(|(i, _)| state.selection[*i])
-            .map(|(_, f)| f);
-
-        if let Some(file) = first {
-            if file.is_dir {
-                state.add_tab_from_file(file.full_path.clone());
-            }
-        }
-    }
-
 }

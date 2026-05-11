@@ -16,7 +16,7 @@
 
 
 
-use std::{cell::{RefCell, RefMut}, collections::HashSet, path::PathBuf, rc::Rc, sync::{Arc, atomic::{AtomicU64, Ordering}}, time::{Instant, SystemTime, UNIX_EPOCH}};
+use std::{cell::{RefCell, RefMut}, collections::HashSet, path::{Path, PathBuf}, rc::Rc, sync::{Arc, atomic::{AtomicU64, Ordering}}, time::{Duration, Instant, SystemTime, UNIX_EPOCH}};
 use bitvec::vec::BitVec;
 use fuzzy_matcher::{FuzzyMatcher, skim::SkimMatcherV2};
 use tracing::{debug, error, info, warn};
@@ -88,6 +88,8 @@ pub struct BlazeCoreState {
     pub calculated_extended_info: HashSet<PathBuf>,
     pub zip_manager: ZipManager,
     pub cwd: PathBuf,
+    last_navigation_time: Option<Instant>,
+    navigation_cooldown: Duration,
 }
 
 impl BlazeCoreState {
@@ -162,6 +164,8 @@ impl BlazeCoreState {
             calculated_extended_info: HashSet::new(),
             zip_manager: ZipManager::new(),
             cwd: PathBuf::new(),
+            last_navigation_time: None,
+            navigation_cooldown: Duration::from_millis(100),
         };
 
 
@@ -361,12 +365,21 @@ impl BlazeCoreState {
         });
     }
 
-    pub fn navigate_to(&mut self, path: PathBuf) {
+    pub fn im_navigating(&self) -> bool {
+        if let Some(time) = self.last_navigation_time {
+            time.elapsed() < self.navigation_cooldown
+        } else {
+            false
+        }
+    }
+
+    pub fn navigate_to(&mut self, path: &Path) {
         let prev_dir = self.cwd.clone();
         self.motor.borrow_mut().active_tab_mut().navigate_to(path);
         self.extended_info_manager.clear_directory(&prev_dir);
-        self.refresh();
         self.save_caches(false);
+        self.last_navigation_time = Some(Instant::now());
+        self.refresh();
     }
 
     pub fn up(&mut self) {
@@ -394,6 +407,7 @@ impl BlazeCoreState {
     }
 
     pub fn refresh(&mut self) {
+        self.clean_search();
         let dispatcher = with_event_bus(|e| e.dispatcher(self.active_id));
         let new_cwd = {
             let mut motor = self.motor.borrow_mut();
@@ -633,10 +647,11 @@ impl BlazeCoreState {
             (new_id, closed)
         };
         self.active_id = new_id;
+        self.refresh();
         closed
     }
 
-    pub fn add_tab_from_file(&mut self, tab_path: PathBuf) {
+    pub fn add_tab_from_file(&mut self, tab_path: &Path) {
         let new_id = {
             let mut motor = self.motor_mut();
             motor.add_tab(tab_path)

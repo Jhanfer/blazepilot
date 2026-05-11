@@ -1,5 +1,5 @@
 use std::path::PathBuf;
-use egui::{Align2, Color32, CursorIcon, FontId, Rect, Sense, Ui, pos2, vec2};
+use egui::{Align2, Color32, CursorIcon, FontId, PointerButton, Rect, Sense, Ui, pos2, vec2};
 use tracing::info;
 use crate::{core::{blaze_state::BlazeCoreState, configs::config_state::{FavoriteLinks, with_configs}, files::file_extension::{DocType, FileExtension}, system::{disk_reader::disk::Disk}}, ui::{blaze_ui_state::BlazeUiState, icons_cache::icons::*, modules::custom_context_menu::context_state::ContextMenuKind}};
 
@@ -94,8 +94,19 @@ pub fn render_local_buttons(label:&str, path: PathBuf, state: &mut BlazeCoreStat
     ui.painter().rect_filled(rect, 5.0, bg_color);
 
 
+    let middle_clicked = ui.input(|i| {
+        i.pointer.button_pressed(PointerButton::Middle)
+        && i.pointer.interact_pos()
+            .map(|p| rect.contains(p))
+            .unwrap_or(false)
+    });
+
+    if middle_clicked {
+        state.add_tab_from_file(&*path);
+    }
+
     if response.clicked() {
-        state.navigate_to(path);
+        state.navigate_to(&*path);
     }
 
     let (icon_name, icon_bytes) = get_folder_icon(label);
@@ -147,7 +158,7 @@ pub fn render_fav_buttons(ui: &mut Ui, fav: FavoriteLinks, state: &mut BlazeCore
     if response.clicked() {
         if fav.is_dir {
             let path = fav.path.clone();
-            state.navigate_to(path);
+            state.navigate_to(&*path);
         } else {
             info!("Intentando abrir");
             state.open_file_by_path(fav.path.clone());
@@ -228,7 +239,7 @@ pub fn render_drives_button(ui: &mut Ui, state: &mut BlazeCoreState, drive: Disk
     if response.clicked() && is_mounted {
         let path_string = drive.mountpoint.clone().unwrap_or_default();
         let path = PathBuf::from(path_string);
-        state.navigate_to(path);
+        state.navigate_to(&*path);
     }
 
 
@@ -334,5 +345,3 @@ pub fn render_drives_button(ui: &mut Ui, state: &mut BlazeCoreState, drive: Disk
     );
 
 }
-
-

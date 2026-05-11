@@ -16,7 +16,7 @@
 
 
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::vec;
 use file_id::{get_file_id};
 use jwalk::{Parallelism, WalkDir};
@@ -252,8 +252,7 @@ impl TabState {
 
 
 
-
-    pub fn navigate_to(&mut self, new_path: PathBuf) {
+    pub fn navigate_to(&mut self, new_path: &Path) {
         if new_path.is_dir() && new_path != self.cwd {
             let old_path = self.cwd.clone();
             if self.history.last() != Some(&old_path) {
@@ -266,7 +265,7 @@ impl TabState {
                 self.history.remove(0);
             }
 
-            self.cwd = new_path;
+            self.cwd = new_path.to_owned();
         }
     }
 
@@ -444,12 +443,12 @@ impl BlazeMotor {
         self.tabs[index].load_path(false, sender).ok();
     }
 
-    pub fn add_tab(&mut self, tab_path: PathBuf) -> Option<Uuid> {
+    pub fn add_tab(&mut self, tab_path: &Path) -> Option<Uuid> {
         if self.tabs.len() >= self.limit {
             return None;
         }
         let tab_id = Uuid::new_v4();
-        let new_tab = TabState::new(tab_path, tab_id);
+        let new_tab = TabState::new(tab_path.to_owned(), tab_id);
 
         let insert_index = self.active_tab_index + 1;
         self.tabs.insert(insert_index, new_tab);
@@ -535,7 +534,7 @@ mod tests {
     fn test_close_tab_clears_all_memory() {
         let mut motor = TOKIO_RUNTIME.block_on(BlazeMotor::new());
         // Añadir un segundo tab para poder cerrar el primero
-        motor.add_tab(std::env::temp_dir());
+        motor.add_tab(&std::env::temp_dir());
         assert_eq!(motor.tabs.len(), 2);
 
         // Llenar datos en tab 0
@@ -561,8 +560,8 @@ mod tests {
     #[test]
     fn test_active_tab_index_clamps_after_close() {
         let mut motor = TOKIO_RUNTIME.block_on(BlazeMotor::new());
-        motor.add_tab(std::env::temp_dir());
-        motor.add_tab(std::env::temp_dir());
+        motor.add_tab(&std::env::temp_dir());
+        motor.add_tab(&std::env::temp_dir());
         // tabs: [0, 1, 2], active = 2
         motor.active_tab_index = 2;
 
@@ -607,7 +606,7 @@ mod tests {
         let (start, other) = two_distinct_dirs();
         let mut tab = make_tab(start.clone());
 
-        tab.navigate_to(other.clone());
+        tab.navigate_to(&*other);
 
         assert_eq!(tab.cwd, other);
         assert!(tab.history.contains(&start));
@@ -626,7 +625,7 @@ mod tests {
         let (start, other) = two_distinct_dirs();
         let mut tab = make_tab(start.clone());
 
-        tab.navigate_to(other.clone());
+        tab.navigate_to(&*other);
         tab.back();
 
         assert_eq!(tab.cwd, start);

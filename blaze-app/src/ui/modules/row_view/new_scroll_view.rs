@@ -1,8 +1,51 @@
 use std::{collections::HashMap, path::PathBuf, sync::Arc};
-use egui::{Color32, ColorImage, CursorIcon, FontId, Key, PointerButton, Rect, RichText, ScrollArea, Sense, Ui, pos2, scroll_area::ScrollSource, vec2};
+use egui::{Id, Button, Color32, ColorImage, CursorIcon, FontId, Key, PointerButton, Rect, RichText, ScrollArea, Sense, TextEdit, TextureOptions, Ui, pos2, scroll_area::ScrollSource, vec2};
 use file_id::FileId;
 use tracing::{error, info};
-use crate::{core::{blaze_state::BlazeCoreState, configs::config_state::{OrderingMode, with_configs}, files::{blaze_motor::motor_structs::FileEntry, file_extension::{DocType, FileExtension}}, runtime::{bus_structs::{SureTo, UiEvent}, event_bus::with_event_bus}, system::{extended_info::extended_info_manager::{ExtendedInfo, GitStatus}, trash_manager::trash_manager::{get_backend}}}, ui::{blaze_ui_state::BlazeUiState, icons_cache::{icons, thumbnails::thumbnails_manager::Thumbnail}, modules::custom_context_menu::context_state::ContextMenuKind}, utils::formating::{format_date, format_size}};
+use crate::{core::{blaze_state::{BlazeCoreState, NewItemType}, configs::config_state::{OrderingMode, with_configs}, files::{blaze_motor::motor_structs::FileEntry, file_extension::{DocType, FileExtension}}, runtime::{bus_structs::{SureTo, UiEvent}, event_bus::with_event_bus}, system::{extended_info::extended_info_manager::{ExtendedInfo, GitStatus}, trash_manager::trash_manager::get_backend}}, ui::{blaze_ui_state::BlazeUiState, icons_cache::{icons, thumbnails::thumbnails_manager::Thumbnail}, modules::custom_context_menu::context_state::ContextMenuKind}, utils::formating::{format_date, format_size}};
+
+
+
+fn new_ff_logic(state: &mut BlazeCoreState, ui: &mut Ui) {
+    if let Some(item_type) = state.creating_new.clone() {
+        let creating_new_id = Id::new("creating_new");
+
+        ui.horizontal(|ui|{
+            let response = ui.add(TextEdit::singleline(&mut state.new_item_buffer).id(creating_new_id));
+
+            if !state.focus_requested {
+                response.request_focus();
+                state.focus_requested = true;
+            }
+
+            if ui.input(|i| i.key_pressed(Key::Enter)) && !state.new_item_buffer.trim().is_empty() {
+                let cwd = state.cwd.clone();
+
+                let result = match item_type {
+                    NewItemType::File => {state.clipboard.create_new_file(&state.new_item_buffer, cwd)},
+                    NewItemType::Folder => {state.clipboard.create_new_dir(&state.new_item_buffer, cwd)},
+                };
+
+                if let Err(e) = result {
+                    error!("Error creando: {}", e);
+                }
+
+                state.creating_new = None;
+                state.refresh();
+                state.focus_requested = false;
+            }
+
+
+            if ui.input(|i| i.key_pressed(Key::Escape)) || (response.lost_focus() && !ui.input(|i| i.key_pressed(Key::Enter))) {
+                state.creating_new = None;
+                state.focus_requested = false;
+            }
+
+        });
+    }
+}
+
+
 
 
 
@@ -21,6 +64,10 @@ fn handle_row_interactions(ui: &mut Ui, response: &egui::Response, i: usize, fil
         let currently = state.is_selected(i);
         state.selection.set(i, !currently);
         state.last_selected_index = Some(i);
+
+        if file.is_dir {
+            state.add_tab_from_file(&*file.full_path);
+        }
     }
 
     if response.drag_started_by(PointerButton::Primary) {
@@ -124,10 +171,14 @@ fn handle_row_interactions(ui: &mut Ui, response: &egui::Response, i: usize, fil
 }
 
 fn render_rename_field(ui: &mut Ui, file: &Arc<FileEntry>, state: &mut BlazeCoreState, rect: Rect, is_renaming: bool) {
+
+    let rename_id = Id::new("rename_space");
+
     let response = ui.put(rect,
-        egui::TextEdit::singleline(&mut state.rename_buffer)
+        TextEdit::singleline(&mut state.rename_buffer)
+            .id(rename_id)
             .margin(vec2(0.0, 5.0))
-            .font(egui::FontId::default())
+            .font(FontId::default())
     );
 
     if is_renaming && !response.has_focus() {
@@ -213,16 +264,16 @@ pub fn new_render_scrollview(ui: &mut Ui, files: &Vec<Arc<FileEntry>>, state: &m
     let id_date_w  = ui.id().with("col_date_w");
     let id_size_w  = ui.id().with("col_size_w");
 
-    let available = ui.available_width();
+    let available = ui.available_width() * 0.8;
     let name_w: f32 = ui.data(|d| d.get_temp(id_name_w).unwrap_or(available - 180.0)).max(80.0);
-    let date_w: f32 = ui.data(|d| d.get_temp(id_date_w).unwrap_or(110.0_f32)).max(60.0);
-    let size_w: f32 = ui.data(|d| d.get_temp(id_size_w).unwrap_or(70.0_f32)).max(40.0);
+    let date_w: f32 = ui.data(|d| d.get_temp(id_date_w).unwrap_or(110.0_f32)).max(80.0);
+    let size_w: f32 = ui.data(|d| d.get_temp(id_size_w).unwrap_or(70.0_f32)).max(60.0);
 
-    let name_w = name_w.min(available - date_w - size_w - 20.0).max(80.0);
+    let name_w = name_w.min(available - date_w - size_w ).max(80.0);
 
     let header_height = 24.0;
     let (header_rect, _) = ui.allocate_exact_size(
-        egui::vec2(ui.available_width(), header_height),
+        vec2(available, header_height),
         Sense::hover(),
     );
 
@@ -230,13 +281,13 @@ pub fn new_render_scrollview(ui: &mut Ui, files: &Vec<Arc<FileEntry>>, state: &m
     painter.rect_filled(header_rect, 0.0, Color32::from_rgb(20, 24, 28));
 
     // Botón Nombre
-    let name_btn_rect = Rect::from_min_size(header_rect.min, egui::vec2(name_w, header_height));
+    let name_btn_rect = Rect::from_min_size(header_rect.min, vec2(name_w, header_height));
     let name_label = match current_order {
         OrderingMode::Az => "Nombre ↑",
         OrderingMode::Za => "Nombre ↓",
         _ => "Nombre",
     };
-    if ui.put(name_btn_rect, egui::Button::new(
+    if ui.put(name_btn_rect, Button::new(
         RichText::new(name_label).size(11.0).color(Color32::from_rgb(140, 140, 160))
     ).frame(false)).clicked() {
         with_configs(|c| {
@@ -247,13 +298,13 @@ pub fn new_render_scrollview(ui: &mut Ui, files: &Vec<Arc<FileEntry>>, state: &m
 
     // Botón Modificado
     let date_x = header_rect.min.x + name_w;
-    let date_btn_rect = Rect::from_min_size(pos2(date_x, header_rect.min.y), egui::vec2(date_w, header_height));
+    let date_btn_rect = Rect::from_min_size(pos2(date_x, header_rect.min.y), vec2(date_w, header_height));
     let date_label = match current_order {
         OrderingMode::DateAsc  => "Modificado ↑",
         OrderingMode::DateDesc => "Modificado ↓",
         _ => "Modificado",
     };
-    if ui.put(date_btn_rect, egui::Button::new(
+    if ui.put(date_btn_rect, Button::new(
         RichText::new(date_label).size(11.0).color(Color32::from_rgb(140, 140, 160))
     ).frame(false)).clicked() {
         with_configs(|c| {
@@ -264,13 +315,13 @@ pub fn new_render_scrollview(ui: &mut Ui, files: &Vec<Arc<FileEntry>>, state: &m
 
     // Botón Tamaño
     let size_x = date_x + date_w;
-    let size_btn_rect = Rect::from_min_size(pos2(size_x, header_rect.min.y), egui::vec2(size_w, header_height));
+    let size_btn_rect = Rect::from_min_size(pos2(size_x, header_rect.min.y), vec2(size_w, header_height));
     let size_label = match current_order {
         OrderingMode::SizeAsc  => "Tamaño ↑",
         OrderingMode::SizeDesc => "Tamaño ↓",
         _ => "Tamaño",
     };
-    if ui.put(size_btn_rect, egui::Button::new(
+    if ui.put(size_btn_rect, Button::new(
         RichText::new(size_label).size(11.0).color(Color32::from_rgb(140, 140, 160))
     ).frame(false)).clicked() {
         with_configs(|c| {
@@ -286,13 +337,13 @@ pub fn new_render_scrollview(ui: &mut Ui, files: &Vec<Arc<FileEntry>>, state: &m
     ] {
         let handle_rect = Rect::from_min_size(
             pos2(x - handle_w / 2.0, header_rect.min.y),
-            egui::vec2(handle_w, header_height),
+            vec2(handle_w, header_height),
         );
         let handle_id = ui.id().with(("resize_handle", id_w));
         let handle_response = ui.interact(handle_rect, handle_id, Sense::click_and_drag());
 
         if handle_response.hovered() || handle_response.dragged() {
-            ui.set_cursor_icon(egui::CursorIcon::ResizeColumn);
+            ui.set_cursor_icon(CursorIcon::ResizeColumn);
             painter.rect_filled(handle_rect, 0.0, Color32::from_rgb(100, 100, 140));
         } else {
             painter.rect_filled(handle_rect, 0.0, Color32::from_rgb(50, 50, 60));
@@ -303,6 +354,9 @@ pub fn new_render_scrollview(ui: &mut Ui, files: &Vec<Arc<FileEntry>>, state: &m
             ui.data_mut(|d| d.insert_temp(id_w, new_w));
         }
     }
+
+    //Creacion de carpetas nuevas
+    new_ff_logic(state, ui);
 
 
     let scroll_area = ScrollArea::vertical()
@@ -369,7 +423,7 @@ pub fn new_render_scrollview(ui: &mut Ui, files: &Vec<Arc<FileEntry>>, state: &m
 
             if is_renaming {
                 let (rect, _) = ui.allocate_exact_size(
-                    vec2(ui.available_width(), row_height),
+                    vec2(available, row_height),
                     Sense::hover(),
                 );
 
@@ -381,9 +435,8 @@ pub fn new_render_scrollview(ui: &mut Ui, files: &Vec<Arc<FileEntry>>, state: &m
                 continue;
             }
 
-
             let (rect, response) = ui.allocate_exact_size(
-                vec2(ui.available_width(), row_height),
+                vec2(available, row_height),
                 Sense::click_and_drag(),
             );
 
@@ -405,12 +458,20 @@ pub fn new_render_scrollview(ui: &mut Ui, files: &Vec<Arc<FileEntry>>, state: &m
             handle_row_interactions(ui, &response, i, file, state, ui_state, files, content_rect, rect);
 
             // clicks y selección
-            if response.double_clicked() {
-                if file.is_dir { state.navigate_to(file.full_path.clone()); }
+            if response.double_clicked_by(PointerButton::Primary) {
+                if file.is_dir { 
+                    state.navigate_to(&*file.full_path); 
+                    state.deselect_all();
+                    state.resize_selection(files.len());
+                }
                 else { state.open_file(&file); }
             }
 
-            if response.clicked_by(egui::PointerButton::Primary) {
+            if response.clicked_by(PointerButton::Primary) {
+                if state.im_navigating() {
+                    return;
+                }
+
                 let modifiers = ui.input(|i| i.modifiers);
                 if modifiers.shift {
                     if let Some(anchor) = state.selection_anchor {
@@ -476,7 +537,7 @@ pub fn new_render_scrollview(ui: &mut Ui, files: &Vec<Arc<FileEntry>>, state: &m
                         ui.load_texture(
                             format!("thumb:{}", path.to_string_lossy()), 
                             color_image,
-                            egui::TextureOptions::LINEAR,
+                            TextureOptions::LINEAR,
                         )
                     });
 
