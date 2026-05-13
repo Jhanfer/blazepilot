@@ -147,7 +147,7 @@ pub fn sidebar_right_component(ui: &mut Ui, state: &mut BlazeCoreState, files: &
                     ui.heading(file.name.clone());
                     ui.label(format_date(file.modified));
                     
-                    if file.is_dir {
+                    if file.is_dir() {
                         ui.label("Tipo: Carpeta");
                     } else {
                         ui.label(format!("Tipo: {:?}", file.extension));

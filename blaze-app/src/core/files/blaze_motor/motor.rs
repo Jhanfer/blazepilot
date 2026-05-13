@@ -16,23 +16,26 @@
 
 
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::vec;
 use file_id::{get_file_id};
+use fuzzy_matcher::FuzzyMatcher;
+use fuzzy_matcher::skim::SkimMatcherV2;
 use jwalk::{Parallelism, WalkDir};
 use tracing::{debug, error, warn};
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use crate::core::files::blaze_motor::blaze_loader::BlazeLoader;
 use crate::core::files::blaze_motor::error::{MotorError, MotorResult};
 use crate::core::files::blaze_motor::motor_structs::{FileEntry, FileLoadingMessage, RecursiveMessages};
 use crate::core::files::blaze_motor::utilities::build_entry;
 use crate::core::files::blaze_motor::watcher::FileWatcher;
-use crate::core::configs::config_state::with_configs;
+use crate::core::configs::config_state::{OrderingMode, with_configs};
 use crate::core::runtime::bus_structs::UiEvent;
 use crate::core::system::disk_reader::disk_manager::DiskManager;
 use crate::core::runtime::event_bus::{Dispatcher, with_event_bus};
 use crate::core::system::knowndirs::knowndirs_manager::KnownDirsManager;
+use crate::core::system::sizer_manager::sizer_manager::SizerManager;
 use uuid::Uuid;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -49,19 +52,19 @@ pub fn new_task_id() -> u64 {
 
 pub struct TabState {
     pub id: Uuid,
-    pub cwd: PathBuf,
-    pub history: Vec<PathBuf>,
-    pub future: Vec<PathBuf>,
+    pub cwd: Arc<Path>,
+    pub history: Vec<Arc<Path>>,
+    pub future: Vec<Arc<Path>>,
     pub loading_flag: Arc<AtomicBool>,
 
-    pub lower_names: Vec<(usize, String)>,
+    pub lower_names: Vec<(usize, Box<str>)>,
     pub loading_generation: u64,
     pub active_generation: u64,
 
-    pub files: Vec<Arc<FileEntry>>,
-    pub sorted_indices: Vec<usize>,
+    pub files: Arc<RwLock<Vec<Arc<FileEntry>>>>,
+    pub sorted_indices: Arc<RwLock<Vec<usize>>>,
 
-    pub recursive_entries: Vec<Arc<FileEntry>>,
+    pub recursive_entries: Arc<RwLock<Vec<FileEntry>>>,
     pub is_recursive_active: bool,
 
     watcher: FileWatcher,
@@ -70,7 +73,7 @@ pub struct TabState {
 
 
 impl TabState {
-    pub fn new(start_path: PathBuf, tab_id: Uuid) -> Self {
+    pub fn new(start_path: Arc<Path>, tab_id: Uuid) -> Self {
 
         //Crear dispatcher para la tab
         with_event_bus(|bus|{
@@ -82,17 +85,182 @@ impl TabState {
             cwd: start_path,
             history: Vec::new(),
             future: Vec::new(),
-            files: Vec::new(),
+            files: Arc::new(RwLock::new(Vec::new())),
             loading_flag: Arc::new(AtomicBool::new(false)),
             lower_names: Vec::new(),
             loading_generation: 0,
             active_generation: 0,
-            sorted_indices: Vec::new(),
-            recursive_entries: Vec::new(),
+            sorted_indices: Arc::new(RwLock::new(Vec::new())),
+            recursive_entries: Arc::new(RwLock::new(Vec::new())),
             is_recursive_active: false,
             watcher: FileWatcher::start(),
             loader: BlazeLoader::default(),
         }
+    }
+
+
+    pub fn get_active_files(&self, search_filter: &str, needs_sort: bool, sizer_manager: &SizerManager) -> MotorResult<Vec<Arc<FileEntry>>> {
+        let show_hidden = with_configs(|c| c.configs.show_hidden_files);
+        let query_lower = search_filter.to_lowercase();
+        let matcher = SkimMatcherV2::default();
+
+        self.ensure_sorted(needs_sort, sizer_manager)?;
+
+        let file_guard = self.files.read()
+            .map_err(|_|MotorError::PoisonedLock)?;
+
+        let indices_guard = self.sorted_indices.read()
+            .map_err(|_|MotorError::PoisonedLock)?;
+
+        let sorted = indices_guard
+            .iter()
+            .map(|&i| file_guard[i].clone())
+            .filter(|f| {
+                if !show_hidden && f.is_hidden {
+                    return false;
+                }
+                if search_filter.is_empty() {
+                    return true;
+                }
+                matcher.fuzzy_match(&f.name.to_lowercase(), &query_lower).is_some()
+            })
+            .collect();
+
+        Ok(sorted)
+    }
+
+
+
+    fn ensure_sorted(&self, needs_sort: bool, sizer_manager: &SizerManager) -> MotorResult<()> {
+        if !needs_sort {
+            return Ok(());
+        }
+
+        let mode = with_configs(|cfg| cfg.configs.app_ordering_mode.clone());
+
+        let file_guard = self.files.write()
+            .map_err(|_|MotorError::PoisonedLock)?;
+
+        let mut indices_guard = self.sorted_indices.write()
+            .map_err(|_|MotorError::PoisonedLock)?;
+
+        let mut indices: Vec<usize> = (0..file_guard.len()).collect();
+
+        indices.sort_by(|&a, &b|{
+            let entry_a = &file_guard[a];
+            let entry_b = &file_guard[b];
+
+            match (entry_a.is_dir(), entry_b.is_dir()) {
+                (true, false) => return std::cmp::Ordering::Less,
+                (false, true) => return std::cmp::Ordering::Greater,
+                _ => {}
+            }
+
+            if matches!(mode, OrderingMode::SizeAsc | OrderingMode::SizeDesc) {
+                let size_a = self.get_effective_size(entry_a, sizer_manager);
+                let size_b = self.get_effective_size(entry_b, sizer_manager);
+
+                if matches!(mode, OrderingMode::SizeAsc) {
+                    size_a.cmp(&size_b)
+                } else {
+                    size_b.cmp(&size_a)
+                }
+            } else {
+                match mode {
+                    OrderingMode::Az => entry_a.name.to_lowercase().cmp(&entry_b.name.to_lowercase()),
+                    OrderingMode::Za => entry_b.name.to_lowercase().cmp(&entry_a.name.to_lowercase()),
+                    OrderingMode::DateAsc => entry_a.modified.cmp(&entry_b.modified),
+                    OrderingMode::DateDesc => entry_b.modified.cmp(&entry_a.modified),
+                    _ => std::cmp::Ordering::Equal,
+                }
+            }
+        });
+
+        *indices_guard = indices;
+
+        Ok(())
+    }
+
+
+    fn get_effective_size(&self, entry: &FileEntry, sizer_manager: &SizerManager) -> u64 {
+        if !entry.is_dir() {
+            return entry.size;
+        }
+        let key = entry.full_path.to_string_lossy();
+        sizer_manager.cache_manager.size_cache
+            .try_read()
+            .ok()
+            .and_then(|g| g.get(key.as_ref()).map(|c| c.size))
+            .unwrap_or(0)
+    }
+
+
+    pub fn get_item_to_delete(&self, files: Vec<Arc<Path>>) -> MotorResult<Vec<(Arc<str>, Arc<Path>)>> {
+        let file_guard = self.files.read()
+            .map_err(|_|MotorError::PoisonedLock)?;
+
+        let ftd = file_guard
+            .iter()
+            .filter(|f| files.contains(&f.full_path))
+            .map(|f| (Arc::from(f.name.to_owned()), f.full_path.to_owned()))
+            .collect();
+
+        Ok(ftd)
+    }
+
+
+
+    pub fn update_dir_size(&self, full_path: Arc<Path>, new_size: u64) -> MotorResult<bool> {
+        let mut guard = self.files.write()
+            .map_err(|_| MotorError::PoisonedLock)?;
+
+        if let Some(entry) = guard.iter_mut().find(|f| *f.full_path.as_ref() == *full_path) {
+            let mut new_entry = (**entry).clone();
+            new_entry.size = new_size;
+            *entry = Arc::new(new_entry); 
+        } else {
+            return Ok(false);
+        }
+        Ok(true)
+    }
+
+
+
+
+    pub fn clear_recursive_files(&self) -> MotorResult<()> {
+        {
+            let mut recursive_entries_guard = self.recursive_entries.write()
+                .map_err(|_| MotorError::PoisonedLock)?;
+            recursive_entries_guard.clear();
+            recursive_entries_guard.shrink_to_fit();
+        }
+        Ok(())
+    }
+
+    pub fn clear_files(&self) -> MotorResult<()> {
+        {
+            let mut file_guard = self.files.write()
+                .map_err(|_| MotorError::PoisonedLock)?;
+            file_guard.clear();
+        } 
+        Ok(())
+    }
+
+    pub fn clear_sorted_indices(&self) -> MotorResult<()> {
+        {
+            let mut sorted_indices_guard = self.sorted_indices.write()
+                .map_err(|_| MotorError::PoisonedLock)?;
+            sorted_indices_guard.clear();
+        }
+        Ok(())
+    }
+
+    pub fn reset_for_new_path(&mut self) -> MotorResult<()> {
+        self.clear_files()?;
+        self.clear_sorted_indices()?;
+        self.clear_recursive_files()?;
+        self.lower_names.clear();
+        Ok(())
     }
 
 
@@ -104,22 +272,21 @@ impl TabState {
         }
 
         self.loading_generation += 1;
-        self.files.clear();
-        self.sorted_indices.clear();
-        self.lower_names.clear();
+        
+        self.reset_for_new_path()?;
 
         self.active_generation = 0;
-        self.loader.load_path(&path, sender.clone(), self.loading_generation)?;
+        self.loader.load_path(path.clone(), sender.clone(), self.loading_generation)?;
 
-        self.watcher.start_watching(&path, sender)
+        self.watcher.start_watching(path, sender)
     }
 
 
-    fn recursive_search(cwd: PathBuf, query: String, max_depth: usize, sender: Dispatcher, show_hidden: bool, loading_generation: u64, flag: Arc<AtomicBool>) {
+    fn recursive_search(cwd: Arc<Path>, query: String, max_depth: usize, sender: Dispatcher, show_hidden: bool, loading_generation: u64, flag: Arc<AtomicBool>) {
         TOKIO_RUNTIME.spawn(async move {
             let query_lower = query.to_lowercase().trim().to_string();
             let mut total_files = 0usize;
-            let mut batch: Vec<Arc<FileEntry>> = Vec::with_capacity(150);
+            let mut batch: Vec<FileEntry> = Vec::with_capacity(150);
 
             sender.send(RecursiveMessages::Started {
                 task_id: loading_generation as u64,
@@ -180,11 +347,9 @@ impl TabState {
                             let entry_path = path.to_path_buf();
                             let unique_id = get_file_id(&entry_path).ok();
 
-                            let file_entry = build_entry(entry_path, metadata, unique_id);
+                            let file_entry = build_entry(&entry_path, metadata, unique_id);
 
-                            let file_arc = Arc::new(file_entry);
-
-                            batch.push(file_arc);
+                            batch.push(file_entry);
                             total_files += 1;
 
                             if batch.len() >= 150 {
@@ -192,7 +357,7 @@ impl TabState {
                                 sender_clone.send(FileLoadingMessage::RecursiveBatch {
                                     generation: loading_generation,
                                     batch: send_batch,
-                                    source_dir: cwd_clone.clone(),
+                                    source_dir: cwd_clone.clone().into(),
                                 }).ok();
                             }
                         }
@@ -209,7 +374,7 @@ impl TabState {
                         sender.send(FileLoadingMessage::RecursiveBatch {
                             generation: loading_generation,
                             batch: remaining_batch,
-                            source_dir: cwd.clone(),
+                            source_dir: cwd.into(),
                         }).ok();
                     }
 
@@ -233,9 +398,14 @@ impl TabState {
         });
     }
 
-    pub fn start_recursive_search(&mut self, query: String, max_depth: usize, sender: Dispatcher) {
-        self.recursive_entries.clear();
-        self.recursive_entries.shrink_to_fit();
+    pub fn start_recursive_search(&mut self, query: String, max_depth: usize, sender: Dispatcher) -> MotorResult<()> {
+        {
+            let mut recursive_entries_guard = self.recursive_entries.write()
+                .map_err(|_| MotorError::PoisonedLock)?;
+            recursive_entries_guard.clear();
+            recursive_entries_guard.shrink_to_fit();
+        }
+
         self.is_recursive_active = true;
 
         self.loading_generation += 1;
@@ -248,11 +418,13 @@ impl TabState {
         let show_hidden = with_configs(|cfg| cfg.configs.show_hidden_files);
 
         Self::recursive_search(path, query, max_depth, sender, show_hidden, current_generation, flag);
+
+        Ok(())
     }
 
 
 
-    pub fn navigate_to(&mut self, new_path: &Path) {
+    pub fn navigate_to(&mut self, new_path: Arc<Path>) {
         if new_path.is_dir() && new_path != self.cwd {
             let old_path = self.cwd.clone();
             if self.history.last() != Some(&old_path) {
@@ -265,17 +437,16 @@ impl TabState {
                 self.history.remove(0);
             }
 
-            self.cwd = new_path.to_owned();
+            self.cwd = new_path.into();
         }
     }
 
 
     pub fn up(&mut self) {
-        if let Some(parent) = self.cwd.parent() {
+        if let Some(new_path) = self.cwd.parent() {
             let old_path = self.cwd.clone();
-            let new_path = parent.to_path_buf();
 
-            if new_path == old_path { return; }
+            if *new_path == *old_path { return; }
             
             self.history.push(old_path.clone());
 
@@ -286,7 +457,7 @@ impl TabState {
                 self.history.remove(0);
             }
 
-            self.cwd = new_path;
+            self.cwd = new_path.into();
         }
     }
 
@@ -402,9 +573,9 @@ impl BlazeMotor {
         });
     }
 
-    pub fn close_tab(&mut self, index:usize) -> bool{
+    pub fn close_tab(&mut self, index:usize) -> MotorResult<bool> {
         if self.tabs.len() <= 1 {
-            return false;
+            return Ok(false);
         }
 
         let tab_id = self.tabs[index].id;
@@ -413,15 +584,7 @@ impl BlazeMotor {
             let tab = &mut self.tabs[index];
             tab.watcher.stop_watching();
 
-            tab.files.clear();
-            tab.files.shrink_to_fit();
-            tab.lower_names.clear();
-            tab.lower_names.shrink_to_fit();
-            tab.sorted_indices.clear();
-            tab.sorted_indices.shrink_to_fit();
-        
-            tab.recursive_entries.clear();
-            tab.recursive_entries.shrink_to_fit();
+            tab.reset_for_new_path()?;
 
             tab.history.clear();
             tab.future.clear();
@@ -433,7 +596,8 @@ impl BlazeMotor {
         if self.active_tab_index >= self.tabs.len() {
             self.set_active_index(self.tabs.len() - 1);
         }
-        true
+
+        Ok(true)
     }
 
     fn start_tab_load(&mut self, index: usize) {
@@ -448,7 +612,7 @@ impl BlazeMotor {
             return None;
         }
         let tab_id = Uuid::new_v4();
-        let new_tab = TabState::new(tab_path.to_owned(), tab_id);
+        let new_tab = TabState::new(tab_path.into(), tab_id);
 
         let insert_index = self.active_tab_index + 1;
         self.tabs.insert(insert_index, new_tab);
@@ -492,17 +656,19 @@ impl BlazeMotor {
 
 #[cfg(test)]
 mod tests {
+    use crate::core::files::{blaze_motor::motor_structs::FileKind, file_extension::FileExtension};
+
     use super::*;
     use std::time::Duration;
 
-    fn make_tab(path: PathBuf) -> TabState {
+    fn make_tab(path: Arc<Path>) -> TabState {
         let id = Uuid::new_v4();
         TabState::new(path, id)
     }
 
     #[test]
     fn test_stop_watching_does_not_leave_handle() {
-        let mut tab = make_tab(std::env::temp_dir());
+        let mut tab = make_tab(std::env::temp_dir().into());
         // Simular que tenía un handle activo
         let handle = TOKIO_RUNTIME.spawn(async { tokio::time::sleep(Duration::from_secs(60)).await });
         tab.watcher.watching_handle = Some(handle);
@@ -517,7 +683,7 @@ mod tests {
 
     #[test]
     fn test_cancel_loading_drains_handles() {
-        let mut tab = make_tab(std::env::temp_dir());
+        let mut tab = make_tab(std::env::temp_dir().into());
         let h1 = TOKIO_RUNTIME.spawn(async { tokio::time::sleep(Duration::from_secs(60)).await });
         let h2 = TOKIO_RUNTIME.spawn(async { tokio::time::sleep(Duration::from_secs(60)).await });
         tab.loader.handles.push(h1);
@@ -531,53 +697,83 @@ mod tests {
     }
 
     #[test]
-    fn test_close_tab_clears_all_memory() {
+    fn test_close_tab_clears_all_memory() -> MotorResult<()> {
         let mut motor = TOKIO_RUNTIME.block_on(BlazeMotor::new());
         // Añadir un segundo tab para poder cerrar el primero
         motor.add_tab(&std::env::temp_dir());
         assert_eq!(motor.tabs.len(), 2);
 
         // Llenar datos en tab 0
-        motor.tabs[0].files = vec![]; // simular con vec vacío, basta para el test
-        motor.tabs[0].recursive_entries.push(Arc::new(FileEntry::default()));
 
-        let closed = motor.close_tab(0);
+        {
+            let mut file_guard = motor.tabs[0].files.write()
+                .map_err(|_| MotorError::PoisonedLock)?;
+            // simular con vec vacío, basta para el test
+            file_guard.push(
+                Arc::new(
+                FileEntry {
+                        name: "".into(),
+                        full_path: Path::new("").into(),
+                        extension: FileExtension::Unknown,
+                        kind: FileKind::File,
+                        size: 0,
+                        modified: 0,
+                        created: 0,
+                        is_hidden: false,
+                        unique_id: None,
+                        accessed: 0,
+                        permissions: 0,
+                        inode: 0,
+                        nlink: 0,
+                        device: 0,
+                    }
+                )
+            );
+        }
+
+        let closed = motor.close_tab(0)?;
 
         assert!(closed);
         assert_eq!(motor.tabs.len(), 1);
+
+        Ok(())
     }
 
     #[test]
-    fn test_close_tab_refuses_last_tab() {
+    fn test_close_tab_refuses_last_tab() -> MotorResult<()> {
         let mut motor = TOKIO_RUNTIME.block_on(BlazeMotor::new());
         assert_eq!(motor.tabs.len(), 1);
 
-        let result = motor.close_tab(0);
+        let result = motor.close_tab(0)?;
         assert!(!result, "no debe permitir cerrar el último tab");
         assert_eq!(motor.tabs.len(), 1);
+
+        Ok(())
     }
 
     #[test]
-    fn test_active_tab_index_clamps_after_close() {
+    fn test_active_tab_index_clamps_after_close() -> MotorResult<()> {
         let mut motor = TOKIO_RUNTIME.block_on(BlazeMotor::new());
         motor.add_tab(&std::env::temp_dir());
         motor.add_tab(&std::env::temp_dir());
         // tabs: [0, 1, 2], active = 2
         motor.active_tab_index = 2;
 
-        motor.close_tab(2); // cierra el activo (el último)
+        motor.close_tab(2)?; // cierra el activo (el último)
 
         assert_eq!(motor.active_tab_index, 1, "debe apuntar al nuevo último tab");
+
+        Ok(())
     }
 
     #[test]
     fn test_watcher_task_exits_on_watcher_drop() {
         // Verificar que la task del watcher termina sola cuando se dropea el watcher
-        let mut tab = make_tab(std::env::temp_dir());
-        let cwd = &tab.cwd;
+        let mut tab = make_tab(std::env::temp_dir().into());
+        let cwd = tab.cwd;
         let sender = with_event_bus(|pool| pool.dispatcher(tab.id));
 
-        tab.watcher.start_watching(&cwd, sender).ok();
+        tab.watcher.start_watching(cwd, sender).ok();
         assert!(tab.watcher.watching_handle.is_some());
 
         // stop_watching dropea el watcher → fs_tx se cierra → task termina
@@ -591,22 +787,22 @@ mod tests {
     }
 
 
-    fn two_distinct_dirs() -> (PathBuf, PathBuf) {
+    fn two_distinct_dirs() -> (Arc<Path>, Arc<Path>) {
         let base = std::env::temp_dir();
         let a = base.join("blaze_test_a");
         let b = base.join("blaze_test_b");
         std::fs::create_dir_all(&a).ok();
         std::fs::create_dir_all(&b).ok();
-        (a, b)
+        (a.into(), b.into())
     }
 
 
     #[test]
     fn test_navigate_to_updates_history() {
         let (start, other) = two_distinct_dirs();
-        let mut tab = make_tab(start.clone());
+        let mut tab = make_tab(start.to_owned());
 
-        tab.navigate_to(&*other);
+        tab.navigate_to(other.to_owned());
 
         assert_eq!(tab.cwd, other);
         assert!(tab.history.contains(&start));
@@ -623,9 +819,9 @@ mod tests {
     #[test]
     fn test_back_and_forward() {
         let (start, other) = two_distinct_dirs();
-        let mut tab = make_tab(start.clone());
+        let mut tab = make_tab(start.to_owned());
 
-        tab.navigate_to(&*other);
+        tab.navigate_to(other.to_owned());
         tab.back();
 
         assert_eq!(tab.cwd, start);

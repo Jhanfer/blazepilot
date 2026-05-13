@@ -1,12 +1,12 @@
 use std::path::{PathBuf, Path};
-use std::sync::OnceLock;
+use std::sync::{Arc, OnceLock};
 use crate::core::system::trash_manager::error::{TrashError, TrashResult};
 
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TrashDestination {
     Home,
-    External { mount_point: PathBuf },
+    External { mount_point: Arc<Path> },
 }
 
 
@@ -29,9 +29,9 @@ pub trait TrashBackend: Send + Sync + std::fmt::Debug {
     fn empty_trash(&self) -> TrashResult<()>;
 
     //ruta base de la papelera para este destino
-    fn get_trash_root(&self, destination: &TrashDestination) -> TrashResult<PathBuf>;
+    fn get_trash_root(&self, destination: &TrashDestination) -> TrashResult<Arc<Path>>;
 
-    fn get_trash_files(&self, destination: &TrashDestination) -> TrashResult<PathBuf>;
+    fn get_trash_files(&self, destination: &TrashDestination) -> TrashResult<Arc<Path>>;
 }
 
 

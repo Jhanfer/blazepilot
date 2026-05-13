@@ -52,10 +52,10 @@ pub fn drag_files(ui: &mut Ui, state: &mut BlazeCoreState, files: &[Arc<FileEntr
                 let hovered_index = (relative_y / row_height).floor() as usize;
                 if hovered_index < files.len() {
                     let file = &files[hovered_index];
-                    if file.is_dir && !state.is_selected(hovered_index) {
-                        state.row_view.drop_target = Some(file.full_path.clone());
-                    } else if !file.is_dir {
-                        state.row_view.drop_invalid_target = Some(file.full_path.clone());
+                    if file.is_dir() && !state.is_selected(hovered_index) {
+                        state.row_view.drop_target = Some(file.full_path.to_owned());
+                    } else if !file.is_dir() {
+                        state.row_view.drop_invalid_target = Some(file.full_path.to_owned());
                     }
                 }
             }

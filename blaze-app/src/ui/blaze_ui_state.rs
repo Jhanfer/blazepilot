@@ -15,7 +15,7 @@
 
 
 
-use std::{collections::{HashMap, HashSet}, path::{Path, PathBuf}};
+use std::{collections::{HashMap, HashSet}, path::{Path, PathBuf}, sync::Arc};
 use egui::{Area, Order, Sense, TextureHandle, Ui};
 use file_id::FileId;
 use uuid::Uuid;
@@ -55,15 +55,15 @@ impl DialogManager {
         }
     }
 
-    pub fn open_selector_dialog(&mut self, path: PathBuf, mime: String, apps: Vec<AppAssociation>, icon_data: Vec<AppsIconData>, show_all_apps: bool) {
+    pub fn open_selector_dialog(&mut self, path: Arc<Path>, mime: String, apps: Vec<AppAssociation>, icon_data: Vec<AppsIconData>, show_all_apps: bool) {
         self.selector_dialog.open(path, mime, apps, icon_data, show_all_apps);
     }
 
-    pub fn open_sure_move_dialog(&mut self, sources: Vec<PathBuf>, dest: PathBuf, tab_id: Uuid) {
+    pub fn open_sure_move_dialog(&mut self, sources: Vec<Arc<Path>>, dest: Arc<Path>, tab_id: Uuid) {
         self.sure_to_dialog.open(sources, dest, tab_id);
     }
 
-    pub fn open_sure_to_delete(&mut self, sources: Vec<PathBuf>, tab_id: Uuid) {
+    pub fn open_sure_to_delete(&mut self, sources: Vec<Arc<Path>>, tab_id: Uuid) {
         self.sure_to_delete_dialog.open(sources, tab_id);
     }
 
@@ -142,10 +142,10 @@ pub struct BlazeUiState {
     pub context_menu_state: ContextMenuState,
     pub thumb_texture_cache: HashMap<PathBuf, TextureHandle>,
     pub thumbnail_manager: ThumbnailManager,
-    pub calculating_thumbnails: HashSet<PathBuf>,
-    pub calculated_thumbnails: HashSet<PathBuf>,
+    pub calculating_thumbnails: HashSet<Arc<Path>>,
+    pub calculated_thumbnails: HashSet<Arc<Path>>,
     pub needs_repaint: bool,
-    pub newly_calculated_thumbnails: HashSet<PathBuf>,
+    pub newly_calculated_thumbnails: HashSet<Arc<Path>>,
     last_thumb_cache_dir: Option<PathBuf>,
 }
 

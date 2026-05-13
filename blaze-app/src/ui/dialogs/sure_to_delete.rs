@@ -16,14 +16,16 @@
 
 
 
-use std::path::PathBuf;
+
+use std::{path::Path, sync::Arc};
+
 use egui::{Color32, CornerRadius, Frame, Margin, Order, RichText, Ui, Window};
 use uuid::Uuid;
 use crate::{core::{runtime::{bus_structs::FileOperation, event_bus::Dispatcher}}, ui::blaze_ui_state::ModalDialog};
 
 
 pub struct SureToDeleteDialog {
-    pub sources: Option<Vec<PathBuf>>,
+    pub sources: Option<Vec<Arc<Path>>>,
     pub tab_id: Option<Uuid>,
     pub show_modal: bool,
 }
@@ -47,7 +49,7 @@ impl SureToDeleteDialog {
         self.show_modal = false; 
     }
 
-    pub fn open(&mut self, sources: Vec<PathBuf>, tab_id: Uuid) {
+    pub fn open(&mut self, sources: Vec<Arc<Path>>, tab_id: Uuid) {
         self.sources = Some(sources);
         self.tab_id = Some(tab_id);
         self.show_modal = true;

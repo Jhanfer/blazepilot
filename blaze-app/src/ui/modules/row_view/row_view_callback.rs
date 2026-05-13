@@ -161,16 +161,15 @@ pub fn render_row_view(ui: &mut Ui, files: &Vec<Arc<FileEntry>>, state: &mut Bla
                 let dispatcher = with_event_bus(|e| e.dispatcher(tab_id));
 
                 //Disparador de sizer
-                
                 for i in state.row_view.first_visible..state.row_view.last_visible.min(files.len()) {
                     let file = &files[i];
 
-                    if file.is_dir 
+                    if file.is_dir() 
                         && !state.calculating_dir_sizes.contains(&file.full_path) 
                         && !state.calculated_dir_sizes.contains(&file.full_path) 
                     {
                         state.calculating_dir_sizes.insert(file.full_path.clone());
-                        if let Err(e) = dispatcher.send(SizerMessages::StartCal(file.full_path.clone())) {
+                        if let Err(e) = dispatcher.send(SizerMessages::StartCal(file.full_path.to_owned())) {
                             warn!("Error enviando Sizer: {}", e);
                         }
                     }
@@ -182,7 +181,7 @@ pub fn render_row_view(ui: &mut Ui, files: &Vec<Arc<FileEntry>>, state: &mut Bla
                     let file = &files[i];
                     if !state.calculating_extended_info.contains(&file.full_path) && !state.calculated_extended_info.contains(&file.full_path) {
                         state.calculating_extended_info.insert(file.full_path.clone());
-                        if let Err(e) = dispatcher.send(ExtendedInfoMessages::StartScan(file.full_path.clone())) {
+                        if let Err(e) = dispatcher.send(ExtendedInfoMessages::StartScan(file.full_path.to_owned())) {
                             warn!("Error enviando Sizer: {}", e);
                         }
                     }

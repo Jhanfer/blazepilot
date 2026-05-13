@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::Path;
 use std::sync::Arc;
 use file_id::FileId;
 use uuid::Uuid;
@@ -14,12 +14,19 @@ use crate::ui::image_preview::image_preview::ImagePreviewState;
 
 #[derive(Debug)]
 pub enum FileOperation {
-    Move { files: Vec<PathBuf>, dest: PathBuf, tab_id: Uuid},
-    Delete { files: Vec<PathBuf> },
-    Copy { files: Vec<PathBuf>, dest: PathBuf },
+    Move { 
+        files: Vec<Arc<Path>>, 
+        dest: Arc<Path>, 
+        tab_id: Uuid
+    },
+    Delete { files: Vec<Arc<Path>> },
+    Copy { 
+        files: Vec<Arc<Path>>, 
+        dest: Arc<Path> 
+    },
     Update,
     UpdateDirSize {
-        full_path: PathBuf, 
+        full_path: Arc<Path>, 
         size: u64, 
         tab_id: Uuid,
     },
@@ -27,25 +34,25 @@ pub enum FileOperation {
         file_names: Vec<String>,
     },
     ExtendedInfoReady {
-        full_path: PathBuf,
+        full_path: Arc<Path>,
         tab_id: Uuid,
     },
 
     ExtractHere {
         entry: Arc<FileEntry>, 
-        dest_dir: PathBuf,
+        dest_dir: Arc<Path>,
     },
 }
 
 #[derive(Debug)]
 pub enum SureTo {
     SureToMove {
-        files: Vec<PathBuf>,
-        dest: PathBuf,
+        files: Vec<Arc<Path>>,
+        dest: Arc<Path>,
         tab_id: Uuid,
     },
     SureToDelete {
-        files: Vec<PathBuf>,
+        files: Vec<Arc<Path>>,
         tab_id: Uuid,
     },
     SureToCopy,
@@ -55,13 +62,13 @@ pub enum SureTo {
 pub enum FileConflict {
     AlreadyExist {
         name: String,
-        path: PathBuf
+        path: Arc<Path>
     }
 }
 
 pub enum UiEvent {
     OpenWithSelector {
-        path: PathBuf,
+        path: Arc<Path>,
         mime: String,
         apps: Vec<AppAssociation>,
         icon_data: Vec<AppsIconData>,
@@ -69,7 +76,7 @@ pub enum UiEvent {
     },
 
     ThumbnailReady {
-        full_path: PathBuf,
+        full_path: Arc<Path>,
         tab_id: Uuid,
     },
 

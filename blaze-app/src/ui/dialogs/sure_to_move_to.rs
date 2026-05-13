@@ -16,15 +16,15 @@
 
 
 
-use std::path::PathBuf;
+use std::{path::Path, sync::Arc};
 use egui::{Color32, CornerRadius, Frame, Margin, Order, RichText, Ui, Window};
 use uuid::Uuid;
 use crate::{core::runtime::{bus_structs::FileOperation, event_bus::Dispatcher}, ui::blaze_ui_state::ModalDialog};
 
 
 pub struct SureToMoveToDialog {
-    pub sources: Option<Vec<PathBuf>>,
-    pub dest: Option<PathBuf>,
+    pub sources: Option<Vec<Arc<Path>>>,
+    pub dest: Option<Arc<Path>>,
     pub tab_id: Option<Uuid>,
     pub show_modal: bool,
 }
@@ -49,7 +49,7 @@ impl SureToMoveToDialog {
         self.show_modal = false; 
     }
 
-    pub fn open(&mut self, sources: Vec<PathBuf>, dest: PathBuf, tab_id: Uuid) {
+    pub fn open(&mut self, sources: Vec<Arc<Path>>, dest: Arc<Path>, tab_id: Uuid) {
         self.sources = Some(sources);
         self.dest = Some(dest);
         self.tab_id = Some(tab_id);
@@ -129,8 +129,8 @@ impl SureToMoveToDialog {
                     if ui.button("Aceptar").clicked() {
 
                         Dispatcher::current().send(FileOperation::Move { 
-                            files: sources.to_vec(), 
-                            dest: dest.to_path_buf(),
+                            files: sources.to_vec(),
+                            dest: dest.to_owned(),
                             tab_id: *tab_id,
                         }).ok();
 

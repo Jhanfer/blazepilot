@@ -15,7 +15,8 @@
 
 
 
-use std::path::PathBuf;
+use std::path::Path;
+use std::sync::Arc;
 use eframe::Frame;
 use egui::{FontData, FontDefinitions, FontFamily, Ui};
 use tracing::{debug};
@@ -56,12 +57,20 @@ impl eframe::App for BlazeApp {
     fn ui(&mut self, ui: &mut Ui, _frame: &mut Frame) {
         self.set_up_custom_font(ui);
 
+        ui.options_mut(|opt| {
+            opt.reduce_texture_memory = true;
+        });
+
         //Dropeo de archivos
         if !ui.ctx().input(|i| i.raw.dropped_files.is_empty()) {
             debug!("Se dropea el objeto");
-            let dropped_files: Vec<PathBuf> = ui.input(|i| i.raw.dropped_files.clone())
+            let dropped_files: Vec<Arc<Path>> = ui.input(|i| i.raw.dropped_files.clone())
                 .iter()
-                .map(|d| d.path.clone().unwrap_or_default())
+                .map(|d| {
+                    let path_buf = &d.path.clone().unwrap_or_default();
+                    let path: &Path = path_buf.as_ref();
+                    Arc::from(path)
+                })
                 .collect();
 
             let cwd = self.state.cwd.clone();
@@ -76,13 +85,8 @@ impl eframe::App for BlazeApp {
         self.ui_state.dialog_manager.render_area(ui);
         self.ui_state.process_events();
 
-        let mut files = self.state.active_files();
-        if self.state.needs_sort {
-            files = self.state.sort_indices(&mut files);
-        }
-
+        let files = self.state.get_active_files();
         connect_ui_components_callback(ui, &files, &mut self.state, &mut self.ui_state);
-
 
         if self.state.is_loading || self.state.active_tasks > 0 {
             ui.request_repaint();

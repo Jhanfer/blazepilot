@@ -16,7 +16,7 @@
 
 
 
-use std::{path::PathBuf, sync::Arc};
+use std::{path::Path, sync::Arc};
 use once_cell::sync::Lazy;
 use serde::{Serialize, Deserialize};
 use tokio::sync::Mutex;
@@ -94,7 +94,7 @@ impl FileOpenerManager {
     }
 
 
-    pub async fn request_open_file(&mut self, path: PathBuf, sender: Dispatcher) {
+    pub async fn request_open_file(&mut self, path: Arc<Path>, sender: Dispatcher) {
         match &mut self.opener {
             #[cfg(target_os = "linux")]
             PlatformOpener::Linux(op) => {
@@ -114,7 +114,7 @@ impl FileOpenerManager {
         }
     }
 
-    pub async fn request_open_file_with(&mut self, path: PathBuf, sender: Dispatcher) {
+    pub async fn request_open_file_with(&mut self, path: Arc<Path>, sender: Dispatcher) {
         match &mut self.opener {
             #[cfg(target_os = "linux")]
             PlatformOpener::Linux(op) => {
@@ -164,7 +164,7 @@ impl FileOpenerManager {
     }
 
 
-    pub async fn request_launch(&mut self, app: &AppAssociation, path: &PathBuf) {
+    pub async fn request_launch(&mut self, app: &AppAssociation, path: Arc<Path>) {
         match &mut self.opener {
             #[cfg(target_os = "linux")]
             PlatformOpener::Linux(op) => {

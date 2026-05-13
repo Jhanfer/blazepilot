@@ -1,11 +1,11 @@
-use std::path::PathBuf;
+use std::{path::Path, sync::Arc};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum OpenerError {
     #[error("No se ha podido leer el archivo: {path} - {source}")]
     Io {
-        path: PathBuf,
+        path: Arc<Path>,
         #[source]
         source: std::io::Error,
     },
@@ -23,7 +23,7 @@ pub enum OpenerError {
     InvalidExec{ desktop_id: String },
 
     #[error("No se pudo parsear el archivo de escritorio: {path}")]
-    DesktopParsedFaild { path: PathBuf},
+    DesktopParsedFaild { path: Arc<Path>},
 
     #[error("Error parseando argumentos de Exec: {raw}")]
     ExecParseFailed { raw: String },

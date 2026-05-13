@@ -18,11 +18,10 @@
 
 use std::{cell::{RefCell, RefMut}, collections::HashSet, path::{Path, PathBuf}, rc::Rc, sync::{Arc, atomic::{AtomicU64, Ordering}}, time::{Duration, Instant, SystemTime, UNIX_EPOCH}};
 use bitvec::vec::BitVec;
-use fuzzy_matcher::{FuzzyMatcher, skim::SkimMatcherV2};
 use tracing::{debug, error, info, warn};
 use tokio::sync::Mutex as TokioMutex;
 use uuid::Uuid;
-use crate::{core::{configs::config_state::{OrderingMode, with_configs}, files::blaze_motor::{motor::{BlazeMotor, MOTOR}, motor_structs::{FileEntry, FileLoadingMessage, RecursiveMessages}}, runtime::{bus_structs::FileOperation, event_bus::with_event_bus}, system::{cache::cache_manager::CacheManager, clipboard::{GlobalClipboard, TOKIO_RUNTIME}, extended_info::extended_info_manager::{ExtendedInfoManager, ExtendedInfoMessages}, fileopener_module::{FileOpenerManager, GLOBAL_FILE_OPENER}, sizer_manager::sizer_manager::SizerManager, terminal_opener::terminal_manager::{GLOBAL_TERMINAL_MANAGER, TerminalManager}, trash_manager::trash_manager::{TrashDestination, get_backend}, updater::updater::Updater, zip_manager::zip_manager::ZipManager}}, ui::task_manager::task_manager::TaskManager};
+use crate::{core::{configs::config_state::with_configs, files::blaze_motor::{motor::{BlazeMotor, MOTOR}, motor_structs::{FileEntry, FileLoadingMessage, RecursiveMessages}}, runtime::{bus_structs::FileOperation, event_bus::with_event_bus}, system::{cache::cache_manager::CacheManager, clipboard::{GlobalClipboard, TOKIO_RUNTIME}, extended_info::extended_info_manager::{ExtendedInfoManager, ExtendedInfoMessages}, fileopener_module::{FileOpenerManager, GLOBAL_FILE_OPENER}, sizer_manager::sizer_manager::SizerManager, terminal_opener::terminal_manager::{GLOBAL_TERMINAL_MANAGER, TerminalManager}, trash_manager::trash_manager::{TrashDestination, get_backend}, updater::updater::Updater, zip_manager::zip_manager::ZipManager}}, ui::task_manager::task_manager::TaskManager};
 
 
 // Para el guardado en caché
@@ -40,8 +39,8 @@ pub struct RubberBand {
 pub struct RowView {
     pub is_dragging_files: bool,
     pub drag_ghost_pos: Option<egui::Pos2>,
-    pub drop_target: Option<PathBuf>,
-    pub drop_invalid_target: Option<PathBuf>,
+    pub drop_target: Option<Arc<Path>>,
+    pub drop_invalid_target: Option<Arc<Path>>,
     pub scroll_area_origin_y: f32,
     pub first_visible: usize,
     pub last_visible: usize,
@@ -75,8 +74,8 @@ pub struct BlazeCoreState {
     pub new_item_buffer: String,
     pub focus_requested: bool,
     pub updater: Updater,
-    pub calculated_dir_sizes: HashSet<PathBuf>,
-    pub calculating_dir_sizes: HashSet<PathBuf>,
+    pub calculated_dir_sizes: HashSet<Arc<Path>>,
+    pub calculating_dir_sizes: HashSet<Arc<Path>>,
     pub last_fs_event: Option<Instant>,
     pub task_manager: &'static TaskManager,
     pub sizer_manager: SizerManager,
@@ -84,10 +83,10 @@ pub struct BlazeCoreState {
     pub _cwd_input: String,
     pub terminal_manager: Arc<TokioMutex<TerminalManager>>,
     pub extended_info_manager: ExtendedInfoManager,
-    pub calculating_extended_info: HashSet<PathBuf>,
-    pub calculated_extended_info: HashSet<PathBuf>,
+    pub calculating_extended_info: HashSet<Arc<Path>>,
+    pub calculated_extended_info: HashSet<Arc<Path>>,
     pub zip_manager: ZipManager,
-    pub cwd: PathBuf,
+    pub cwd: Arc<Path>,
     last_navigation_time: Option<Instant>,
     navigation_cooldown: Duration,
 }
@@ -163,7 +162,7 @@ impl BlazeCoreState {
             calculating_extended_info: HashSet::new(),
             calculated_extended_info: HashSet::new(),
             zip_manager: ZipManager::new(),
-            cwd: PathBuf::new(),
+            cwd: PathBuf::new().into(),
             last_navigation_time: None,
             navigation_cooldown: Duration::from_millis(100),
         };
@@ -186,73 +185,25 @@ impl BlazeCoreState {
         state
     }
 
-    pub fn sort_indices(&mut self, files: &mut Vec<Arc<FileEntry>>) -> Vec<Arc<FileEntry>> {
-        let new_mode = with_configs(|cfg| cfg.configs.app_ordering_mode.clone());
-        let by_size = matches!(new_mode, OrderingMode::SizeAsc | OrderingMode::SizeDesc);
-        
-        if by_size {
-            files.sort_by(|a, b|{
-                match (a.is_dir, b.is_dir) {
-                    (true, false) => return std::cmp::Ordering::Less,
-                    (false, true) => return std::cmp::Ordering::Greater,
-                    _ => (),
-                }
 
-                let size_a = if a.is_dir {
-                    let key = &a.full_path.to_string_lossy();
-                    self.sizer_manager.cache_manager.size_cache
-                        .try_read()
-                        .ok()
-                        .and_then(|g|{
-                            g.get(key.as_ref()).map(|c| c.size)
-                        })
-                        .unwrap_or(0)
-                } else {
-                    a.size
-                };
 
-                let size_b = if b.is_dir {
-                    let key = &b.full_path.to_string_lossy();
-                    self.sizer_manager.cache_manager.size_cache
-                        .try_read()
-                        .ok()
-                        .and_then(|g|{
-                            g.get(key.as_ref()).map(|c| c.size)
-                        })
-                        .unwrap_or(0)
-                } else {
-                    b.size
-                };
 
-                match new_mode {
-                    OrderingMode::SizeAsc => size_a.cmp(&size_b),
-                    OrderingMode::SizeDesc => size_b.cmp(&size_a),
-                    OrderingMode::Az => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
-                    OrderingMode::Za => b.name.to_lowercase().cmp(&a.name.to_lowercase()),
-                    OrderingMode::DateAsc => a.modified.cmp(&b.modified),
-                    OrderingMode::DateDesc => b.modified.cmp(&a.modified),
-                }
-            });
-        } else {
-            files.sort_by(|a, b|{
-                match (a.is_dir, b.is_dir) {
-                    (true, false) => return std::cmp::Ordering::Less,
-                    (false, true) => return std::cmp::Ordering::Greater,
-                    _ => {}
-                }
+    pub fn get_active_files(&mut self) -> Vec<Arc<FileEntry>> {
+        let motor = self.motor.borrow();
+        let tab = motor.active_tab();
 
-                match new_mode {
-                    OrderingMode::Az => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
-                    OrderingMode::Za => b.name.to_lowercase().cmp(&a.name.to_lowercase()),
-                    OrderingMode::DateAsc => a.modified.cmp(&b.modified),
-                    OrderingMode::DateDesc => b.modified.cmp(&a.modified),
-                    _ => std::cmp::Ordering::Equal,
-                }
-            });
+        match tab.get_active_files(&self.search_filter, self.needs_sort, &self.sizer_manager) {
+            Ok(files) => {
+                self.needs_sort = false;
+                files
+            },
+            Err(e) => {
+                warn!("Ha ocurrido un error obteniendo los archivos: {e}");
+                vec![]
+            }
         }
-
-        files.to_vec()
     }
+
 
     pub fn is_selected(&self, index: usize) -> bool {
         if index >= self.selection.len() {
@@ -323,7 +274,7 @@ impl BlazeCoreState {
         }
     }
 
-    pub fn get_selected_paths(&self, files: &[Arc<FileEntry>]) -> Vec<PathBuf> {
+    pub fn get_selected_paths(&self, files: &[Arc<FileEntry>]) -> Vec<Arc<Path>> {
         files.iter()
             .enumerate()
             .filter(|(i, _)| self.is_selected(*i))
@@ -373,7 +324,7 @@ impl BlazeCoreState {
         }
     }
 
-    pub fn navigate_to(&mut self, path: &Path) {
+    pub fn navigate_to(&mut self, path: Arc<Path>) {
         let prev_dir = self.cwd.clone();
         self.motor.borrow_mut().active_tab_mut().navigate_to(path);
         self.extended_info_manager.clear_directory(&prev_dir);
@@ -449,14 +400,6 @@ impl BlazeCoreState {
         result
     }
 
-    pub fn _get_file_entry(&self, path: &PathBuf) -> Option<Arc<FileEntry>> {
-        self.motor.borrow_mut()
-            .active_tab()
-            .files
-            .iter()
-            .find(|f| f.full_path == *path)
-            .cloned()
-    }
 
 
     pub fn copy(&self, files: &Vec<Arc<FileEntry>>) {
@@ -471,58 +414,32 @@ impl BlazeCoreState {
         self.clipboard.cut_items(items, cwd);
     }
 
-    pub fn move_to_trash(&mut self, files: &Vec<Arc<FileEntry>>) {
-        let cwd = self.motor.borrow().tabs[self.motor.borrow().active_tab_index].cwd.clone();
-        let items = self.selected_as_entries(files);
+    pub fn move_to_trash(&mut self, items: Vec<(Arc<str>, Arc<Path>)>) {
         let dispatcher = with_event_bus(|e| e.dispatcher(self.active_id));
-        self.clipboard.move_to_trash(items, cwd,&dispatcher).ok();
+        self.clipboard.move_to_trash(items,&dispatcher).ok();
     }
 
-    fn move_to_trash_event_only(&mut self, items: Vec<Arc<FileEntry>>) {
-        let cwd = self.motor.borrow().tabs[self.motor.borrow().active_tab_index].cwd.clone();
+    fn move_to_trash_event_only(&self, items: Vec<(Arc<str>, Arc<Path>)>) {
         let dispatcher = with_event_bus(|e| e.dispatcher(self.active_id));
-        self.clipboard.move_to_trash(items, cwd, &dispatcher).ok();
+        self.clipboard.move_to_trash(items, &dispatcher).ok();
     }
 
-    pub fn move_files(&mut self, files: Vec<PathBuf>, dest: PathBuf) {
+    pub fn move_files(&mut self, files: Vec<Arc<Path>>, dest: Arc<Path>) {
         let dispatcher = with_event_bus(|e| e.dispatcher(self.active_id));
         self.clipboard.move_files(files, dest, &dispatcher).ok();
     }
 
-    pub fn paste(&mut self, path: PathBuf) {
+    pub fn paste(&mut self, path: Arc<Path>) {
         self.clipboard.set_dest(path);
         let dispatcher = with_event_bus(|e| e.dispatcher(self.active_id));
         self.clipboard.paste(&dispatcher).ok();
     }
 
-
-    pub fn active_files(&self) -> Vec<Arc<FileEntry>> {
-        let mut motor = self.motor.borrow_mut();
-        let tab = motor.active_tab_mut();
-        let show_hidden = with_configs(|c| c.configs.show_hidden_files);
-
-        let base: Vec<Arc<FileEntry>> = if tab.is_recursive_active {
-            tab.recursive_entries.iter().cloned().collect()
-        } else {
-            tab.sorted_indices.iter().map(|&i| tab.files[i].clone()).collect()
-        };
-
-        let matcher = SkimMatcherV2::default();
-        let query_lower = self.search_filter.to_lowercase();
-
-        base.into_iter()
-            .filter(|f| {
-                if !show_hidden && f.is_hidden { return false; }
-                if tab.is_recursive_active { return true; }
-                if self.search_filter.is_empty() { return true;}
-                matcher.fuzzy_match(&f.name.to_lowercase(), &query_lower).is_some()
-            })
-            .collect()
-    }
-
     pub fn clean_search(&mut self) {
         let mut motor = self.motor.borrow_mut();
-        motor.active_tab_mut().recursive_entries.clear();
+        if let Err(e) = motor.active_tab_mut().clear_recursive_files() {
+            warn!("Ha ocirrido un error: {}", e);
+        }
         motor.active_tab_mut().is_recursive_active = false;
         self.search_filter.clear();
     }
@@ -540,7 +457,9 @@ impl BlazeCoreState {
             let clean = query.replacen("rec:", "", 1);
             if clean.len() >= 2 && clean != self.search_filter.replacen("rec:", "", 1) {
                 let dispatcher = with_event_bus(|e| e.dispatcher(self.active_id));
-                self.motor.borrow_mut().active_tab_mut().start_recursive_search(clean, 30, dispatcher);
+                if let Err(e) = self.motor.borrow_mut().active_tab_mut().start_recursive_search(clean, 30, dispatcher) {
+                    warn!("Ha ocirrido un error: {}", e);
+                }
             }
         }
 
@@ -548,10 +467,11 @@ impl BlazeCoreState {
     }
 
 
-    pub fn open_file_by_path(&mut self, path: PathBuf) {
+    pub fn open_file_by_path(&mut self, path: Arc<Path>) {
         let manager_arc = self.file_opener_manager.clone();
 
         let dispatcher = with_event_bus(|e| e.dispatcher(self.active_id));
+
         TOKIO_RUNTIME.spawn(async move {
             info!("intentando abrir");
             let mut manager = manager_arc.lock().await;
@@ -560,7 +480,7 @@ impl BlazeCoreState {
     }
 
     pub fn open_file(&mut self, file:&Arc<FileEntry>) {
-        let path = file.full_path.clone();
+        let path = file.full_path.to_owned();
         let manager_arc = self.file_opener_manager.clone();
         
         let dispatcher = with_event_bus(|e| e.dispatcher(self.active_id));
@@ -573,7 +493,7 @@ impl BlazeCoreState {
     }
 
     pub fn open_file_with(&mut self, file:&Arc<FileEntry>) {
-        let path = file.full_path.clone();
+        let path = file.full_path.to_owned();
         let manager_arc = self.file_opener_manager.clone();
         
         let dispatcher = with_event_bus(|e| e.dispatcher(self.active_id));
@@ -642,7 +562,7 @@ impl BlazeCoreState {
     pub fn close_tab(&mut self, index:usize) -> bool {
         let (new_id, closed) = {
             let mut motor = self.motor_mut();
-            let closed = motor.close_tab(index);
+            let closed = motor.close_tab(index).is_ok();
             let new_id = motor.active_tab().id;
             (new_id, closed)
         };
@@ -724,22 +644,44 @@ impl BlazeCoreState {
         for msg in file_messages {
             match msg {
                 FileLoadingMessage::Batch(gene, batch) => {
-                    let mut motor = self.motor.borrow_mut();
-                    let tab = motor.active_tab_mut();
-
+                    let motor = self.motor.borrow();
+                    let tab = motor.active_tab();
 
                     debug!("Batch recibido: generation={}, tamaño={}", gene, batch.len());
-                    if gene == tab.loading_generation {
-                        debug!("Batch aplicado a tab");
-    
-                        tab.files.extend(batch.iter().cloned());
-                        let new_start = tab.sorted_indices.len();
-                        tab.sorted_indices.extend(new_start..tab.files.len());                        
-                        self.needs_sort = true;
 
-                    } else {
+                    if gene != tab.loading_generation {
                         warn!("Generation no coincide: esperado={}, recibido={}", tab.loading_generation, gene);
+
+                        return;
                     }
+                    debug!("Batch aplicado a tab");
+
+                    {
+                        let mut files_guard = match tab.files.write() {
+                            Ok(guard) => guard,
+                            Err(e) => {
+                                warn!("Lock envenenado: {}", e);
+                                return;
+                            },
+                        };
+
+                        let mut indices_guard = match tab.sorted_indices.write() {
+                            Ok(guard) => guard,
+                            Err(e) => {
+                                warn!("Lock envenenado: {}", e);
+                                return;
+                            },
+                        };
+
+                        let start = files_guard.len();
+
+                        files_guard.extend(batch.iter().cloned());
+
+                        indices_guard.extend(start..files_guard.len());
+                    }
+
+                    self.needs_sort = true;
+
                 },
                 FileLoadingMessage::ProgressUpdate { total, done, text } => {
                     debug!("Progress: {} - {}", done as f32 / total as f32, text);
@@ -750,7 +692,17 @@ impl BlazeCoreState {
                     let tab = motor.active_tab_mut();
 
                     if generation == tab.loading_generation {
-                        tab.recursive_entries.extend(batch);
+                        {
+                            let mut recursive_entries_guard = match tab.recursive_entries.write() {
+                                Ok(guard) => guard,
+                                Err(e) => {
+                                    warn!("Lock envenenado: {}", e);
+                                    return;
+                                },
+                            };
+
+                            recursive_entries_guard.extend(batch);
+                        }
                     }
                 },
 
@@ -769,14 +721,26 @@ impl BlazeCoreState {
                         if tab.is_recursive_active {
                             
                         } else {
-                            tab.files.shrink_to_fit();
-                            tab.lower_names.clear();
-                            tab.lower_names.extend(
-                                tab.files.iter().enumerate()
-                                    .map(|(i, e)| (i, e.name.to_lowercase()))
-                            );
-                            tab.lower_names.shrink_to_fit();
-
+                            {
+                                let mut files_guard = match tab.files.write() {
+                                    Ok(guard) => guard,
+                                    Err(e) => {
+                                        warn!("Lock envenenado: {}", e);
+                                        return;
+                                    },
+                                };
+                                
+                                files_guard.shrink_to_fit();
+                                
+                                tab.lower_names.clear();
+                                tab.lower_names.extend(
+                                    files_guard.iter().enumerate()
+                                        .map(|(i, e)| {
+                                            (i, e.name.to_lowercase().into_boxed_str())
+                                        })
+                                );
+                                tab.lower_names.shrink_to_fit();
+                            }
                             self.needs_sort = true;
                         }
                     }
@@ -801,20 +765,30 @@ impl BlazeCoreState {
                 },
 
                 FileLoadingMessage::GitStatusChanged => {
-                    let paths: Vec<PathBuf> = self.motor.borrow()
-                        .active_tab()
-                        .files
-                        .iter()
-                        .map(|f| f.full_path.clone())
-                        .collect();
+                    let motor = self.motor.borrow();
+                    let tab = motor.active_tab();
 
-                    let dispatcher = with_event_bus(|e| e.dispatcher(self.active_id));
-                    for path in paths {
-                        dispatcher.send(
-                            ExtendedInfoMessages::ForceScan(path)
-                        ).ok();
+                    {
+                        let files_guard = match tab.files.read() {
+                            Ok(guard) => guard,
+                            Err(e) => {
+                                warn!("Lock envenenado: {}", e);
+                                return;
+                            },
+                        };
+
+                        let paths: Vec<Arc<Path>> = files_guard
+                            .iter()
+                            .map(|f| f.full_path.clone())
+                            .collect();
+
+                        let dispatcher = with_event_bus(|e| e.dispatcher(self.active_id));
+                        for path in paths {
+                            dispatcher.send(
+                                ExtendedInfoMessages::ForceScan(path)
+                            ).ok();
+                        }
                     }
-                
                 }
             }
         }
@@ -837,14 +811,12 @@ impl BlazeCoreState {
             match msg {
                 FileOperation::Copy { files:_, dest:_ } => {}, 
                 FileOperation::Delete { files } => {
-                    let files: Vec<Arc<FileEntry>> = self.motor.borrow_mut()
-                        .active_tab_mut()
-                        .files
-                        .iter()
-                        .filter(|f| files.contains(&f.full_path))
-                        .cloned()
-                        .collect();
-                    self.move_to_trash_event_only(files);
+                    let motor = self.motor.borrow();
+                    let tab = motor.active_tab();
+
+                    if let Ok(ftd) = tab.get_item_to_delete(files) {
+                        self.move_to_trash_event_only(ftd);
+                    } 
                 },
 
                 FileOperation::Move { files, dest, tab_id:_ } => {
@@ -858,16 +830,15 @@ impl BlazeCoreState {
 
                 FileOperation::UpdateDirSize { full_path, size, tab_id } => {
                     let mut motor = self.motor.borrow_mut();
+
                     if let Some(tab) = motor.tabs.iter_mut().find(|t| t.id == tab_id) {
-                        if let Some((idx, _)) = tab.files.iter().enumerate().find(|(_, f)| f.full_path == full_path) {
-                            let mut new_file = (*tab.files[idx]).clone();
-                            new_file.size = size;
-                            tab.files[idx] = Arc::new(new_file);
+                        if let Ok(e) = tab.update_dir_size(full_path.to_owned(), size) {
+                            if e {
+                                self.calculating_dir_sizes.remove(&full_path);
+                                self.calculated_dir_sizes.insert(full_path);
+                                self.needs_sort = true;
+                            }
                         }
-                        
-                        self.calculating_dir_sizes.remove(&full_path);
-                        self.calculated_dir_sizes.insert(full_path.clone());
-                        self.needs_sort = true;
                     }
                 },
 
@@ -881,7 +852,7 @@ impl BlazeCoreState {
                     
                     if let Some(trash_root) = trash_path.parent() {
                         let dispatcher = with_event_bus(|e| e.dispatcher(self.active_id));
-                        self.clipboard.restore_from_trash(file_names, trash_root.to_path_buf(), dispatcher).ok();
+                        self.clipboard.restore_from_trash(file_names, trash_root.into(), dispatcher).ok();
                     }
                 },
 

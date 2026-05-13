@@ -1,4 +1,4 @@
-use std::{collections::HashMap, path::PathBuf, sync::Arc};
+use std::{collections::HashMap, path::Path, sync::Arc};
 use egui::{Id, Button, Color32, ColorImage, CursorIcon, FontId, Key, PointerButton, Rect, RichText, ScrollArea, Sense, TextEdit, TextureOptions, Ui, pos2, scroll_area::ScrollSource, vec2};
 use file_id::FileId;
 use tracing::{error, info};
@@ -65,7 +65,7 @@ fn handle_row_interactions(ui: &mut Ui, response: &egui::Response, i: usize, fil
         state.selection.set(i, !currently);
         state.last_selected_index = Some(i);
 
-        if file.is_dir {
+        if file.is_dir() {
             state.add_tab_from_file(&*file.full_path);
         }
     }
@@ -201,7 +201,7 @@ fn render_rename_field(ui: &mut Ui, file: &Arc<FileEntry>, state: &mut BlazeCore
 }
 
 fn resolve_icon(file: &Arc<FileEntry>, color_snapshot: &HashMap<FileId, Color32>) -> (String, &'static [u8], Color32) {
-    if file.is_dir {
+    if file.is_dir() {
         let (color, cache_key) = if let Some(file_id) = &file.unique_id {
                 let color = color_snapshot.get(file_id).copied().unwrap_or(Color32::YELLOW);
                 let cache_key = format!("folder-{:?}", file_id);
@@ -372,7 +372,7 @@ pub fn new_render_scrollview(ui: &mut Ui, files: &Vec<Arc<FileEntry>>, state: &m
         state.row_view.first_visible = row_range.start.clone();
         state.row_view.last_visible = row_range.end;
 
-        let info_snapshot: HashMap<PathBuf, ExtendedInfo> = {
+        let info_snapshot: HashMap<Arc<Path>, ExtendedInfo> = {
             match state.extended_info_manager.info_map.write() {
                 Ok(mut map) => {
                     row_range.clone()
@@ -380,7 +380,7 @@ pub fn new_render_scrollview(ui: &mut Ui, files: &Vec<Arc<FileEntry>>, state: &m
                             let path = &files[i].full_path;
                             map.get(path).map(|v| (path.clone(), v.clone()))
                         })
-                        .collect()
+                        .collect::<HashMap<Arc<Path>, ExtendedInfo>>()
                 },
                 Err(_) => HashMap::new(),
             }
@@ -400,7 +400,7 @@ pub fn new_render_scrollview(ui: &mut Ui, files: &Vec<Arc<FileEntry>>, state: &m
             }
         };
 
-        let thumbnail_snapshot: HashMap<PathBuf, Thumbnail> = {
+        let thumbnail_snapshot: HashMap<Arc<Path>, Thumbnail> = {
             match ui_state.thumbnail_manager.thumb_map.try_write() {
                 Ok(mut guard) => {
                     row_range.clone()
@@ -459,8 +459,8 @@ pub fn new_render_scrollview(ui: &mut Ui, files: &Vec<Arc<FileEntry>>, state: &m
 
             // clicks y selección
             if response.double_clicked_by(PointerButton::Primary) {
-                if file.is_dir { 
-                    state.navigate_to(&*file.full_path); 
+                if file.is_dir() { 
+                    state.navigate_to(file.full_path.to_owned()); 
                     state.deselect_all();
                     state.resize_selection(files.len());
                 }
@@ -525,7 +525,7 @@ pub fn new_render_scrollview(ui: &mut Ui, files: &Vec<Arc<FileEntry>>, state: &m
 
             if let Some(thumb) = thumbnail_snapshot.get(&file.full_path) {
                 let tex = ui_state.thumb_texture_cache
-                    .entry(file.full_path.clone())
+                    .entry(file.full_path.to_path_buf())
                     .or_insert_with_key(|path|{
                         let color_image = ColorImage::from_rgba_unmultiplied(
                             [thumb.width as usize, thumb.height as usize],
@@ -626,7 +626,7 @@ pub fn new_render_scrollview(ui: &mut Ui, files: &Vec<Arc<FileEntry>>, state: &m
                 pos2(rect.min.x + name_w + date_w, rect.min.y),
                 pos2(rect.max.x, rect.max.y),
             );
-            let display_size = if file.is_dir {
+            let display_size = if file.is_dir() {
                 if state.calculating_dir_sizes.contains(&file.full_path) { None }
                 else if state.calculated_dir_sizes.contains(&file.full_path) { Some(file.size) }
                 else { state.sizer_manager.cache_manager.get_cached_size(&file.full_path) }
@@ -635,7 +635,7 @@ pub fn new_render_scrollview(ui: &mut Ui, files: &Vec<Arc<FileEntry>>, state: &m
             };
             let size_text = match display_size {
                 None => "...".to_string(),
-                Some(0) if file.is_dir => "-".to_string(),
+                Some(0) if file.is_dir() => "-".to_string(),
                 Some(size) => format_size(size),
             };
             let size_galley = ui.fonts_mut(|f| f.layout_no_wrap(

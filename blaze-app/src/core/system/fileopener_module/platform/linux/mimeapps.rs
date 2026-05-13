@@ -21,7 +21,7 @@ impl MimeApps {
         let config_home = env::var_os("XDG_CONFIG_HOME")
             .map(PathBuf::from)
             .unwrap_or_else(|| {
-                let mut home = KnownDirsManager::get().home.clone();
+                let mut home = KnownDirsManager::get().home.to_path_buf();
                 home.push(".config");
                 home
             });
@@ -51,7 +51,7 @@ impl MimeApps {
         let data_home = env::var_os("XDG_DATA_HOME")
             .map(PathBuf::from)
             .unwrap_or_else(|| {
-                let mut home = KnownDirsManager::get().home.clone();
+                let mut home = KnownDirsManager::get().home.to_path_buf();
                 home.push(".local");
                 home.push("share");
                 home.to_owned()
@@ -88,7 +88,7 @@ impl MimeApps {
                     parsed.push(mf);
                 },
                 Err(e) => {
-                    return Err(OpenerError::Io { path: path.clone(), source: e });
+                    return Err(OpenerError::Io { path: path.to_path_buf().into(), source: e });
                 }
             }
         }

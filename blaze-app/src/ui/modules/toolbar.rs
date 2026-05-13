@@ -141,7 +141,7 @@ pub fn toolbar_component(ui: &mut Ui, state: &mut BlazeCoreState, ui_state: &mut
                                         let response = ui.add(button);
 
                                         if response.clicked() && !is_last {
-                                            state.navigate_to(&*current_path);
+                                            state.navigate_to(current_path.to_owned().into());
                                         }
 
                                         // Separador ">"

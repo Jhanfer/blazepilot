@@ -33,7 +33,7 @@ pub static LINUX_FILE_OPENER: Lazy<Arc<tokio::sync::Mutex<LinuxOpener>>> = Lazy:
 
 pub struct LinuxOpener {
     mimeapps: MimeApps,
-    desktop_index: HashMap<String, PathBuf>,
+    desktop_index: HashMap<String, Arc<Path>>,
     pub assoc_manager: AssociationManager,
     pub pending_default_app_name: Option<String>
 }
@@ -55,8 +55,8 @@ impl LinuxOpener {
     }
 
 
-    fn build_desktop_index() -> HashMap<String, PathBuf> {
-        let mut index: HashMap<String, PathBuf> = HashMap::new();
+    fn build_desktop_index() -> HashMap<String, Arc<Path>> {
+        let mut index: HashMap<String, Arc<Path>> = HashMap::new();
         let dirs = Self::xdg_app_dirs();
 
         for dir in dirs.iter().rev() {
@@ -65,7 +65,7 @@ impl LinuxOpener {
                     let path = entry.path();
                     if path.extension().map_or(false, |e| e == "desktop") {
                         if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
-                            index.insert(stem.to_string(), path);
+                            index.insert(stem.to_string(), path.into());
                         }
                     }
                 }
@@ -207,12 +207,12 @@ impl LinuxOpener {
     }
 
 
-    fn parse_desktop_file(&self, path: &Path) -> OpenerResult<AppAssociation> {
-        let content = fs::read_to_string(path)
-            .map_err(|e| OpenerError::Io { path: path.to_owned(), source: e })?;
+    fn parse_desktop_file(&self, path: Arc<Path>) -> OpenerResult<AppAssociation> {
+        let content = fs::read_to_string(&path)
+            .map_err(|e| OpenerError::Io { path: path.clone(), source: e })?;
 
         let entry = self.parse_desktop_content(&content)
-            .ok_or_else(|| OpenerError::DesktopParsedFaild { path: path.to_owned() })?;
+            .ok_or_else(|| OpenerError::DesktopParsedFaild { path: path.clone() })?;
 
         if entry.name.trim().is_empty() || entry.exec.trim().is_empty() {
             return Err(OpenerError::DesktopParsedFaild { path: path.to_owned() });
@@ -231,16 +231,16 @@ impl LinuxOpener {
         let path = match self.desktop_index.get(stem) {
             Some(path) => path,
             None => return Err(OpenerError::DesktopParsedFaild { 
-                path: PathBuf::from("") 
+                path: PathBuf::from("").into()
             }),
         };
 
 
         let content = fs::read_to_string(path)
-            .map_err(|e| OpenerError::Io { path: PathBuf::from("") , source: e })?;
+            .map_err(|e| OpenerError::Io { path: PathBuf::from("").into() , source: e })?;
 
         let entry = self.parse_desktop_content(&content)
-            .ok_or_else(|| OpenerError::DesktopParsedFaild { path: path.to_owned() })?;
+            .ok_or_else(|| OpenerError::DesktopParsedFaild { path: path.clone() })?;
         
         if entry.name.trim().is_empty() || entry.exec.trim().is_empty() {
             return Err(OpenerError::DesktopParsedFaild { path: path.to_owned() });
@@ -249,9 +249,9 @@ impl LinuxOpener {
         Ok(self.entry_to_association(entry, id))
     }
 
-    fn parse_desktop_file_with_mime(&self, path: &Path, target_mime: &str) -> OpenerResult<AppAssociation> {
-        let content = fs::read_to_string(path)
-            .map_err(|e| OpenerError::Io { path: PathBuf::from("") , source: e })?;
+    fn parse_desktop_file_with_mime(&self, path: Arc<Path>, target_mime: &str) -> OpenerResult<AppAssociation> {
+        let content = fs::read_to_string(&path)
+            .map_err(|e| OpenerError::Io { path: PathBuf::from("").into() , source: e })?;
 
         let entry = self.parse_desktop_content(&content)
             .ok_or_else(|| OpenerError::DesktopParsedFaild { path: path.to_owned() })?;
@@ -323,7 +323,7 @@ impl LinuxOpener {
                 continue;
             }
 
-            match self.parse_desktop_file_with_mime(path, mime) {
+            match self.parse_desktop_file_with_mime(path.to_owned(), mime) {
                 Ok(mut app) => {
                     if seen_ids.insert(app.id.clone()) {
                         app.is_recommended = false;
@@ -360,7 +360,7 @@ impl LinuxOpener {
             .into_iter()
             .filter_map(|(stem, path)| {
 
-                let app = match self.parse_desktop_file(path) {
+                let app = match self.parse_desktop_file(path.to_owned()) {
                     Ok(mut app) => {
                         seen_ids.insert(stem.clone());
                         app.is_recommended = false;
@@ -421,7 +421,7 @@ impl LinuxOpener {
             .unwrap_or(false)
     }
 
-    fn build_arguments(exec: &str, file_path: &Path, app_name: &str) -> OpenerResult<Vec<OsString>> {
+    fn build_arguments(exec: &str, file_path: Arc<Path>, app_name: &str) -> OpenerResult<Vec<OsString>> {
         let pre = exec.replace("%%", "\x00PERCENT\x00");
         let tokens = shell_words::split(&pre)
             .map_err(|_| OpenerError::ExecParseFailed { raw: exec.to_string() })?;
@@ -448,8 +448,8 @@ impl LinuxOpener {
         Ok(args)
     }
 
-    pub fn launch_app_linux(&self, app: &AppAssociation, path: &Path) -> OpenerResult<()> {
-        let args = Self::build_arguments(&app.exec, path, &app.name)?;
+    pub fn launch_app_linux(&self, app: &AppAssociation, path: Arc<Path>) -> OpenerResult<()> {
+        let args = Self::build_arguments(&app.exec, path.clone(), &app.name)?;
 
         if args.is_empty() {
             return Err(OpenerError::InvalidExec { desktop_id: app.id.clone() });
@@ -468,15 +468,15 @@ impl LinuxOpener {
         std::process::Command::new(&args[0])
             .args(&args[1..])
             .spawn()
-            .map_err(|e| OpenerError::Io { path: path.to_owned(), source: e })?;
+            .map_err(|e| OpenerError::Io { path: path, source: e })?;
 
         Ok(())
     }
 
 
-    fn fallback_open(&self, path: &PathBuf) {
+    fn fallback_open(&self, path: Arc<Path>) {
         let _ = std::process::Command::new("xdg-open")
-            .arg(path)
+            .arg(path.to_path_buf())
             .spawn();
     }
 
@@ -512,7 +512,7 @@ impl LinuxOpener {
 
 
 
-    pub async fn open_file_with_linux(&mut self, path: PathBuf, sender: Dispatcher) {
+    pub async fn open_file_with_linux(&mut self, path: Arc<Path>, sender: Dispatcher) {
         let mime = Self::detect_mime(&path).await;
 
         let available_apps = self.get_all_apps_for_open_with(&mime).await;
@@ -521,7 +521,7 @@ impl LinuxOpener {
         let show_all_apps = true;
 
         if available_apps.is_empty() {
-            self.fallback_open(&path);
+            self.fallback_open(path);
         } else {
             self.show_selector_linux(path, mime, available_apps, show_all_apps, sender).await;
         }
@@ -549,22 +549,22 @@ impl LinuxOpener {
     }
     
 
-    fn launch_with_app_logged(&self, app: &AppAssociation, path: &Path) {
-        match self.launch_app_linux(app, path) {
+    fn launch_with_app_logged(&self, app: &AppAssociation, path: Arc<Path>) {
+        match self.launch_app_linux(app, path.to_owned()) {
             Ok(_) => info!("Abierto '{}' con '{}'", path.display(), app.name),
             Err(e) => warn!("Fallo lanzando '{}': {e}", app.name),
         }
     }
 
 
-    pub async fn open_file_linux(&mut self, path: PathBuf, sender: Dispatcher) {
+    pub async fn open_file_linux(&mut self, path: Arc<Path>, sender: Dispatcher) {
         let mime = Self::detect_mime(&path).await;
 
         match self.resolve_open_strategy(&path, &mime).await {
             OpenStrategy::LaunchDirect => self.launch_direct(&path),
-            OpenStrategy::LaunchWithApp(app) => self.launch_with_app_logged(&app, &path),
+            OpenStrategy::LaunchWithApp(app) => self.launch_with_app_logged(&app, path),
             OpenStrategy::ShowSelector(apps) => self.show_selector_linux(path, mime, apps, false, sender).await,
-            OpenStrategy::Fallback => self.fallback_open(&path),
+            OpenStrategy::Fallback => self.fallback_open(path),
         }
     }
 
@@ -677,7 +677,7 @@ impl LinuxOpener {
 
     fn rasterize_svg(path: &PathBuf) -> OpenerResult<AppsIconData> {
         let svg_data = fs::read(path)
-            .map_err(|e| OpenerError::Io { path: path.to_owned(), source: e })?;
+            .map_err(|e| OpenerError::Io { path: path.to_owned().into(), source: e })?;
 
         let rtree = usvg::Tree::from_data(&svg_data, &usvg::Options::default())
             .map_err(|e| OpenerError::SvgError(e))?;
@@ -715,18 +715,18 @@ impl LinuxOpener {
         use std::io::BufReader;
 
         let mut file = std::fs::File::open(path)
-            .map_err(|e| OpenerError::Io { path: path.to_owned(), source: e })?;
+            .map_err(|e| OpenerError::Io { path: path.to_owned().into(), source: e })?;
 
         let mut header = [0u8; 16];
 
         let n = file.read(&mut header)
-            .map_err(|e| OpenerError::Io { path: path.to_owned(), source: e })?;
+            .map_err(|e| OpenerError::Io { path: path.to_owned().into(), source: e })?;
 
         let real_format = image::guess_format(&header[..n])
             .map_err(|_| OpenerError::UnsuportedFormat)?;
 
         let file = std::fs::File::open(path)
-            .map_err(|e| OpenerError::Io { path: path.to_owned(), source: e })?;
+            .map_err(|e| OpenerError::Io { path: path.to_owned().into(), source: e })?;
 
         let dynamic_image = image::ImageReader::with_format(BufReader::new(file), real_format)
             .decode()
@@ -767,7 +767,7 @@ impl LinuxOpener {
 
 
 
-    async fn show_selector_linux(&mut self, path: PathBuf, mime: String, apps: Vec<AppAssociation>, show_all_apps: bool, sender: Dispatcher)  {
+    async fn show_selector_linux(&mut self, path: Arc<Path>, mime: String, apps: Vec<AppAssociation>, show_all_apps: bool, sender: Dispatcher)  {
         let icon_data = match tokio::time::timeout(
             std::time::Duration::from_secs(3),
             self.load_icons_async(&apps)
@@ -788,7 +788,13 @@ impl LinuxOpener {
         };
 
         sender.send(
-            UiEvent::OpenWithSelector { path, mime, apps, icon_data, show_all_apps }
+            UiEvent::OpenWithSelector { 
+                path: path.into(), 
+                mime, 
+                apps, 
+                icon_data, 
+                show_all_apps 
+            }
         ).ok();
     }
 

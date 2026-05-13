@@ -18,7 +18,7 @@
 use std::sync::atomic::Ordering;
 use std::sync::{Arc, atomic::AtomicBool};
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::Path;
 use std::time::Duration;
 use file_id::{get_file_id};
 use tokio::sync::Mutex;
@@ -37,48 +37,48 @@ use crate::core::files::blaze_motor::utilities::build_entry;
 enum FileOp {
     Add(Arc<FileEntry>),
     #[allow(unused)]
-    Remove(PathBuf),
+    Remove(Arc<Path>),
     #[allow(unused)]
-    Modify(PathBuf),
+    Modify(Arc<Path>),
 }
 
 
-type PathKey = PathBuf;
+type PathKey = Arc<Path>;
 pub struct EventBuffer {
     map: HashMap<PathKey, FileOp>,
 }
 
 
 impl EventBuffer {
-    fn push(&mut self, path: PathBuf, op:FileOp) {
+    fn push(&mut self, path: &Path, op:FileOp) {
         use FileOp::*;
 
-        match (self.map.remove(&path), op) {
+        match (self.map.remove(path), op) {
 
             //Crear - anula todo
             (_, Add(entry)) => {
-                self.map.insert(path, Add(entry));
+                self.map.insert(path.into(), Add(entry));
             },
 
             //Borrar - anula todo
             (_, Remove(entry)) => {
-                self.map.insert(path, Remove(entry));
+                self.map.insert(path.into(), Remove(entry));
             },
 
             //modificar y fusionar en existentes
             (Some(Add(e)), Modify(_)) => {
-                self.map.insert(path, Add(e));
+                self.map.insert(path.into(), Add(e));
             },
 
             //modificar unico
             (_, Modify(p)) => {
-                self.map.insert(path, Modify(p));
+                self.map.insert(path.into(), Modify(p));
             },
 
         }
     }
 
-    fn drain(&mut self) -> Vec<(PathBuf, FileOp)> {
+    fn drain(&mut self) -> Vec<(Arc<Path>, FileOp)> {
         self.map.drain().collect()
     }
 
@@ -122,7 +122,7 @@ impl BlazeLoader {
     }
 
 
-    pub fn load_path(&mut self, path: &PathBuf, sender: Dispatcher, generation: u64) -> MotorResult<()> {
+    pub fn load_path(&mut self, path: Arc<Path>, sender: Dispatcher, generation: u64) -> MotorResult<()> {
         //cancelar la carga anterior
         self.cancel();
 
@@ -163,7 +163,7 @@ impl BlazeLoader {
         Ok(())
     }
 
-    async fn scan_dir(path: PathBuf, buffer: Arc<Mutex<EventBuffer>>, cancel: Arc<AtomicBool>) -> MotorResult<()> {
+    async fn scan_dir(path: Arc<Path>, buffer: Arc<Mutex<EventBuffer>>, cancel: Arc<AtomicBool>) -> MotorResult<()> {
         let mut entries = match tokio::fs::read_dir(&path).await {
             Ok(e) => e,
             Err(e) => {
@@ -186,13 +186,15 @@ impl BlazeLoader {
 
             let file_entry = tokio::task::spawn_blocking(move ||{
                 let unique_id = get_file_id(&entry_path).ok();
-                let entry = build_entry(entry_path.clone(), meta, unique_id);
+                let entry = build_entry(&entry_path, meta, unique_id);
                 Arc::new(entry)
             })
             .await
             .map_err(|e| MotorError::ThreadError(e))?;
 
-            buffer.lock().await.push(file_entry.full_path.clone(), FileOp::Add(file_entry));
+            let path_key: Arc<Path> = Arc::from(file_entry.full_path.as_ref());
+
+            buffer.lock().await.push(&path_key, FileOp::Add(file_entry));
         }
 
         Ok(())

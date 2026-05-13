@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{path::Path, sync::Arc};
 use thiserror::Error;
 use crate::core::files::blaze_motor::motor_structs::FileLoadingMessage;
 
@@ -21,7 +21,10 @@ pub enum MotorError {
     OneshotRecv(#[from] tokio::sync::oneshot::error::RecvError),
 
     #[error("Directorio no existe: {0}")]
-    InvalidPath(PathBuf)
+    InvalidPath(Arc<Path>),
+
+    #[error("Error de lock envenenado")]
+    PoisonedLock,
 }
 
 pub type MotorResult<T> = Result<T, MotorError>;

@@ -66,7 +66,7 @@ pub fn render_island_bubble(ui: &mut Ui, state: &mut BlazeCoreState, ui_state: &
                                 .enumerate()
                                 .filter(|(i, _)| state.is_selected(*i))
                                 .map(|(_, f)| {
-                                    if f.is_dir {
+                                    if f.is_dir() {
                                         state.sizer_manager.cache_manager
                                             .get_cached_size(&f.full_path)
                                             .unwrap_or(0)

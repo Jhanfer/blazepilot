@@ -14,6 +14,7 @@
 
 
 
+use std::sync::Arc;
 use eframe::{HardwareAcceleration};
 use tracing::warn;
 use tracing_subscriber::{fmt, EnvFilter};
@@ -67,10 +68,39 @@ fn main() {
             .with_min_inner_size([800.0, 500.0])
             .with_title("BlazePilot")
             .with_decorations(true)
-            .with_transparent(true),
-        multisampling: 4,
+            .with_transparent(true)
+            .with_resizable(true)
+            .with_maximized(false)
+            .with_fullscreen(false),
         renderer: eframe::Renderer::Wgpu,
         hardware_acceleration: HardwareAcceleration::Preferred,
+        vsync: false,
+        multisampling: 0,
+        depth_buffer: 0,
+        stencil_buffer: 0,
+        dithering: false,
+
+        wgpu_options: eframe::egui_wgpu::WgpuConfiguration {
+            present_mode: eframe::wgpu::PresentMode::Immediate,
+            desired_maximum_frame_latency: Some(1),
+
+            wgpu_setup: eframe::egui_wgpu::WgpuSetup::CreateNew(eframe::egui_wgpu::WgpuSetupCreateNew {
+                power_preference: eframe::wgpu::PowerPreference::LowPower,
+                device_descriptor: Arc::new(|adapter| eframe::wgpu::DeviceDescriptor {
+                    label: Some("BlazePilot Device"),
+                    required_limits: adapter.limits(),
+                    required_features: eframe::wgpu::Features::empty(),
+                    memory_hints: eframe::wgpu::MemoryHints::MemoryUsage,
+                    experimental_features: eframe::wgpu::ExperimentalFeatures::disabled(),
+                    trace: eframe::wgpu::Trace::Off,
+                }),
+
+                ..eframe::egui_wgpu::WgpuSetupCreateNew::without_display_handle()
+            }),
+
+            ..Default::default()
+        },
+
         ..Default::default()
     };
 

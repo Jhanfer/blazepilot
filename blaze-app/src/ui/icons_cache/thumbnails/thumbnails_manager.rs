@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::{io::{BufReader, Read}, path::PathBuf, sync::Arc, time::UNIX_EPOCH};
+use std::{io::{BufReader, Read}, path::{Path, PathBuf}, sync::Arc, time::UNIX_EPOCH};
 use ffmpeg_sidecar::{download::auto_download, paths::ffmpeg_path};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
@@ -56,7 +56,7 @@ pub enum ThumbError {
 
 
 pub enum ThumbnailMessages {
-    RequestThumb(PathBuf),
+    RequestThumb(Arc<Path>),
 }
 
 #[derive(Clone)]
@@ -68,7 +68,7 @@ pub struct Thumbnail {
 
 
 pub struct ThumbnailManager {
-    pub thumb_map: Arc<RwLock<LruCache<PathBuf, Thumbnail>>>,
+    pub thumb_map: Arc<RwLock<LruCache<Arc<Path>, Thumbnail>>>,
     pub semaphore: Arc<Semaphore>,
 }
 
@@ -103,7 +103,7 @@ impl ThumbnailManager {
         CacheManager::global().cache_dir.join("thumbs")
     }
 
-    fn path_hash(path: &PathBuf) -> String {
+    fn path_hash(path: &Path) -> String {
         let mut hasher = Sha256::new();
         hasher.update(path.to_string_lossy().as_bytes());
         hasher.finalize()
@@ -112,11 +112,11 @@ impl ThumbnailManager {
             .collect()
     }
 
-    fn cache_path_for(path: &PathBuf) -> PathBuf {
+    fn cache_path_for(path: &Path) -> PathBuf {
         Self::thumb_cache_dir().join(format!("{}.bin", Self::path_hash(path)))
     }
 
-    fn get_real_mtime(path: &PathBuf) -> u64 {
+    fn get_real_mtime(path: &Path) -> u64 {
         std::fs::metadata(path)
             .and_then(|m| m.modified())
             .map(|t| t.duration_since(UNIX_EPOCH).unwrap_or_default().as_secs())
@@ -125,19 +125,19 @@ impl ThumbnailManager {
 
 
 
-    fn is_image(path: &PathBuf) -> bool {
+    fn is_image(path: &Path) -> bool {
         matches!(
             path.extension().and_then(|e| e.to_str()).map(|e| e.to_lowercase()).as_deref(),
             Some("png" | "jpg" | "jpeg" | "webp" | "gif")
         )
     }
 
-    fn is_svg(path: &PathBuf) -> bool {
+    fn is_svg(path: &Path) -> bool {
         path.extension().and_then(|e| e.to_str())
             .map(|e| e.to_lowercase()) .as_deref() == Some("svg")
     }
 
-    fn is_video(path: &PathBuf) -> bool {
+    fn is_video(path: &Path) -> bool {
         matches!(
             path.extension().and_then(|e| e.to_str()).map(|e| e.to_lowercase()).as_deref(),
             Some("mp4" | "mkv" | "avi" | "mov" | "webm" | "flv" | "wmv")
@@ -298,7 +298,7 @@ impl ThumbnailManager {
     }
 
 
-    async fn save_to_cache(cache_path: &PathBuf, thumb: &Thumbnail, mtime: u64, original_path: &PathBuf) -> Result<(), ThumbError> {
+    async fn save_to_cache(cache_path: &Path, thumb: &Thumbnail, mtime: u64, original_path: &Path) -> Result<(), ThumbError> {
         if let Some(parent) = cache_path.parent() {
             tokio::fs::create_dir_all(parent).await
                 .map_err(ThumbError::Io)?;
@@ -306,7 +306,7 @@ impl ThumbnailManager {
 
         let pixels = thumb.pixels.clone();
         let (w, h) = (thumb.width, thumb.height);
-        let cache_path_clone = cache_path.clone();
+        let cache_path_clone = cache_path.to_path_buf();
 
         //guardar binario
         tokio::task::spawn_blocking(move || -> Result<(), ThumbError> {
@@ -333,8 +333,8 @@ impl ThumbnailManager {
     }
 
 
-    async fn generate_image_thumb(path: &PathBuf) -> Result<Thumbnail, ThumbError> {
-        let path = path.clone();
+    async fn generate_image_thumb(path: &Path) -> Result<Thumbnail, ThumbError> {
+        let path = path.to_path_buf();
         tokio::task::spawn_blocking(move || -> Result<Thumbnail, ThumbError> {
 
             let mut file = std::fs::File::open(path.clone())
@@ -368,8 +368,8 @@ impl ThumbnailManager {
         .map_err(|e| ThumbError::ThreadError(e))?
     }
 
-    async fn generate_svg_thumb(path: &PathBuf) -> Result<Thumbnail, ThumbError> {
-        let path = path.clone();
+    async fn generate_svg_thumb(path: &Path) -> Result<Thumbnail, ThumbError> {
+        let path = path.to_path_buf();
         let out = tokio::task::spawn_blocking(
             move || {
                 let data = std::fs::read(&path)
@@ -417,7 +417,7 @@ impl ThumbnailManager {
         Ok(output.stdout)
     }
 
-    async fn generate_video_thumb(path: &PathBuf) -> Result<Thumbnail, ThumbError> {
+    async fn generate_video_thumb(path: &Path) -> Result<Thumbnail, ThumbError> {
         let path_str = path.to_string_lossy().to_string();
 
         auto_download().map_err(|_| ThumbError::VideoError)?;

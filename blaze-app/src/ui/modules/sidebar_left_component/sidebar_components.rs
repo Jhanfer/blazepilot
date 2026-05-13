@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{path::{Path, PathBuf}, sync::Arc};
 use egui::{Align2, Color32, CursorIcon, FontId, PointerButton, Rect, Sense, Ui, pos2, vec2};
 use tracing::info;
 use crate::{core::{blaze_state::BlazeCoreState, configs::config_state::{FavoriteLinks, with_configs}, files::file_extension::{DocType, FileExtension}, system::{disk_reader::disk::Disk}}, ui::{blaze_ui_state::BlazeUiState, icons_cache::icons::*, modules::custom_context_menu::context_state::ContextMenuKind}};
@@ -79,7 +79,7 @@ pub fn render_header_text(label: &str,ui: &mut Ui, ui_state: &mut BlazeUiState) 
 
 
 
-pub fn render_local_buttons(label:&str, path: PathBuf, state: &mut BlazeCoreState, ui: &mut Ui, ui_state: &mut BlazeUiState) {
+pub fn render_local_buttons(label:&str, path: Arc<Path>, state: &mut BlazeCoreState, ui: &mut Ui, ui_state: &mut BlazeUiState) {
     let (rect, response) = ui.allocate_exact_size(
         egui::vec2(ui.available_width(), 30.0),
         Sense::click_and_drag()
@@ -106,7 +106,7 @@ pub fn render_local_buttons(label:&str, path: PathBuf, state: &mut BlazeCoreStat
     }
 
     if response.clicked() {
-        state.navigate_to(&*path);
+        state.navigate_to(path);
     }
 
     let (icon_name, icon_bytes) = get_folder_icon(label);
@@ -157,11 +157,11 @@ pub fn render_fav_buttons(ui: &mut Ui, fav: FavoriteLinks, state: &mut BlazeCore
 
     if response.clicked() {
         if fav.is_dir {
-            let path = fav.path.clone();
-            state.navigate_to(&*path);
+            let path = fav.path.to_owned();
+            state.navigate_to(path);
         } else {
             info!("Intentando abrir");
-            state.open_file_by_path(fav.path.clone());
+            state.open_file_by_path(fav.path.to_owned());
         }
     }
 
@@ -239,7 +239,7 @@ pub fn render_drives_button(ui: &mut Ui, state: &mut BlazeCoreState, drive: Disk
     if response.clicked() && is_mounted {
         let path_string = drive.mountpoint.clone().unwrap_or_default();
         let path = PathBuf::from(path_string);
-        state.navigate_to(&*path);
+        state.navigate_to(path.as_path().into());
     }
 
 

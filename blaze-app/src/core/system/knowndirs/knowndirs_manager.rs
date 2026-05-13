@@ -2,24 +2,24 @@ use directories::{BaseDirs, ProjectDirs, UserDirs};
 use tracing::warn;
 use std::fs;
 use std::path::{PathBuf, Path};
-use std::sync::OnceLock;
+use std::sync::{Arc, OnceLock};
 
 pub struct KnownDirsManager {
-    pub home: PathBuf,
-    pub app_config: PathBuf,
-    pub app_cache: PathBuf,
-    pub app_data: PathBuf,
-    pub sys_config: PathBuf,
-    pub sys_cache: PathBuf,
-    pub data_local: PathBuf,
+    pub home: Arc<Path>,
+    pub app_config: Arc<Path>,
+    pub app_cache: Arc<Path>,
+    pub app_data: Arc<Path>,
+    pub sys_config: Arc<Path>,
+    pub sys_cache: Arc<Path>,
+    pub data_local: Arc<Path>,
 
-    pub desktop: Option<PathBuf>,
-    pub downloads: Option<PathBuf>,
-    pub documents: Option<PathBuf>,
-    pub pictures: Option<PathBuf>,
-    pub videos: Option<PathBuf>,
-    pub music: Option<PathBuf>,
-    pub public: Option<PathBuf>,
+    pub desktop: Option<Arc<Path>>,
+    pub downloads: Option<Arc<Path>>,
+    pub documents: Option<Arc<Path>>,
+    pub pictures: Option<Arc<Path>>,
+    pub videos: Option<Arc<Path>>,
+    pub music: Option<Arc<Path>>,
+    pub public: Option<Arc<Path>>,
 }
 
 static INSTANCE: OnceLock<KnownDirsManager> = OnceLock::new();
@@ -104,24 +104,26 @@ impl KnownDirsManager {
                 },
             };
 
-            let opt = |f: Option<&Path>| f.map(PathBuf::from);
+            let opt = |f: Option<&Path>| f.map(|p| p.into());
+
+            let user_ref = user.as_ref();
 
             KnownDirsManager {
-                home,
-                app_config,
-                app_cache,
-                app_data,
-                sys_config,
-                sys_cache,
-                data_local,
+                home: home.into(),
+                app_config: app_config.into(),
+                app_cache: app_cache.into(),
+                app_data: app_data.into(),
+                sys_config: sys_config.into(),
+                sys_cache: sys_cache.into(),
+                data_local: data_local.into(),
 
-                desktop: user.as_ref().and_then(|u| opt(u.desktop_dir())),
-                downloads: user.as_ref().and_then(|u| opt(u.download_dir())),
-                documents: user.as_ref().and_then(|u| opt(u.document_dir())),
-                pictures: user.as_ref().and_then(|u| opt(u.picture_dir())),
-                videos: user.as_ref().and_then(|u| opt(u.video_dir())),
-                music: user.as_ref().and_then(|u| opt(u.audio_dir())),
-                public: user.as_ref().and_then(|u| opt(u.public_dir())),
+                desktop: user_ref.and_then(|u| opt(u.desktop_dir())),
+                downloads: user_ref.and_then(|u| opt(u.download_dir())),
+                documents: user_ref.and_then(|u| opt(u.document_dir())),
+                pictures: user_ref.and_then(|u| opt(u.picture_dir())),
+                videos: user_ref.and_then(|u| opt(u.video_dir())),
+                music: user_ref.and_then(|u| opt(u.audio_dir())),
+                public: user_ref.and_then(|u| opt(u.public_dir())),
             }
         });
 
@@ -147,7 +149,7 @@ impl KnownDirsManager {
         INSTANCE.get().expect("KnownDirsManager::init() no fue llamado")
     }
 
-    pub fn sidebar_dirs(&'static self) -> Vec<(&'static str, &'static PathBuf)> {
+    pub fn sidebar_dirs(&'static self) -> Vec<(&'static str, &Arc<Path>)> {
         let mut dirs = vec![("Home", &self.home)];
 
         macro_rules! push_opt {

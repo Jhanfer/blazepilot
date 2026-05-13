@@ -101,7 +101,7 @@ impl FileWatcher {
     }
 
 
-    pub fn start_watching(&mut self, path: &Path, sender: Dispatcher) -> MotorResult<()> {
+    pub fn start_watching(&mut self, path: Arc<Path>, sender: Dispatcher) -> MotorResult<()> {
         self.stop_watching();
 
         let watching = Arc::new(AtomicBool::new(true));
@@ -130,7 +130,7 @@ impl FileWatcher {
             }
         })?;
         
-        watcher.watch(path, RecursiveMode::NonRecursive)?;
+        watcher.watch(&path, RecursiveMode::NonRecursive)?;
         self.watcher = Some(Box::new(watcher) as Box<dyn Watcher + Send>);
         
         

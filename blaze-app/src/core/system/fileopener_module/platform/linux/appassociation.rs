@@ -65,14 +65,14 @@ impl AssociationManager {
     fn save(&self) -> OpenerResult<()> {
         if let Some(parent) = self.config_path.parent() {
             fs::create_dir_all(parent)
-                .map_err(|e| OpenerError::Io { path: parent.to_owned(), source: e })?;
+                .map_err(|e| OpenerError::Io { path: parent.into(), source: e })?;
         }
         
         let json = serde_json::to_string_pretty(&self.associations)
             .map_err(|e| OpenerError::SerdeError(e))?;
 
         fs::write(&self.config_path, json)
-            .map_err(|e| OpenerError::Io { path: self.config_path.clone(), source: e })?;
+            .map_err(|e| OpenerError::Io { path: self.config_path.to_owned().into(), source: e })?;
         
         Ok(())
     }

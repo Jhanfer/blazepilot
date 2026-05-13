@@ -16,14 +16,14 @@
 
 
 
-use std::path::PathBuf;
+use std::{path::Path, sync::Arc};
 use egui::{Color32, ColorImage, Ui, Frame, Margin, Order, RichText, ScrollArea, TextureOptions, Window, scroll_area::ScrollSource};
 use tracing::info;
 
 use crate::{core::system::{clipboard::TOKIO_RUNTIME, fileopener_module::{AppAssociation, GLOBAL_FILE_OPENER, platform::linux::structs::AppsIconData}}, ui::blaze_ui_state::ModalDialog};
 
 pub struct SelectorData {
-    pub path: PathBuf,
+    pub path: Arc<Path>,
     pub mime: String,
     pub apps: Vec<AppAssociation>,
     pub icon_data: Vec<AppsIconData>,
@@ -55,11 +55,12 @@ impl AppSelectorDialog {
         self.selector_data = None;
     }
 
-    pub fn open(&mut self, path: PathBuf, mime: String, apps: Vec<AppAssociation>, icon_data: Vec<AppsIconData>, show_all_apps: bool) {
+    pub fn open(&mut self, path: Arc<Path>
+        , mime: String, apps: Vec<AppAssociation>, icon_data: Vec<AppsIconData>, show_all_apps: bool) {
         let textures = vec![None; apps.len()];
         self.selector_data = Some(
             SelectorData {
-                path, 
+                path,
                 mime, 
                 apps, 
                 icon_data, 
@@ -113,7 +114,7 @@ impl AppSelectorDialog {
 
                 TOKIO_RUNTIME.spawn(async move {
                     let mut opener = opener_clone.lock().await;
-                    opener.request_launch(&app_owned, &path_owned).await;
+                    opener.request_launch(&app_owned, path_owned).await;
                 });
 
                 should_close = true;
@@ -140,7 +141,7 @@ impl AppSelectorDialog {
                     let opener_clone = opener.clone();
                     TOKIO_RUNTIME.spawn(async move {
                         let mut opener = opener_clone.lock().await;
-                        opener.request_launch(&app_owned, &path_owned).await;
+                        opener.request_launch(&app_owned, path_owned).await;
                     });
 
                     should_close = true;

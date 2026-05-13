@@ -179,7 +179,12 @@ pub fn tools(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, files: &Ve
                     )
                 ).ok();
             } else {
-                state.move_to_trash(files);
+                let items = files
+                    .iter()
+                    .map(|f| (Arc::from(f.name.to_owned()), f.full_path.to_owned()))
+                    .collect();
+                
+                state.move_to_trash(items);
             }
         }
 

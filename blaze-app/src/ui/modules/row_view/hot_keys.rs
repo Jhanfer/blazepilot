@@ -71,8 +71,8 @@ pub fn hot_keys_logic(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, f
         if let Some(idx) = state.last_selected_index {
             if idx < files.len() {
                 let file = &files[idx];
-                if file.is_dir {
-                    state.navigate_to(&*file.full_path);
+                if file.is_dir() {
+                    state.navigate_to(file.full_path.to_owned());
                 } else {
                     state.open_file(&file);
                 }
@@ -91,14 +91,18 @@ pub fn hot_keys_logic(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, f
     //Recargar
     if (input.key_pressed(Key::F5) || 
     (input.modifiers.command && input.key_pressed(Key::R))) && disable_keys {
+        {
+            let motor = state.motor.borrow();
+            let tab = motor.active_tab();
 
-        let files = state.motor.borrow_mut().active_tab().files.clone();
-        for file in files.iter().filter(|f| f.is_dir) {
-            state.calculated_dir_sizes.remove(&file.full_path);
-            state.calculating_dir_sizes.remove(&file.full_path);
-            CacheManager::global().invalidate(&file.full_path);
+            let file_guard = tab.files.read().unwrap();
+
+            for file in file_guard.iter().filter(|f| f.is_dir()) {
+                state.calculated_dir_sizes.remove(&file.full_path);
+                state.calculating_dir_sizes.remove(&file.full_path);
+                CacheManager::global().invalidate(&file.full_path);
+            }
         }
-
         ui.ctx().request_repaint();
         state.refresh();
     }
@@ -134,7 +138,11 @@ pub fn hot_keys_logic(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, f
             ).ok();
             
         } else if !sources.is_empty(){
-            state.move_to_trash(files);
+            let items = files
+                .iter()
+                .map(|f| (Arc::from(f.name.to_owned()), f.full_path.to_owned()))
+                .collect();
+            state.move_to_trash(items);
         }
     }
 

@@ -1,4 +1,4 @@
-use std::{ fs, io, os::unix::fs::{MetadataExt, PermissionsExt}, path::{Path, PathBuf}};
+use std::{ fs, io, os::unix::fs::{MetadataExt, PermissionsExt}, path::{Path, PathBuf}, sync::Arc};
 use chrono::{Utc, DateTime};
 use users::get_current_uid;
 use crate::core::system::trash_manager::{error::{TrashError, TrashResult}, trash_manager::{TrashBackend, TrashDestination}};
@@ -7,7 +7,7 @@ use crate::core::system::knowndirs::knowndirs_manager::KnownDirsManager;
 
 #[derive(Debug, Clone)]
 pub struct LinuxTrashBackend {
-    home_dir: PathBuf,
+    home_dir: Arc<Path>,
     uid: u32,
 }
 
@@ -33,7 +33,7 @@ impl LinuxTrashBackend {
             .join("files")
     }
 
-    fn external_trash_root(&self, mount_point: &Path) -> TrashResult<PathBuf> {
+    fn external_trash_root(&self, mount_point: Arc<Path>) -> TrashResult<Arc<Path>> {
         let dot_trash = mount_point.join(".Trash");
         let dot_trash_uid = mount_point.join(format!(".Trash-{}", self.uid));
 
@@ -54,7 +54,7 @@ impl LinuxTrashBackend {
                                 .map_err(|e| TrashError::Io(e))?;
                         }
 
-                        return Ok(user_trash);
+                        return Ok(user_trash.as_path().into());
                     } else {
                         return Err(TrashError::TrashDirInvalidPermissions{ path: dot_trash.clone() });
                     }
@@ -74,7 +74,7 @@ impl LinuxTrashBackend {
                 .map_err(|e| TrashError::Io(e))?;
         }
 
-        Ok(dot_trash_uid)
+        Ok(dot_trash_uid.as_path().into())
     }
 
     fn files_dir(&self, root: &Path) -> PathBuf {
@@ -97,7 +97,7 @@ impl LinuxTrashBackend {
     }
 
 
-    fn detect_mount_point(path: &Path) -> TrashResult<PathBuf> {
+    fn detect_mount_point(path: &Path) -> TrashResult<Arc<Path>> {
         let canonical = path
             .canonicalize()
             .unwrap_or_else(|_| path.to_path_buf());
@@ -133,7 +133,7 @@ impl LinuxTrashBackend {
             }
 
             if let Some(best) = best_match {
-                return Ok(best);
+                return Ok(best.into());
             }
         }
 
@@ -149,12 +149,12 @@ impl LinuxTrashBackend {
                 .map_err(|e| TrashError::Io(e))?
                 .dev();
             if parent_dev != target_dev {
-                return Ok(current);
+                return Ok(current.into());
             }
             current = parent.to_path_buf();
         }
 
-        Ok(current)
+        Ok(current.into())
     }
 
 
@@ -348,21 +348,21 @@ impl TrashBackend for LinuxTrashBackend {
         Self::find_trash_root_for_file(path, self.uid).is_ok()
     }
 
-    fn get_trash_files(&self, destination: &TrashDestination) -> TrashResult<PathBuf> {
+    fn get_trash_files(&self, destination: &TrashDestination) -> TrashResult<Arc<Path>> {
         match destination {
             TrashDestination::Home => {
                 let root = self.home_trash_files();
                 fs::create_dir_all(&root)
                     .map_err(|e| TrashError::Io(e))?;
-                Ok(root)
+                Ok(root.into())
             },
             TrashDestination::External { mount_point } => {
-                self.external_trash_root(mount_point)
+                self.external_trash_root(mount_point.to_owned())
             },
         }
     }
 
-    fn get_trash_root(&self, destination: &TrashDestination) -> TrashResult<PathBuf> {
+    fn get_trash_root(&self, destination: &TrashDestination) -> TrashResult<Arc<Path>> {
         match destination {
             TrashDestination::Home => {
                 let root = self.home_trash_root();
@@ -370,10 +370,10 @@ impl TrashBackend for LinuxTrashBackend {
                     .map_err(|e| TrashError::Io(e))?;
                 fs::create_dir_all(self.info_dir(&root))
                     .map_err(|e| TrashError::Io(e))?;
-                Ok(root)
+                Ok(root.into())
             },
             TrashDestination::External { mount_point } => {
-                self.external_trash_root(mount_point)
+                self.external_trash_root(mount_point.to_owned())
             },
         }
     }

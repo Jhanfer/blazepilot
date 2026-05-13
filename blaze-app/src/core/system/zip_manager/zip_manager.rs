@@ -187,7 +187,7 @@ impl ZipManager {
     fn assert_archive(&self, entry: &FileEntry) -> ZipResult<()> { 
         match &entry.extension { 
             FileExtension::Archive(_) => Ok(()),
-            _ => Err(ZipError::UnsupportedFormat(entry.full_path.clone())) 
+            _ => Err(ZipError::UnsupportedFormat(entry.full_path.to_path_buf())) 
         } 
     }
 }

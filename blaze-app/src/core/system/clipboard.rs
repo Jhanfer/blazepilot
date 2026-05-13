@@ -58,7 +58,7 @@ pub struct Clipboard {
 struct ClipboardInner {
     pub mode: Option<ClipboardMode>,
     pub items: Vec<ClipboardItem>,
-    pub dest_dir: Option<PathBuf>,
+    pub dest_dir: Option<Arc<Path>>,
 }
 
 pub struct GlobalClipboard;
@@ -84,16 +84,16 @@ impl GlobalClipboard {
         Self::inner().clear();
     }
 
-    pub fn set_dest(&self, dest: PathBuf) {
+    pub fn set_dest(&self, dest: Arc<Path>) {
         Self::inner().set_dest(dest);
     }
 
 
-    pub fn copy_items(&self, items: Vec<Arc<FileEntry>>, current_cwd: PathBuf) {
+    pub fn copy_items(&self, items: Vec<Arc<FileEntry>>, current_cwd: Arc<Path>) {
         Self::inner().copy_items(items, current_cwd);
     }
 
-    pub fn cut_items(&self, items: Vec<Arc<FileEntry>>, current_cwd: PathBuf) {
+    pub fn cut_items(&self, items: Vec<Arc<FileEntry>>, current_cwd: Arc<Path>) {
         Self::inner().cut_items(items, current_cwd);
     }
 
@@ -101,15 +101,15 @@ impl GlobalClipboard {
         Self::inner().pastex(sender)
     }
 
-    pub fn move_files(&self, items: Vec<PathBuf>, dest: PathBuf, sender: &Dispatcher) -> Result<(), String> {
+    pub fn move_files(&self, items: Vec<Arc<Path>>, dest: Arc<Path>, sender: &Dispatcher) -> Result<(), String> {
         Self::inner().move_files(items, dest, ConflictStrategy::Ask, sender)
     }
 
-    pub fn move_to_trash(&self, items: Vec<Arc<FileEntry>>, current_cwd: PathBuf, sender: &Dispatcher) -> Result<(), String> {
-        Self::inner().move_to_trash(items, current_cwd, sender)
+    pub fn move_to_trash(&self, items: Vec<(Arc<str>, Arc<Path>)>, sender: &Dispatcher) -> Result<(), String> {
+        Self::inner().move_to_trash(items, sender)
     }
 
-    pub fn restore_from_trash(&self, items: Vec<String>, trash_root: PathBuf, sender: Dispatcher) -> Result<(), String>  {
+    pub fn restore_from_trash(&self, items: Vec<String>, trash_root: Arc<Path>, sender: Dispatcher) -> Result<(), String>  {
         Self::inner().restore_items(items, trash_root, sender)
     }
 
@@ -117,11 +117,11 @@ impl GlobalClipboard {
         Self::inner().rename_file(file_name, new_file_name)
     }
 
-    pub fn create_new_dir(&self, file_name: &str, current_cwd: PathBuf) -> Result<(), String> {
+    pub fn create_new_dir(&self, file_name: &str, current_cwd: Arc<Path>) -> Result<(), String> {
         Self::inner().create_new_dir(file_name, current_cwd)
     }
 
-    pub fn create_new_file(&self, file_name: &str, current_cwd: PathBuf) -> Result<(), String> {
+    pub fn create_new_file(&self, file_name: &str, current_cwd: Arc<Path>) -> Result<(), String> {
         Self::inner().create_new_file(file_name, current_cwd)
     }
 
@@ -155,19 +155,19 @@ impl Clipboard {
     }
 
 
-    pub fn copy_items(&self, items: Vec<Arc<FileEntry>>, current_cwd: PathBuf) {
+    pub fn copy_items(&self, items: Vec<Arc<FileEntry>>, current_cwd: Arc<Path>) {
         let mut inner = self.inner.lock().unwrap();
         inner.mode = Some(ClipboardMode::Copy);
         self.prepare_items(items, current_cwd, &mut inner);
     }
 
-    pub fn cut_items(&self, items: Vec<Arc<FileEntry>>, current_cwd: PathBuf) {
+    pub fn cut_items(&self, items: Vec<Arc<FileEntry>>, current_cwd: Arc<Path>) {
         let mut inner = self.inner.lock().unwrap();
         inner.mode = Some(ClipboardMode::Cut);
         self.prepare_items(items, current_cwd, &mut inner);
     }
 
-    fn prepare_items(&self, items: Vec<Arc<FileEntry>>, current_cwd: PathBuf, inner: &mut std::sync::MutexGuard<'_, ClipboardInner>) {
+    fn prepare_items(&self, items: Vec<Arc<FileEntry>>, current_cwd: Arc<Path>, inner: &mut std::sync::MutexGuard<'_, ClipboardInner>) {
         inner.items = items.iter().map(|e| ClipboardItem {
             src_path: current_cwd.join(e.name.as_ref()),
             name: e.name.to_string()
@@ -175,7 +175,7 @@ impl Clipboard {
         inner.dest_dir = None;
     }
 
-    pub fn set_dest(&self, dest: PathBuf) {
+    pub fn set_dest(&self, dest: Arc<Path>) {
         let mut inner = self.inner.lock().unwrap();
         if !dest.is_dir() || !dest.exists() { return; }
         inner.dest_dir = Some(dest);
@@ -543,7 +543,7 @@ impl Clipboard {
     }
 
 
-    pub fn move_files(&self, items: Vec<PathBuf>, dest: PathBuf, conflict: ConflictStrategy, sender: &Dispatcher) -> Result<(), String> {
+    pub fn move_files(&self, items: Vec<Arc<Path>>, dest: Arc<Path>, conflict: ConflictStrategy, sender: &Dispatcher) -> Result<(), String> {
         let task_id = new_task_id();
 
         sender.send(TaskMessage::Started { 
@@ -553,6 +553,7 @@ impl Clipboard {
         }).ok();
 
         let sender = sender.clone();
+
         TOKIO_RUNTIME.spawn(async move {
             let total = items.len();
             let mut errors = Vec::new();
@@ -587,7 +588,7 @@ impl Clipboard {
                                 UiEvent::FileConflict(
                                     FileConflict::AlreadyExist {
                                         name: file_name.to_string_lossy().to_string(),
-                                        path: target,
+                                        path: target.into(),
                                     }
                                 )
                             ).ok();
@@ -639,7 +640,7 @@ impl Clipboard {
         Ok(())
     }
 
-    fn copy_dir_recursive(src: &PathBuf, dst: &PathBuf) -> Result<(), std::io::Error> {
+    fn copy_dir_recursive(src: &Path, dst: &PathBuf) -> Result<(), std::io::Error> {
         fs::create_dir_all(dst)?;
         for entry in fs::read_dir(src)? {
             let entry = entry?;
@@ -655,20 +656,18 @@ impl Clipboard {
     }
 
 
-    fn move_to_trash(&self, items: Vec<Arc<FileEntry>>, current_cwd: PathBuf, sender: &Dispatcher) -> Result<(), String> {
+    fn move_to_trash(&self, items: Vec<(Arc<str>, Arc<Path>)>, sender: &Dispatcher) -> Result<(), String> {
         let task_id = new_task_id();
         let backend = get_backend();
         
-        let mut resolved: Vec<(Arc<FileEntry>, PathBuf, Option<TrashDestination>)> = Vec::new();
+        let mut resolved: Vec<(Arc<str>, Arc<Path>, Option<TrashDestination>)> = Vec::new();
 
-        for item in &items {
-            let source = current_cwd.join(&*item.name);
-            
-            let destination = backend.resolve_destination(&source)
-                .inspect_err(|e| warn!("No se ha podido resolver papelera para {:?}: {}", source, e))
+        for (name, full_path) in &items {
+            let destination = backend.resolve_destination(full_path)
+                .inspect_err(|e| warn!("No se ha podido resolver papelera para {:?}: {}", full_path, e))
             .ok();
 
-            resolved.push((item.clone(), source, destination));
+            resolved.push((name.clone(), full_path.to_owned(), destination));
         }
 
         sender.send(TaskMessage::Started {
@@ -687,19 +686,19 @@ impl Clipboard {
     }
 
 
-    fn process_trash_operations(task_id: u64, resolved: Vec<(Arc<FileEntry>, PathBuf, Option<TrashDestination>)>, backend: &dyn TrashBackend, sender: &Dispatcher) {
+    fn process_trash_operations(task_id: u64, resolved: Vec<(Arc<str>, Arc<Path>, Option<TrashDestination>)>, backend: &dyn TrashBackend, sender: &Dispatcher) {
         let total = resolved.len();
         let mut errors: Vec<String> = Vec::new();
 
-        for (done, (item, source, _desination)) in resolved.into_iter().enumerate() {
+        for (done, (name, source, _desination)) in resolved.into_iter().enumerate() {
 
             let result = if backend.is_in_trash(&source) {
                 backend.permanently_delete(&source)
-                    .map_err(|e| format!("Error eliminando '{}': {}", item.name, e))
+                    .map_err(|e| format!("Error eliminando '{}': {}", name, e))
             } else {
                 backend.move_to_trash(&source)
                     .map(|_| ())
-                    .map_err(|e| format!("Error moviendo '{}' a la papelera: {}", item.name, e))
+                    .map_err(|e| format!("Error moviendo '{}' a la papelera: {}", name, e))
             };
 
             if let Err(e) = result {
@@ -729,7 +728,7 @@ impl Clipboard {
     }
 
 
-    pub fn restore_items(&self, items_to_restore: Vec<String>, trash_root: PathBuf, sender: Dispatcher) -> Result<(), String> {
+    pub fn restore_items(&self, items_to_restore: Vec<String>, trash_root: Arc<Path>, sender: Dispatcher) -> Result<(), String> {
         let task_id = new_task_id();
 
         sender.send(TaskMessage::Started {
@@ -811,7 +810,7 @@ impl Clipboard {
         }
     }
 
-    pub fn create_new_dir(&self, file_name: &str, current_cwd: PathBuf) -> Result<(), String> {
+    pub fn create_new_dir(&self, file_name: &str, current_cwd: Arc<Path>) -> Result<(), String> {
         let new_name_trimmed = file_name.trim();
         if new_name_trimmed.is_empty() {
             return Err("El nombre no puede estar vacío.".to_string());
@@ -838,7 +837,7 @@ impl Clipboard {
     }
 
 
-    pub fn create_new_file(&self, file_name: &str, current_cwd: PathBuf) -> Result<(), String> {
+    pub fn create_new_file(&self, file_name: &str, current_cwd: Arc<Path>) -> Result<(), String> {
         let new_name_trimmed = file_name.trim();
         if new_name_trimmed.is_empty() {
             return Err("El nombre no puede estar vacío.".to_string());

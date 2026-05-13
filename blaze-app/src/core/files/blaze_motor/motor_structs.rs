@@ -1,6 +1,6 @@
-use std::{path::PathBuf, sync::Arc};
+use std::{path::Path, sync::Arc};
 use file_id::FileId;
-use crate::core::files::file_extension::FileExtension;
+use crate::{core::files::file_extension::FileExtension};
 
 
 
@@ -33,8 +33,8 @@ pub enum FileLoadingMessage {
 
     RecursiveBatch {
         generation: u64,
-        batch: Vec<Arc<FileEntry>>,
-        source_dir: PathBuf,
+        batch: Vec<FileEntry>,
+        source_dir: Arc<Path>,
     },
 
     GitStatusChanged
@@ -50,7 +50,7 @@ pub enum RecursiveMessages {
     Progress {
         task_id: u64,       
         files_found: usize,  
-        current_dir: PathBuf, 
+        current_dir: Arc<Path>, 
         text: String, 
     },
     Finished {
@@ -61,17 +61,17 @@ pub enum RecursiveMessages {
 }
 
 
-#[derive(Debug, Default, Clone)]
+
+#[derive(Debug, Clone)]
 pub struct FileEntry {
     pub name: Box<str>,
+    pub full_path: Arc<Path>,
     pub extension: FileExtension,
     pub kind: FileKind,
     pub size: u64,
     pub modified: u64,
     pub created: u64,
     pub is_hidden: bool,
-    pub is_dir: bool,
-    pub full_path: PathBuf,
     pub unique_id: Option<FileId>,
 
     pub accessed: u64,
@@ -95,6 +95,12 @@ pub enum FileKind {
     Dir,
     Symlink
 }
-
+impl FileEntry {
+    pub fn is_dir(&self) -> bool {
+        matches!(self.kind, FileKind::Dir)
+    }
+}
 
 //------------------------------------------------
+
+

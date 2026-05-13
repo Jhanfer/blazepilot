@@ -315,8 +315,8 @@ impl ContextMenuState {
                             });
                         } else {
                             let path_string = drive.mountpoint.clone().unwrap_or_default();
-                            let path = PathBuf::from(path_string);
-                            state.navigate_to(&*path);
+                            let path = PathBuf::from(path_string).into();
+                            state.navigate_to(path);
                         }
                         should_close = true;
                     }
@@ -408,7 +408,7 @@ impl ContextMenuState {
         self.show_menu(ui, "custom_ctx_background_trash", |ui| {
             let sources = state.get_selected_paths(files);
             let file_names: Vec<String> = sources.iter()
-                .map(|p| PathBuf::from(p)
+                .map(|p| PathBuf::from(p.as_ref())
                 .file_name()
                 .unwrap_or_default()
                 .to_string_lossy()
@@ -461,7 +461,7 @@ impl ContextMenuState {
                         sender.send(
                             UiEvent::SureTo(
                                 SureTo::SureToDelete {
-                                    files: sources, 
+                                    files: sources,
                                     tab_id: sender.tab_id
                                 }
                             )
@@ -679,7 +679,7 @@ impl ContextMenuState {
 
             let sources = state.get_selected_paths(files);
             let file_names: Vec<String> = sources.iter()
-                .map(|p| PathBuf::from(p)
+                .map(|p| PathBuf::from(p.as_ref())
                     .file_name()
                     .unwrap_or_default()
                     .to_string_lossy()
@@ -788,13 +788,13 @@ impl ContextMenuState {
                     match action.get() {
                         Some(0) => {
 
-                            let all_images: Vec<PathBuf> = files.iter()
+                            let all_images = files.iter()
                                 .filter(|f| f.extension.is_image())
-                                .map(|f| f.full_path.clone())
+                                .map(|f| f.full_path.to_path_buf())
                                 .collect();
 
                             let pvw = ImagePreviewState::new(
-                                file.full_path.clone(),
+                                file.full_path.to_path_buf(),
                                 all_images
                             );
 
@@ -814,7 +814,7 @@ impl ContextMenuState {
 
 
             ui.horizontal(|ui|{
-                if !file.is_dir {
+                if !file.is_dir() {
                     let icon = ("external-link",icons::ICON_EXTERNAL_LINK);
                     let label = "Abrir";
                     let hint = "Enter";
@@ -839,8 +839,8 @@ impl ContextMenuState {
 
                     match action.get() {
                         Some(0) => {
-                            if file.is_dir {
-                                state.navigate_to(&*file.full_path);
+                            if file.is_dir() {
+                                state.navigate_to(file.full_path.to_owned());
                                 state.deselect_all();
                                 state.resize_selection(files.len());
                             } else {
@@ -880,7 +880,7 @@ impl ContextMenuState {
 
                     match action.get() {
                         Some(0) => {
-                            state.navigate_to(&*file.full_path);
+                            state.navigate_to(file.full_path.to_owned());
                             state.deselect_all();
                             state.resize_selection(files.len());
                             should_close = true;
@@ -897,7 +897,7 @@ impl ContextMenuState {
 
             //Pegar
             ui.horizontal(|ui|{
-                let enable = state.clipboard.clipboard_has_files() && file.is_dir;
+                let enable = state.clipboard.clipboard_has_files() && file.is_dir();
 
                 let icon = if enable {
                     ("clipboard", icons::ICON_CLIPBOARD)
@@ -917,7 +917,7 @@ impl ContextMenuState {
 
                 match action.get() {
                     Some(0) => {
-                        state.paste(file.full_path.clone());
+                        state.paste(file.full_path.to_owned());
                         should_close = true;
                     }
                     _ => {}
@@ -999,7 +999,7 @@ impl ContextMenuState {
                             sender.send(
                                 FileOperation::ExtractHere { 
                                     entry: file.clone(), 
-                                    dest_dir: cwd,
+                                    dest_dir: cwd.into(),
                                 }
                             ).ok();
                             should_close = true;
@@ -1013,10 +1013,10 @@ impl ContextMenuState {
 
 
             let is_in_fav = with_configs(|c| {
-                c.is_in_favorite(&file.full_path)
+                c.is_in_favorite(file.full_path.to_owned())
             });
 
-            if file.is_dir {
+            if file.is_dir() {
                 //Color de carpeta
                 ui.horizontal(|ui|{
                     let icon = ("palette", icons::ICON_PALETTE);
@@ -1076,12 +1076,12 @@ impl ContextMenuState {
                     Some(0) => {
                         if !is_in_fav {
                             with_configs(|c| {
-                                c.add_to_favorites(file.name.to_string(),file.full_path.clone(), file.is_dir)
+                                c.add_to_favorites(file.name.to_string(),file.full_path.to_owned(), file.is_dir())
                             });
                             should_close = true;
                         } else {
                         with_configs(|c| {
-                            c.delete_from_favorites(file.name.to_string(),file.full_path.clone())
+                            c.delete_from_favorites(file.name.to_string(),file.full_path.to_owned())
                         });
                         should_close = true;
                         }
@@ -1112,7 +1112,12 @@ impl ContextMenuState {
 
                 match action.get() {
                     Some(0) => {
-                        state.move_to_trash(files);
+                        let items = files
+                            .iter()
+                            .map(|f| (Arc::from(f.name.to_owned()), f.full_path.to_owned()))
+                            .collect();
+                        
+                        state.move_to_trash(items);
                         should_close = true;
                     }
                     _ => {}
@@ -1138,7 +1143,7 @@ impl ContextMenuState {
 
                 match action.get() {
                     Some(0) => {
-                        state.renaming_file = Some(file.full_path.clone());
+                        state.renaming_file = Some(file.full_path.to_path_buf());
                         state.rename_buffer = file.name.to_ascii_lowercase();
                         should_close = true;
                     }

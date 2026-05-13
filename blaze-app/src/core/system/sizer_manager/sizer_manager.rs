@@ -15,7 +15,7 @@
 
 
 
-use std::{collections::HashSet, os::unix::fs::MetadataExt, path::{Path, PathBuf}, sync::{Arc, atomic::{AtomicU64, Ordering}}, time::{UNIX_EPOCH}};
+use std::{collections::HashSet, os::unix::fs::MetadataExt, path::Path, sync::{Arc, atomic::{AtomicU64, Ordering}}, time::{UNIX_EPOCH}};
 use jwalk::{Parallelism, WalkDir};
 use tokio::sync::{Mutex, Semaphore};
 use uuid::Uuid;
@@ -24,7 +24,7 @@ use crate::core::{runtime::{bus_structs::FileOperation, event_bus::{Dispatcher, 
 
 
 pub enum SizerMessages {
-    StartCal(PathBuf),
+    StartCal(Arc<Path>),
 }
 
 pub struct SizerManager {
@@ -40,7 +40,7 @@ impl SizerManager {
         Self { cache_manager }
     }
 
-    fn get_real_mtime(path: &PathBuf) -> u64 {
+    fn get_real_mtime(path: &Path) -> u64 {
         std::fs::metadata(path)
             .and_then(|m| m.modified())
             .map(|t| t.duration_since(UNIX_EPOCH).unwrap().as_secs())
@@ -100,7 +100,7 @@ impl SizerManager {
                                 &path_to_task, 
                                 12,
                                 sender_clone.clone(),
-                                path_buf.clone(),
+                                &path_buf,
                                 tab_id,
                             ).await;
 
@@ -124,7 +124,7 @@ impl SizerManager {
     }
 
 
-    pub async fn get_recursive_size(root: impl AsRef<Path>, max_concurrency: usize, sender: Dispatcher, path_buf: PathBuf, tab_id: Uuid) -> u64 {
+    pub async fn get_recursive_size(root: impl AsRef<Path>, max_concurrency: usize, sender: Dispatcher, path_buf: &Path, tab_id: Uuid) -> u64 {
         let total_size = Arc::new(AtomicU64::new(0));
         let seen_inodes = Arc::new(Mutex::new(HashSet::new()));
         let semaphore = Arc::new(Semaphore::new(max_concurrency));
@@ -151,7 +151,7 @@ impl SizerManager {
                 let inodes_arc = seen_inodes.clone();
                 let permit = semaphore.clone().acquire_owned().await.unwrap();
                 let sender_task = sender.clone();
-                let path_task = path_buf.clone();
+                let path_task = path_buf.to_path_buf();
                 let last_reported = last_reported.clone();
                 
                 let task = TOKIO_RUNTIME.spawn(async move {
@@ -173,7 +173,7 @@ impl SizerManager {
                                 ).is_ok() {
                                     sender_task.send(
                                         FileOperation::UpdateDirSize {
-                                            full_path: path_task,
+                                            full_path: path_task.into(),
                                             size: new_total,
                                             tab_id,
                                         }

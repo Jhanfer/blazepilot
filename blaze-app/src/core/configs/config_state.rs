@@ -19,7 +19,7 @@
 
 use serde::{Serialize, Deserialize};
 use directories::ProjectDirs;
-use std::{collections::HashSet, path::PathBuf};
+use std::{collections::HashSet, path::{Path, PathBuf}, sync::Arc};
 use once_cell::sync::Lazy;
 use std::sync::Mutex;
 use tracing::debug;
@@ -38,7 +38,7 @@ pub enum OrderingMode {
 #[derive(Serialize, Deserialize, Debug, Clone, Hash, PartialEq, Eq)]
 pub struct FavoriteLinks {
     pub name: String,
-    pub path: PathBuf,
+    pub path: Arc<Path>,
     pub is_dir: bool,
 }
 
@@ -174,24 +174,24 @@ impl ConfigsFlags {
     }
 
     
-    pub fn add_to_favorites(&mut self, name: String,  path: PathBuf, is_dir: bool) -> &mut Self {
-        if !self.is_in_favorite(&path) {
+    pub fn add_to_favorites(&mut self, name: String,  path: Arc<Path>, is_dir: bool) -> &mut Self {
+        if !self.is_in_favorite(path.to_owned()) {
             self.favorite_list.insert(FavoriteLinks {name, path, is_dir});
         }
         self.save().ok();
         self
     }
 
-    pub fn delete_from_favorites(&mut self, name: String,  path: PathBuf) -> &mut Self {
+    pub fn delete_from_favorites(&mut self, name: String,  path: Arc<Path>) -> &mut Self {
         self.favorite_list.retain(|f| !(f.name == name && f.path == path));
         self.save().ok();
         self
     }
 
-    pub fn is_in_favorite(&self, path: &PathBuf) -> bool {
+    pub fn is_in_favorite(&self, path: Arc<Path>) -> bool {
         self.favorite_list
             .iter()
-            .any(|f| f.path == *path)
+            .any(|f| f.path == path)
     }
 
 
@@ -257,15 +257,15 @@ impl ConfigHandler {
         self.configs.set_item_file_list_size(size);
     }
 
-    pub fn add_to_favorites(&mut self, name: String,  path: PathBuf, is_dir: bool) {
+    pub fn add_to_favorites(&mut self, name: String,  path: Arc<Path>, is_dir: bool) {
         self.configs.add_to_favorites(name, path, is_dir);
     }
 
-    pub fn delete_from_favorites(&mut self, name: String,  path: PathBuf) {
+    pub fn delete_from_favorites(&mut self, name: String,  path: Arc<Path>) {
         self.configs.delete_from_favorites(name, path);
     }
 
-    pub fn is_in_favorite(&mut self, path: &PathBuf) -> bool {
+    pub fn is_in_favorite(&mut self, path: Arc<Path>) -> bool {
         self.configs.is_in_favorite(path)
     }
 

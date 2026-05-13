@@ -1,5 +1,5 @@
 use std::fs::Metadata;
-use std::path::PathBuf;
+use std::path::Path;
 use std::time::SystemTime;
 use file_id::FileId;
 use crate::core::files::blaze_motor::motor_structs::{FileEntry, FileKind};
@@ -11,7 +11,7 @@ use std::os::unix::fs::MetadataExt;
 use std::os::windows::fs::MetadataExt;
 
 
-pub fn build_entry(path: PathBuf, m: Metadata, unique_id: Option<FileId>) -> FileEntry {
+pub fn build_entry(path: &Path, m: Metadata, unique_id: Option<FileId>) -> FileEntry {
     let name = path
         .file_name()
         .map(|n| n.to_string_lossy().into())
@@ -49,7 +49,6 @@ pub fn build_entry(path: PathBuf, m: Metadata, unique_id: Option<FileId>) -> Fil
 
     FileEntry {
         name: name.clone(),
-        is_dir,
         extension,
         kind,
         size: m.len(),
@@ -57,7 +56,7 @@ pub fn build_entry(path: PathBuf, m: Metadata, unique_id: Option<FileId>) -> Fil
         created: ts(m.created()),
         accessed: ts(m.accessed()),
         is_hidden: name.starts_with("."),
-        full_path: path,
+        full_path: path.into(),
         unique_id,
         permissions,
         inode,

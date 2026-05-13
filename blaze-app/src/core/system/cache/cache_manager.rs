@@ -15,7 +15,7 @@
 
 
 
-use std::{collections::{HashMap, HashSet}, hash::Hash, path::PathBuf, sync::{OnceLock, RwLock}};
+use std::{collections::{HashMap, HashSet}, hash::Hash, path::Path, sync::{Arc, OnceLock, RwLock}};
 use egui::Color32;
 use file_id::FileId;
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
@@ -33,7 +33,7 @@ pub struct SizeCache {
 
 static CACHE_MANAGER: OnceLock<CacheManager> = OnceLock::new();
 pub struct CacheManager {
-    pub cache_dir: PathBuf,
+    pub cache_dir: Arc<Path>,
     pub size_cache: AsyncRwLock<HashMap<String, SizeCache>>,
     pub invalidated: RwLock<HashSet<String>>,
 
@@ -45,7 +45,8 @@ impl CacheManager {
     pub fn global() -> &'static Self {
         let sys_cache = &KnownDirsManager::get().sys_cache;
         let cache_dir = sys_cache
-            .join("blazepilot");
+            .join("blazepilot")
+            .into();
 
         CACHE_MANAGER.get_or_init(|| {
             Self {
@@ -58,17 +59,17 @@ impl CacheManager {
         })
     }
 
-    pub fn invalidate(&self, path: &PathBuf) {
+    pub fn invalidate(&self, path: &Path) {
         let key = path.to_string_lossy().into_owned();
         self.invalidated.write().unwrap().insert(key);
     }
 
-    pub fn is_invalidated(&self, path: &PathBuf) -> bool {
+    pub fn is_invalidated(&self, path: &Path) -> bool {
         let key = path.to_string_lossy();
         self.invalidated.read().unwrap().contains(key.as_ref())
     }
 
-    pub fn clear_invalidated(&self, path: &PathBuf) {
+    pub fn clear_invalidated(&self, path: &Path) {
         let key = path.to_string_lossy().into_owned();
         self.invalidated.write().unwrap().remove(&key);
     }
@@ -146,7 +147,7 @@ impl CacheManager {
         self.size_cache.write().await.insert(path, SizeCache { size, modified });
     }
 
-    pub fn get_cached_size(&self, path: &PathBuf) -> Option<u64> {
+    pub fn get_cached_size(&self, path: &Path) -> Option<u64> {
         let key = path.to_string_lossy();
         self.size_cache.try_read().ok()?
             .get(key.as_ref())
@@ -203,7 +204,7 @@ impl CacheManager {
         self.extended_info_cache.write().await.insert(path, info);
     }
 
-    pub fn get_cached_extended_info(&self, path: &PathBuf) -> Option<ExtendedInfoCache> {
+    pub fn get_cached_extended_info(&self, path: &Path) -> Option<ExtendedInfoCache> {
         let key = path.to_string_lossy();
         self.extended_info_cache.try_read().ok()?
             .get(key.as_ref())
