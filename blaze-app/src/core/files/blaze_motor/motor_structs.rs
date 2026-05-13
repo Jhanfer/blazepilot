@@ -33,7 +33,7 @@ pub enum FileLoadingMessage {
 
     RecursiveBatch {
         generation: u64,
-        batch: Vec<FileEntry>,
+        batch: Vec<Arc<FileEntry>>,
         source_dir: Arc<Path>,
     },
 

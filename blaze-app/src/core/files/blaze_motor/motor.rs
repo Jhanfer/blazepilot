@@ -64,7 +64,7 @@ pub struct TabState {
     pub files: Arc<RwLock<Vec<Arc<FileEntry>>>>,
     pub sorted_indices: Arc<RwLock<Vec<usize>>>,
 
-    pub recursive_entries: Arc<RwLock<Vec<FileEntry>>>,
+    pub recursive_entries: Arc<RwLock<Vec<Arc<FileEntry>>>>,
     pub is_recursive_active: bool,
 
     watcher: FileWatcher,
@@ -104,13 +104,31 @@ impl TabState {
         let query_lower = search_filter.to_lowercase();
         let matcher = SkimMatcherV2::default();
 
+        if self.is_recursive_active {
+            let recursive_guard = self.recursive_entries.read()
+                .map_err(|_| MotorError::PoisonedLock)?;
+
+            let result = recursive_guard
+                .iter()
+                .filter(|f| {
+                    if !show_hidden && f.is_hidden {
+                        return false;
+                    }
+                    true 
+                })
+                .cloned()
+                .collect();
+
+            return Ok(result);
+        }
+
         self.ensure_sorted(needs_sort, sizer_manager)?;
 
         let file_guard = self.files.read()
-            .map_err(|_|MotorError::PoisonedLock)?;
+            .map_err(|_| MotorError::PoisonedLock)?;
 
         let indices_guard = self.sorted_indices.read()
-            .map_err(|_|MotorError::PoisonedLock)?;
+            .map_err(|_| MotorError::PoisonedLock)?;
 
         let sorted = indices_guard
             .iter()
@@ -286,7 +304,7 @@ impl TabState {
         TOKIO_RUNTIME.spawn(async move {
             let query_lower = query.to_lowercase().trim().to_string();
             let mut total_files = 0usize;
-            let mut batch: Vec<FileEntry> = Vec::with_capacity(150);
+            let mut batch: Vec<Arc<FileEntry>> = Vec::with_capacity(150);
 
             sender.send(RecursiveMessages::Started {
                 task_id: loading_generation as u64,
@@ -349,7 +367,9 @@ impl TabState {
 
                             let file_entry = build_entry(&entry_path, metadata, unique_id);
 
-                            batch.push(file_entry);
+                            let arc_entry = Arc::from(file_entry);
+
+                            batch.push(arc_entry);
                             total_files += 1;
 
                             if batch.len() >= 150 {
