@@ -18,7 +18,7 @@
 
 use core::f32;
 use egui::{Area, CentralPanel, Color32, ComboBox, CornerRadius, Frame, Key, Margin, OpenUrl, Order, Panel, RichText, TextEdit, Ui, Window, pos2};
-use crate::{core::{configs::config_state::{DisplayBackend, with_configs}, system::{clipboard::TOKIO_RUNTIME, terminal_opener::terminal_manager::GLOBAL_TERMINAL_MANAGER}}, ui::blaze_ui_state::ModalDialog};
+use crate::{core::{configs::config_state::{DisplayBackend, with_configs}, system::{ clipboard::clipboard::TOKIO_RUNTIME, terminal_opener::terminal_manager::GLOBAL_TERMINAL_MANAGER}}, ui::blaze_ui_state::ModalDialog};
 
 #[derive(PartialEq, Clone, Copy)]
 enum CurrentConfigTab {

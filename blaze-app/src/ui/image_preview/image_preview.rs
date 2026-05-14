@@ -19,7 +19,7 @@ use std::{io::{BufReader, Read}, path::{Path, PathBuf}};
 use crossbeam_channel::{Receiver, bounded};
 use egui::{ColorImage, TextureHandle, TextureOptions, Ui, Vec2};
 use tracing::warn;
-use crate::{core::system::clipboard::TOKIO_RUNTIME, ui::image_preview::error::{ImagePreviewError, ImagePreviewResult}};
+use crate::{core::system::clipboard::clipboard::TOKIO_RUNTIME, ui::image_preview::error::{ImagePreviewError, ImagePreviewResult}};
 
 
 pub struct ImagePreviewState {

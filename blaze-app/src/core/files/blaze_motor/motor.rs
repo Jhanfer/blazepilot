@@ -32,6 +32,7 @@ use crate::core::files::blaze_motor::utilities::build_entry;
 use crate::core::files::blaze_motor::watcher::FileWatcher;
 use crate::core::configs::config_state::{OrderingMode, with_configs};
 use crate::core::runtime::bus_structs::UiEvent;
+use crate::core::system::clipboard::clipboard::TOKIO_RUNTIME;
 use crate::core::system::disk_reader::disk_manager::DiskManager;
 use crate::core::runtime::event_bus::{Dispatcher, with_event_bus};
 use crate::core::system::knowndirs::knowndirs_manager::KnownDirsManager;
@@ -39,7 +40,6 @@ use crate::core::system::sizer_manager::sizer_manager::SizerManager;
 use uuid::Uuid;
 use std::cell::RefCell;
 use std::rc::Rc;
-use crate::core::system::clipboard::TOKIO_RUNTIME;
 
 
 
@@ -408,7 +408,7 @@ impl TabState {
                 }
                 Err(e) => {
                     sender.send(
-                        UiEvent::ShowError(format!("Error buscando archivos: {}", e))
+                        UiEvent::ShowError(format!("Error buscando archivos: {}", e).into())
                     ).ok();
                 }
             }

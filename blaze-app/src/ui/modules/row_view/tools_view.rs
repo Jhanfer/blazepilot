@@ -1,5 +1,6 @@
 use std::sync::Arc;
 use egui::{Color32, Rect, Sense, Ui, pos2};
+use tracing::warn;
 use crate::{core::{blaze_state::{BlazeCoreState, NewItemType}, configs::config_state::with_configs, files::blaze_motor::motor_structs::FileEntry, runtime::{bus_structs::{SureTo, UiEvent}, event_bus::with_event_bus}, system::trash_manager::trash_manager::{get_backend}}, ui::{blaze_ui_state::BlazeUiState, icons_cache::icons}};
 
 pub fn tools(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, files: &Vec<Arc<FileEntry>>, ui: &mut Ui) {
@@ -62,7 +63,14 @@ pub fn tools(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, files: &Ve
 
 
         let has_selection = state.selected_count(files.len()) > 0;
-        let has_clipboard = state.clipboard.clipboard_has_files();
+        
+        let has_clipboard = match state.clipboard.clipboard_has_files() {
+            Ok(has_files) => has_files,
+            Err(e) => {
+                warn!("Error en el clipboard: {}", e);
+                false
+            }
+        };
 
         let (icon_cut, icon_bytes_cut) = if has_selection {
             ("scissors", icons::ICON_SCISSORS)

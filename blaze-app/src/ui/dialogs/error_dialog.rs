@@ -22,7 +22,7 @@ use crate::{core::{runtime::{bus_structs::FileOperation, event_bus::Dispatcher}}
 
 
 pub struct ErrorDialog {
-    pub message: Option<String>,
+    pub message: Option<Box<str>>,
     pub show_modal: bool,
 }
 
@@ -44,8 +44,8 @@ impl ErrorDialog {
         self.show_modal = false; 
     }
 
-    pub fn open(&mut self, message: String) {
-        self.message = Some(message);
+    pub fn open(&mut self, message: &str) {
+        self.message = Some(message.into());
         self.show_modal = true;
     }
 

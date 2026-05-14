@@ -1,5 +1,6 @@
 use std::sync::Arc;
 use egui::{ Key, PointerButton, Ui};
+use tracing::warn;
 use crate::{core::{blaze_state::{BlazeCoreState, NewItemType}, files::blaze_motor::motor_structs::FileEntry, runtime::{bus_structs::{SureTo, UiEvent}, event_bus::with_event_bus}, system::{cache::cache_manager::CacheManager, trash_manager::trash_manager::get_backend}}, ui::blaze_ui_state::BlazeUiState};
 
 
@@ -11,7 +12,14 @@ fn get_focus(ui: &mut Ui, id: &'static str) -> bool {
 pub fn hot_keys_logic(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, files: &Vec<Arc<FileEntry>>, ui: &mut Ui, _total_rows: usize) {
     let input = ui.input(|i| i.clone());
     let disable_keys = state.renaming_file.is_none() && state.creating_new.is_none();
-    let has_clipboard = state.clipboard.clipboard_has_files();
+
+    let has_clipboard = match state.clipboard.clipboard_has_files() {
+        Ok(has_files) => has_files,
+        Err(e) => {
+            warn!("Error en el clipboard: {}", e);
+            false
+        }
+    };
 
     //tecla de arriba
     if input.key_pressed(Key::ArrowUp) && disable_keys {

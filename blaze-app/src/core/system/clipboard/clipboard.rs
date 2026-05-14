@@ -1,7 +1,6 @@
-use std::path::Path;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::vec;
-use std::{fs, path::PathBuf};
+use std::{fs, path::Path};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use once_cell::sync::Lazy;
 use tokio::runtime::Runtime;
@@ -9,9 +8,10 @@ use tokio::sync::Semaphore;
 use crate::core::files::blaze_motor::motor::{new_task_id, with_motor};
 use crate::core::files::blaze_motor::motor_structs::{FileEntry, TaskType};
 use crate::core::runtime::bus_structs::{FileConflict, UiEvent};
+use crate::core::system::clipboard::error::{ClipBoardError, ClipBoardResult};
 use crate::core::system::trash_manager::trash_manager::{TrashBackend, TrashDestination, get_backend};
 use crate::ui::task_manager::task_manager::TaskMessage;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, MutexGuard};
 use std::sync::OnceLock;
 use crate::core::runtime::event_bus::Dispatcher;
 use tracing::{info, warn, debug};
@@ -43,7 +43,7 @@ pub enum ClipboardMode {
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct ClipboardItem {
-    pub src_path: PathBuf,
+    pub src_path: Arc<Path>,
     pub name: String
 }
 
@@ -76,52 +76,52 @@ impl GlobalClipboard {
         })
     }
 
-    pub fn clipboard_has_files(&self) -> bool {
+    pub fn clipboard_has_files(&self) -> ClipBoardResult<bool> {
         Self::inner().clipboard_has_files()
     }
 
-    pub fn clear(&self) {
-        Self::inner().clear();
+    pub fn clear(&self) -> ClipBoardResult<()> {
+        Self::inner().clear()
     }
 
-    pub fn set_dest(&self, dest: Arc<Path>) {
-        Self::inner().set_dest(dest);
+    pub fn set_dest(&self, dest: Arc<Path>) -> ClipBoardResult<()> {
+        Self::inner().set_dest(dest)
     }
 
 
-    pub fn copy_items(&self, items: Vec<Arc<FileEntry>>, current_cwd: Arc<Path>) {
-        Self::inner().copy_items(items, current_cwd);
+    pub fn copy_items(&self, items: Vec<Arc<FileEntry>>, current_cwd: Arc<Path>) -> ClipBoardResult<()> {
+        Self::inner().copy_items(items, current_cwd)
     }
 
-    pub fn cut_items(&self, items: Vec<Arc<FileEntry>>, current_cwd: Arc<Path>) {
-        Self::inner().cut_items(items, current_cwd);
+    pub fn cut_items(&self, items: Vec<Arc<FileEntry>>, current_cwd: Arc<Path>) -> ClipBoardResult<()> {
+        Self::inner().cut_items(items, current_cwd)
     }
 
-    pub fn paste(&self, sender: &Dispatcher) -> Result<(), String> {
+    pub fn paste(&self, sender: &Dispatcher) -> ClipBoardResult<()> {
         Self::inner().pastex(sender)
     }
 
-    pub fn move_files(&self, items: Vec<Arc<Path>>, dest: Arc<Path>, sender: &Dispatcher) -> Result<(), String> {
+    pub fn move_files(&self, items: Vec<Arc<Path>>, dest: Arc<Path>, sender: &Dispatcher) -> ClipBoardResult<()> {
         Self::inner().move_files(items, dest, ConflictStrategy::Ask, sender)
     }
 
-    pub fn move_to_trash(&self, items: Vec<(Arc<str>, Arc<Path>)>, sender: &Dispatcher) -> Result<(), String> {
+    pub fn move_to_trash(&self, items: Vec<(Arc<str>, Arc<Path>)>, sender: &Dispatcher) -> ClipBoardResult<()> {
         Self::inner().move_to_trash(items, sender)
     }
 
-    pub fn restore_from_trash(&self, items: Vec<String>, trash_root: Arc<Path>, sender: Dispatcher) -> Result<(), String>  {
+    pub fn restore_from_trash(&self, items: Vec<String>, trash_root: Arc<Path>, sender: Dispatcher) -> ClipBoardResult<()>  {
         Self::inner().restore_items(items, trash_root, sender)
     }
 
-    pub fn rename_file(&self, file_name: &str, new_file_name: &str) -> Result<(), String> {
+    pub fn rename_file(&self, file_name: &str, new_file_name: &str) -> ClipBoardResult<()> {
         Self::inner().rename_file(file_name, new_file_name)
     }
 
-    pub fn create_new_dir(&self, file_name: &str, current_cwd: Arc<Path>) -> Result<(), String> {
+    pub fn create_new_dir(&self, file_name: &str, current_cwd: Arc<Path>) -> ClipBoardResult<()> {
         Self::inner().create_new_dir(file_name, current_cwd)
     }
 
-    pub fn create_new_file(&self, file_name: &str, current_cwd: Arc<Path>) -> Result<(), String> {
+    pub fn create_new_file(&self, file_name: &str, current_cwd: Arc<Path>) -> ClipBoardResult<()> {
         Self::inner().create_new_file(file_name, current_cwd)
     }
 
@@ -141,52 +141,64 @@ impl Clipboard {
         }
     }
 
-    pub fn clipboard_has_files(&self) -> bool {
-        let inner = self.inner.lock().unwrap();
-        !inner.items.is_empty()
+    fn get_inner(&self) -> ClipBoardResult<MutexGuard<'_, ClipboardInner>> {
+        self.inner.lock().map_err(|_|ClipBoardError::PoisonedLock)
+    }
+
+    pub fn clipboard_has_files(&self) -> ClipBoardResult<bool> {
+        let inner = self.get_inner()?;
+        Ok(!inner.items.is_empty())
     }
 
 
-    pub fn clear(&self) {
-        let mut inner = self.inner.lock().unwrap();
+    pub fn clear(&self) -> ClipBoardResult<()> {
+        let mut inner = self.get_inner()?;
         inner.mode = None;
         inner.items.clear();
         inner.dest_dir = None;
+
+        Ok(())
     }
 
 
-    pub fn copy_items(&self, items: Vec<Arc<FileEntry>>, current_cwd: Arc<Path>) {
-        let mut inner = self.inner.lock().unwrap();
+    pub fn copy_items(&self, items: Vec<Arc<FileEntry>>, current_cwd: Arc<Path>) -> ClipBoardResult<()> {
+        let mut inner = self.get_inner()?;
         inner.mode = Some(ClipboardMode::Copy);
         self.prepare_items(items, current_cwd, &mut inner);
+
+        Ok(())
     }
 
-    pub fn cut_items(&self, items: Vec<Arc<FileEntry>>, current_cwd: Arc<Path>) {
-        let mut inner = self.inner.lock().unwrap();
+    pub fn cut_items(&self, items: Vec<Arc<FileEntry>>, current_cwd: Arc<Path>) -> ClipBoardResult<()> {
+        let mut inner = self.get_inner()?;
         inner.mode = Some(ClipboardMode::Cut);
         self.prepare_items(items, current_cwd, &mut inner);
+
+        Ok(())
     }
 
-    fn prepare_items(&self, items: Vec<Arc<FileEntry>>, current_cwd: Arc<Path>, inner: &mut std::sync::MutexGuard<'_, ClipboardInner>) {
+    fn prepare_items(&self, items: Vec<Arc<FileEntry>>, current_cwd: Arc<Path>, inner: &mut MutexGuard<'_, ClipboardInner>) {
         inner.items = items.iter().map(|e| ClipboardItem {
-            src_path: current_cwd.join(e.name.as_ref()),
+            src_path: current_cwd.join(e.name.as_ref()).into(),
             name: e.name.to_string()
         }).collect();
         inner.dest_dir = None;
     }
 
-    pub fn set_dest(&self, dest: Arc<Path>) {
-        let mut inner = self.inner.lock().unwrap();
-        if !dest.is_dir() || !dest.exists() { return; }
+    pub fn set_dest(&self, dest: Arc<Path>) -> ClipBoardResult<()> {
+        let mut inner = self.get_inner()?;
+        if !dest.is_dir() || !dest.exists() { return Ok(()); }
         inner.dest_dir = Some(dest);
+
+        Ok(())
     }
 
 
-    pub fn pastex(&self, sender: &Dispatcher) -> Result<(), String> {
-        let mut inner = self.inner.lock().unwrap();
+    pub fn pastex(&self, sender: &Dispatcher) -> ClipBoardResult<()> {
+        let mut inner = self.get_inner()?;
         let Some(dest) = inner.dest_dir.take() else {
             warn!("No hay destio donde pegar.");
-            return  Err("No hay destino".to_string());
+            return  Err(ClipBoardError::NoDestError);
         };
 
         let items = inner.items.clone();
@@ -232,28 +244,25 @@ impl Clipboard {
                 let handle = tokio::spawn(async move {
                     let _permit = permit;
 
-                    let mut dest_path = dest.join(&item.name);
-
-                    if dest_path.exists() {
+                    let dest_path_buf = dest.join(&item.name);
+                    let dest_path = if dest_path_buf.exists() {
                         match mode {
                             Some(ClipboardMode::Cut) => {
                                 warn!("Destino ya existe para Cut, saltando");
                                 errors.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-
                                 return ;
                             },
                             _ => {
-                                dest_path = Self::generate_unique_path(&dest_path);
-                                info!("Renombrado: {} -> {}", item.name, dest_path.display());
+                                Self::generate_unique_path(&dest_path_buf)
                             }
                         }
-                    }
-
-                    
+                    } else {
+                        dest_path_buf.into()
+                    };
 
                     let result = Self::paste_item_with_progress(
-                        &item.src_path,
-                        &dest_path,
+                        item.src_path,
+                        dest_path.into(),
                         task_id,
                         &sender,
                         &copied_global,
@@ -265,10 +274,15 @@ impl Clipboard {
                     if let Err(err_msg) = result {
                         errors.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
 
-                        let needs_root = err_msg.to_lowercase().contains("permission denied") || err_msg.to_lowercase().contains("permiso denegado");
+                        let msg = err_msg.to_string();
+
+                        let needs_root = match err_msg {
+                            ClipBoardError::PermissionDenied(_) => true,
+                            _ => false,
+                        };
 
                         sender.send(
-                            UiEvent::ShowError(err_msg)
+                            UiEvent::ShowError(msg.into())
                         ).ok();
 
                         if needs_root {
@@ -286,7 +300,13 @@ impl Clipboard {
 
             let has_errors = errors_count.load(std::sync::atomic::Ordering::Relaxed) > 0;
 
-            let mut inner = inner.lock().unwrap();
+            let mut inner = match inner.lock() {
+                Ok(guard) => guard,
+                Err(e) => {
+                    warn!("Error dentro de TOKIO_RUNTIME:Pastex: {}", e);
+                    return;
+                }
+            };
 
             if is_cut {
                 inner.mode = None;
@@ -312,26 +332,25 @@ impl Clipboard {
 
 
 
-    async fn paste_item_with_progress(src: &PathBuf, dest: &PathBuf, task_id: u64, sender: &Dispatcher, copied_global: &Arc<AtomicU64>, total_bytes_global: u64, is_cut: bool) -> Result<(), String> {
+    async fn paste_item_with_progress(src: Arc<Path>, dest: Arc<Path>, task_id: u64, sender: &Dispatcher, copied_global: &Arc<AtomicU64>, total_bytes_global: u64, is_cut: bool) -> ClipBoardResult<()> {
 
         if is_cut {
-            match tokio::fs::rename(src, dest).await {
+            match tokio::fs::rename(src.clone(), dest.clone()).await {
                 Ok(_) => {
-                    info!("Move rápido exitoso {:?}", dest.file_name());
                     return Ok(());
                 },
                 Err(e) => {
                     if e.raw_os_error() != Some(18) {
-                        warn!("rename falló (no es cross-device): {}", e);
+                        return Err(ClipBoardError::CrossDeviceError);
                     }
                 },
             }
         }
         
         let copy_result = if src.is_dir() {
-            Self::copy_dir_recursive_async(src, dest, task_id, sender, copied_global, total_bytes_global).await
+            Self::copy_dir_recursive_async(src.clone(), dest, task_id, sender, copied_global, total_bytes_global).await
         } else {
-            Self::copy_file_with_progress(src, dest, task_id, sender, copied_global, total_bytes_global).await
+            Self::copy_file_with_progress(src.clone(), dest, task_id, sender, copied_global, total_bytes_global).await
         };
         
 
@@ -356,16 +375,17 @@ impl Clipboard {
     }
 
 
-    async fn copy_file_with_progress(src: &PathBuf, dest: &PathBuf, task_id: u64, sender: &Dispatcher, copied_global: &Arc<AtomicU64>, total_bytes_global: u64) -> Result<(), String>{
-        let mut reader = tokio::fs::File::open(src)
+    async fn copy_file_with_progress(src: Arc<Path>, dest: Arc<Path>, task_id: u64, sender: &Dispatcher, copied_global: &Arc<AtomicU64>, total_bytes_global: u64) -> ClipBoardResult<()>{
+        let mut reader = tokio::fs::File::open(src.clone())
             .await
-            .map_err(|e| format!("Error abriendo origen: {}", e))?;
-        let mut writer = tokio::fs::File::create(dest)
+            .map_err(|e| ClipBoardError::Io(e))?;
+        let mut writer = tokio::fs::File::create(dest.clone())
             .await
-            .map_err(|e| format!("Error creando destino: {}", e))?;
+            .map_err(|e| ClipBoardError::Io(e))?;
 
-        if let Ok(metadata) = tokio::fs::metadata(src).await {
-            tokio::fs::set_permissions(dest, metadata.permissions()).await.ok();
+        if let Ok(metadata) = tokio::fs::metadata(src.clone()).await {
+            tokio::fs::set_permissions(dest.clone(), metadata.permissions()).await
+                .map_err(|_| ClipBoardError::PermissionDenied(src))?;
         }
 
         //future conservar timestamps
@@ -375,11 +395,11 @@ impl Clipboard {
 
         loop {
             let bytes_read = reader.read(&mut buffer).await
-                .map_err(|e| format!("Error leyendo {:?}: {}", src.file_name(), e))?;
+                .map_err(|e| ClipBoardError::Io(e))?;
             if bytes_read == 0 { break; }
             
             writer.write_all(&buffer[..bytes_read]).await
-                .map_err(|e| format!("Error escribiendo {:?}: {}", dest.file_name(), e))?;
+                .map_err(|e| ClipBoardError::Io(e))?;
 
             copied_global.fetch_add(bytes_read as u64, Ordering::Relaxed);
 
@@ -407,17 +427,16 @@ impl Clipboard {
 
 
 
-    async fn copy_dir_recursive_async(src: &PathBuf, dest: &PathBuf, task_id: u64, sender: &Dispatcher, copied_global: &Arc<AtomicU64>, total_bytes_global: u64) -> Result<(), String> {
-        tokio::fs::create_dir_all(dest)
+    async fn copy_dir_recursive_async(src: Arc<Path>, dest: Arc<Path>, task_id: u64, sender: &Dispatcher, copied_global: &Arc<AtomicU64>, total_bytes_global: u64) -> ClipBoardResult<()> {
+        tokio::fs::create_dir_all(dest.clone())
             .await
-            .map_err(|e| format!("No se pudo crear carpeta: {}", e))?;
+            .map_err(|e| ClipBoardError::Io(e))?;
 
 
-        if let Ok(metadata) = tokio::fs::metadata(src).await {
+        if let Ok(metadata) = tokio::fs::metadata(src.clone()).await {
             let permissions = metadata.permissions();
-            if let Err(e) = tokio::fs::set_permissions(dest, permissions).await {
-                warn!("No se pudieron aplicar permisos a la carpeta '{}': {}", dest.display(), e);
-            }
+            tokio::fs::set_permissions(dest.clone(), permissions).await
+                .map_err(|_|ClipBoardError::PermissionDenied(dest.clone()))?;
         }
 
         //future conservar timestamps
@@ -426,23 +445,24 @@ impl Clipboard {
             Ok(rd) => rd,
             Err(e) => {
                 if e.kind() == std::io::ErrorKind::PermissionDenied {
-                    tokio::fs::remove_dir_all(dest).await.ok();
-                    return Err(format!("Permiso denegado al leer carpeta: {}", src.display()));
+                    tokio::fs::remove_dir_all(dest.clone()).await.ok();
+                    return Err(ClipBoardError::PermissionDenied(dest));
                 }
 
                 tokio::fs::remove_dir_all(dest).await.ok();
-                return Err(format!("No se pudo leer la carpeta '{}': {}", src.display(), e));
+                return Err(ClipBoardError::Io(e));
             },
         };
 
-        while let Some(entry) = read_dir.next_entry().await.map_err(|e|format!("Error en next_entry: {}", e))? {
+        while let Some(entry) = read_dir.next_entry().await.map_err(|e|ClipBoardError::Io(e))? {
             let entry_path = entry.path();
+            let entry_path = entry_path.as_path();
             let dst_path = dest.join(entry.file_name());
 
             if entry_path.is_dir() {
-                Box::pin(Self::copy_dir_recursive_async(&entry_path, &dst_path, task_id, sender, copied_global, total_bytes_global)).await?;
+                Box::pin(Self::copy_dir_recursive_async(entry_path.into(), dst_path.into(), task_id, sender, copied_global, total_bytes_global)).await?;
             } else {
-                if let Err(e) = Self::copy_file_with_progress(&entry_path, &dst_path, task_id, sender, copied_global, total_bytes_global).await {
+                if let Err(e) = Self::copy_file_with_progress(entry_path.into(), dst_path.into(), task_id, sender, copied_global, total_bytes_global).await {
                     return  Err(e);
                 }
             }
@@ -453,7 +473,7 @@ impl Clipboard {
 
 
 
-    async fn calculate_size(path: &PathBuf) -> u64 {
+    async fn calculate_size(path: &Arc<Path>) -> u64 {
         if path.is_file() {
             return tokio::fs::metadata(path).await
             .map(|m|m.len())
@@ -478,7 +498,7 @@ impl Clipboard {
                         .map(|m|m.len())
                         .unwrap_or(0);
                 } else {
-                    stack.push(entry_path);
+                    stack.push(entry_path.into());
                 }
             };
         }
@@ -486,9 +506,9 @@ impl Clipboard {
         total
     }
 
-    pub fn generate_unique_path(path: &Path) -> PathBuf {
+    pub fn generate_unique_path(path: &Path) -> Arc<Path> {
         if !path.exists() {
-            return path.to_path_buf();
+            return path.into();
         }
 
         let parent = path.parent().unwrap_or_else(|| Path::new("."));
@@ -505,21 +525,21 @@ impl Clipboard {
 
             let new_path = parent.join(new_name);
             if !new_path.exists() {
-                return new_path;
+                return new_path.into();
             }
             counter += 1;
 
             if counter > 10_00 {
-                return parent.join(format!("{}_{}", stem, uuid::Uuid::new_v4()));
+                return parent.join(format!("{}_{}", stem, uuid::Uuid::new_v4())).into();
             }
         }
     }
     
 
     ///Mover archivos
-    fn resolve_dest_path(target: &PathBuf) -> PathBuf {
+    fn resolve_dest_path(target: Arc<Path>) -> Arc<Path> {
         if !target.exists() {
-            return target.clone();
+            return target.into();
         }
 
         let stem = target.file_stem()
@@ -529,21 +549,21 @@ impl Clipboard {
             .and_then(|e| e.to_str())
             .map(|e| format!(".{}", e))
             .unwrap_or_default();
-        let parent = target.parent().unwrap_or(std::path::Path::new(""));
+        let parent = target.parent().unwrap_or(Path::new(""));
 
         let mut counter = 2;
         loop {
             let new_name = format!("{} ({}){}", stem, counter, ext);
             let new_path = parent.join(new_name);
             if !new_path.exists() {
-                return new_path;
+                return new_path.into();
             }
             counter += 1;
         }
     }
 
 
-    pub fn move_files(&self, items: Vec<Arc<Path>>, dest: Arc<Path>, conflict: ConflictStrategy, sender: &Dispatcher) -> Result<(), String> {
+    pub fn move_files(&self, items: Vec<Arc<Path>>, dest: Arc<Path>, conflict: ConflictStrategy, sender: &Dispatcher) -> ClipBoardResult<()> {
         let task_id = new_task_id();
 
         sender.send(TaskMessage::Started { 
@@ -571,8 +591,8 @@ impl Clipboard {
 
                 let final_target = if target.exists() {
                     match conflict {
-                        ConflictStrategy::Overwrite => target,
-                        ConflictStrategy::Rename => Self::resolve_dest_path(&target),
+                        ConflictStrategy::Overwrite => target.into(),
+                        ConflictStrategy::Rename => Self::resolve_dest_path(target.into()),
                         ConflictStrategy::Skip => {
                             sender.send(TaskMessage::Progress {
                                 task_id,
@@ -597,19 +617,27 @@ impl Clipboard {
                         }
                     }
                 } else {
-                    target
+                    target.into()
                 };
 
 
 
-                let result = fs::rename(source, &final_target).or_else(|_|{
+            let result = fs::rename(source, &final_target)
+                .map_err(|e| ClipBoardError::Io(e))
+                .or_else(|_| {
                     if source.is_dir() {
-                        Self::copy_dir_recursive(source, &final_target)
-                            .and_then(|_| fs::remove_dir_all(source))
+                        Self::copy_dir_recursive(source.to_owned(), final_target.to_owned())
+                            .and_then(|_| {
+                                fs::remove_dir_all(source)
+                                    .map_err(|e| ClipBoardError::Io(e))
+                            })
                     } else {
-                        fs::copy(source, &final_target)
-                            .map(|_| ())
-                            .and_then(|_| fs::remove_file(source))
+                        fs::copy(source.to_owned(), final_target.to_owned())
+                            .map_err(|e| ClipBoardError::Io(e))
+                            .and_then(|_| {
+                                fs::remove_file(source)
+                                    .map_err(|e| ClipBoardError::Io(e))
+                            })
                     }
                 });
                 
@@ -640,14 +668,14 @@ impl Clipboard {
         Ok(())
     }
 
-    fn copy_dir_recursive(src: &Path, dst: &PathBuf) -> Result<(), std::io::Error> {
-        fs::create_dir_all(dst)?;
+    fn copy_dir_recursive(src: Arc<Path>, dst: Arc<Path>) -> ClipBoardResult<()> {
+        fs::create_dir_all(&dst)?;
         for entry in fs::read_dir(src)? {
             let entry = entry?;
             let src_path = entry.path();
             let dst_path = dst.join(entry.file_name());
             if src_path.is_dir() {
-                Self::copy_dir_recursive(&src_path, &dst_path)?;
+                Self::copy_dir_recursive(src_path.into(), dst_path.into())?;
             } else {
                 fs::copy(&src_path, &dst_path)?;
             }
@@ -656,16 +684,15 @@ impl Clipboard {
     }
 
 
-    fn move_to_trash(&self, items: Vec<(Arc<str>, Arc<Path>)>, sender: &Dispatcher) -> Result<(), String> {
+    fn move_to_trash(&self, items: Vec<(Arc<str>, Arc<Path>)>, sender: &Dispatcher) -> ClipBoardResult<()> {
         let task_id = new_task_id();
         let backend = get_backend();
         
-        let mut resolved: Vec<(Arc<str>, Arc<Path>, Option<TrashDestination>)> = Vec::new();
+        let mut resolved: Vec<(Arc<str>, Arc<Path>, TrashDestination)> = Vec::new();
 
         for (name, full_path) in &items {
             let destination = backend.resolve_destination(full_path)
-                .inspect_err(|e| warn!("No se ha podido resolver papelera para {:?}: {}", full_path, e))
-            .ok();
+                .map_err(|e| ClipBoardError::TrashError(e))?;
 
             resolved.push((name.clone(), full_path.to_owned(), destination));
         }
@@ -686,19 +713,19 @@ impl Clipboard {
     }
 
 
-    fn process_trash_operations(task_id: u64, resolved: Vec<(Arc<str>, Arc<Path>, Option<TrashDestination>)>, backend: &dyn TrashBackend, sender: &Dispatcher) {
+    fn process_trash_operations(task_id: u64, resolved: Vec<(Arc<str>, Arc<Path>, TrashDestination)>, backend: &dyn TrashBackend, sender: &Dispatcher) {
         let total = resolved.len();
-        let mut errors: Vec<String> = Vec::new();
+        let mut errors: Vec<ClipBoardError> = Vec::new();
 
-        for (done, (name, source, _desination)) in resolved.into_iter().enumerate() {
+        for (done, (_name, source, _desination)) in resolved.into_iter().enumerate() {
 
             let result = if backend.is_in_trash(&source) {
                 backend.permanently_delete(&source)
-                    .map_err(|e| format!("Error eliminando '{}': {}", name, e))
+                    .map_err(|e| ClipBoardError::TrashError(e))
             } else {
                 backend.move_to_trash(&source)
                     .map(|_| ())
-                    .map_err(|e| format!("Error moviendo '{}' a la papelera: {}", name, e))
+                    .map_err(|e| ClipBoardError::TrashError(e))
             };
 
             if let Err(e) = result {
@@ -724,11 +751,10 @@ impl Clipboard {
                 format!("Completado con {} error(es)", errors.len())
             },
         }).ok();
-
     }
 
 
-    pub fn restore_items(&self, items_to_restore: Vec<String>, trash_root: Arc<Path>, sender: Dispatcher) -> Result<(), String> {
+    pub fn restore_items(&self, items_to_restore: Vec<String>, trash_root: Arc<Path>, sender: Dispatcher) -> ClipBoardResult<()> {
         let task_id = new_task_id();
 
         sender.send(TaskMessage::Started {
@@ -781,14 +807,14 @@ impl Clipboard {
     }
 
 
-    pub fn rename_file(&self, file_name: &str, new_file_name: &str) -> Result<(), String> {
+    pub fn rename_file(&self, file_name: &str, new_file_name: &str) -> ClipBoardResult<()> {
         info!("Renombrando");
         let new_name_trimmed = new_file_name.trim();
         if new_name_trimmed.is_empty() {
-            return Err("El nombre no puede estar vacío".to_string());
+            return Err(ClipBoardError::InvalidName("no puede estar vacío".into()));
         }
         if new_name_trimmed.contains("/") || new_name_trimmed.contains("\\") {
-            return Err("El nombre no puede contener barras".to_string());
+            return Err(ClipBoardError::InvalidName("no puede contener barras: '\\' - '/' ".into()));
         }
 
         let cwd = with_motor(|m|m.active_tab_mut().cwd.clone());
@@ -800,67 +826,67 @@ impl Clipboard {
             let same_file = file_path.canonicalize().ok() == new_file_path.canonicalize().ok();
             // canonicalize() ayuda a comparar si son físicamente el mismo lugar en el disco
             if !same_file {
-                return Err(format!("Ya existe un archivo llamado {}", new_file_name));
+                return Err(ClipBoardError::AlreadyExist(new_file_name.into()));
             }  
         };
 
-        match fs::rename(file_path, &new_file_path) {
-            Ok(_) => Ok(()),
-            Err(e) => Err(format!("Error al renombrar: {}", e)),
-        }
+        fs::rename(file_path, &new_file_path)
+            .map_err(|_|ClipBoardError::RenamingError(file_name.into()))?;
+
+        Ok(())
     }
 
-    pub fn create_new_dir(&self, file_name: &str, current_cwd: Arc<Path>) -> Result<(), String> {
+    pub fn create_new_dir(&self, file_name: &str, current_cwd: Arc<Path>) -> ClipBoardResult<()> {
         let new_name_trimmed = file_name.trim();
         if new_name_trimmed.is_empty() {
-            return Err("El nombre no puede estar vacío.".to_string());
+            return Err(ClipBoardError::InvalidName("no puede estar vacío".into()));
         }
         if new_name_trimmed.contains("/") || new_name_trimmed.contains("\\") {
-            return Err("El nombre no puede contener barras.".to_string());
+            return Err(ClipBoardError::InvalidName("no puede contener barras: '\\' - '/' ".into()));
         }
 
         if let Ok(meta) = current_cwd.metadata() {
             if meta.permissions().readonly() {
-                return Err("No tienes los permisos para crear ficheros.".to_string());
+                return Err(ClipBoardError::PermissionDenied(current_cwd));
             }
         }
 
         let final_path_name = current_cwd.join(file_name);
         if final_path_name.exists() {
-            return Err("Ya existe un fichero con ese nombre.".to_string());
+            return Err(ClipBoardError::AlreadyExist(file_name.into()));
         }
         
-        match fs::create_dir(final_path_name) {
-            Ok(_) => Ok(()),
-            Err(e) => Err(format!("Error al crear fichero. {}", e))
-        } 
+        fs::create_dir(final_path_name)
+            .map_err(|e| ClipBoardError::Io(e))?;
+
+        Ok(())
     }
 
 
-    pub fn create_new_file(&self, file_name: &str, current_cwd: Arc<Path>) -> Result<(), String> {
+    pub fn create_new_file(&self, file_name: &str, current_cwd: Arc<Path>) -> ClipBoardResult<()> {
         let new_name_trimmed = file_name.trim();
         if new_name_trimmed.is_empty() {
-            return Err("El nombre no puede estar vacío.".to_string());
+            return Err(ClipBoardError::InvalidName("no puede estar vacío".into()));
         }
         if new_name_trimmed.contains("/") || new_name_trimmed.contains("\\") {
-            return Err("El nombre no puede contener barras.".to_string());
+            return Err(ClipBoardError::InvalidName("no puede contener barras: '\\' - '/' ".into()));
         }
 
         if let Ok(meta) = current_cwd.metadata() {
             if meta.permissions().readonly() {
-                return Err("No tienes los permisos para crear ficheros.".to_string());
+                return Err(ClipBoardError::PermissionDenied(current_cwd));
             }
         }
 
         let final_path_name = current_cwd.join(file_name);
         if final_path_name.exists() {
-            return Err("Ya existe un fichero con ese nombre.".to_string());
+            return Err(ClipBoardError::AlreadyExist(file_name.into()));
         }
         
-        match fs::File::create_new(final_path_name) {
-            Ok(_) => Ok(()),
-            Err(e) => Err(format!("Error al crear fichero. {}", e))
-        } 
+        fs::File::create_new(final_path_name)
+            .map_err(|e| ClipBoardError::Io(e))?;
+        
+        Ok(())
     }
 
 }

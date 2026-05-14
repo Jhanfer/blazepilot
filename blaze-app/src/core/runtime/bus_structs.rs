@@ -91,7 +91,7 @@ pub enum UiEvent {
 
     FileConflict(FileConflict),
 
-    ShowError(String),
+    ShowError(Box<str>),
 
     ShowFolderColorSelector {
         folder_id: FileId,

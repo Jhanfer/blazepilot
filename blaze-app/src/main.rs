@@ -30,7 +30,7 @@ use winit::platform::x11::EventLoopBuilderExtX11;
 #[cfg(target_os = "linux")]
 use winit::platform::wayland::EventLoopBuilderExtWayland;
 
-use crate::{core::{blaze_state::BlazeCoreState, configs::config_state::with_configs, system::{clipboard::TOKIO_RUNTIME, knowndirs::knowndirs_manager::KnownDirsManager, trash_manager::trash_manager::init_trash_backend}}, ui::blaze_ui_state::BlazeUiState};
+use crate::{core::{blaze_state::BlazeCoreState, configs::config_state::with_configs, system::{clipboard::clipboard::TOKIO_RUNTIME, knowndirs::knowndirs_manager::KnownDirsManager, trash_manager::trash_manager::init_trash_backend}}, ui::blaze_ui_state::BlazeUiState};
 
 #[global_allocator]
 static GLOBAL: MiMalloc = MiMalloc;

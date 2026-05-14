@@ -3,7 +3,7 @@ use std::{cell::Cell, path::PathBuf, sync::Arc};
 use egui::{Align2, Area, Color32, CursorIcon, FontId, Frame, Id, Key, Order, Pos2, Rect, Response, Sense, Stroke, TextEdit, Ui, UiBuilder, pos2, vec2};
 use tracing::{info, warn};
 
-use crate::{core::{blaze_state::{BlazeCoreState, NewItemType}, configs::config_state::with_configs, files::blaze_motor::motor_structs::FileEntry, runtime::{bus_structs::{FileOperation, SureTo, UiEvent}, event_bus::{Dispatcher, with_event_bus}}, system::{clipboard::TOKIO_RUNTIME, disk_reader::disk::Disk}}, ui::{blaze_ui_state::BlazeUiState, icons_cache::icons, image_preview::image_preview::ImagePreviewState}};
+use crate::{core::{blaze_state::{BlazeCoreState, NewItemType}, configs::config_state::with_configs, files::blaze_motor::motor_structs::FileEntry, runtime::{bus_structs::{FileOperation, SureTo, UiEvent}, event_bus::{Dispatcher, with_event_bus}}, system::{clipboard::clipboard::TOKIO_RUNTIME, disk_reader::disk::Disk}}, ui::{blaze_ui_state::BlazeUiState, icons_cache::icons, image_preview::image_preview::ImagePreviewState}};
 
 
 #[derive(Default, PartialEq)]
@@ -417,6 +417,8 @@ impl ContextMenuState {
 
 
             ui.horizontal(|ui|{
+                let enable = !file_names.is_empty();
+
                 let icon = ("restore", icons::ICON_RESTORE);
 
                 let label = "Restaurar";
@@ -424,7 +426,7 @@ impl ContextMenuState {
                 
                 let action: Cell<Option<u8>> = Cell::new(None);
                 
-                Self::render_context_button(ui, ui_state, label, hint, icon, true,|| {
+                Self::render_context_button(ui, ui_state, label, hint, icon, enable,|| {
                     action.set(Some(0));
                 },
                 None::<fn(&mut Ui, &mut BlazeUiState)>);
@@ -445,13 +447,15 @@ impl ContextMenuState {
 
 
             ui.horizontal(|ui|{
+                let enable = !sources.is_empty();
+
                 let icon = ("trash-forever", icons::ICON_TRASH);
                 let label = "Eliminar";
                 let hint = "Supr";
                 
                 let action: Cell<Option<u8>> = Cell::new(None);
                 
-                Self::render_context_button(ui, ui_state, label, hint, icon, true,|| {
+                Self::render_context_button(ui, ui_state, label, hint, icon, enable,|| {
                     action.set(Some(0));
                 },
                 None::<fn(&mut Ui, &mut BlazeUiState)>);
@@ -556,7 +560,13 @@ impl ContextMenuState {
 
 
             ui.horizontal(|ui|{
-                let enable = state.clipboard.clipboard_has_files();
+                let enable = match state.clipboard.clipboard_has_files() {
+                    Ok(has_files) => has_files,
+                    Err(e) => {
+                        warn!("Error en el clipboard: {}", e);
+                        false
+                    }
+                };
 
                 let icon = if enable {
                     ("clipboard", icons::ICON_CLIPBOARD)
@@ -688,6 +698,8 @@ impl ContextMenuState {
 
 
             ui.horizontal(|ui|{
+                let enable = !file_names.is_empty();
+
                 let icon = ("restore", icons::ICON_RESTORE);
 
                 let label = "Restaurar";
@@ -695,7 +707,7 @@ impl ContextMenuState {
                 
                 let action: Cell<Option<u8>> = Cell::new(None);
                 
-                Self::render_context_button(ui, ui_state, label, hint, icon, true,|| {
+                Self::render_context_button(ui, ui_state, label, hint, icon, enable,|| {
                     action.set(Some(0));
                 },
                 None::<fn(&mut Ui, &mut BlazeUiState)>);
@@ -718,6 +730,8 @@ impl ContextMenuState {
             ui.separator();
 
             ui.horizontal(|ui|{
+                let enable = !sources.is_empty();
+
                 let icon = ("trash-forever", icons::ICON_TRASH);
 
                 let label = "Eliminar";
@@ -725,7 +739,7 @@ impl ContextMenuState {
                 
                 let action: Cell<Option<u8>> = Cell::new(None);
                 
-                Self::render_context_button(ui, ui_state, label, hint, icon, true,|| {
+                Self::render_context_button(ui, ui_state, label, hint, icon, enable,|| {
                     action.set(Some(0));
                 },
                 None::<fn(&mut Ui, &mut BlazeUiState)>);
@@ -897,7 +911,13 @@ impl ContextMenuState {
 
             //Pegar
             ui.horizontal(|ui|{
-                let enable = state.clipboard.clipboard_has_files() && file.is_dir();
+                let enable = match state.clipboard.clipboard_has_files() {
+                    Ok(has_files) => has_files && file.is_dir(),
+                    Err(e) => {
+                        warn!("Error en el clipboard: {}", e);
+                        false
+                    }
+                };
 
                 let icon = if enable {
                     ("clipboard", icons::ICON_CLIPBOARD)

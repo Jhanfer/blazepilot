@@ -1,5 +1,5 @@
 use egui::{Color32, CornerRadius, Frame, Margin, Panel, ScrollArea, Ui, scroll_area::ScrollSource};
-use crate::{core::{blaze_state::BlazeCoreState, configs::config_state::with_configs, system::{clipboard::TOKIO_RUNTIME, knowndirs::knowndirs_manager::KnownDirsManager, trash_manager::trash_manager::{TrashDestination, get_backend}}}, ui::{blaze_ui_state::BlazeUiState, modules::{custom_context_menu::context_state::ContextMenuKind, sidebar_left_component::sidebar_components::{render_drives_button, render_fav_buttons, render_header_text, render_local_buttons}}}};
+use crate::{core::{blaze_state::BlazeCoreState, configs::config_state::with_configs, system::{clipboard::clipboard::TOKIO_RUNTIME, knowndirs::knowndirs_manager::KnownDirsManager, trash_manager::trash_manager::{TrashDestination, get_backend}}}, ui::{blaze_ui_state::BlazeUiState, modules::{custom_context_menu::context_state::ContextMenuKind, sidebar_left_component::sidebar_components::{render_drives_button, render_fav_buttons, render_header_text, render_local_buttons}}}};
 
 pub fn sidebar_left_component(ui: &mut Ui, state: &mut BlazeCoreState, ui_state: &mut BlazeUiState) {
     let custom_frame = Frame::NONE

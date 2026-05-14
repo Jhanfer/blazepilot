@@ -18,7 +18,7 @@
 
 use egui::{Color32, Ui, CornerRadius, Frame, Margin, Order, Window};
 use file_id::FileId;
-use crate::{core::system::{cache::cache_manager, clipboard::TOKIO_RUNTIME}, ui::blaze_ui_state::ModalDialog};
+use crate::{core::system::{cache::cache_manager, clipboard::clipboard::TOKIO_RUNTIME,}, ui::blaze_ui_state::ModalDialog};
 
 
 pub struct FolderColorSelector {

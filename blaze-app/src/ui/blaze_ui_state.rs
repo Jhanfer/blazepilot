@@ -71,7 +71,7 @@ impl DialogManager {
         self.update_dialog.open(current_version, new_version, tab_id);
     }
 
-    pub fn open_error_dialog(&mut self, message: String) {
+    pub fn open_error_dialog(&mut self, message: &str) {
         self.error_dialog.open(message);
     }
 
@@ -219,7 +219,7 @@ impl BlazeUiState {
                 },
                 UiEvent::ShowError(message) => {
                     info!("Error recibido");
-                    self.dialog_manager.open_error_dialog(message);
+                    self.dialog_manager.open_error_dialog(&message);
                 },
                 UiEvent::RefreshList => {
                     info!("RECIBIDO!!");

@@ -20,7 +20,7 @@ use std::{path::Path, sync::Arc};
 use egui::{Color32, ColorImage, Ui, Frame, Margin, Order, RichText, ScrollArea, TextureOptions, Window, scroll_area::ScrollSource};
 use tracing::info;
 
-use crate::{core::system::{clipboard::TOKIO_RUNTIME, fileopener_module::{AppAssociation, GLOBAL_FILE_OPENER, platform::linux::structs::AppsIconData}}, ui::blaze_ui_state::ModalDialog};
+use crate::{core::system::{clipboard::clipboard::TOKIO_RUNTIME, fileopener_module::{AppAssociation, GLOBAL_FILE_OPENER, platform::linux::structs::AppsIconData}}, ui::blaze_ui_state::ModalDialog};
 
 pub struct SelectorData {
     pub path: Arc<Path>,

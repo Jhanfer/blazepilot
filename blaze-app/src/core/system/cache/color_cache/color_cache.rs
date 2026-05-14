@@ -2,7 +2,7 @@ use egui::Color32;
 use file_id::FileId;
 use serde::{Deserialize, Serialize};
 
-use crate::core::system::{cache::cache_manager::CacheManager, clipboard::TOKIO_RUNTIME};
+use crate::core::system::{cache::cache_manager::CacheManager, clipboard::clipboard::TOKIO_RUNTIME};
 
 #[derive(Default, Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct ColorCache {

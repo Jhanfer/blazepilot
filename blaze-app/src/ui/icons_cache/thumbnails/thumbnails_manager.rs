@@ -19,7 +19,7 @@ use thiserror::Error;
 use tokio::sync::{RwLock, Semaphore};
 use tracing::error;
 use uuid::Uuid;
-use crate::core::{runtime::{bus_structs::UiEvent, event_bus::{ Dispatcher, with_event_bus}}, system::{cache::cache_manager::CacheManager, clipboard::TOKIO_RUNTIME}};
+use crate::core::{runtime::{bus_structs::UiEvent, event_bus::{ Dispatcher, with_event_bus}}, system::{cache::cache_manager::CacheManager, clipboard::clipboard::TOKIO_RUNTIME}};
 use lru::LruCache;
 use std::num::NonZeroUsize;
 
@@ -245,7 +245,7 @@ impl ThumbnailManager {
                                     let err = format!("Error en el caché de miniaturas: {}", e);
                                     error!(err);
                                     sender_clone.send(UiEvent::ShowError(
-                                        err
+                                        err.into()
                                     )).ok();
                                 }
 

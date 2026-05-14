@@ -21,7 +21,7 @@ use bitvec::vec::BitVec;
 use tracing::{debug, error, info, warn};
 use tokio::sync::Mutex as TokioMutex;
 use uuid::Uuid;
-use crate::{core::{configs::config_state::with_configs, files::blaze_motor::{motor::{BlazeMotor, MOTOR}, motor_structs::{FileEntry, FileLoadingMessage, RecursiveMessages}}, runtime::{bus_structs::FileOperation, event_bus::with_event_bus}, system::{cache::cache_manager::CacheManager, clipboard::{GlobalClipboard, TOKIO_RUNTIME}, extended_info::extended_info_manager::{ExtendedInfoManager, ExtendedInfoMessages}, fileopener_module::{FileOpenerManager, GLOBAL_FILE_OPENER}, sizer_manager::sizer_manager::SizerManager, terminal_opener::terminal_manager::{GLOBAL_TERMINAL_MANAGER, TerminalManager}, trash_manager::trash_manager::{TrashDestination, get_backend}, updater::updater::Updater, zip_manager::zip_manager::ZipManager}}, ui::task_manager::task_manager::TaskManager};
+use crate::{core::{configs::config_state::with_configs, files::blaze_motor::{motor::{BlazeMotor, MOTOR}, motor_structs::{FileEntry, FileLoadingMessage, RecursiveMessages}}, runtime::{bus_structs::FileOperation, event_bus::with_event_bus}, system::{cache::cache_manager::CacheManager, clipboard::clipboard::{GlobalClipboard, TOKIO_RUNTIME}, extended_info::extended_info_manager::{ExtendedInfoManager, ExtendedInfoMessages}, fileopener_module::{FileOpenerManager, GLOBAL_FILE_OPENER}, sizer_manager::sizer_manager::SizerManager, terminal_opener::terminal_manager::{GLOBAL_TERMINAL_MANAGER, TerminalManager}, trash_manager::trash_manager::{TrashDestination, get_backend}, updater::updater::Updater, zip_manager::zip_manager::ZipManager}}, ui::task_manager::task_manager::TaskManager};
 
 
 // Para el guardado en caché
@@ -401,17 +401,29 @@ impl BlazeCoreState {
     }
 
 
+    pub fn clear_clipboard(&self) {
+        match self.clipboard.clear() {
+            Ok(_) => {},
+            Err(e) => warn!("Eror en clipboard: {e}"),
+        }
+    }
 
     pub fn copy(&self, files: &Vec<Arc<FileEntry>>) {
         let cwd = self.motor.borrow_mut().active_tab().cwd.clone();
         let items = self.selected_as_entries(files);
-        self.clipboard.copy_items(items, cwd);
+        match self.clipboard.copy_items(items, cwd) {
+            Ok(_) => {},
+            Err(e) => warn!("Eror en clipboard: {e}"),
+        }
     }
 
     pub fn cut(&self, files: &Vec<Arc<FileEntry>>) {
         let cwd = self.motor.borrow().tabs[self.motor.borrow().active_tab_index].cwd.clone();
         let items = self.selected_as_entries(files);
-        self.clipboard.cut_items(items, cwd);
+        match self.clipboard.cut_items(items, cwd) {
+            Ok(_) => {},
+            Err(e) => warn!("Eror en clipboard: {e}"),
+        }
     }
 
     pub fn move_to_trash(&mut self, items: Vec<(Arc<str>, Arc<Path>)>) {
@@ -430,9 +442,20 @@ impl BlazeCoreState {
     }
 
     pub fn paste(&mut self, path: Arc<Path>) {
-        self.clipboard.set_dest(path);
+        match self.clipboard.set_dest(path) {
+            Ok(_) => {},
+            Err(e) => {
+                warn!("Eror en clipboard: {e}");
+                return;
+            },
+        }
+
         let dispatcher = with_event_bus(|e| e.dispatcher(self.active_id));
-        self.clipboard.paste(&dispatcher).ok();
+        
+        match self.clipboard.paste(&dispatcher) {
+            Ok(_) => {},
+            Err(e) => warn!("Eror en clipboard: {e}"),
+        }
     }
 
     pub fn clean_search(&mut self) {
