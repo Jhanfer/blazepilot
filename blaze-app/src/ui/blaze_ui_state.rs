@@ -59,8 +59,8 @@ impl DialogManager {
         self.selector_dialog.open(path, mime, apps, icon_data, show_all_apps);
     }
 
-    pub fn open_sure_move_dialog(&mut self, sources: Vec<Arc<Path>>, dest: Arc<Path>, tab_id: Uuid) {
-        self.sure_to_dialog.open(sources, dest, tab_id);
+    pub fn open_sure_move_dialog(&mut self, sources: Vec<Arc<Path>>, dest: Arc<Path>) {
+        self.sure_to_dialog.open(sources, dest);
     }
 
     pub fn open_sure_to_delete(&mut self, sources: Vec<Arc<Path>>, tab_id: Uuid) {
@@ -226,9 +226,9 @@ impl BlazeUiState {
                 },
                 UiEvent::SureTo(sureto) => {
                     match sureto {
-                        SureTo::SureToMove { files, dest, tab_id } => {
+                        SureTo::SureToMove { files, dest, tab_id:_ } => {
                             debug!("Mover {:?} → {:?}", files, dest);
-                            self.dialog_manager.open_sure_move_dialog(files, dest, tab_id);
+                            self.dialog_manager.open_sure_move_dialog(files, dest);
                         },
                         SureTo::SureToDelete{files, tab_id} => {
                             self.dialog_manager.open_sure_to_delete(files, tab_id);

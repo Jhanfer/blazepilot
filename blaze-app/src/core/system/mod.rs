@@ -9,3 +9,4 @@ pub mod extended_info;
 pub mod zip_manager;
 pub mod knowndirs;
 pub mod trash_manager;
+pub mod operationstate;

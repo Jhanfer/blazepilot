@@ -149,7 +149,7 @@ impl KnownDirsManager {
         INSTANCE.get().expect("KnownDirsManager::init() no fue llamado")
     }
 
-    pub fn sidebar_dirs(&'static self) -> Vec<(&'static str, &Arc<Path>)> {
+    pub fn sidebar_dirs(&'static self) -> Vec<(&'static str, &'static Arc<Path>)> {
         let mut dirs = vec![("Home", &self.home)];
 
         macro_rules! push_opt {

@@ -14,9 +14,6 @@ pub enum ClipBoardError {
     #[error("El archivo {0} ya existe")]
     AlreadyExist(Arc<str>),
 
-    #[error("Error al intentar renombrar: {0}")]
-    RenamingError(Arc<str>),
-
     #[error("Error con la papelera: {0}")]
     TrashError(#[from] TrashError),
 

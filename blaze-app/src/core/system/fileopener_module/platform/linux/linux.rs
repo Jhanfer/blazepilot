@@ -389,8 +389,8 @@ impl LinuxOpener {
         "python", "python3", "python2", "ruby", "perl", "lua", "node",
         "php", "deno", "bun", 
         //Herramientas
-        "sudo", "su", "pkexec", "doas", "xterm", "xdg-open", "env", "nohup",
-        "env", "setsid",
+        "sudo", "su", "pkexec", "doas", "xterm", "xdg-open", "nohup", 
+        "setsid",
     ];
 
     fn is_blocked(cmd: &str) -> bool {

@@ -114,7 +114,7 @@ impl SureToDeleteDialog {
                     if ui.button("Aceptar").clicked() {
 
                         Dispatcher::current().send(
-                            FileOperation::Delete { 
+                            FileOperation::Trash { 
                                 files: sources.to_vec()
                             }
                         ).ok();

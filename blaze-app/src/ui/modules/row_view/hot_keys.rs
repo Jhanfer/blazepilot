@@ -1,7 +1,7 @@
 use std::sync::Arc;
 use egui::{ Key, PointerButton, Ui};
 use tracing::warn;
-use crate::{core::{blaze_state::{BlazeCoreState, NewItemType}, files::blaze_motor::motor_structs::FileEntry, runtime::{bus_structs::{SureTo, UiEvent}, event_bus::with_event_bus}, system::{cache::cache_manager::CacheManager, trash_manager::trash_manager::get_backend}}, ui::blaze_ui_state::BlazeUiState};
+use crate::{core::{blaze_state::{BlazeCoreState, NewItemType}, files::blaze_motor::motor_structs::FileEntry, runtime::{bus_structs::{SureTo, UiEvent}, event_bus::with_event_bus}, system::{cache::cache_manager::CacheManager, operationstate::operation_manager::with_history, trash_manager::trash_manager::get_backend}}, ui::blaze_ui_state::BlazeUiState};
 
 
 fn get_focus(ui: &mut Ui, id: &'static str) -> bool {
@@ -12,6 +12,8 @@ fn get_focus(ui: &mut Ui, id: &'static str) -> bool {
 pub fn hot_keys_logic(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, files: &Vec<Arc<FileEntry>>, ui: &mut Ui, _total_rows: usize) {
     let input = ui.input(|i| i.clone());
     let disable_keys = state.renaming_file.is_none() && state.creating_new.is_none();
+
+    let dispatcher = with_event_bus(|e| e.dispatcher(state.active_id));
 
     let has_clipboard = match state.clipboard.clipboard_has_files() {
         Ok(has_files) => has_files,
@@ -148,7 +150,9 @@ pub fn hot_keys_logic(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, f
         } else if !sources.is_empty(){
             let items = files
                 .iter()
-                .map(|f| (Arc::from(f.name.to_owned()), f.full_path.to_owned()))
+                .enumerate()
+                .filter(|(index, _)| state.is_selected(*index))
+                .map(|(_, f)| (Arc::from(f.name.to_owned()), f.full_path.to_owned()))
                 .collect();
             state.move_to_trash(items);
         }
@@ -156,17 +160,19 @@ pub fn hot_keys_logic(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, f
 
 
     let (mut do_copy, mut do_cut, mut do_paste) = (false, false, false);
-
-    ui.ctx().input(|i| {
-        for event in &i.events {
-            match event {
-                egui::Event::Copy => do_copy = true,
-                egui::Event::Cut => do_cut = true,
-                egui::Event::Paste(_) => do_paste = true,
-                _ => {}
-            }
+    for event in &input.events {
+        match event {
+            egui::Event::Copy => do_copy = true,
+            egui::Event::Cut => do_cut = true,
+            egui::Event::Paste(_) => do_paste = true,
+            _ => {}
         }
-    });
+    }
+    
+    //Undo
+    if input.modifiers.ctrl && input.key_pressed(egui::Key::Z) {
+        with_history(|h| h.undo_last(&dispatcher));
+    }
 
     //copiar
     if do_copy && disable_keys { 

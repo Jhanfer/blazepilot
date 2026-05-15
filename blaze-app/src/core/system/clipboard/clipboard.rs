@@ -1,3 +1,22 @@
+// Copyright 2026 Jhanfer
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+
+
+
+
+
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::vec;
 use std::{fs, path::Path};
@@ -7,14 +26,16 @@ use tokio::runtime::Runtime;
 use tokio::sync::Semaphore;
 use crate::core::files::blaze_motor::motor::{new_task_id, with_motor};
 use crate::core::files::blaze_motor::motor_structs::{FileEntry, TaskType};
-use crate::core::runtime::bus_structs::{FileConflict, UiEvent};
+use crate::core::runtime::bus_structs::{FileConflict, FileOperation, UiEvent};
 use crate::core::system::clipboard::error::{ClipBoardError, ClipBoardResult};
+use crate::core::system::operationstate::operation_manager::with_history;
+use crate::core::system::operationstate::undo_record::UndoRecord;
 use crate::core::system::trash_manager::trash_manager::{TrashBackend, TrashDestination, get_backend};
 use crate::ui::task_manager::task_manager::TaskMessage;
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::sync::OnceLock;
 use crate::core::runtime::event_bus::Dispatcher;
-use tracing::{info, warn, debug};
+use tracing::{debug, info, warn};
 
 pub static TOKIO_RUNTIME: Lazy<Runtime> = Lazy::new(|| {
     tokio::runtime::Builder::new_multi_thread()
@@ -113,16 +134,16 @@ impl GlobalClipboard {
         Self::inner().restore_items(items, trash_root, sender)
     }
 
-    pub fn rename_file(&self, file_name: &str, new_file_name: &str) -> ClipBoardResult<()> {
-        Self::inner().rename_file(file_name, new_file_name)
+    pub fn rename_file(&self, file_name: &str, new_file_name: &str, sender: &Dispatcher) -> ClipBoardResult<()> {
+        Self::inner().rename_file(file_name, new_file_name, sender)
     }
 
-    pub fn create_new_dir(&self, file_name: &str, current_cwd: Arc<Path>) -> ClipBoardResult<()> {
-        Self::inner().create_new_dir(file_name, current_cwd)
+    pub fn create_new_dir(&self, file_name: &str, current_cwd: Arc<Path>, sender: &Dispatcher) -> ClipBoardResult<()> {
+        Self::inner().create_new_dir(file_name, current_cwd, sender)
     }
 
-    pub fn create_new_file(&self, file_name: &str, current_cwd: Arc<Path>) -> ClipBoardResult<()> {
-        Self::inner().create_new_file(file_name, current_cwd)
+    pub fn create_new_file(&self, file_name: &str, current_cwd: Arc<Path>, sender: &Dispatcher) -> ClipBoardResult<()> {
+        Self::inner().create_new_file(file_name, current_cwd, sender)
     }
 
 }
@@ -231,15 +252,29 @@ impl Clipboard {
 
             let errors_count = Arc::new(std::sync::atomic::AtomicUsize::new(0));
 
+            let actual_sources = Arc::new(Mutex::new(Vec::<Arc<Path>>::new()));
+            let actual_finals  = Arc::new(Mutex::new(Vec::<Arc<Path>>::new()));
+
             let is_cut = matches!(mode, Some(ClipboardMode::Cut));
 
             for item in items {
-                let permit = semaphore.clone().acquire_owned().await.unwrap();
+                let permit = match semaphore.clone().acquire_owned().await {
+                    Ok(p) => p,
+                    Err(e) => {
+                        errors_count.fetch_add(1, Ordering::Relaxed);
+                        warn!("Acquire error: {:?}", e);
+                        continue;
+                    }
+                };
+
                 let dest = dest.clone();
                 let mode = mode.clone();
                 let sender = sender.clone();
                 let errors = errors_count.clone();
                 let copied_global = copied_bytes_global.clone();
+
+                let src_for_history   = Arc::clone(&actual_sources);
+                let final_for_history = Arc::clone(&actual_finals);
 
                 let handle = tokio::spawn(async move {
                     let _permit = permit;
@@ -259,6 +294,9 @@ impl Clipboard {
                     } else {
                         dest_path_buf.into()
                     };
+
+                    let src_path_clone  = item.src_path.clone();
+                    let dest_path_clone = dest_path.clone();
 
                     let result = Self::paste_item_with_progress(
                         item.src_path,
@@ -289,6 +327,22 @@ impl Clipboard {
                             info!("Error de permisos detectado. Abortando tarea.");
                             return;
                         }
+                    } else {
+                        match src_for_history.lock() {
+                            Ok(mut src) => src.push(src_path_clone),
+                            Err(e) => {
+                                errors.fetch_add(1, Ordering::Relaxed);
+                                warn!("Acquire error: {:?}", e);
+                            }
+                        };
+
+                        match final_for_history.lock() {
+                            Ok(mut final_for) => final_for.push(dest_path_clone),
+                            Err(e) => {
+                                errors.fetch_add(1, Ordering::Relaxed);
+                                warn!("Acquire error: {:?}", e);
+                            }
+                        };
                     }
 
                 });
@@ -314,6 +368,37 @@ impl Clipboard {
             }
             inner.dest_dir = None; 
             
+
+
+            let (actual_sources, actual_finals) = {
+                let sources = actual_sources.lock();
+                let finals = actual_finals.lock();
+
+                match (sources, finals) {
+                    (Ok(s), Ok(f)) => (s.clone(), f.clone()),
+                    _ => {
+                        warn!("mutex envenenado en results de pastex");
+                        return;
+                    }
+                }
+            };
+
+            if !actual_finals.is_empty() {
+                let op = if is_cut {
+                    FileOperation::PasteCut {
+                        sources:        actual_sources,
+                        final_targets:  actual_finals,
+                    }
+                } else {
+                    FileOperation::PasteCopy {
+                        final_targets: actual_finals,
+                    }
+                };
+
+                sender.send(op).ok();
+            }
+
+
             info!("Todos los items procesados, mandando Finished");
             sender.send(
                 TaskMessage::Finished {
@@ -577,6 +662,8 @@ impl Clipboard {
         TOKIO_RUNTIME.spawn(async move {
             let total = items.len();
             let mut errors = Vec::new();
+            let mut actual_finals: Vec<Arc<Path>> = Vec::new();
+            let mut actual_sources: Vec<Arc<Path>> = Vec::new();
 
             for (done, source) in items.iter().enumerate() {
                 let file_name = match source.file_name() {
@@ -621,10 +708,9 @@ impl Clipboard {
                 };
 
 
-
-            let result = fs::rename(source, &final_target)
-                .map_err(|e| ClipBoardError::Io(e))
-                .or_else(|_| {
+                let result = fs::rename(source, &final_target)
+                    .map_err(|e| ClipBoardError::Io(e))
+                    .or_else(|_| {
                     if source.is_dir() {
                         Self::copy_dir_recursive(source.to_owned(), final_target.to_owned())
                             .and_then(|_| {
@@ -640,8 +726,11 @@ impl Clipboard {
                             })
                     }
                 });
-                
-                if let Err(e) = result {
+
+                if result.is_ok() {
+                    actual_sources.push(source.to_owned());
+                    actual_finals.push(final_target.clone());
+                } else if let Err(e) = result {
                     errors.push(format!("Error moviendo '{:?}': {}", file_name, e));
                 }
 
@@ -651,6 +740,16 @@ impl Clipboard {
                     text: format!("Moviendo {}...", file_name.to_string_lossy()),
                     task_type: TaskType::CopyPaste,
                 }).ok();
+            }
+
+
+            if !actual_finals.is_empty() {
+                with_history(|h| h.push(
+                UndoRecord::MoveBack {
+                        from: actual_finals,
+                        to: actual_sources,
+                    }
+                ));
             }
 
             sender.send(TaskMessage::Finished {
@@ -716,10 +815,15 @@ impl Clipboard {
     fn process_trash_operations(task_id: u64, resolved: Vec<(Arc<str>, Arc<Path>, TrashDestination)>, backend: &dyn TrashBackend, sender: &Dispatcher) {
         let total = resolved.len();
         let mut errors: Vec<ClipBoardError> = Vec::new();
+        
+        let mut trash_paths: Vec<Arc<Path>> = Vec::new();
+        let mut names = Vec::new();
+        let mut is_permanent = false;
 
-        for (done, (_name, source, _desination)) in resolved.into_iter().enumerate() {
+        for (done, (name, source, destination)) in resolved.into_iter().enumerate() {
 
             let result = if backend.is_in_trash(&source) {
+                is_permanent = true;
                 backend.permanently_delete(&source)
                     .map_err(|e| ClipBoardError::TrashError(e))
             } else {
@@ -728,7 +832,19 @@ impl Clipboard {
                     .map_err(|e| ClipBoardError::TrashError(e))
             };
 
-            if let Err(e) = result {
+            if result.is_ok() && !is_permanent {
+                names.push(name.to_string());
+                match backend.get_trash_root(&destination) {
+                    Ok(trash_path) => {
+                        let file_trash_path = trash_path
+                            .join("files")
+                            .join(name.to_string());
+                        trash_paths.push(file_trash_path.into());
+                    },
+                    Err(e) => warn!("Ha ocurrido un error obteniendo las rutas de trash: {}", e),
+                }
+
+            } else if let Err(e) = result {
                 warn!("{}", e);
                 errors.push(e);
             }
@@ -740,6 +856,17 @@ impl Clipboard {
                 task_type: TaskType::MoveTrash,
             }).ok();
         }
+
+
+        if !trash_paths.is_empty() {
+            with_history(|h| h.push(
+            UndoRecord::RestoreFromTrash {
+                    file_names: names,
+                    trash_paths,
+                }
+            ));
+        }
+
 
         sender.send(TaskMessage::Finished {
             task_id,
@@ -807,7 +934,7 @@ impl Clipboard {
     }
 
 
-    pub fn rename_file(&self, file_name: &str, new_file_name: &str) -> ClipBoardResult<()> {
+    pub fn rename_file(&self, file_name: &str, new_file_name: &str, sender: &Dispatcher) -> ClipBoardResult<()> {
         info!("Renombrando");
         let new_name_trimmed = new_file_name.trim();
         if new_name_trimmed.is_empty() {
@@ -830,13 +957,21 @@ impl Clipboard {
             }  
         };
 
-        fs::rename(file_path, &new_file_path)
-            .map_err(|_|ClipBoardError::RenamingError(file_name.into()))?;
-
-        Ok(())
+        match fs::rename(&file_path, &new_file_path) {
+            Ok(_) => {
+                sender.send(
+                    FileOperation::Rename {
+                        original_path: file_path.into(),
+                        new_path: new_file_path.into()
+                    }
+                ).ok();
+                Ok(())
+            },
+            Err(e) => Err(ClipBoardError::Io(e)),
+        }
     }
 
-    pub fn create_new_dir(&self, file_name: &str, current_cwd: Arc<Path>) -> ClipBoardResult<()> {
+    pub fn create_new_dir(&self, file_name: &str, current_cwd: Arc<Path>, sender: &Dispatcher) -> ClipBoardResult<()> {
         let new_name_trimmed = file_name.trim();
         if new_name_trimmed.is_empty() {
             return Err(ClipBoardError::InvalidName("no puede estar vacío".into()));
@@ -856,14 +991,21 @@ impl Clipboard {
             return Err(ClipBoardError::AlreadyExist(file_name.into()));
         }
         
-        fs::create_dir(final_path_name)
-            .map_err(|e| ClipBoardError::Io(e))?;
-
-        Ok(())
+        match fs::create_dir(&final_path_name) {
+            Ok(_) => {
+                sender.send(
+                    FileOperation::CreateDir {
+                        path: final_path_name.into(),
+                    }
+                ).ok();
+                Ok(())
+            },
+            Err(e) => Err(ClipBoardError::Io(e)),
+        }
     }
 
 
-    pub fn create_new_file(&self, file_name: &str, current_cwd: Arc<Path>) -> ClipBoardResult<()> {
+    pub fn create_new_file(&self, file_name: &str, current_cwd: Arc<Path>, sender: &Dispatcher) -> ClipBoardResult<()> {
         let new_name_trimmed = file_name.trim();
         if new_name_trimmed.is_empty() {
             return Err(ClipBoardError::InvalidName("no puede estar vacío".into()));
@@ -883,10 +1025,17 @@ impl Clipboard {
             return Err(ClipBoardError::AlreadyExist(file_name.into()));
         }
         
-        fs::File::create_new(final_path_name)
-            .map_err(|e| ClipBoardError::Io(e))?;
-        
-        Ok(())
+        match fs::File::create_new(&final_path_name) {
+            Ok(_) => {
+                sender.send(
+                    FileOperation::CreateFile {
+                        path: final_path_name.into(),
+                    }
+                ).ok();
+                Ok(())
+            },
+            Err(e) => Err(ClipBoardError::Io(e)),
+        }
     }
 
 }

@@ -73,8 +73,9 @@ impl eframe::App for BlazeApp {
                 })
                 .collect();
 
-            let cwd = self.state.cwd.clone();
-            self.state.move_files(dropped_files, cwd);
+            let dest = self.state.cwd.clone();
+
+            self.state.move_files(dropped_files, dest);
 
             ui.input_mut(|i| i.raw.dropped_files.clear());
         }

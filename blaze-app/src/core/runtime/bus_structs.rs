@@ -15,15 +15,36 @@ use crate::ui::image_preview::image_preview::ImagePreviewState;
 #[derive(Debug)]
 pub enum FileOperation {
     Move { 
-        files: Vec<Arc<Path>>, 
+        sources: Vec<Arc<Path>>, 
         dest: Arc<Path>, 
-        tab_id: Uuid
     },
-    Delete { files: Vec<Arc<Path>> },
-    Copy { 
-        files: Vec<Arc<Path>>, 
-        dest: Arc<Path> 
+
+    PasteCut {
+        sources: Vec<Arc<Path>>,
+        final_targets: Vec<Arc<Path>>,
     },
+
+    PasteCopy {
+        final_targets: Vec<Arc<Path>>,
+    },
+
+    Rename {
+        original_path: Arc<Path>,
+        new_path: Arc<Path>,
+    },
+
+    Trash { 
+        files: Vec<Arc<Path>> 
+    },
+
+    CreateDir {
+        path: Arc<Path>,
+    },
+
+    CreateFile {
+        path: Arc<Path>,
+    },
+
     Update,
     UpdateDirSize {
         full_path: Arc<Path>, 

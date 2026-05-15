@@ -1,6 +1,6 @@
 [package]
 name = "blazepilot"
-version = "0.9.0"
+version = "0.10.0"
 edition = "2021"
 
 [[bin]]
@@ -55,6 +55,7 @@ sha2 = "0.11.0"
 ffmpeg-sidecar = "2.5.1"
 dashmap = "6.1.0"
 urlencoding = "2.1.3"
+parking_lot = "0.12.5"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 eframe = { version = "0.34.2", default-features = false, features = ["wgpu", "x11", "wayland", "wgpu_no_default_features"] }

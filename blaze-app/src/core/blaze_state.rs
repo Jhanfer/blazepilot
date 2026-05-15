@@ -21,7 +21,7 @@ use bitvec::vec::BitVec;
 use tracing::{debug, error, info, warn};
 use tokio::sync::Mutex as TokioMutex;
 use uuid::Uuid;
-use crate::{core::{configs::config_state::with_configs, files::blaze_motor::{motor::{BlazeMotor, MOTOR}, motor_structs::{FileEntry, FileLoadingMessage, RecursiveMessages}}, runtime::{bus_structs::FileOperation, event_bus::with_event_bus}, system::{cache::cache_manager::CacheManager, clipboard::clipboard::{GlobalClipboard, TOKIO_RUNTIME}, extended_info::extended_info_manager::{ExtendedInfoManager, ExtendedInfoMessages}, fileopener_module::{FileOpenerManager, GLOBAL_FILE_OPENER}, sizer_manager::sizer_manager::SizerManager, terminal_opener::terminal_manager::{GLOBAL_TERMINAL_MANAGER, TerminalManager}, trash_manager::trash_manager::{TrashDestination, get_backend}, updater::updater::Updater, zip_manager::zip_manager::ZipManager}}, ui::task_manager::task_manager::TaskManager};
+use crate::{core::{configs::config_state::with_configs, files::blaze_motor::{motor::{BlazeMotor, MOTOR}, motor_structs::{FileEntry, FileLoadingMessage, RecursiveMessages}}, runtime::{bus_structs::FileOperation, event_bus::with_event_bus}, system::{cache::cache_manager::CacheManager, clipboard::clipboard::{GlobalClipboard, TOKIO_RUNTIME}, extended_info::extended_info_manager::{ExtendedInfoManager, ExtendedInfoMessages}, fileopener_module::{FileOpenerManager, GLOBAL_FILE_OPENER}, operationstate::operation_manager::with_history, sizer_manager::sizer_manager::SizerManager, terminal_opener::terminal_manager::{GLOBAL_TERMINAL_MANAGER, TerminalManager}, trash_manager::trash_manager::{TrashDestination, get_backend}, updater::updater::Updater, zip_manager::zip_manager::ZipManager}}, ui::task_manager::task_manager::TaskManager};
 
 
 // Para el guardado en caché
@@ -426,6 +426,26 @@ impl BlazeCoreState {
         }
     }
 
+    pub fn rename(&self, file_name: &str) {
+        let dispatcher = with_event_bus(|e| e.dispatcher(self.active_id));
+        if let Err(e) = self.clipboard.rename_file(file_name, &self.rename_buffer, &dispatcher) {
+            error!("Error renombrando: {}", e);
+        }
+    }
+
+    pub fn create_new(&self, nit: NewItemType) {
+        let dispatcher = with_event_bus(|e| e.dispatcher(self.active_id));
+
+        let res = match nit {
+            NewItemType::File => self.clipboard.create_new_file(&self.new_item_buffer, self.cwd.clone(), &dispatcher),
+            NewItemType::Folder => self.clipboard.create_new_dir(&self.new_item_buffer, self.cwd.clone(), &dispatcher),
+        };
+
+        if let Err(e) = res {
+            warn!("Ha ocurrido un error en el clipboard: {e}");
+        }
+    }
+
     pub fn move_to_trash(&mut self, items: Vec<(Arc<str>, Arc<Path>)>) {
         let dispatcher = with_event_bus(|e| e.dispatcher(self.active_id));
         self.clipboard.move_to_trash(items,&dispatcher).ok();
@@ -436,9 +456,13 @@ impl BlazeCoreState {
         self.clipboard.move_to_trash(items, &dispatcher).ok();
     }
 
-    pub fn move_files(&mut self, files: Vec<Arc<Path>>, dest: Arc<Path>) {
+    pub fn move_files(&mut self, sources: Vec<Arc<Path>>, dest: Arc<Path>) {
         let dispatcher = with_event_bus(|e| e.dispatcher(self.active_id));
-        self.clipboard.move_files(files, dest, &dispatcher).ok();
+
+        match self.clipboard.move_files(sources, dest, &dispatcher) {
+            Ok(_) => {},
+            Err(e) => warn!("Ha ocurrido un error al mover: {e}"),
+        }
     }
 
     pub fn paste(&mut self, path: Arc<Path>) {
@@ -767,7 +791,6 @@ impl BlazeCoreState {
                             self.needs_sort = true;
                         }
                     }
-
                 },
 
                 FileLoadingMessage::FileRemoved { name } => {
@@ -832,20 +855,64 @@ impl BlazeCoreState {
 
         for msg in fileops_events {
             match msg {
-                FileOperation::Copy { files:_, dest:_ } => {}, 
-                FileOperation::Delete { files } => {
+
+                // Operaciones de Archivos
+                // __--__--__--__--__--__--__--__--__--__--__--__--__--__--__--__--__--__--
+
+
+                FileOperation::PasteCut { .. } => {
+                    with_history(|h| h.push_completed(&msg));
+                },
+
+                FileOperation::PasteCopy { .. } => {
+                    with_history(|h| h.push_completed(&msg));
+                },
+
+                FileOperation::Rename { .. } => {
+                    with_history(|h| h.push_completed(&msg));
+                },
+
+                FileOperation::CreateDir { .. } => {
+                    with_history(|h| h.push_completed(&msg));
+                },
+
+                FileOperation::CreateFile { .. } => {
+                    with_history(|h| h.push_completed(&msg));
+                },
+
+                FileOperation::Move { sources, dest, .. } => {
+                    self.move_files(sources, dest);
+                },
+
+                FileOperation::Trash { files } => {
                     let motor = self.motor.borrow();
                     let tab = motor.active_tab();
 
                     if let Ok(ftd) = tab.get_item_to_delete(files) {
                         self.move_to_trash_event_only(ftd);
-                    } 
+                    }
                 },
 
-                FileOperation::Move { files, dest, tab_id:_ } => {
-                    info!("Se intenta mover");
-                    self.move_files(files, dest);
+
+                FileOperation::RestoreDeletedFiles { file_names } => {
+                    let Some(trash_path) = get_backend().get_trash_files(&TrashDestination::Home).ok() else {return;};
+
+                    if let Some(trash_root) = trash_path.parent() {
+                        let dispatcher = with_event_bus(|e| e.dispatcher(self.active_id));
+                        self.clipboard.restore_from_trash(file_names, trash_root.into(), dispatcher).ok();
+                    }
                 },
+
+
+                FileOperation::ExtractHere {entry, dest_dir} => {
+                    info!("Solicitando extracción de: [{}] -> [{:?}]", entry.name, dest_dir);
+                    let res = self.zip_manager.extract(&entry, &dest_dir);
+                    res.map_err(|e| warn!("Error: {}", e)).ok();
+                },
+
+                // Operaciones Extra
+                // __--__--__--__--__--__--__--__--__--__--__--__--__--__--__--__--__--__--
+
 
                 FileOperation::Update => {
                     self.updater.start_update_process();
@@ -868,22 +935,6 @@ impl BlazeCoreState {
                 FileOperation::ExtendedInfoReady { full_path, tab_id:_ } => {
                     self.calculating_extended_info.remove(&full_path);
                     self.calculated_extended_info.insert(full_path);
-                },
-
-                FileOperation::RestoreDeletedFiles { file_names } => {
-                    let Some(trash_path) = get_backend().get_trash_files(&TrashDestination::Home).ok() else {return;};
-                    
-                    if let Some(trash_root) = trash_path.parent() {
-                        let dispatcher = with_event_bus(|e| e.dispatcher(self.active_id));
-                        self.clipboard.restore_from_trash(file_names, trash_root.into(), dispatcher).ok();
-                    }
-                },
-
-
-                FileOperation::ExtractHere {entry, dest_dir} => {
-                    info!("Solicitando extracción de: [{}] -> [{:?}]", entry.name, dest_dir);
-                    let res = self.zip_manager.extract(&entry, &dest_dir);
-                    res.map_err(|e| warn!("Error: {}", e)).ok();
                 },
             }
         }

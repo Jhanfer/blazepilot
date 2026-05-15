@@ -18,14 +18,12 @@
 
 use std::{path::Path, sync::Arc};
 use egui::{Color32, CornerRadius, Frame, Margin, Order, RichText, Ui, Window};
-use uuid::Uuid;
 use crate::{core::runtime::{bus_structs::FileOperation, event_bus::Dispatcher}, ui::blaze_ui_state::ModalDialog};
 
 
 pub struct SureToMoveToDialog {
     pub sources: Option<Vec<Arc<Path>>>,
     pub dest: Option<Arc<Path>>,
-    pub tab_id: Option<Uuid>,
     pub show_modal: bool,
 }
 
@@ -40,7 +38,6 @@ impl SureToMoveToDialog {
         Self {
             sources: None, 
             dest: None,
-            tab_id: None,
             show_modal: false,
         }
     }
@@ -49,10 +46,9 @@ impl SureToMoveToDialog {
         self.show_modal = false; 
     }
 
-    pub fn open(&mut self, sources: Vec<Arc<Path>>, dest: Arc<Path>, tab_id: Uuid) {
+    pub fn open(&mut self, sources: Vec<Arc<Path>>, dest: Arc<Path>) {
         self.sources = Some(sources);
         self.dest = Some(dest);
-        self.tab_id = Some(tab_id);
         self.show_modal = true;
     }
 
@@ -60,7 +56,7 @@ impl SureToMoveToDialog {
     pub fn render_dialog(&mut self, ui: &mut Ui) {
         let mut should_close = false;
 
-        let (Some(sources), Some(dest), Some(tab_id)) = (self.sources.as_ref(), self.dest.as_ref(), self.tab_id.as_ref()) else { return; };
+        let (Some(sources), Some(dest)) = (self.sources.as_ref(), self.dest.as_ref()) else { return; };
         
         let custom_frame = Frame::NONE
             .fill(Color32::from_rgb(16, 21, 25))
@@ -128,13 +124,13 @@ impl SureToMoveToDialog {
                     ui.add_space(spacing);
                     if ui.button("Aceptar").clicked() {
 
-                        Dispatcher::current().send(FileOperation::Move { 
-                            files: sources.to_vec(),
-                            dest: dest.to_owned(),
-                            tab_id: *tab_id,
-                        }).ok();
-
-
+                        Dispatcher::current().send(
+                            FileOperation::Move { 
+                                sources: sources.to_vec(),
+                                dest: dest.to_owned(),
+                            }
+                        ).ok();
+                        
                         should_close = true;
                     }
                 });

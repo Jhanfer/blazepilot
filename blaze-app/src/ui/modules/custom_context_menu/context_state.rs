@@ -1134,9 +1134,10 @@ impl ContextMenuState {
                     Some(0) => {
                         let items = files
                             .iter()
-                            .map(|f| (Arc::from(f.name.to_owned()), f.full_path.to_owned()))
+                            .enumerate()
+                            .filter(|(index, _)| state.is_selected(*index))
+                            .map(|(_, f)| (Arc::from(f.name.to_owned()), f.full_path.to_owned()))
                             .collect();
-                        
                         state.move_to_trash(items);
                         should_close = true;
                     }

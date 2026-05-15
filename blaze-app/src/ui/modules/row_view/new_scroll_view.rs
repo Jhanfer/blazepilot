@@ -1,8 +1,8 @@
 use std::{collections::HashMap, path::Path, sync::Arc};
-use egui::{Id, Button, Color32, ColorImage, CursorIcon, FontId, Key, PointerButton, Rect, RichText, ScrollArea, Sense, TextEdit, TextureOptions, Ui, pos2, scroll_area::ScrollSource, vec2};
+use egui::{Button, Color32, ColorImage, CursorIcon, FontId, Id, Key, Modifiers, PointerButton, Rect, RichText, ScrollArea, Sense, TextEdit, TextureOptions, Ui, pos2, scroll_area::ScrollSource, vec2};
 use file_id::FileId;
-use tracing::{error, info};
-use crate::{core::{blaze_state::{BlazeCoreState, NewItemType}, configs::config_state::{OrderingMode, with_configs}, files::{blaze_motor::motor_structs::FileEntry, file_extension::{DocType, FileExtension}}, runtime::{bus_structs::{SureTo, UiEvent}, event_bus::with_event_bus}, system::{extended_info::extended_info_manager::{ExtendedInfo, GitStatus}, trash_manager::trash_manager::get_backend}}, ui::{blaze_ui_state::BlazeUiState, icons_cache::{icons, thumbnails::thumbnails_manager::Thumbnail}, modules::custom_context_menu::context_state::ContextMenuKind}, utils::formating::{format_date, format_size}};
+use tracing::info;
+use crate::{core::{blaze_state::BlazeCoreState, configs::config_state::{OrderingMode, with_configs}, files::{blaze_motor::motor_structs::FileEntry, file_extension::{DocType, FileExtension}}, runtime::{bus_structs::{SureTo, UiEvent}, event_bus::with_event_bus}, system::{extended_info::extended_info_manager::{ExtendedInfo, GitStatus}, trash_manager::trash_manager::get_backend}}, ui::{blaze_ui_state::BlazeUiState, icons_cache::{icons, thumbnails::thumbnails_manager::Thumbnail}, modules::custom_context_menu::context_state::ContextMenuKind}, utils::formating::{format_date, format_size}};
 
 
 
@@ -19,17 +19,7 @@ fn new_ff_logic(state: &mut BlazeCoreState, ui: &mut Ui) {
             }
 
             if ui.input(|i| i.key_pressed(Key::Enter)) && !state.new_item_buffer.trim().is_empty() {
-                let cwd = state.cwd.clone();
-
-                let result = match item_type {
-                    NewItemType::File => {state.clipboard.create_new_file(&state.new_item_buffer, cwd)},
-                    NewItemType::Folder => {state.clipboard.create_new_dir(&state.new_item_buffer, cwd)},
-                };
-
-                if let Err(e) = result {
-                    error!("Error creando: {}", e);
-                }
-
+                state.create_new(item_type);
                 state.creating_new = None;
                 state.refresh();
                 state.focus_requested = false;
@@ -185,17 +175,26 @@ fn render_rename_field(ui: &mut Ui, file: &Arc<FileEntry>, state: &mut BlazeCore
         response.request_focus();
     }
 
-    if !response.lost_focus() && ui.input(|i| i.key_pressed(Key::Enter)) {
-        if let Err(e) = state.clipboard.rename_file(&file.name, &state.rename_buffer) {
-            error!("Error renombrando: {}", e);
-        }
+
+
+    if response.has_focus() && ui.input(|i| i.key_pressed(Key::Enter)) {
+        state.rename(&file.name);
+        
+        ui.input_mut(|i| {
+            i.consume_key(Modifiers::NONE, Key::Enter);
+        });
+
         state.renaming_file = None;
+        return;
     }
 
-    let cancel = ui.input(|i| i.key_pressed(Key::Escape)) || ui.input(|i| i.pointer.any_click());
 
-
-    if response.lost_focus() || cancel {
+    if ui.input(|i| i.key_pressed(Key::Escape)) {
+        state.renaming_file = None;
+        return;
+    }
+    
+    if response.lost_focus() && !response.hovered() {
         state.renaming_file = None;
     }
 }
