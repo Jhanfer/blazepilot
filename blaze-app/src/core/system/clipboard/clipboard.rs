@@ -285,6 +285,9 @@ impl Clipboard {
                             Some(ClipboardMode::Cut) => {
                                 warn!("Destino ya existe para Cut, saltando");
                                 errors.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                                sender.send(
+                                    UiEvent::ShowError(format!("Ya existe '{}' en destino.", item.name).into())
+                                ).ok();
                                 return ;
                             },
                             _ => {

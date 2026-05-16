@@ -175,17 +175,17 @@ pub fn hot_keys_logic(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, f
     }
 
     //copiar
-    if do_copy && disable_keys { 
+    if do_copy && disable_keys {
         state.copy(files);
     }
 
     //cortar
-    if do_cut && disable_keys { 
+    if do_cut && disable_keys {
         state.cut(files);
     }
 
     //pegar
-    if do_paste && disable_keys && has_clipboard { 
+    if do_paste && disable_keys && has_clipboard {
         let cwd = state.cwd.clone();
         state.paste(cwd);
     }

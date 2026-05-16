@@ -112,14 +112,14 @@ impl UndoRecord {
             let result = match self {
                 
                 UndoRecord::MoveBack { from, to } => {
-                    let mut errors = Vec::new();
-                    for (src, dst) in from.iter().zip(to.iter()) {
-                        if let Err(e) = tokio::fs::rename(src.as_ref(), dst.as_ref()).await {
-                            errors.push(format!("{:?}: {}", src.file_name(), e));
+                    for (src, original_target) in from.iter().zip(to.iter()) {
+                        if let Some(parent) = original_target.parent() {
+                            let sources = vec![src.clone()];
+                            let dest = Arc::from(parent);
+                            sender.send(FileOperation::Move { sources, dest }).ok();
                         }
                     }
-                    if errors.is_empty() { Ok(()) }
-                    else { Err(errors.join(", ")) }
+                    Ok(())
                 },
 
                 UndoRecord::DeleteCopied { paths } => {
