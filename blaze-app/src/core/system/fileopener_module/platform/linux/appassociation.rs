@@ -17,8 +17,7 @@
 
 
 use tracing::warn;
-
-use crate::core::{configs::config_state::with_configs, system::fileopener_module::{error::{OpenerError, OpenerResult}, fileopener_manager::AppAssociation}};
+use crate::core::{bootstrap::configs::config_manager::with_configs, system::fileopener_module::{error::{OpenerError, OpenerResult}, fileopener_manager::AppAssociation}};
 use std::{fs, path::PathBuf, collections::HashMap};
 
 pub type UserAssociations = HashMap<String, AppAssociation>;
@@ -31,7 +30,7 @@ pub struct AssociationManager {
 
 impl AssociationManager {
     pub fn new() -> Self {
-        let mut config_path = with_configs(|c| c.configs.get_config_folder());
+        let mut config_path = with_configs(|c| c.config_dir().to_owned());
         config_path.push("BlazePilot");
         config_path.push("associations.json");
 

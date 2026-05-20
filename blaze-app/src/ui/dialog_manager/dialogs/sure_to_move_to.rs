@@ -18,7 +18,7 @@
 
 use std::{path::Path, sync::Arc};
 use egui::{Color32, CornerRadius, Frame, Margin, Order, RichText, Ui, Window};
-use crate::{core::runtime::{bus_structs::FileOperation, event_bus::Dispatcher}, ui::blaze_ui_state::ModalDialog};
+use crate::{core::runtime::{bus_structs::FileOperation, event_bus::Dispatcher}, ui::dialog_manager::dialog_manager::ModalDialog};
 
 
 pub struct SureToMoveToDialog {

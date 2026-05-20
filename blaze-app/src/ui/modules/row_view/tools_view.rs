@@ -1,7 +1,7 @@
 use std::sync::Arc;
 use egui::{Color32, Rect, Sense, Ui, pos2};
 use tracing::warn;
-use crate::{core::{blaze_state::{BlazeCoreState, NewItemType}, configs::config_state::with_configs, files::blaze_motor::motor_structs::FileEntry, runtime::{bus_structs::{SureTo, UiEvent}, event_bus::with_event_bus}, system::trash_manager::trash_manager::{get_backend}}, ui::{blaze_ui_state::BlazeUiState, icons_cache::icons}};
+use crate::{core::{blaze_state::{BlazeCoreState, NewItemType}, bootstrap::configs::config_manager::with_configs, files::blaze_motor::motor_structs::FileEntry, runtime::{bus_structs::{SureTo, UiEvent}, event_bus::with_event_bus}, system::trash_manager::trash_manager::get_backend}, ui::{blaze_ui_state::BlazeUiState, icons_cache::icons}};
 
 pub fn tools(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, files: &Vec<Arc<FileEntry>>, ui: &mut Ui) {
     ui.horizontal(|ui|{
@@ -254,7 +254,7 @@ pub fn tools(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, files: &Ve
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             ui.visuals_mut().button_frame = false;
 
-            let is_hidden = with_configs(|c| {c.configs.show_hidden_files.clone()});
+            let is_hidden = with_configs(|c| {c.get_show_hidden_files()});
 
 
             let (icon_refresh, icon_bytes_refresh) = if is_hidden {

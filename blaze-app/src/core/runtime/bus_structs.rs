@@ -114,9 +114,16 @@ pub enum UiEvent {
 
     ShowError(Box<str>),
 
+    ShowGeneric {
+        title: Box<str>,
+        message: Box<str>,
+    },
+
     ShowFolderColorSelector {
         folder_id: FileId,
     },
+
+    ShowWantToInstall,
 
     OpenConfigs,
 

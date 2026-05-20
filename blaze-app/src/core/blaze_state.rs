@@ -21,7 +21,7 @@ use bitvec::vec::BitVec;
 use tracing::{debug, error, info, warn};
 use tokio::sync::Mutex as TokioMutex;
 use uuid::Uuid;
-use crate::{core::{configs::config_state::with_configs, files::blaze_motor::{motor::{BlazeMotor, MOTOR}, motor_structs::{FileEntry, FileLoadingMessage, RecursiveMessages}}, runtime::{bus_structs::FileOperation, event_bus::with_event_bus}, system::{cache::cache_manager::CacheManager, clipboard::clipboard::{GlobalClipboard, TOKIO_RUNTIME}, extended_info::extended_info_manager::{ExtendedInfoManager, ExtendedInfoMessages}, fileopener_module::{FileOpenerManager, GLOBAL_FILE_OPENER}, operationstate::operation_manager::with_history, sizer_manager::sizer_manager::SizerManager, terminal_opener::terminal_manager::{GLOBAL_TERMINAL_MANAGER, TerminalManager}, trash_manager::trash_manager::{TrashDestination, get_backend}, updater::updater::Updater, zip_manager::zip_manager::ZipManager}}, ui::task_manager::task_manager::TaskManager};
+use crate::{core::{bootstrap::{configs::config_manager::with_configs, install_manager::installation_manager::with_installation_manager}, files::blaze_motor::{motor::{BlazeMotor, BlazeMotorBuilder, MOTOR}, motor_structs::{FileEntry, FileLoadingMessage, RecursiveMessages}}, runtime::{bus_structs::{FileOperation, UiEvent}, event_bus::with_event_bus}, system::{cache::cache_manager::CacheManager, clipboard::clipboard::{GlobalClipboard, TOKIO_RUNTIME}, extended_info::extended_info_manager::{ExtendedInfoManager, ExtendedInfoMessages}, fileopener_module::{FileOpenerManager, GLOBAL_FILE_OPENER}, operationstate::operation_manager::with_history, sizer_manager::sizer_manager::SizerManager, terminal_opener::terminal_manager::{GLOBAL_TERMINAL_MANAGER, TerminalManager}, trash_manager::trash_manager::{TrashDestination, get_backend}, updater::updater::Updater, zip_manager::zip_manager::ZipManager}}, ui::task_manager::task_manager::TaskManager};
 
 
 // Para el guardado en caché
@@ -51,6 +51,153 @@ pub enum NewItemType {
     Folder,
     File,
 }
+
+
+#[must_use = "llama .build() para crear el state"]
+pub struct BlazeCoreBuilder {
+    start_path: Option<Arc<Path>>,
+}
+
+impl BlazeCoreBuilder {
+    fn new() -> Self {
+        Self {
+            start_path: None,
+        }
+    }
+
+    pub fn with_start_path(mut self, path: Option<Arc<Path>>) -> Self {
+        self.start_path = path;
+        self
+    }
+
+    #[must_use]
+    pub async fn build(self) -> BlazeCoreState { 
+        let motor = Rc::new(
+            RefCell::new(
+                BlazeMotorBuilder::default()
+                    .with_start_path(self.start_path)
+                    .build()
+                    .await
+            )
+        );
+        let active_id = motor.borrow().active_tab().id.clone();
+
+        //Asignar el id de la ventana inicial al active_id
+        crate::core::runtime::event_bus::set_active_tab(active_id);
+
+        MOTOR.with(|m|{
+            *m.borrow_mut() = Some(motor.clone());
+        });
+
+        let rubber_band = RubberBand {
+            rubber_band_start: None,
+            rubber_band_current: None,
+            is_rubber_banding: false,
+            rubber_band_start_content_y: 0.0,
+        };
+
+        let row_view = RowView {
+            is_dragging_files: false,
+            drag_ghost_pos: None,
+            drop_target: None,
+            drop_invalid_target: None,
+            scroll_area_origin_y: 0.0,
+            first_visible: 0,
+            last_visible: 0,
+        };
+
+        let file_opener_manager = GLOBAL_FILE_OPENER.clone();
+
+        let task_manager = TaskManager::global();
+
+        let sizer_manager = SizerManager::new();
+
+        let terminal_manager = GLOBAL_TERMINAL_MANAGER.clone();
+
+        let mut state = BlazeCoreState {
+            active_id,
+            motor,
+            is_loading: false,
+            search_filter: String::new(),
+            clipboard: GlobalClipboard::new(),
+            last_selected_index: None,
+            selection_anchor: None,
+            selection: BitVec::new(),
+            select_all_mode: false,
+            active_tasks: 0,
+            pending_scroll_to: None,
+            scroll_offset: 0.0,
+            rubber_band,
+            row_view,
+            renaming_file: None,
+            rename_buffer: String::new(),
+            creating_new: None,
+            new_item_buffer: String::new(),
+            focus_requested: false,
+            updater: Updater::init(),
+            calculating_dir_sizes: HashSet::new(),
+            calculated_dir_sizes: HashSet::new(),
+            file_opener_manager,
+            last_fs_event: None,
+            task_manager,
+            sizer_manager,
+            needs_sort: false,
+            _cwd_input: String::new(),
+            terminal_manager,
+            extended_info_manager: ExtendedInfoManager::new(),
+            calculating_extended_info: HashSet::new(),
+            calculated_extended_info: HashSet::new(),
+            zip_manager: ZipManager::new(),
+            cwd: PathBuf::new().into(),
+            last_navigation_time: None,
+            navigation_cooldown: Duration::from_millis(100),
+        };
+
+        let dispatcher = with_event_bus(|e| e.dispatcher(active_id));
+
+        let new_cwd = {
+            let mut motor = state.motor.borrow_mut();
+            let tab = motor.active_tab_mut();
+
+            if let Err(e) = tab.load_path(true, dispatcher.clone()) {
+                warn!("Ha ocurrido un error al cargar los archivos: {}", e);
+            }
+            state.updater.check_for_update(dispatcher.clone());
+            tab.cwd.clone()
+        };
+
+        state.cwd = new_cwd;
+
+        let is_installed = with_installation_manager(|im|!im.is_installed());
+
+        with_configs(|c| {
+
+            let day_elapsed = match c.get_last_time_asked_install() {
+                None => true,
+                Some(time) => time.elapsed().unwrap_or_default() >= Duration::from_hours(24),
+            };
+
+
+            if is_installed && (c.get_should_ask_install() || day_elapsed) {
+                dispatcher.send(UiEvent::ShowWantToInstall).ok();
+            } else {
+                info!("Instalado {} {} {}", !is_installed, c.get_should_ask_install(), day_elapsed )
+            }
+        });
+        
+
+        state
+    }
+}
+
+
+impl Default for BlazeCoreBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+
 
 pub struct BlazeCoreState {
     pub active_id: Uuid,
@@ -92,102 +239,6 @@ pub struct BlazeCoreState {
 }
 
 impl BlazeCoreState {
-    pub async fn new() -> Self {
-        let motor = Rc::new(RefCell::new(BlazeMotor::new().await));
-        let active_id = motor.borrow().active_tab().id.clone();
-
-        //Asignar el id de la ventana inicial al active_id
-        crate::core::runtime::event_bus::set_active_tab(active_id);
-
-        MOTOR.with(|m|{
-            *m.borrow_mut() = Some(motor.clone());
-        });
-
-        let rubber_band = RubberBand {
-            rubber_band_start: None,
-            rubber_band_current: None,
-            is_rubber_banding: false,
-            rubber_band_start_content_y: 0.0,
-        };
-
-        let row_view = RowView {
-            is_dragging_files: false,
-            drag_ghost_pos: None,
-            drop_target: None,
-            drop_invalid_target: None,
-            scroll_area_origin_y: 0.0,
-            first_visible: 0,
-            last_visible: 0,
-        };
-
-        let file_opener_manager = GLOBAL_FILE_OPENER.clone();
-
-        let task_manager = TaskManager::global();
-
-        let sizer_manager = SizerManager::new();
-
-        let terminal_manager = GLOBAL_TERMINAL_MANAGER.clone();
-
-        let mut state = Self {
-            active_id,
-            motor,
-            is_loading: false,
-            search_filter: String::new(),
-            clipboard: GlobalClipboard::new(),
-            last_selected_index: None,
-            selection_anchor: None,
-            selection: BitVec::new(),
-            select_all_mode: false,
-            active_tasks: 0,
-            pending_scroll_to: None,
-            scroll_offset: 0.0,
-            rubber_band,
-            row_view,
-            renaming_file: None,
-            rename_buffer: String::new(),
-            creating_new: None,
-            new_item_buffer: String::new(),
-            focus_requested: false,
-            updater: Updater::init(),
-            calculating_dir_sizes: HashSet::new(),
-            calculated_dir_sizes: HashSet::new(),
-            file_opener_manager,
-            last_fs_event: None,
-            task_manager,
-            sizer_manager,
-            needs_sort: false,
-            _cwd_input: String::new(),
-            terminal_manager,
-            extended_info_manager: ExtendedInfoManager::new(),
-            calculating_extended_info: HashSet::new(),
-            calculated_extended_info: HashSet::new(),
-            zip_manager: ZipManager::new(),
-            cwd: PathBuf::new().into(),
-            last_navigation_time: None,
-            navigation_cooldown: Duration::from_millis(100),
-        };
-
-
-        let new_cwd = {
-            let mut motor = state.motor.borrow_mut();
-            let tab = motor.active_tab_mut();
-            let dispatcher = with_event_bus(|e| e.dispatcher(active_id));
-
-            if let Err(e) = tab.load_path(true, dispatcher.clone()) {
-                warn!("Ha ocurrido un error al cargar los archivos: {}", e);
-            }
-            state.updater.check_for_update(dispatcher.clone());
-            tab.cwd.clone()
-        };
-
-        state.cwd = new_cwd;
-
-        state
-    }
-
-
-
-
     pub fn get_active_files(&mut self) -> Vec<Arc<FileEntry>> {
         let motor = self.motor.borrow();
         let tab = motor.active_tab();
@@ -557,10 +608,10 @@ impl BlazeCoreState {
         let cwd = self.motor.borrow_mut().active_tab().cwd.clone();
 
         let preferred_terminal = with_configs(|c| {
-            if c.configs.default_terminal.trim().is_empty() {
+            if c.get_default_terminal().trim().is_empty() {
                 None
             } else {
-                Some(c.configs.default_terminal.clone())
+                Some(c.get_default_terminal())
             }
         });
 

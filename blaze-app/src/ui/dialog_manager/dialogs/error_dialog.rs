@@ -16,31 +16,27 @@
 
 
 
+use egui::{Color32, Ui, CornerRadius, Frame, Margin, Order, Window};
+use tracing::info;
 
-use egui::{Color32, CornerRadius, Frame, Margin, Order, Ui, Window};
-use uuid::Uuid;
-use crate::{core::runtime::{bus_structs::FileOperation, event_bus::Dispatcher}, ui::blaze_ui_state::ModalDialog};
+use crate::ui::dialog_manager::dialog_manager::ModalDialog;
 
 
-pub struct UpdateDialog {
-    pub current_version: Option<String>,
-    pub new_version: Option<String>,
-    pub tab_id: Option<Uuid>,
+pub struct ErrorDialog {
+    pub message: Option<Box<str>>,
     pub show_modal: bool,
 }
 
-impl ModalDialog for UpdateDialog {
+impl ModalDialog for ErrorDialog {
     fn is_open(&self) -> bool { self.show_modal }
     fn close(&mut self) { self.close() }
     fn render(&mut self, ui: &mut Ui) { self.render_dialog(ui); }
 }
 
-impl UpdateDialog {
+impl ErrorDialog {
     pub fn new() -> Self {
         Self {
-            current_version: None, 
-            new_version: None,
-            tab_id: None,
+            message: None,
             show_modal: false,
         }
     }
@@ -49,10 +45,8 @@ impl UpdateDialog {
         self.show_modal = false; 
     }
 
-    pub fn open(&mut self, current_version: String, new_version: String, tab_id: Uuid) {
-        self.current_version = Some(current_version);
-        self.new_version = Some(new_version);
-        self.tab_id = Some(tab_id);
+    pub fn open(&mut self, message: &str) {
+        self.message = Some(message.into());
         self.show_modal = true;
     }
 
@@ -60,14 +54,14 @@ impl UpdateDialog {
     pub fn render_dialog(&mut self, ui: &mut Ui) {
         let mut should_close = false;
 
-        let (Some(current_ver), Some(new_ver), Some(_)) = (self.current_version.as_ref(), self.new_version.as_ref(), self.tab_id.as_ref()) else { return; };
+        let Some(message) = self.message.as_ref() else { return; };
         
         let custom_frame = Frame::NONE
             .fill(Color32::from_rgb(16, 21, 25))
             .corner_radius(CornerRadius::same(10))
             .inner_margin(Margin::same(10));
 
-        Window::new("¡Nueva versión disponible!")
+        Window::new("¡Ha ocurrido un error!")
             .frame(custom_frame)
             .order(Order::Foreground)
             .collapsible(false)
@@ -79,13 +73,8 @@ impl UpdateDialog {
                 ui.set_min_height(100.0);
                 
                 ui.vertical_centered(|ui|{
-                    ui.label("Hay una actualización de Blazepilot.");
+                    ui.label(message);
                     ui.add_space(8.0);
-
-                    ui.label(format!{"¿Quieres actualizar a la versión {}?", new_ver});
-                    ui.add_space(8.0);
-                    
-                    ui.label(format!("Versión actual: {}", current_ver));
                 });
 
 
@@ -97,21 +86,14 @@ impl UpdateDialog {
                     let spacing = (width - button_width * 2.0) / 3.0;
 
                     ui.add_space(spacing);
-                    if ui.button("Cancelar").clicked() {
-                        should_close = true;
-                    }
-
-                    ui.add_space(spacing);
                     if ui.button("Aceptar").clicked() {
-
-                        Dispatcher::current().send(FileOperation::Update).ok();
-
                         should_close = true;
                     }
                 });
             });
 
         if should_close {
+            info!("Se cierra");
             self.close();
         }
     }

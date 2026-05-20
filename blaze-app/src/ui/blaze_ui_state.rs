@@ -12,125 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-
-
-
-use std::{collections::{HashMap, HashSet}, path::{Path, PathBuf}, sync::Arc};
-use egui::{Area, Order, Sense, TextureHandle, Ui};
-use file_id::FileId;
-use uuid::Uuid;
-use crate::{core::{files::blaze_motor::motor::with_motor, runtime::{bus_structs::{FileConflict, SureTo, UiEvent}, event_bus::with_event_bus}, system::{cache::color_cache::color_cache::FolderColorManager, fileopener_module::{AppAssociation, platform::linux::structs::AppsIconData}, updater::updater::UpdateMessages}}, ui::{dialogs::{configs_dialog::ConfigDialog, error_dialog::ErrorDialog, folder_color_selector_dialog::FolderColorSelector, image_preview_dialog::ImagePreviewDialog, selector_dialog::AppSelectorDialog, sure_to_delete::SureToDeleteDialog, sure_to_move_to::SureToMoveToDialog, update_dialog::UpdateDialog}, icons_cache::{icon_cache::IconCache, thumbnails::thumbnails_manager::ThumbnailManager}, image_preview::image_preview::ImagePreviewState, modules::custom_context_menu::context_state::ContextMenuState}};
+use std::{collections::{HashMap, HashSet}, path::Path, sync::Arc};
+use egui::TextureHandle;
 use tracing::{debug, info};
 
-
-pub trait ModalDialog {
-    fn is_open(&self) -> bool;
-    fn close(&mut self);
-    fn render(&mut self, ui: &mut Ui);
-}
-
-
-pub struct DialogManager {
-    pub selector_dialog: AppSelectorDialog,
-    pub sure_to_dialog: SureToMoveToDialog,
-    pub update_dialog: UpdateDialog,
-    pub error_dialog: ErrorDialog,
-    pub sure_to_delete_dialog: SureToDeleteDialog,
-    pub folder_color_dialog: FolderColorSelector,
-    pub config_dialog: ConfigDialog,
-    pub img_pvw_dialog: ImagePreviewDialog,
-}
-
-impl DialogManager {
-    pub fn new() -> Self {
-        Self {
-            selector_dialog: AppSelectorDialog::new(),
-            sure_to_dialog: SureToMoveToDialog::new(),
-            update_dialog: UpdateDialog::new(),
-            error_dialog: ErrorDialog::new(),
-            sure_to_delete_dialog: SureToDeleteDialog::new(),
-            folder_color_dialog: FolderColorSelector::new(),
-            config_dialog: ConfigDialog::new(),
-            img_pvw_dialog: ImagePreviewDialog::new(),
-        }
+use crate::{
+    core::{files::blaze_motor::motor::with_motor, runtime::{bus_structs::{FileConflict, SureTo, UiEvent}, event_bus::with_event_bus}, system::{cache::color_cache::color_cache::FolderColorManager, updater::updater::UpdateMessages}}, 
+    ui::{
+        dialog_manager::dialog_manager::DialogManager, 
+        icons_cache::{icon_cache::IconCache, thumbnails::thumbnails_manager::ThumbnailManager}, modules::custom_context_menu::context_state::ContextMenuState
     }
+};
 
-    pub fn open_selector_dialog(&mut self, path: Arc<Path>, mime: String, apps: Vec<AppAssociation>, icon_data: Vec<AppsIconData>, show_all_apps: bool) {
-        self.selector_dialog.open(path, mime, apps, icon_data, show_all_apps);
-    }
-
-    pub fn open_sure_move_dialog(&mut self, sources: Vec<Arc<Path>>, dest: Arc<Path>) {
-        self.sure_to_dialog.open(sources, dest);
-    }
-
-    pub fn open_sure_to_delete(&mut self, sources: Vec<Arc<Path>>, tab_id: Uuid) {
-        self.sure_to_delete_dialog.open(sources, tab_id);
-    }
-
-    pub fn open_updater_dialog(&mut self, current_version: String, new_version: String, tab_id: Uuid) {
-        self.update_dialog.open(current_version, new_version, tab_id);
-    }
-
-    pub fn open_error_dialog(&mut self, message: &str) {
-        self.error_dialog.open(message);
-    }
-
-    pub fn open_folder_color_selector_dialog(&mut self, folder_id: FileId) {
-        self.folder_color_dialog.open(folder_id);
-    }
-
-    pub fn open_configs(&mut self) {
-        self.config_dialog.open();
-    }
-
-    pub fn open_img_pvw_dialog(&mut self, imp_pvw: ImagePreviewState) {
-        self.img_pvw_dialog.open(imp_pvw);
-    }
-
-    pub fn render_area(&mut self, ui: &mut Ui) {
-        let dialogs: Vec<&mut dyn ModalDialog> = vec![
-            &mut self.selector_dialog,
-            &mut self.sure_to_dialog,
-            &mut self.update_dialog,
-            &mut self.error_dialog,
-            &mut self.sure_to_delete_dialog,
-            &mut self.folder_color_dialog,
-            &mut self.config_dialog,
-            &mut self.img_pvw_dialog,
-        ];
-
-        let open_dialog = dialogs.into_iter().find(|d| d.is_open());
-
-        if let Some(dialog) = open_dialog {
-            let mut should_close = false;
-
-            Area::new("blocker".into())
-                .fixed_pos(egui::pos2(0.0, 0.0))
-                .order(Order::Middle)
-                .sense(Sense::click())
-                .interactable(true)
-                .show(ui, |ui|{
-                    let screen_rect = ui.ctx().content_rect();
-                    ui.painter().rect_filled(
-                        screen_rect,
-                        0.0,
-                        egui::Color32::from_rgba_unmultiplied(0, 0, 0, 180),
-                    );
-
-                    if ui.allocate_rect(screen_rect, egui::Sense::click_and_drag()).clicked() {
-                        should_close = true;
-                    }
-                });
-            
-            if should_close {
-                dialog.close();
-            }
-
-            dialog.render(ui);
-        }
-    }
-
-}
 
 
 
@@ -140,18 +33,23 @@ pub struct BlazeUiState {
     pub icon_cache: IconCache,
     pub folder_color_manager: FolderColorManager,
     pub context_menu_state: ContextMenuState,
-    pub thumb_texture_cache: HashMap<PathBuf, TextureHandle>,
+    pub thumb_texture_cache: HashMap<Arc<Path>, TextureHandle>,
     pub thumbnail_manager: ThumbnailManager,
     pub calculating_thumbnails: HashSet<Arc<Path>>,
     pub calculated_thumbnails: HashSet<Arc<Path>>,
     pub needs_repaint: bool,
     pub newly_calculated_thumbnails: HashSet<Arc<Path>>,
-    last_thumb_cache_dir: Option<PathBuf>,
+    last_thumb_cache_dir: Option<Arc<Path>>,
 }
 
+impl Default for BlazeUiState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl BlazeUiState {
-    pub fn new() -> Self {
+    fn new() -> Self {
         let dialog_manager = DialogManager::new();
         Self { 
             dialog_manager,
@@ -177,14 +75,14 @@ impl BlazeUiState {
             self.thumb_texture_cache.clear();
             self.calculating_thumbnails.clear();
             self.calculated_thumbnails.clear();
-            self.last_thumb_cache_dir = Some(cwd.to_path_buf());
+            self.last_thumb_cache_dir = Some(cwd.into());
         }
     }
 
     pub fn enforce_texture_cache_limit(&mut self, max_entries: usize) {
         if self.thumb_texture_cache.len() > max_entries {
             let to_remove = self.thumb_texture_cache.len() - max_entries;
-            let keys: Vec<PathBuf> = self.thumb_texture_cache
+            let keys: Vec<Arc<Path>> = self.thumb_texture_cache
                 .keys()
                 .take(to_remove)
                 .cloned()
@@ -278,7 +176,15 @@ impl BlazeUiState {
                     if let Some(img_pvw) = pvw {
                         self.dialog_manager.open_img_pvw_dialog(img_pvw);
                     }
-                }
+                },
+
+                UiEvent::ShowWantToInstall => {
+                    self.dialog_manager.open_want_to_install_dialog();
+                },
+
+                UiEvent::ShowGeneric { title, message } => {
+                    self.dialog_manager.open_show_generic(&title, &message);
+                },
             }
         }
     }

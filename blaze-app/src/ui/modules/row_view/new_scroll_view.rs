@@ -2,7 +2,7 @@ use std::{collections::HashMap, path::Path, sync::Arc};
 use egui::{Button, Color32, ColorImage, CursorIcon, FontId, Id, Key, Modifiers, PointerButton, Rect, RichText, ScrollArea, Sense, TextEdit, TextureOptions, Ui, pos2, scroll_area::ScrollSource, vec2};
 use file_id::FileId;
 use tracing::info;
-use crate::{core::{blaze_state::BlazeCoreState, configs::config_state::{OrderingMode, with_configs}, files::{blaze_motor::motor_structs::FileEntry, file_extension::{DocType, FileExtension}}, runtime::{bus_structs::{SureTo, UiEvent}, event_bus::with_event_bus}, system::{extended_info::extended_info_manager::{ExtendedInfo, GitStatus}, trash_manager::trash_manager::get_backend}}, ui::{blaze_ui_state::BlazeUiState, icons_cache::{icons, thumbnails::thumbnails_manager::Thumbnail}, modules::custom_context_menu::context_state::ContextMenuKind}, utils::formating::{format_date, format_size}};
+use crate::{core::{blaze_state::BlazeCoreState, bootstrap::configs::{config_manager::with_configs, platform::linux::conf_structs::OrderingMode}, files::{blaze_motor::motor_structs::FileEntry, file_extension::{DocType, FileExtension}}, runtime::{bus_structs::{SureTo, UiEvent}, event_bus::with_event_bus}, system::{extended_info::extended_info_manager::{ExtendedInfo, GitStatus}, trash_manager::trash_manager::get_backend}}, ui::{blaze_ui_state::BlazeUiState, icons_cache::{icons, thumbnails::thumbnails_manager::Thumbnail}, modules::custom_context_menu::context_state::ContextMenuKind}, utils::formating::{format_date, format_size}};
 
 
 
@@ -256,7 +256,7 @@ pub fn new_render_scrollview(ui: &mut Ui, files: &Vec<Arc<FileEntry>>, state: &m
     ui_state.evict_thumbnail_cache_if_dir_changed(&state.cwd);
     ui_state.enforce_texture_cache_limit(500);
 
-    let current_order = with_configs(|c| c.configs.app_ordering_mode.clone());
+    let current_order = with_configs(|c| c.get_ordering_mode());
 
     // --- Header manual ---
     let id_name_w  = ui.id().with("col_name_w");
@@ -524,7 +524,7 @@ pub fn new_render_scrollview(ui: &mut Ui, files: &Vec<Arc<FileEntry>>, state: &m
 
             if let Some(thumb) = thumbnail_snapshot.get(&file.full_path) {
                 let tex = ui_state.thumb_texture_cache
-                    .entry(file.full_path.to_path_buf())
+                    .entry(file.full_path.to_owned())
                     .or_insert_with_key(|path|{
                         let color_image = ColorImage::from_rgba_unmultiplied(
                             [thumb.width as usize, thumb.height as usize],

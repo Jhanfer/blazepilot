@@ -16,29 +16,32 @@
 
 
 
-use egui::{Color32, Ui, CornerRadius, Frame, Margin, Order, Window};
-use file_id::FileId;
-use crate::{core::system::{cache::cache_manager, clipboard::clipboard::TOKIO_RUNTIME,}, ui::blaze_ui_state::ModalDialog};
+
+use egui::{Color32, CornerRadius, Frame, Margin, Order, Ui, Window};
+use uuid::Uuid;
+use crate::{core::runtime::{bus_structs::FileOperation, event_bus::Dispatcher}, ui::dialog_manager::dialog_manager::ModalDialog};
 
 
-pub struct FolderColorSelector {
-    pub folder_id: Option<FileId>,
+pub struct UpdateDialog {
+    pub current_version: Option<String>,
+    pub new_version: Option<String>,
+    pub tab_id: Option<Uuid>,
     pub show_modal: bool,
-    temp_color: Option<Color32>,
 }
 
-impl ModalDialog for FolderColorSelector {
+impl ModalDialog for UpdateDialog {
     fn is_open(&self) -> bool { self.show_modal }
     fn close(&mut self) { self.close() }
     fn render(&mut self, ui: &mut Ui) { self.render_dialog(ui); }
 }
 
-impl FolderColorSelector {
+impl UpdateDialog {
     pub fn new() -> Self {
         Self {
-            folder_id: None,
+            current_version: None, 
+            new_version: None,
+            tab_id: None,
             show_modal: false,
-            temp_color: None,
         }
     }
 
@@ -46,12 +49,10 @@ impl FolderColorSelector {
         self.show_modal = false; 
     }
 
-    pub fn open(&mut self, folder_id: FileId) {
-        let cm = cache_manager::CacheManager::global();
-        let initial_color = cm.get_cached_color(&folder_id);
-
-        self.temp_color = Some(initial_color);
-        self.folder_id = Some(folder_id);
+    pub fn open(&mut self, current_version: String, new_version: String, tab_id: Uuid) {
+        self.current_version = Some(current_version);
+        self.new_version = Some(new_version);
+        self.tab_id = Some(tab_id);
         self.show_modal = true;
     }
 
@@ -59,15 +60,14 @@ impl FolderColorSelector {
     pub fn render_dialog(&mut self, ui: &mut Ui) {
         let mut should_close = false;
 
-        let Some(folder_id) = self.folder_id.as_ref() else { return; };
-        let Some(temp_color) = &mut self.temp_color else { return; };
+        let (Some(current_ver), Some(new_ver), Some(_)) = (self.current_version.as_ref(), self.new_version.as_ref(), self.tab_id.as_ref()) else { return; };
         
         let custom_frame = Frame::NONE
             .fill(Color32::from_rgb(16, 21, 25))
             .corner_radius(CornerRadius::same(10))
             .inner_margin(Margin::same(10));
 
-        Window::new("Selecciona un color")
+        Window::new("¡Nueva versión disponible!")
             .frame(custom_frame)
             .order(Order::Foreground)
             .collapsible(false)
@@ -77,50 +77,35 @@ impl FolderColorSelector {
             .show(ui, |ui|{
                 ui.set_min_width(250.0);
                 ui.set_min_height(100.0);
+                
+                ui.vertical_centered(|ui|{
+                    ui.label("Hay una actualización de Blazepilot.");
+                    ui.add_space(8.0);
 
-                let mut rgb: [f32; 3] = [
-                    temp_color.r() as f32 / 255.0,
-                    temp_color.g() as f32 / 255.0,
-                    temp_color.b() as f32 / 255.0,
-                ];
+                    ui.label(format!{"¿Quieres actualizar a la versión {}?", new_ver});
+                    ui.add_space(8.0);
+                    
+                    ui.label(format!("Versión actual: {}", current_ver));
+                });
 
-                ui.color_edit_button_rgb(&mut rgb);
-
-                *temp_color = Color32::from_rgb(
-                    (rgb[0] * 255.0) as u8,
-                    (rgb[1] * 255.0) as u8,
-                    (rgb[2] * 255.0) as u8,
-                );
 
                 ui.add_space(50.0);
                 
                 ui.horizontal(|ui| {
                     let width = ui.available_width();
-                    let button_width = 110.0;
-                    let spacing = (width - button_width * 3.0) / 4.0;
+                    let button_width = 120.0;
+                    let spacing = (width - button_width * 2.0) / 3.0;
 
                     ui.add_space(spacing);
-
-                    if ui.button("Restaurar predeterminado").clicked() {
-                        *temp_color = Color32::YELLOW;
-                    }
-                    
                     if ui.button("Cancelar").clicked() {
                         should_close = true;
                     }
 
+                    ui.add_space(spacing);
                     if ui.button("Aceptar").clicked() {
-                        let cm = cache_manager::CacheManager::global();
-                        let (folder_id, temp_color) = (*folder_id, *temp_color);
 
+                        Dispatcher::current().send(FileOperation::Update).ok();
 
-                        TOKIO_RUNTIME.spawn(async move {
-                            cm.update_color_cache(folder_id, temp_color).await;
-                            cm.save_color_cache().await;
-                        });
-                        
-
-                        ui.ctx().request_repaint();
                         should_close = true;
                     }
                 });

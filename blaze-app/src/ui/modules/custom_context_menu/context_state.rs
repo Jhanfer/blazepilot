@@ -3,7 +3,7 @@ use std::{cell::Cell, path::PathBuf, sync::Arc};
 use egui::{Align2, Area, Color32, CursorIcon, FontId, Frame, Id, Key, Order, Pos2, Rect, Response, Sense, Stroke, TextEdit, Ui, UiBuilder, pos2, vec2};
 use tracing::{info, warn};
 
-use crate::{core::{blaze_state::{BlazeCoreState, NewItemType}, configs::config_state::with_configs, files::blaze_motor::motor_structs::FileEntry, runtime::{bus_structs::{FileOperation, SureTo, UiEvent}, event_bus::{Dispatcher, with_event_bus}}, system::{clipboard::clipboard::TOKIO_RUNTIME, disk_reader::disk::Disk}}, ui::{blaze_ui_state::BlazeUiState, icons_cache::icons, image_preview::image_preview::ImagePreviewState}};
+use crate::{core::{blaze_state::{BlazeCoreState, NewItemType}, bootstrap::configs::config_manager::with_configs, files::blaze_motor::motor_structs::FileEntry, runtime::{bus_structs::{FileOperation, SureTo, UiEvent}, event_bus::{Dispatcher, with_event_bus}}, system::{clipboard::clipboard::TOKIO_RUNTIME, disk_reader::disk::Disk}}, ui::{blaze_ui_state::BlazeUiState, icons_cache::icons, image_preview::image_preview::ImagePreviewState}};
 
 
 #[derive(Default, PartialEq)]
@@ -1033,7 +1033,7 @@ impl ContextMenuState {
 
 
             let is_in_fav = with_configs(|c| {
-                c.is_in_favorite(file.full_path.to_owned())
+                c.is_in_favorite(&file.full_path)
             });
 
             if file.is_dir() {
@@ -1096,12 +1096,12 @@ impl ContextMenuState {
                     Some(0) => {
                         if !is_in_fav {
                             with_configs(|c| {
-                                c.add_to_favorites(file.name.to_string(),file.full_path.to_owned(), file.is_dir())
+                                c.add_to_favorites(file.name.to_string(), file.full_path.to_owned(), file.is_dir())
                             });
                             should_close = true;
                         } else {
                         with_configs(|c| {
-                            c.delete_from_favorites(file.name.to_string(),file.full_path.to_owned())
+                            c.delete_from_favorites(&file.name, &file.full_path)
                         });
                         should_close = true;
                         }

@@ -18,24 +18,24 @@
 
 use egui::{Color32, Ui, CornerRadius, Frame, Margin, Order, Window};
 use tracing::info;
-use crate::{core::{runtime::{bus_structs::FileOperation, event_bus::Dispatcher}}, ui::blaze_ui_state::ModalDialog};
+use crate::{core::{bootstrap::{configs::config_manager::with_configs, install_manager::installation_manager::with_installation_manager}, runtime::{bus_structs::UiEvent, event_bus::Dispatcher}}};
+use crate::core::bootstrap::install_manager::installation_manager::InstallResult;
+use crate::ui::dialog_manager::dialog_manager::ModalDialog;
 
 
-pub struct ErrorDialog {
-    pub message: Option<Box<str>>,
+pub struct WantToInstallDialog {
     pub show_modal: bool,
 }
 
-impl ModalDialog for ErrorDialog {
+impl ModalDialog for WantToInstallDialog {
     fn is_open(&self) -> bool { self.show_modal }
     fn close(&mut self) { self.close() }
     fn render(&mut self, ui: &mut Ui) { self.render_dialog(ui); }
 }
 
-impl ErrorDialog {
+impl WantToInstallDialog {
     pub fn new() -> Self {
         Self {
-            message: None,
             show_modal: false,
         }
     }
@@ -44,23 +44,19 @@ impl ErrorDialog {
         self.show_modal = false; 
     }
 
-    pub fn open(&mut self, message: &str) {
-        self.message = Some(message.into());
+    pub fn open(&mut self) {
         self.show_modal = true;
     }
 
 
     pub fn render_dialog(&mut self, ui: &mut Ui) {
-        let mut should_close = false;
-
-        let Some(message) = self.message.as_ref() else { return; };
-        
+        let mut should_close = false;        
         let custom_frame = Frame::NONE
             .fill(Color32::from_rgb(16, 21, 25))
             .corner_radius(CornerRadius::same(10))
             .inner_margin(Margin::same(10));
 
-        Window::new("¡Ha ocurrido un error!")
+        Window::new("¿Deseas instalar la app?")
             .frame(custom_frame)
             .order(Order::Foreground)
             .collapsible(false)
@@ -72,8 +68,10 @@ impl ErrorDialog {
                 ui.set_min_height(100.0);
                 
                 ui.vertical_centered(|ui|{
-                    ui.label(message);
                     ui.add_space(8.0);
+                    ui.label("Esto creará un '.desktop' ");
+
+                    ui.label("Puedes instalar desde configuraciones más tarde");
                 });
 
 
@@ -82,13 +80,37 @@ impl ErrorDialog {
                 ui.horizontal(|ui| {
                     let width = ui.available_width();
                     let button_width = 120.0;
-                    let spacing = (width - button_width * 2.0) / 3.0;
+                    let spacing = (width - button_width * 2.0) / 2.0;
 
                     ui.add_space(spacing);
-                    if ui.button("Aceptar").clicked() {
+                    if ui.button("Sí").clicked() {
+                        let dispatcher = Dispatcher::current();
 
-                        Dispatcher::current().send(FileOperation::Update).ok();
+                        with_installation_manager(|im|{
+                            let installresult = im.install();
+                            match installresult {
+                                InstallResult::InstalledSystem(path) |
+                                InstallResult::InstalledLocal(path) => {
+                                    dispatcher.send(
+                                        UiEvent::ShowGeneric {
+                                            title: "!Instalado con éxito!".into(),
+                                            message: format!("Se ha instalado en: '{}'", path.display()).into(),
+                                        }
+                                    ).ok()
+                                },
+                                InstallResult::Failed(e) => {
+                                    dispatcher.send(UiEvent::ShowError(e)).ok()
+                                },
+                                _=>{None},
+                            }
+                        });
+                        should_close = true;
+                    }
 
+                    if ui.button("Recuerdame luego").clicked() {
+                        with_configs(|im| {
+                            im.set_should_ask_install(false);
+                        });
                         should_close = true;
                     }
                 });

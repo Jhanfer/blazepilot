@@ -1,7 +1,7 @@
 use std::{path::{Path, PathBuf}, sync::Arc};
 use egui::{Align2, Color32, CursorIcon, FontId, PointerButton, Rect, Sense, Ui, pos2, vec2};
 use tracing::info;
-use crate::{core::{blaze_state::BlazeCoreState, configs::config_state::{FavoriteLinks, with_configs}, files::file_extension::{DocType, FileExtension}, system::{disk_reader::disk::Disk}}, ui::{blaze_ui_state::BlazeUiState, icons_cache::icons::*, modules::custom_context_menu::context_state::ContextMenuKind}};
+use crate::{core::{blaze_state::BlazeCoreState, bootstrap::configs::{config_manager::with_configs, platform::linux::conf_structs::FavoriteLinks}, files::file_extension::{DocType, FileExtension}, system::disk_reader::disk::Disk}, ui::{blaze_ui_state::BlazeUiState, icons_cache::icons::*, modules::custom_context_menu::context_state::ContextMenuKind}};
 
 
 
@@ -168,7 +168,7 @@ pub fn render_fav_buttons(ui: &mut Ui, fav: FavoriteLinks, state: &mut BlazeCore
     response.context_menu(|ui|{
         if ui.button("Eliminar de favoritos").clicked() {
             with_configs(|c| {
-                c.delete_from_favorites(fav.name.clone(), fav.path);
+                c.delete_from_favorites(&fav.name, &fav.path);
             });
         }
     });

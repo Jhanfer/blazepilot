@@ -20,9 +20,11 @@ use std::sync::Arc;
 use egui::{Button, Color32, CornerRadius, Frame, Margin, Panel, TextEdit, Ui};
 use tracing::error;
 
+use crate::core::bootstrap::configs::config_manager::with_configs;
+use crate::core::bootstrap::configs::platform::linux::conf_structs::OrderingMode;
 use crate::core::files::blaze_motor::motor_structs::FileEntry;
 use crate::core::system::extended_info::extended_info_manager::ExtendedInfo;
-use crate::core::{blaze_state::BlazeCoreState, configs::config_state::{OrderingMode, with_configs}};
+use crate::core::{blaze_state::BlazeCoreState};
 use crate::utils::formating::{format_date, format_size};
 
 pub fn sidebar_right_component(ui: &mut Ui, state: &mut BlazeCoreState, files: &Vec<Arc<FileEntry>>) {
@@ -76,7 +78,7 @@ pub fn sidebar_right_component(ui: &mut Ui, state: &mut BlazeCoreState, files: &
                 ui.horizontal_top(|ui|{
 
                     let current_order = with_configs(|c|{
-                        c.configs.app_ordering_mode.clone()
+                        c.get_ordering_mode()
                     });
 
 

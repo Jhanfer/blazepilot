@@ -16,31 +16,28 @@
 
 
 
-
-use std::{path::Path, sync::Arc};
-
-use egui::{Color32, CornerRadius, Frame, Margin, Order, RichText, Ui, Window};
-use uuid::Uuid;
-use crate::{core::{runtime::{bus_structs::FileOperation, event_bus::Dispatcher}}, ui::blaze_ui_state::ModalDialog};
+use egui::{Color32, Ui, CornerRadius, Frame, Margin, Order, Window};
+use tracing::info;
+use crate::ui::dialog_manager::dialog_manager::ModalDialog;
 
 
-pub struct SureToDeleteDialog {
-    pub sources: Option<Vec<Arc<Path>>>,
-    pub tab_id: Option<Uuid>,
+pub struct ShowGenericDialog {
+    pub title: Option<Box<str>>,
+    pub message: Option<Box<str>>,
     pub show_modal: bool,
 }
 
-impl ModalDialog for SureToDeleteDialog {
+impl ModalDialog for ShowGenericDialog {
     fn is_open(&self) -> bool { self.show_modal }
     fn close(&mut self) { self.close() }
     fn render(&mut self, ui: &mut Ui) { self.render_dialog(ui); }
 }
 
-impl SureToDeleteDialog {
+impl ShowGenericDialog {
     pub fn new() -> Self {
         Self {
-            sources: None, 
-            tab_id: None,
+            title: None,
+            message: None,
             show_modal: false,
         }
     }
@@ -49,9 +46,9 @@ impl SureToDeleteDialog {
         self.show_modal = false; 
     }
 
-    pub fn open(&mut self, sources: Vec<Arc<Path>>, tab_id: Uuid) {
-        self.sources = Some(sources);
-        self.tab_id = Some(tab_id);
+    pub fn open(&mut self, title: &str, message: &str) {
+        self.title = Some(title.into());
+        self.message = Some(message.into());
         self.show_modal = true;
     }
 
@@ -59,14 +56,14 @@ impl SureToDeleteDialog {
     pub fn render_dialog(&mut self, ui: &mut Ui) {
         let mut should_close = false;
 
-        let (Some(sources), Some(_)) = (self.sources.as_ref(), self.tab_id.as_ref()) else { return; };
+        let (Some(title), Some(message)) = ( self.title.as_ref(), self.message.as_ref()) else { return; };
         
         let custom_frame = Frame::NONE
             .fill(Color32::from_rgb(16, 21, 25))
             .corner_radius(CornerRadius::same(10))
             .inner_margin(Margin::same(10));
 
-        Window::new("")
+        Window::new(title)
             .frame(custom_frame)
             .order(Order::Foreground)
             .collapsible(false)
@@ -77,54 +74,28 @@ impl SureToDeleteDialog {
                 ui.set_min_width(250.0);
                 ui.set_min_height(100.0);
                 
-                ui.heading("¿Deseas eliminar permanentemente?");
+                ui.vertical_centered(|ui|{
+                    ui.label(message);
+                    ui.add_space(8.0);
+                });
 
-                const MAX_SHOWN: usize = 5;
-                let total = sources.len();
-
-                for source in sources.iter().take(MAX_SHOWN) {
-                    let file_name = source.file_name()
-                        .map(|f| f.to_string_lossy().into_owned())
-                        .unwrap_or_else(|| "Archivo".to_string());
-
-                    ui.label(format!("• {}", file_name));
-                }
-
-                if total > MAX_SHOWN {
-                    ui.label(
-                        RichText::new(format!("...y {} archivos más", total - MAX_SHOWN))
-                            .weak()
-                            .italics(),
-                    );
-                }
 
                 ui.add_space(50.0);
                 
                 ui.horizontal(|ui| {
                     let width = ui.available_width();
                     let button_width = 120.0;
-                    let spacing = (width - button_width * 2.0) / 3.0;
+                    let spacing = (width - button_width * 2.0) / 2.0;
 
                     ui.add_space(spacing);
-                    if ui.button("Cancelar").clicked() {
-                        should_close = true;
-                    }
-
-                    ui.add_space(spacing);
-                    if ui.button("Aceptar").clicked() {
-
-                        Dispatcher::current().send(
-                            FileOperation::Trash { 
-                                files: sources.to_vec()
-                            }
-                        ).ok();
-
+                    if ui.button("Cerrar").clicked() {
                         should_close = true;
                     }
                 });
             });
 
         if should_close {
+            info!("Se cierra");
             self.close();
         }
     }

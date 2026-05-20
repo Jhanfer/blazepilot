@@ -15,14 +15,13 @@
 
 
 use std::sync::Arc;
-use eframe::{HardwareAcceleration};
+use eframe::HardwareAcceleration;
 use tracing::warn;
 use tracing_subscriber::{fmt, EnvFilter};
 mod app;
 mod core;
 mod ui;
 mod utils;
-use app::BlazeApp;
 use mimalloc::MiMalloc;
 
 #[cfg(target_os = "linux")]
@@ -30,7 +29,8 @@ use winit::platform::x11::EventLoopBuilderExtX11;
 #[cfg(target_os = "linux")]
 use winit::platform::wayland::EventLoopBuilderExtWayland;
 
-use crate::{core::{blaze_state::BlazeCoreState, configs::config_state::with_configs, system::{clipboard::clipboard::TOKIO_RUNTIME, knowndirs::knowndirs_manager::KnownDirsManager, trash_manager::trash_manager::init_trash_backend}}, ui::blaze_ui_state::BlazeUiState};
+
+use crate::{app::BlazeAppBuilder, core::{bootstrap::configs::config_manager::with_configs, system::{knowndirs::knowndirs_manager::KnownDirsManager, trash_manager::trash_manager::init_trash_backend}},utils::initial_path_handler::parse_initial_path};
 
 #[global_allocator]
 static GLOBAL: MiMalloc = MiMalloc;
@@ -52,13 +52,13 @@ fn main() {
         .with_thread_ids(true)
         .init();
 
+    let initial_path = parse_initial_path();
+
     let _ = init_dir_trash()
         .map_err(|e| warn!("Ha ocurrido un error inicializando: {}", e));
 
     let backend = with_configs(|c| {
-        c.load_or_init_configs().unwrap();
-
-        c.configs.display_backend.clone()
+        c.get_display_backend()
     });
 
 
@@ -107,7 +107,7 @@ fn main() {
     #[cfg(target_os = "linux")]
     {
         options.event_loop_builder = Some(Box::new(move |builder| {
-            use crate::core::configs::config_state::DisplayBackend;
+            use crate::core::bootstrap::configs::platform::linux::conf_structs::DisplayBackend;
             match backend {
                 DisplayBackend::X11 => builder.with_x11(),
                 DisplayBackend::Wayland => builder.with_wayland(),
@@ -116,13 +116,9 @@ fn main() {
         }));
     }
 
-    let state = TOKIO_RUNTIME.block_on(BlazeCoreState::new());
-    let ui_state = BlazeUiState::new();
-
-    let blazeapp = BlazeApp {
-        state,
-        ui_state,
-    };
+    let blazeapp = BlazeAppBuilder::default()
+        .with_start_path(initial_path)
+        .build();
 
     eframe::run_native(
         "BlazePilot",

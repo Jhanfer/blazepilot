@@ -1,4 +1,4 @@
-pub mod dialogs;
+pub mod dialog_manager;
 pub mod blaze_ui_state;
 pub mod modules;
 pub mod icons_cache;

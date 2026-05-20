@@ -20,14 +20,54 @@ use std::sync::Arc;
 use eframe::Frame;
 use egui::{FontData, FontDefinitions, FontFamily, Ui};
 use tracing::{debug};
-use crate::core::blaze_state::BlazeCoreState;
+use crate::core::blaze_state::{BlazeCoreBuilder, BlazeCoreState};
+use crate::core::system::clipboard::clipboard::TOKIO_RUNTIME;
+use crate::core::system::knowndirs::knowndirs_manager::KnownDirsManager;
 use crate::ui::blaze_ui_state::BlazeUiState;
 use crate::ui::modules::ui_callback::connect_ui_components_callback;
 
 
+
+#[must_use = "llama .build() para construir la aap"]
+pub struct BlazeAppBuilder {
+    pub start_path: Option<Arc<Path>>,
+}
+
+impl BlazeAppBuilder {
+    fn new() -> Self {
+        Self {
+            start_path: Some(KnownDirsManager::get().home.clone()),
+        }
+    }
+
+    pub fn with_start_path(mut self, path: Option<Arc<Path>>) -> Self {
+        self.start_path = path;
+        self
+    }
+
+    #[must_use]
+    pub fn build(self) -> BlazeApp { 
+        let state = TOKIO_RUNTIME.block_on(
+            BlazeCoreBuilder::default()
+                .with_start_path(self.start_path)
+                .build()
+        );
+        let ui_state = BlazeUiState::default();
+
+        BlazeApp { state, ui_state }
+    }
+}
+
+impl Default for BlazeAppBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+
 pub struct BlazeApp {
     pub state: BlazeCoreState, //motor, archivos, mover
-    pub ui_state: BlazeUiState, //visuales (qué item está hovereado, etc)
+    pub ui_state: BlazeUiState, //visuales
 }
 
 

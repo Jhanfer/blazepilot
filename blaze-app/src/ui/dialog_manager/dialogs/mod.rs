@@ -6,3 +6,5 @@ pub mod sure_to_delete;
 pub mod folder_color_selector_dialog;
 pub mod configs_dialog;
 pub mod image_preview_dialog;
+pub mod want_to_install;
+pub mod show_generic_message;

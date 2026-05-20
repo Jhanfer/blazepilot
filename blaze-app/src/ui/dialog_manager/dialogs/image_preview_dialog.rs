@@ -18,8 +18,8 @@
 
 
 use egui::{Button, Color32, CornerRadius, Frame, Key, Margin, Order, Rect, ScrollArea, Sense, Ui, Vec2, Window, pos2, vec2};
-use crate::{ui::{blaze_ui_state::ModalDialog, image_preview::image_preview::ImagePreviewState}};
-
+use crate::{ui::{image_preview::image_preview::ImagePreviewState}};
+use crate::ui::dialog_manager::dialog_manager::ModalDialog;
 
 pub struct ImagePreviewDialog {
     pub preview: Option<ImagePreviewState>,

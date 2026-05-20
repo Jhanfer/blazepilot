@@ -18,7 +18,7 @@
 
 use std::{path::Path, sync::Arc};
 
-use crate::{core::{files::blaze_motor::{motor::new_task_id, motor_structs::TaskType}, runtime::{bus_structs::{FileOperation, UiEvent}, event_bus::Dispatcher}, system::clipboard::clipboard::TOKIO_RUNTIME}, ui::task_manager::task_manager::TaskMessage};
+use crate::{core::{files::blaze_motor::{tab_state::new_task_id, motor_structs::TaskType}, runtime::{bus_structs::{FileOperation, UiEvent}, event_bus::Dispatcher}, system::clipboard::clipboard::TOKIO_RUNTIME}, ui::task_manager::task_manager::TaskMessage};
 
 #[derive(Debug, Clone)]
 pub enum UndoRecord {

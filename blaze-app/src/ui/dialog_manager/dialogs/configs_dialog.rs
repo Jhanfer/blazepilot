@@ -18,7 +18,9 @@
 
 use core::f32;
 use egui::{Area, CentralPanel, Color32, ComboBox, CornerRadius, Frame, Key, Margin, OpenUrl, Order, Panel, RichText, TextEdit, Ui, Window, pos2};
-use crate::{core::{configs::config_state::{DisplayBackend, with_configs}, system::{ clipboard::clipboard::TOKIO_RUNTIME, terminal_opener::terminal_manager::GLOBAL_TERMINAL_MANAGER}}, ui::blaze_ui_state::ModalDialog};
+use crate::{core::{bootstrap::configs::{config_manager::with_configs, platform::linux::conf_structs::DisplayBackend}, system::{ clipboard::clipboard::TOKIO_RUNTIME, terminal_opener::terminal_manager::GLOBAL_TERMINAL_MANAGER}}};
+use crate::ui::dialog_manager::dialog_manager::ModalDialog;
+
 
 #[derive(PartialEq, Clone, Copy)]
 enum CurrentConfigTab {
@@ -238,17 +240,17 @@ impl ConfigDialog {
 
     fn get_selected_terminal_text(&self) -> String {
         with_configs(|c| {
-            if c.configs.default_terminal.trim().is_empty() {
+            if c.get_default_terminal().trim().is_empty() {
                 "Seleccionar terminal".to_string()
             } else {
-                c.configs.default_terminal.clone()
+                c.get_default_terminal()
             }
         })
     }
 
     fn is_terminal_selected(&self, term: &str) -> bool {
         with_configs(|c| {
-            c.configs.default_terminal == term
+            c.get_default_terminal() == term
         })
     }
 
@@ -327,7 +329,7 @@ impl ConfigDialog {
 
             ui.add_space(8.0);
 
-            let current = with_configs(|c|c.configs.display_backend.clone());
+            let current = with_configs(|c|c.get_display_backend());
 
             ComboBox::from_label("Backend")
                 .selected_text(current.name())
