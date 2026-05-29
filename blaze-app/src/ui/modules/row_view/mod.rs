@@ -6,3 +6,6 @@ pub mod hot_keys;
 pub mod render_drag;
 pub mod island_n_bubble;
 pub mod new_scroll_view;
+pub mod utilities;
+pub mod render_tags_view;
+pub mod render_row_panel_view;

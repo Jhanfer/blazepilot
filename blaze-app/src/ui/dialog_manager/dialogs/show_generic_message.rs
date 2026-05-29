@@ -18,7 +18,7 @@
 
 use egui::{Color32, Ui, CornerRadius, Frame, Margin, Order, Window};
 use tracing::info;
-use crate::ui::dialog_manager::dialog_manager::ModalDialog;
+use crate::ui::{dialog_manager::dialog_manager::ModalDialog, themes::colors::COLOR_BG_MAIN};
 
 
 pub struct ShowGenericDialog {
@@ -59,7 +59,7 @@ impl ShowGenericDialog {
         let (Some(title), Some(message)) = ( self.title.as_ref(), self.message.as_ref()) else { return; };
         
         let custom_frame = Frame::NONE
-            .fill(Color32::from_rgb(16, 21, 25))
+            .fill(COLOR_BG_MAIN)
             .corner_radius(CornerRadius::same(10))
             .inner_margin(Margin::same(10));
 

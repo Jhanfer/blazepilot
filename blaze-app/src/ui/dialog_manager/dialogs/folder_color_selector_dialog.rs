@@ -18,7 +18,7 @@
 
 use egui::{Color32, Ui, CornerRadius, Frame, Margin, Order, Window};
 use file_id::FileId;
-use crate::{core::system::{cache::cache_manager, clipboard::clipboard::TOKIO_RUNTIME,}};
+use crate::{core::system::{cache::cache_manager, clipboard::clipboard::TOKIO_RUNTIME,}, ui::themes::colors::COLOR_BG_MAIN};
 use crate::ui::dialog_manager::dialog_manager::ModalDialog;
 
 
@@ -64,7 +64,7 @@ impl FolderColorSelector {
         let Some(temp_color) = &mut self.temp_color else { return; };
         
         let custom_frame = Frame::NONE
-            .fill(Color32::from_rgb(16, 21, 25))
+            .fill(COLOR_BG_MAIN)
             .corner_radius(CornerRadius::same(10))
             .inner_margin(Margin::same(10));
 

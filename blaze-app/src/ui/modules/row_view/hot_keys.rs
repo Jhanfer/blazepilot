@@ -1,7 +1,26 @@
 use std::sync::Arc;
-use egui::{ Key, PointerButton, Ui};
+use egui::{ Color32, Key, PointerButton, Ui};
 use tracing::warn;
-use crate::{core::{blaze_state::{BlazeCoreState, NewItemType}, files::blaze_motor::motor_structs::FileEntry, runtime::{bus_structs::{SureTo, UiEvent}, event_bus::with_event_bus}, system::{cache::cache_manager::CacheManager, operationstate::operation_manager::with_history, trash_manager::trash_manager::get_backend}}, ui::blaze_ui_state::BlazeUiState};
+use crate::{
+    core::{
+        blaze_state::{
+            BlazeCoreState,
+            NewItemType,
+            ViewMode
+        },
+        files::blaze_motor::motor_structs::FileEntry,
+        runtime::{
+            bus_structs::{QuickTagEvent, SureTo, UiEvent},
+            event_bus::with_event_bus
+        },
+        system::{
+            cache::cache_manager::CacheManager,
+            operationstate::operation_manager::with_history,
+            trash_manager::trash_manager::get_backend
+        }
+    },
+    ui::blaze_ui_state::BlazeUiState
+};
 
 
 fn get_focus(ui: &mut Ui, id: &'static str) -> bool {
@@ -207,7 +226,7 @@ pub fn hot_keys_logic(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, f
         state.open_terminal_here();
     }
 
-
+    //búsqueda recursiva
     if input.modifiers.alt && input.key_pressed(Key::R) {
         if state.search_filter.is_empty() || !ui.memory(|m| m.has_focus("search_bar".into())) {
             state.set_search("rec:".to_owned());
@@ -216,6 +235,23 @@ pub fn hot_keys_logic(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, f
                 mem.request_focus("search_bar".into());
             });
         }
+    }
+
+
+    //Tags
+    if input.modifiers.ctrl && input.key_pressed(Key::T) && !input.modifiers.shift {
+        state.view_mode = match state.view_mode {
+            ViewMode::Normal => ViewMode::Tags,
+            ViewMode::Tags => ViewMode::Normal,
+        };
+    }
+
+    if input.modifiers.ctrl && input.modifiers.shift && input.key_pressed(Key::T) {
+        dispatcher.send(
+            UiEvent::QuickTagEvent(
+                QuickTagEvent::CreateNewTag { title: String::new(), temp_color: Color32::GRAY }
+            )
+        ).ok();
     }
 
 
@@ -235,7 +271,7 @@ pub fn hot_keys_logic(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, f
 
     // cambiar de pestaña y encender búsqueda
 
-    let text_edit_focused = get_focus(ui, "search_bar") || get_focus(ui, "search_ctx_menu") || get_focus(ui, "creating_new") || get_focus(ui, "rename_space");
+    let text_edit_focused = get_focus(ui, "search_bar") || get_focus(ui, "search_ctx_menu") || get_focus(ui, "creating_new") || get_focus(ui, "rename_space") || get_focus(ui, "quick_tag_name");
 
     if !text_edit_focused {
         for event in &input.events {
@@ -279,7 +315,7 @@ pub fn hot_keys_logic(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, f
                             {
                                 state.set_search(key.name().to_lowercase());
                                 
-                                ui.ctx().memory_mut(|mem| {
+                                ui.memory_mut(|mem| {
                                     mem.request_focus("search_bar".into());
                                 });
                             }

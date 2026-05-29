@@ -1,5 +1,6 @@
 use std::{path::Path, sync::Arc};
 use file_id::FileId;
+use serde::{Deserialize, Serialize};
 use crate::{core::files::file_extension::FileExtension};
 
 
@@ -88,13 +89,38 @@ pub struct FileEntry {
     pub attributes: u32,
 }
 
-#[derive(Debug, Default, Clone, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum FileKind {
     #[default]
     File,
     Dir,
     Symlink
 }
+
+impl Default for FileEntry {
+    fn default() -> Self {
+        Self { 
+            name: Default::default(), 
+            full_path: Arc::from(Path::new("")),
+            extension: Default::default(),
+            kind: Default::default(), 
+            size: Default::default(), 
+            modified: Default::default(), 
+            created: Default::default(), 
+            is_hidden: Default::default(), 
+            unique_id: Default::default(), 
+            accessed: Default::default(), 
+            permissions: Default::default(), 
+            inode: Default::default(), 
+            nlink: Default::default(), 
+            device: Default::default(),
+
+            #[cfg(windows)]
+            attributes: 0
+        }
+    }
+}
+
 impl FileEntry {
     pub fn is_dir(&self) -> bool {
         matches!(self.kind, FileKind::Dir)

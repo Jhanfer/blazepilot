@@ -1,7 +1,9 @@
 use std::path::Path;
 use std::sync::Arc;
+use egui::Color32;
 use file_id::FileId;
 use uuid::Uuid;
+use crate::core::bootstrap::quick_access_manager::platform::structs::QuickLinks;
 use crate::core::files::blaze_motor::motor_structs::FileEntry;
 use crate::core::system::fileopener_module::AppAssociation;
 use crate::core::system::fileopener_module::platform::linux::structs::AppsIconData;
@@ -63,6 +65,10 @@ pub enum FileOperation {
         entry: Arc<FileEntry>, 
         dest_dir: Arc<Path>,
     },
+
+    NavigateTo(Arc<Path>),
+    OpenFileByPath(Arc<Path>),
+    OpenPathToNewTab(Arc<Path>),
 }
 
 #[derive(Debug)]
@@ -76,7 +82,6 @@ pub enum SureTo {
         files: Vec<Arc<Path>>,
         tab_id: Uuid,
     },
-    SureToCopy,
 }
 
 #[derive(Debug)]
@@ -128,4 +133,39 @@ pub enum UiEvent {
     OpenConfigs,
 
     RefreshList,
+
+    QuickTagEvent(QuickTagEvent),
+}
+
+
+pub enum QuickTagEvent {
+    CreateNewTag {
+        title: String, 
+        temp_color: Color32
+    },
+    AddQuickLinkToTag { 
+        quicks: Vec<QuickLinks>
+    },
+    EditCurrentTag  {
+        id: Uuid,
+        title: String,
+        temp_color: Color32, 
+    },
+    DeleteCurrentTag {
+        title: Box<str>,
+        id: Uuid
+    },
+
+    DeleteQuickLink {
+        tag_id: Uuid,
+        quick_title: Box<str>,
+        quick_id: Uuid,
+    },
+
+    EditCurrentQuickLink {
+        tag_id: Uuid,
+        quick_id: Uuid,
+        title: String, 
+        temp_color: Color32,
+    },
 }

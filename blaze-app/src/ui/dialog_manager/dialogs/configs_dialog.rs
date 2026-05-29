@@ -18,7 +18,7 @@
 
 use core::f32;
 use egui::{Area, CentralPanel, Color32, ComboBox, CornerRadius, Frame, Key, Margin, OpenUrl, Order, Panel, RichText, TextEdit, Ui, Window, pos2};
-use crate::{core::{bootstrap::configs::{config_manager::with_configs, platform::linux::conf_structs::DisplayBackend}, system::{ clipboard::clipboard::TOKIO_RUNTIME, terminal_opener::terminal_manager::GLOBAL_TERMINAL_MANAGER}}};
+use crate::{core::{bootstrap::configs::{config_manager::with_configs, platform::linux::conf_structs::DisplayBackend}, system::{ clipboard::clipboard::TOKIO_RUNTIME, terminal_opener::terminal_manager::GLOBAL_TERMINAL_MANAGER}}, ui::themes::colors::COLOR_BG_MAIN};
 use crate::ui::dialog_manager::dialog_manager::ModalDialog;
 
 
@@ -379,7 +379,7 @@ impl ConfigDialog {
 
         let frame = Frame::new()
             .corner_radius(CornerRadius::same(10))
-            .fill(Color32::from_rgb(16, 21, 25))
+            .fill(COLOR_BG_MAIN)
             .outer_margin(Margin::same(5));
 
         let mut close_requested = false;

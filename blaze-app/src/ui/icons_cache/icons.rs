@@ -62,3 +62,4 @@ pub const ICON_EXTRACT: &[u8] = include_bytes!("../assets/icons/arrow-autofit-do
 pub const ICON_DATABASE: &[u8] = include_bytes!("../assets/icons/database.svg");
 pub const ICON_MUSIC: &[u8] = include_bytes!("../assets/icons/music.svg");
 pub const ICON_PUBLIC: &[u8] = include_bytes!("../assets/icons/users.svg");
+pub const ICON_TAG: &[u8] = include_bytes!("../assets/icons/tag.svg");

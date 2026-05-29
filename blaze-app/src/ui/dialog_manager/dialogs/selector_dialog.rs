@@ -20,7 +20,7 @@ use std::{path::Path, sync::Arc};
 use egui::{Color32, ColorImage, Ui, Frame, Margin, Order, RichText, ScrollArea, TextureOptions, Window, scroll_area::ScrollSource};
 use tracing::info;
 
-use crate::{core::system::{clipboard::clipboard::TOKIO_RUNTIME, fileopener_module::{AppAssociation, GLOBAL_FILE_OPENER, platform::linux::structs::AppsIconData}}, ui::dialog_manager::dialog_manager::ModalDialog};
+use crate::{core::system::{clipboard::clipboard::TOKIO_RUNTIME, fileopener_module::{AppAssociation, GLOBAL_FILE_OPENER, platform::linux::structs::AppsIconData}}, ui::{dialog_manager::dialog_manager::ModalDialog, themes::colors::COLOR_BG_MAIN}};
 
 pub struct SelectorData {
     pub path: Arc<Path>,
@@ -162,7 +162,7 @@ impl AppSelectorDialog {
         let Some(data) = &mut self.selector_data else { return; };
         
         let custom_frame = Frame::NONE
-            .fill(Color32::from_rgb(16, 21, 25))
+            .fill(COLOR_BG_MAIN)
             .inner_margin(Margin::same(20));
 
         let file_name = data.path.file_name()

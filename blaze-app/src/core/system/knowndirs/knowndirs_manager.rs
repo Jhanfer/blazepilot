@@ -160,13 +160,13 @@ impl KnownDirsManager {
             };
         }
 
-        push_opt!("Desktop",   self.desktop);
-        push_opt!("Downloads", self.downloads);
-        push_opt!("Documents", self.documents);
-        push_opt!("Pictures",  self.pictures);
-        push_opt!("Videos",    self.videos);
-        push_opt!("Music",     self.music);
-        push_opt!("Public",    self.public);
+        push_opt!("Escritorio",   self.desktop);
+        push_opt!("Descargas", self.downloads);
+        push_opt!("Documentos", self.documents);
+        push_opt!("Imágenes",  self.pictures);
+        push_opt!("Vídeos",    self.videos);
+        push_opt!("Música",     self.music);
+        push_opt!("Público",    self.public);
 
         dirs
     } 

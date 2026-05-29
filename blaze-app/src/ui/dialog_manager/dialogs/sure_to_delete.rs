@@ -21,7 +21,7 @@ use std::{path::Path, sync::Arc};
 
 use egui::{Color32, CornerRadius, Frame, Margin, Order, RichText, Ui, Window};
 use uuid::Uuid;
-use crate::{core::{runtime::{bus_structs::FileOperation, event_bus::Dispatcher}}};
+use crate::{core::runtime::{bus_structs::FileOperation, event_bus::Dispatcher}, ui::themes::colors::COLOR_BG_MAIN};
 use crate::ui::dialog_manager::dialog_manager::ModalDialog;
 
 pub struct SureToDeleteDialog {
@@ -62,7 +62,7 @@ impl SureToDeleteDialog {
         let (Some(sources), Some(_)) = (self.sources.as_ref(), self.tab_id.as_ref()) else { return; };
         
         let custom_frame = Frame::NONE
-            .fill(Color32::from_rgb(16, 21, 25))
+            .fill(COLOR_BG_MAIN)
             .corner_radius(CornerRadius::same(10))
             .inner_margin(Margin::same(10));
 

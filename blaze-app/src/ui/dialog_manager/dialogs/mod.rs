@@ -8,3 +8,4 @@ pub mod configs_dialog;
 pub mod image_preview_dialog;
 pub mod want_to_install;
 pub mod show_generic_message;
+pub mod quick_dialogs;

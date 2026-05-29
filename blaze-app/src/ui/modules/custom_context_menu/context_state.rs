@@ -3,7 +3,37 @@ use std::{cell::Cell, path::PathBuf, sync::Arc};
 use egui::{Align2, Area, Color32, CursorIcon, FontId, Frame, Id, Key, Order, Pos2, Rect, Response, Sense, Stroke, TextEdit, Ui, UiBuilder, pos2, vec2};
 use tracing::{info, warn};
 
-use crate::{core::{blaze_state::{BlazeCoreState, NewItemType}, bootstrap::configs::config_manager::with_configs, files::blaze_motor::motor_structs::FileEntry, runtime::{bus_structs::{FileOperation, SureTo, UiEvent}, event_bus::{Dispatcher, with_event_bus}}, system::{clipboard::clipboard::TOKIO_RUNTIME, disk_reader::disk::Disk}}, ui::{blaze_ui_state::BlazeUiState, icons_cache::icons, image_preview::image_preview::ImagePreviewState}};
+use crate::{
+    core::{
+        blaze_state::{
+            BlazeCoreState, 
+            NewItemType
+        }, 
+        bootstrap::quick_access_manager::platform::structs::QuickLinks, 
+        files::blaze_motor::motor_structs::FileEntry, 
+        runtime::{
+            bus_structs::{
+                FileOperation, 
+                QuickTagEvent, 
+                SureTo, 
+                UiEvent
+            }, 
+            event_bus::{
+                Dispatcher, 
+                with_event_bus
+            }
+        }, 
+        system::{
+            clipboard::clipboard::TOKIO_RUNTIME, 
+            disk_reader::disk::Disk
+        }
+    }, 
+    ui::{
+        blaze_ui_state::BlazeUiState, 
+        icons_cache::icons, 
+        image_preview::image_preview::ImagePreviewState, themes::colors::{COLOR_ACCENT_GLOW, COLOR_BG_PANEL}
+    }
+};
 
 
 #[derive(Default, PartialEq)]
@@ -109,9 +139,9 @@ impl ContextMenuState {
                 .constrain_to(screen)
                 .show(ui.ctx(), |ui| {
                     Frame::new()
-                        .fill(Color32::from_rgb(40, 40, 50))
+                        .fill(COLOR_BG_PANEL)
                         .corner_radius(12.0)
-                        .stroke(Stroke::new(1.0, Color32::from_rgb(46, 5, 63)))
+                        .stroke(Stroke::new(0.8, COLOR_ACCENT_GLOW))
                         .inner_margin(8.0)
                         .show(ui, |ui| {
                             ui.set_min_width(190.0);
@@ -1031,11 +1061,6 @@ impl ContextMenuState {
 
             ui.separator();
 
-
-            let is_in_fav = with_configs(|c| {
-                c.is_in_favorite(&file.full_path)
-            });
-
             if file.is_dir() {
                 //Color de carpeta
                 ui.horizontal(|ui|{
@@ -1070,19 +1095,12 @@ impl ContextMenuState {
             }
             
 
-            //Agregar a favoritos
+            //Agregar a Tags
             ui.horizontal(|ui|{
-                let icon = if !is_in_fav {
-                    ("star-row", icons::ICON_STAR)
-                } else {
-                    ("star-disable", icons::ICON_STAR_DISABLE)
-                };
+                let icon = ("star-row", icons::ICON_STAR);
 
-                let label = if !is_in_fav {
-                    "Agregar a favoritos"
-                } else {
-                    "Quitar a favoritos"
-                };
+                let label = "Agregar a tag";
+
                 let hint = "";
                 
                 let action: Cell<Option<u8>> = Cell::new(None);
@@ -1094,17 +1112,18 @@ impl ContextMenuState {
 
                 match action.get() {
                     Some(0) => {
-                        if !is_in_fav {
-                            with_configs(|c| {
-                                c.add_to_favorites(file.name.to_string(), file.full_path.to_owned(), file.is_dir())
-                            });
-                            should_close = true;
-                        } else {
-                        with_configs(|c| {
-                            c.delete_from_favorites(&file.name, &file.full_path)
-                        });
+                        let qick = QuickLinks::new(file.name.clone(), Color32::GRAY)
+                            .with_path(file.full_path.clone())
+                            .with_kind(file.kind.clone())
+                            .with_is_dir(file.is_dir());
+
+                        sender.send(
+                            UiEvent::QuickTagEvent (
+                                QuickTagEvent::AddQuickLinkToTag { quicks: vec![qick] }
+                            )
+                        ).ok();
+
                         should_close = true;
-                        }
                     }
                     _ => {}
                 }
@@ -1165,7 +1184,7 @@ impl ContextMenuState {
                 match action.get() {
                     Some(0) => {
                         state.renaming_file = Some(file.full_path.to_path_buf());
-                        state.rename_buffer = file.name.to_ascii_lowercase();
+                        state.rename_buffer = file.name.to_string();
                         should_close = true;
                     }
                     _ => {}

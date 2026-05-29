@@ -1,6 +1,6 @@
 use std::sync::Arc;
 use egui::{Color32, Painter, Rect, Stroke, pos2, vec2};
-use crate::core::{blaze_state::BlazeCoreState, files::blaze_motor::motor_structs::FileEntry};
+use crate::{core::{blaze_state::BlazeCoreState, files::blaze_motor::motor_structs::FileEntry}, ui::themes::colors::COLOR_ACCENT_GLOW};
 
 
 pub fn render_rubberband(state: &mut BlazeCoreState, files: &Vec<Arc<FileEntry>>, clipped_painter: &Painter, panel_top: f32, content_rect: Rect, row_height: f32) {
@@ -17,12 +17,25 @@ pub fn render_rubberband(state: &mut BlazeCoreState, files: &Vec<Arc<FileEntry>>
         clipped_painter.rect_filled(
             rect, 
             10.0, 
-            Color32::from_rgba_unmultiplied(100, 100, 255, 40)
+            Color32::from_rgba_unmultiplied(
+                COLOR_ACCENT_GLOW.r(),
+                COLOR_ACCENT_GLOW.g(),
+                COLOR_ACCENT_GLOW.b(),
+                40
+            )
         );
 
         let mut points = Vec::new();
 
-        let stroke = Stroke::new(3.0, Color32::from_rgba_unmultiplied(150, 150, 255, 200));
+        let stroke = Stroke::new(
+            3.0, 
+            Color32::from_rgba_unmultiplied(
+                COLOR_ACCENT_GLOW.r(),
+                COLOR_ACCENT_GLOW.g(),
+                COLOR_ACCENT_GLOW.b(),
+                200
+            )
+        );
         let radius = (rect.width().min(rect.height()) / 2.0).min(10.0);
         let steps = 8;
 

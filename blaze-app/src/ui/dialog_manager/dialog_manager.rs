@@ -2,12 +2,22 @@ use std::{path::Path, sync::Arc};
 
 use egui::{Area, Order, Sense, Ui};
 use file_id::FileId;
+use tracing::info;
 use uuid::Uuid;
 
-use crate::{core::system::fileopener_module::{AppAssociation, platform::linux::structs::AppsIconData}, 
+use crate::{core::{runtime::bus_structs::QuickTagEvent, system::fileopener_module::{AppAssociation, platform::linux::structs::AppsIconData}}, 
     ui::{
         dialog_manager::dialogs::{
-            configs_dialog::ConfigDialog, error_dialog::ErrorDialog, folder_color_selector_dialog::FolderColorSelector, image_preview_dialog::ImagePreviewDialog, selector_dialog::AppSelectorDialog, show_generic_message::ShowGenericDialog, sure_to_delete::SureToDeleteDialog, sure_to_move_to::SureToMoveToDialog, update_dialog::UpdateDialog, want_to_install::WantToInstallDialog
+            configs_dialog::ConfigDialog, 
+            error_dialog::ErrorDialog, 
+            folder_color_selector_dialog::FolderColorSelector, image_preview_dialog::ImagePreviewDialog, 
+            quick_dialogs::QuickAccDialog, 
+            selector_dialog::AppSelectorDialog, 
+            show_generic_message::ShowGenericDialog, 
+            sure_to_delete::SureToDeleteDialog, 
+            sure_to_move_to::SureToMoveToDialog, 
+            update_dialog::UpdateDialog, 
+            want_to_install::WantToInstallDialog
         },
         image_preview::image_preview::ImagePreviewState
     }
@@ -33,6 +43,7 @@ pub struct DialogManager {
     pub img_pvw_dialog: ImagePreviewDialog,
     pub want_to_install_dialog: WantToInstallDialog,
     pub generic_dialog: ShowGenericDialog,
+    pub quick_dialog: QuickAccDialog,
 }
 
 impl DialogManager {
@@ -48,6 +59,7 @@ impl DialogManager {
             img_pvw_dialog: ImagePreviewDialog::new(),
             want_to_install_dialog: WantToInstallDialog::new(),
             generic_dialog: ShowGenericDialog::new(),
+            quick_dialog: QuickAccDialog::new(),
         }
     }
 
@@ -91,6 +103,10 @@ impl DialogManager {
         self.generic_dialog.open(title, message);
     }
 
+    pub fn open_quick_acc_dialog(&mut self, event: QuickTagEvent) {
+        self.quick_dialog.open(event);
+    }
+
     pub fn render_area(&mut self, ui: &mut Ui) {
         let dialogs: Vec<&mut dyn ModalDialog> = vec![
             &mut self.selector_dialog,
@@ -103,6 +119,7 @@ impl DialogManager {
             &mut self.img_pvw_dialog,
             &mut self.want_to_install_dialog,
             &mut self.generic_dialog,
+            &mut self.quick_dialog,
         ];
 
         let open_dialog = dialogs.into_iter().find(|d| d.is_open());

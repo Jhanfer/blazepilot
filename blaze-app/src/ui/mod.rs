@@ -4,3 +4,4 @@ pub mod modules;
 pub mod icons_cache;
 pub mod task_manager;
 pub mod image_preview;
+pub mod themes;

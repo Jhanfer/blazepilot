@@ -20,7 +20,9 @@ use crate::{
     core::{files::blaze_motor::motor::with_motor, runtime::{bus_structs::{FileConflict, SureTo, UiEvent}, event_bus::with_event_bus}, system::{cache::color_cache::color_cache::FolderColorManager, updater::updater::UpdateMessages}}, 
     ui::{
         dialog_manager::dialog_manager::DialogManager, 
-        icons_cache::{icon_cache::IconCache, thumbnails::thumbnails_manager::ThumbnailManager}, modules::custom_context_menu::context_state::ContextMenuState
+        icons_cache::{icon_cache::IconCache, thumbnails::thumbnails_manager::ThumbnailManager}, modules::{
+            custom_context_menu::context_state::ContextMenuState
+        }
     }
 };
 
@@ -131,7 +133,6 @@ impl BlazeUiState {
                         SureTo::SureToDelete{files, tab_id} => {
                             self.dialog_manager.open_sure_to_delete(files, tab_id);
                         },
-                        SureTo::SureToCopy => todo!(),
                     }
                 },
                 UiEvent::UpdateMessages(update_message) => {
@@ -184,6 +185,10 @@ impl BlazeUiState {
 
                 UiEvent::ShowGeneric { title, message } => {
                     self.dialog_manager.open_show_generic(&title, &message);
+                },
+
+                UiEvent::QuickTagEvent(event) => {
+                    self.dialog_manager.open_quick_acc_dialog(event);
                 },
             }
         }

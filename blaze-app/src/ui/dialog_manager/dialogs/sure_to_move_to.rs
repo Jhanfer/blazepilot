@@ -18,7 +18,7 @@
 
 use std::{path::Path, sync::Arc};
 use egui::{Color32, CornerRadius, Frame, Margin, Order, RichText, Ui, Window};
-use crate::{core::runtime::{bus_structs::FileOperation, event_bus::Dispatcher}, ui::dialog_manager::dialog_manager::ModalDialog};
+use crate::{core::runtime::{bus_structs::FileOperation, event_bus::Dispatcher}, ui::{dialog_manager::dialog_manager::ModalDialog, themes::colors::COLOR_BG_MAIN}};
 
 
 pub struct SureToMoveToDialog {
@@ -59,7 +59,7 @@ impl SureToMoveToDialog {
         let (Some(sources), Some(dest)) = (self.sources.as_ref(), self.dest.as_ref()) else { return; };
         
         let custom_frame = Frame::NONE
-            .fill(Color32::from_rgb(16, 21, 25))
+            .fill(COLOR_BG_MAIN)
             .corner_radius(CornerRadius::same(10))
             .inner_margin(Margin::same(10));
 

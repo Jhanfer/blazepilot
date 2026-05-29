@@ -17,30 +17,27 @@
 
 
 use std::sync::Arc;
-use egui::{Button, Color32, CornerRadius, Frame, Margin, Panel, TextEdit, Ui};
+use egui::{Button, CornerRadius, Frame, Margin, Panel, Stroke, TextEdit, Ui};
 use tracing::error;
-
-use crate::core::bootstrap::configs::config_manager::with_configs;
-use crate::core::bootstrap::configs::platform::linux::conf_structs::OrderingMode;
 use crate::core::files::blaze_motor::motor_structs::FileEntry;
 use crate::core::system::extended_info::extended_info_manager::ExtendedInfo;
 use crate::core::{blaze_state::BlazeCoreState};
+use crate::ui::themes::colors::*;
 use crate::utils::formating::{format_date, format_size};
 
 pub fn sidebar_right_component(ui: &mut Ui, state: &mut BlazeCoreState, files: &Vec<Arc<FileEntry>>) {
 
     let custom_frame = Frame::NONE
-        .fill(Color32::from_rgb(16, 21, 25))
+        .fill(COLOR_BG_MAIN)
         .inner_margin(Margin {
-            left: 5,
-            right: 5,
+            left: 0,
+            right: 15,
             top: 0,
             bottom: 0,
         });
 
     Panel::right("info_panel")
         .resizable(false)
-        .exact_size(230.0)
         .frame(custom_frame)
         .show_separator_line(false)
         .show_inside(ui,|ui| {
@@ -48,8 +45,14 @@ pub fn sidebar_right_component(ui: &mut Ui, state: &mut BlazeCoreState, files: &
 
         Frame::NONE
             .inner_margin(egui::Margin::same(10))
-            .fill(Color32::from_rgb(27, 31, 35))
+            .fill(COLOR_BG_PANEL)
             .corner_radius(CornerRadius::same(20))
+            .stroke(
+                Stroke {
+                    width: 0.5,
+                    color: COLOR_ACCENT_GLOW
+                }
+            )
             .show(ui, |ui|{
 
                 ui.horizontal(|ui|{
@@ -60,7 +63,7 @@ pub fn sidebar_right_component(ui: &mut Ui, state: &mut BlazeCoreState, files: &
                         TextEdit::singleline(&mut search)
                             .id("search_bar".into())
                             .hint_text("Búsqueda")
-                            .desired_width(ui.max_rect().width() - 60.0)
+                            .desired_width(150.0)
                     );
                     
                     if response.changed() {
@@ -71,72 +74,6 @@ pub fn sidebar_right_component(ui: &mut Ui, state: &mut BlazeCoreState, files: &
                     if ui.add_enabled(!state.search_filter.is_empty(), Button::new("X")).clicked() {
                         state.clean_search();
                     }
-                });
-
-                ui.label("Orden");
-
-                ui.horizontal_top(|ui|{
-
-                    let current_order = with_configs(|c|{
-                        c.get_ordering_mode()
-                    });
-
-
-                    let alphabetic_label = match current_order  {
-                        OrderingMode::Az => "A-Z",
-                        OrderingMode::Za => "Z-A",
-                        _ => "A-Z",
-                    };
-
-                    if ui.button(alphabetic_label).clicked() {
-                        with_configs(|c| {
-                            let new_mode = match current_order {
-                                OrderingMode::Az => OrderingMode::Za,
-                                _ => OrderingMode::Az,
-                            };
-
-                            c.set_ordering_mode(new_mode);
-                        });
-                        state.refresh();
-                    };
-
-
-                    let size_label = match current_order  {
-                        OrderingMode::SizeAsc => "Gb ↗",
-                        OrderingMode::SizeDesc => "Gb ↘",
-                        _ => "Gb ↗",
-                    };
-
-                    if ui.button(size_label).clicked() {
-                        with_configs(|c| {
-                            let new_mode = match current_order {
-                                OrderingMode::SizeAsc => OrderingMode::SizeDesc,
-                                _ => OrderingMode::SizeAsc,
-                            };
-
-                            c.set_ordering_mode(new_mode);
-                        });
-                        state.refresh();
-                    };
-
-
-                    let date_label = match current_order {
-                        OrderingMode::DateAsc => "⏳",
-                        OrderingMode::DateDesc => "⌛",
-                        _ => "⏳",
-                    };
-
-                    if ui.button(date_label).clicked() {
-                        with_configs(|c| {
-                            let new_mode = match current_order {
-                                OrderingMode::DateAsc => OrderingMode::DateDesc,
-                                _ => OrderingMode::DateAsc,
-                            };
-
-                            c.set_ordering_mode(new_mode);
-                        });
-                        state.refresh();
-                    };
                 });
 
 

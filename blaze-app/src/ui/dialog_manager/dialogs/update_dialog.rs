@@ -19,7 +19,7 @@
 
 use egui::{Color32, CornerRadius, Frame, Margin, Order, Ui, Window};
 use uuid::Uuid;
-use crate::{core::runtime::{bus_structs::FileOperation, event_bus::Dispatcher}, ui::dialog_manager::dialog_manager::ModalDialog};
+use crate::{core::runtime::{bus_structs::FileOperation, event_bus::Dispatcher}, ui::{dialog_manager::dialog_manager::ModalDialog, themes::colors::COLOR_BG_MAIN}};
 
 
 pub struct UpdateDialog {
@@ -63,7 +63,7 @@ impl UpdateDialog {
         let (Some(current_ver), Some(new_ver), Some(_)) = (self.current_version.as_ref(), self.new_version.as_ref(), self.tab_id.as_ref()) else { return; };
         
         let custom_frame = Frame::NONE
-            .fill(Color32::from_rgb(16, 21, 25))
+            .fill(COLOR_BG_MAIN)
             .corner_radius(CornerRadius::same(10))
             .inner_margin(Margin::same(10));
 

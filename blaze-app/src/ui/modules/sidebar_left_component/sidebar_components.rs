@@ -1,7 +1,23 @@
-use std::{path::{Path, PathBuf}, sync::Arc};
-use egui::{Align2, Color32, CursorIcon, FontId, PointerButton, Rect, Sense, Ui, pos2, vec2};
-use tracing::info;
-use crate::{core::{blaze_state::BlazeCoreState, bootstrap::configs::{config_manager::with_configs, platform::linux::conf_structs::FavoriteLinks}, files::file_extension::{DocType, FileExtension}, system::disk_reader::disk::Disk}, ui::{blaze_ui_state::BlazeUiState, icons_cache::icons::*, modules::custom_context_menu::context_state::ContextMenuKind}};
+use std::{
+    path::{
+        Path, 
+        PathBuf
+    }, 
+    sync::Arc
+};
+use egui::{Align2, Color32, FontId, PointerButton, Rect, Sense, Stroke, StrokeKind, Ui, pos2, vec2};
+use crate::{
+    core::{
+        blaze_state::BlazeCoreState,
+        system::disk_reader::disk::Disk
+    }, 
+    ui::{
+        blaze_ui_state::BlazeUiState, 
+        icons_cache::icons::*, 
+        modules::custom_context_menu::context_state::ContextMenuKind, 
+        themes::colors::*,
+    }
+};
 
 
 
@@ -10,9 +26,9 @@ fn get_folder_icon(label: &str) -> (&'static str, &'static [u8]) {
     match label_lower.as_str() {
         "home" => ("home", ICON_HOME),
         "escritorio" | "desktop" => ("desktop", ICON_DESKTOP),
-        "descargas" | "downloads" => ("downloads", ICON_DOWNLOADS),
+        "descargas" | "downloads" => ("donwloads", ICON_DOWNLOADS),
         "documentos" | "documents" => ("documents", ICON_ARCHIVE),
-        "imágenes" | "imagenes" | "pictures" | "images" => ("pictures", ICON_POLAROID),
+        "imágenes" | "imagenes" | "pictures" | "images" => ("images", ICON_POLAROID),
         "papelera" | "trash" | "basura" => ("trash", ICON_TRASH),
         "videos" | "vídeos" => ("videos", ICON_VIDEO),
         "public" | "público" | "publico" => ("public", ICON_PUBLIC),
@@ -34,7 +50,7 @@ fn get_herader_icon(label: &str) -> (&'static str, &'static [u8]) {
 
 
 pub fn render_icon(ui: &mut Ui, ui_state: &mut BlazeUiState, icon_name: &str, color: Color32, icon_bytes: &[u8], rect: Rect) {
-    let icon = ui_state.icon_cache.get_or_load(ui, icon_name, icon_bytes, color);
+    let icon: &egui::TextureHandle = ui_state.icon_cache.get_or_load(ui, icon_name, icon_bytes, color);
 
     let icon_size = vec2(16.0, 16.0);
     let icon_pos = rect.left_center() - vec2(-10.0, icon_size.y / 2.0);
@@ -84,14 +100,32 @@ pub fn render_local_buttons(label:&str, path: Arc<Path>, state: &mut BlazeCoreSt
         egui::vec2(ui.available_width(), 30.0),
         Sense::click_and_drag()
     );
-    let bg_color = if response.hovered() {
-        ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
-        Color32::from_rgba_unmultiplied(100, 100, 255, 60)
+    
+    let (bg_color, icon_color) = if response.hovered() {
+        ui.set_cursor_icon(egui::CursorIcon::PointingHand);
+        (
+            Color32::from_rgba_unmultiplied(100, 100, 255, 60),
+            COLOR_ACCENT_GLOW
+        )
     } else {
-        Color32::from_rgba_unmultiplied(255, 255, 255, 15)
+        (
+            COLOR_MAIN_BUTTONS,
+            Color32::WHITE,
+        )
     };
 
-    ui.painter().rect_filled(rect, 5.0, bg_color);
+    ui.painter()
+        .rect(
+            rect,
+            20.0,
+            bg_color,
+            if response.hovered() {
+                Stroke::new(0.5, icon_color)
+            } else {
+                Stroke::NONE
+            },
+            StrokeKind::Outside,
+        );
 
 
     let middle_clicked = ui.input(|i| {
@@ -110,13 +144,13 @@ pub fn render_local_buttons(label:&str, path: Arc<Path>, state: &mut BlazeCoreSt
     }
 
     let (icon_name, icon_bytes) = get_folder_icon(label);
-    let color = Color32::WHITE;
+    
 
     render_icon(
         ui,
         ui_state,
         icon_name,
-        color,
+        icon_color,
         icon_bytes,
         rect
     );
@@ -130,90 +164,6 @@ pub fn render_local_buttons(label:&str, path: Arc<Path>, state: &mut BlazeCoreSt
         ui.visuals().text_color(),
     );
 
-}
-
-
-pub fn render_fav_buttons(ui: &mut Ui, fav: FavoriteLinks, state: &mut BlazeCoreState, ui_state: &mut BlazeUiState) {
-    let (rect, response) = ui.allocate_exact_size(
-        vec2(ui.available_width(), 30.0),
-        Sense::click()
-    );
-
-    let bg_color = if response.hovered() {
-        ui.ctx().set_cursor_icon(CursorIcon::PointingHand);
-        Color32::from_rgba_unmultiplied(100, 100, 255, 60)
-    } else {
-        Color32::from_rgba_unmultiplied(255, 255, 255, 15)
-    };
-
-    ui.painter()
-        .rect_filled(
-            rect,
-            5.0,
-            bg_color
-        );
-    
-    let ext = FileExtension::from_path(&fav.path);
-
-    if response.clicked() {
-        if fav.is_dir {
-            let path = fav.path.to_owned();
-            state.navigate_to(path);
-        } else {
-            info!("Intentando abrir");
-            state.open_file_by_path(fav.path.to_owned());
-        }
-    }
-
-    response.context_menu(|ui|{
-        if ui.button("Eliminar de favoritos").clicked() {
-            with_configs(|c| {
-                c.delete_from_favorites(&fav.name, &fav.path);
-            });
-        }
-    });
-
-
-    let galley = ui.fonts_mut(|f| {
-        f.layout_no_wrap(
-            fav.name.clone(),
-            FontId::proportional(14.0),
-            ui.visuals().text_color()
-        )
-    });
-
-    let (name, icon, color) = if fav.is_dir {
-        ("folder".to_owned(), ICON_FOLDER, Color32::YELLOW)
-    } else {
-        match &ext {
-            FileExtension::Image(_) => ("image".to_owned(), ICON_IMAGE, Color32::from_rgb(100, 200, 255)),
-            FileExtension::Document(DocType::Pdf) => ("pdf".to_owned(), ICON_PDF, Color32::from_rgb(255, 80,  80)),
-            FileExtension::Document(_) => ("doc".to_owned(), ICON_DOC, Color32::from_rgb(100, 140, 255)),
-            FileExtension::Video(_) => ("video".to_owned(), ICON_VIDEO, Color32::from_rgb(200, 100, 255)),
-            FileExtension::Audio(_) => ("audio".to_owned(), ICON_VIDEO, Color32::from_rgb(255, 200, 80)),
-            FileExtension::Archive(_) => ("archive".to_owned(), ICON_ARCHIVE, Color32::from_rgb(255, 160, 60)),
-            FileExtension::Code(_) => ("code".to_owned(), ICON_CODE, Color32::from_rgb(100, 255, 150)),
-            FileExtension::Font(_) => ("font".to_owned(), ICON_FONT, Color32::from_rgb(200, 200, 200)),
-            FileExtension::Executable(_) => ("exe".to_owned(), ICON_EXE, Color32::from_rgb(255, 100, 100)),
-            FileExtension::Unknown => ("file".to_owned(), ICON_FILE, Color32::WHITE),
-        }
-    };
-
-    render_icon(
-        ui,
-        ui_state,
-        &name,
-        color,
-        icon,
-        rect,
-    );
-
-    ui.painter().with_clip_rect(rect)
-        .galley(
-            rect.left_center() + vec2(34.0, -galley.size().y / 2.0),
-            galley,
-            ui.visuals().text_color()
-        );
 }
 
 
@@ -256,16 +206,31 @@ pub fn render_drives_button(ui: &mut Ui, state: &mut BlazeCoreState, drive: Disk
         ui_state.context_menu_state.target_drive = Some(drive);
     }
 
-
-    let bg_color = if response.hovered() {
-        ui.ctx().set_cursor_icon(CursorIcon::PointingHand);
-        Color32::from_rgba_unmultiplied(100, 100, 255, 60)
+    let (bg_color, icon_color) = if response.hovered() {
+        ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+        (
+            Color32::from_rgba_unmultiplied(100, 100, 255, 60),
+            COLOR_ACCENT_GLOW
+        )
     } else {
-        Color32::from_rgba_unmultiplied(255, 255, 255, 15)
+        (
+            COLOR_MAIN_BUTTONS,
+            Color32::WHITE,
+        )
     };
 
     ui.painter()
-        .rect_filled(rect, 5.0, bg_color);
+        .rect(
+            rect,
+            20.0,
+            bg_color,
+            if response.hovered() {
+                Stroke::new(0.5, icon_color)
+            } else {
+                Stroke::NONE
+            },
+            StrokeKind::Outside,
+        );
 
     response.on_hover_text(used_percentage);
 
@@ -309,8 +274,6 @@ pub fn render_drives_button(ui: &mut Ui, state: &mut BlazeCoreState, drive: Disk
     }
 
 
-    let color = Color32::WHITE;
-
     let (icon, bytes) = if is_system {
         ("system", ICON_DEVICE_PC)
     } else if is_removable {
@@ -324,7 +287,7 @@ pub fn render_drives_button(ui: &mut Ui, state: &mut BlazeCoreState, drive: Disk
         ui,
         ui_state,
         icon,
-        color,
+        icon_color,
         bytes,
         rect
     );

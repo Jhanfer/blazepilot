@@ -16,17 +16,111 @@
 
 
 
-use std::{cell::{RefCell, RefMut}, collections::HashSet, path::{Path, PathBuf}, rc::Rc, sync::{Arc, atomic::{AtomicU64, Ordering}}, time::{Duration, Instant, SystemTime, UNIX_EPOCH}};
+use std::{
+    cell::{
+        RefCell,
+        RefMut
+    },
+    collections::HashSet,
+    path::{
+        Path,
+        PathBuf
+    }, 
+    rc::Rc, sync::{
+        Arc,
+        atomic::{
+            AtomicU64,
+            Ordering
+        }
+    }, 
+    time::
+    {Duration,
+        Instant,
+        SystemTime,
+        UNIX_EPOCH
+    }
+};
 use bitvec::vec::BitVec;
 use tracing::{debug, error, info, warn};
 use tokio::sync::Mutex as TokioMutex;
 use uuid::Uuid;
-use crate::{core::{bootstrap::{configs::config_manager::with_configs, install_manager::installation_manager::with_installation_manager}, files::blaze_motor::{motor::{BlazeMotor, BlazeMotorBuilder, MOTOR}, motor_structs::{FileEntry, FileLoadingMessage, RecursiveMessages}}, runtime::{bus_structs::{FileOperation, UiEvent}, event_bus::with_event_bus}, system::{cache::cache_manager::CacheManager, clipboard::clipboard::{GlobalClipboard, TOKIO_RUNTIME}, extended_info::extended_info_manager::{ExtendedInfoManager, ExtendedInfoMessages}, fileopener_module::{FileOpenerManager, GLOBAL_FILE_OPENER}, operationstate::operation_manager::with_history, sizer_manager::sizer_manager::SizerManager, terminal_opener::terminal_manager::{GLOBAL_TERMINAL_MANAGER, TerminalManager}, trash_manager::trash_manager::{TrashDestination, get_backend}, updater::updater::Updater, zip_manager::zip_manager::ZipManager}}, ui::task_manager::task_manager::TaskManager};
+use crate::{
+    core::{
+        bootstrap::{
+            configs::config_manager::with_configs,
+            install_manager::installation_manager::with_installation_manager
+        },
+        files::blaze_motor::{
+            motor::{
+                BlazeMotor,
+                BlazeMotorBuilder,
+                MOTOR
+            },
+            motor_structs::{
+                FileEntry,
+                FileLoadingMessage,
+                RecursiveMessages
+            }
+        },
+        runtime::{
+            bus_structs::{
+                FileOperation,
+                UiEvent
+            },
+            event_bus::with_event_bus
+        },
+        system::{
+            cache::cache_manager::CacheManager,
+            clipboard::clipboard::{
+                GlobalClipboard,
+                TOKIO_RUNTIME
+            },
+            extended_info::extended_info_manager::{
+                ExtendedInfoManager,
+                ExtendedInfoMessages
+            },
+            fileopener_module::{
+                FileOpenerManager,
+                GLOBAL_FILE_OPENER
+            },
+            operationstate::operation_manager::with_history,
+            sizer_manager::sizer_manager::{SizerManager, SizerMessages},
+            terminal_opener::terminal_manager::{
+                GLOBAL_TERMINAL_MANAGER,
+                TerminalManager
+            },
+            trash_manager::trash_manager::{
+                TrashDestination,
+                get_backend
+            },
+            updater::updater::Updater,
+            zip_manager::zip_manager::ZipManager
+        }
+    },
+    ui::task_manager::task_manager::TaskManager
+};
 
 
 // Para el guardado en caché
 static LAST_SAVE_REQUEST: AtomicU64 = AtomicU64::new(0);
 
+
+#[derive(PartialEq, Clone, Default)]
+pub enum ViewMode {
+    #[default]
+    Normal,
+    Tags,
+}
+
+pub enum TagViewFilter {
+    All {
+        all_items_len: usize,
+    },
+    Tag {
+        name: String,
+        items_len: usize
+    },
+}
 
 pub struct RubberBand {
     pub rubber_band_start: Option<egui::Pos2>,
@@ -44,6 +138,7 @@ pub struct RowView {
     pub scroll_area_origin_y: f32,
     pub first_visible: usize,
     pub last_visible: usize,
+    pub viewport_height: f32,
 }
 
 #[derive(Clone, PartialEq)]
@@ -104,6 +199,7 @@ impl BlazeCoreBuilder {
             scroll_area_origin_y: 0.0,
             first_visible: 0,
             last_visible: 0,
+            viewport_height: 0.0,
         };
 
         let file_opener_manager = GLOBAL_FILE_OPENER.clone();
@@ -151,6 +247,8 @@ impl BlazeCoreBuilder {
             cwd: PathBuf::new().into(),
             last_navigation_time: None,
             navigation_cooldown: Duration::from_millis(100),
+            view_mode: ViewMode::Normal,
+            tag_filter: TagViewFilter::All { all_items_len: 0 },
         };
 
         let dispatcher = with_event_bus(|e| e.dispatcher(active_id));
@@ -236,6 +334,8 @@ pub struct BlazeCoreState {
     pub cwd: Arc<Path>,
     last_navigation_time: Option<Instant>,
     navigation_cooldown: Duration,
+    pub view_mode: ViewMode,
+    pub tag_filter: TagViewFilter
 }
 
 impl BlazeCoreState {
@@ -376,34 +476,46 @@ impl BlazeCoreState {
     }
 
     pub fn navigate_to(&mut self, path: Arc<Path>) {
+        let dispatcher = with_event_bus(|e| e.dispatcher(self.active_id));
         let prev_dir = self.cwd.clone();
-        self.motor.borrow_mut().active_tab_mut().navigate_to(path);
+
+        dispatcher.send(SizerMessages::CancelAll).ok();
+        self.calculating_dir_sizes.clear();
+
         self.extended_info_manager.clear_directory(&prev_dir);
+        self.motor.borrow_mut().active_tab_mut().navigate_to(path);
         self.save_caches(false);
         self.last_navigation_time = Some(Instant::now());
+
         self.refresh();
     }
 
     pub fn up(&mut self) {
+        let dispatcher = with_event_bus(|e| e.dispatcher(self.active_id));
         let prev_dir = self.cwd.clone();
         self.motor.borrow_mut().active_tab_mut().up();
         self.extended_info_manager.clear_directory(&prev_dir);
+        dispatcher.send(SizerMessages::CancelAll).ok();
         self.refresh();
         self.save_caches(false);
     }
 
     pub fn back(&mut self) {
+        let dispatcher = with_event_bus(|e| e.dispatcher(self.active_id));
         let prev_dir = self.cwd.clone();
         self.motor.borrow_mut().active_tab_mut().back();
         self.extended_info_manager.clear_directory(&prev_dir);
+        dispatcher.send(SizerMessages::CancelAll).ok();
         self.refresh();
         self.save_caches(false);
     }
 
     pub fn forward(&mut self) {
+        let dispatcher = with_event_bus(|e| e.dispatcher(self.active_id));
         let prev_dir = self.cwd.clone();
         self.motor.borrow_mut().active_tab_mut().forward();
         self.extended_info_manager.clear_directory(&prev_dir);
+        dispatcher.send(SizerMessages::CancelAll).ok();
         self.refresh();
         self.save_caches(false);
     }
@@ -986,6 +1098,19 @@ impl BlazeCoreState {
                 FileOperation::ExtendedInfoReady { full_path, tab_id:_ } => {
                     self.calculating_extended_info.remove(&full_path);
                     self.calculated_extended_info.insert(full_path);
+                },
+
+                FileOperation::NavigateTo(path) => {
+                    self.view_mode = ViewMode::Normal;
+                    self.navigate_to(path);
+                },
+
+                FileOperation::OpenFileByPath(path) => {
+                    self.open_file_by_path(path);
+                },
+
+                FileOperation::OpenPathToNewTab(path) => {
+                    self.add_tab_from_file(&path);
                 },
             }
         }

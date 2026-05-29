@@ -17,18 +17,22 @@
 
 
 use parking_lot::Mutex;
-use std::{collections::HashSet, path::Path, sync::{Arc, LazyLock}, time::SystemTime};
+use std::{ 
+    path::Path, 
+    sync::LazyLock,
+    time::SystemTime
+};
 use tracing::warn;
-
-use crate::core::bootstrap::configs::{
-    error::ConfigResult, 
-    platform::{
-        PlatformConfigTrait, 
-        PlatformConfigs, 
-        linux::conf_structs::{
-            DisplayBackend, 
-            FavoriteLinks, 
-            OrderingMode
+use crate::core::bootstrap::{
+    configs::{
+        error::ConfigResult, 
+        platform::{
+            PlatformConfigTrait, 
+            PlatformConfigs, 
+            linux::conf_structs::{
+                DisplayBackend,
+                OrderingMode
+            }
         }
     }
 };
@@ -64,11 +68,6 @@ impl ConfigManager {
         self.platform.config_dir()
     }
 
-    #[must_use]
-    pub fn is_in_favorite(&self, path: &Arc<Path>) -> bool {
-        self.platform.favorite_list.iter().any(|f| &f.path == path)
-    }
-
 //--__--__--__--__ Getters  __--__--__--__--__--__--__
 
     pub fn get_ordering_mode(&self) -> OrderingMode {
@@ -79,20 +78,12 @@ impl ConfigManager {
         self.platform.show_hidden_files
     }
 
-    pub fn get_item_file_list_size(&self) -> usize {
-        self.platform.item_file_list_size
-    }
-
     pub fn get_display_backend(&self) -> DisplayBackend {
         self.platform.display_backend.to_owned()
     }
 
     pub fn get_default_terminal(&self) -> String {
         self.platform.default_terminal.to_owned()
-    }
-
-    pub fn get_favorites(&self) -> HashSet<FavoriteLinks> {
-        self.platform.favorite_list.to_owned()
     }
 
     pub fn get_should_ask_install(&self) -> bool {
@@ -115,11 +106,6 @@ impl ConfigManager {
         self.platform.save().ok();
     }
 
-    pub fn set_item_file_list_size(&mut self, size: usize) {
-        self.platform.item_file_list_size = size;
-        self.platform.save().ok();
-    }
-
     pub fn set_display_backend(&mut self, backend: DisplayBackend) {
         self.platform.display_backend = backend;
         self.platform.save().ok();
@@ -127,18 +113,6 @@ impl ConfigManager {
 
     pub fn set_default_terminal(&mut self, terminal: String) {
         self.platform.default_terminal = terminal;
-        self.platform.save().ok();
-    }
-
-    pub fn add_to_favorites(&mut self, name: String, path: Arc<Path>, is_dir: bool) {
-        if !self.is_in_favorite(&path) {
-            self.platform.favorite_list.insert(FavoriteLinks { name, path, is_dir });
-            self.platform.save().ok();
-        }
-    }
-
-    pub fn delete_from_favorites(&mut self, name: &str, path: &Arc<Path>) {
-        self.platform.favorite_list.retain(|f| !(f.name == name && &f.path == path));
         self.platform.save().ok();
     }
 

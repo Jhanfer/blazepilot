@@ -15,20 +15,17 @@
 
 
 
-use std::{collections::HashSet, path::{Path, PathBuf}, time::SystemTime};
+use std::{path::{Path, PathBuf}, time::SystemTime};
 
 use directories::ProjectDirs;
 use serde::{Serialize, Deserialize};
 
-use crate::core::bootstrap::configs::{error::{ConfigError, ConfigResult}, platform::{PlatformConfigTrait, linux::conf_structs::{DisplayBackend, FavoriteLinks, OrderingMode}}};
+use crate::core::bootstrap::configs::{error::{ConfigError, ConfigResult}, platform::{PlatformConfigTrait, linux::conf_structs::{DisplayBackend, OrderingMode}}};
 
 
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct LinuxConfigs {
-    #[serde(default)]
-    pub favorite_list: HashSet<FavoriteLinks>,
-    
+pub struct LinuxConfigs {    
     #[serde(default)]
     pub app_ordering_mode: OrderingMode,
     
@@ -88,7 +85,6 @@ impl Default for LinuxConfigs {
     fn default() -> Self {
         let path = Self::init_config_path().unwrap_or_default();
         Self {
-            favorite_list: HashSet::new(),
             app_ordering_mode: OrderingMode::Az,
             config_file_path: path,
             show_hidden_files: false,

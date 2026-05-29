@@ -81,7 +81,7 @@ fn main() {
         dithering: false,
 
         wgpu_options: eframe::egui_wgpu::WgpuConfiguration {
-            present_mode: eframe::wgpu::PresentMode::Immediate,
+            present_mode: eframe::wgpu::PresentMode::Fifo,
             desired_maximum_frame_latency: Some(1),
 
             wgpu_setup: eframe::egui_wgpu::WgpuSetup::CreateNew(eframe::egui_wgpu::WgpuSetupCreateNew {

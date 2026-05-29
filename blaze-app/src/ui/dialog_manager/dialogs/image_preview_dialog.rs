@@ -18,7 +18,7 @@
 
 
 use egui::{Button, Color32, CornerRadius, Frame, Key, Margin, Order, Rect, ScrollArea, Sense, Ui, Vec2, Window, pos2, vec2};
-use crate::{ui::{image_preview::image_preview::ImagePreviewState}};
+use crate::ui::{image_preview::image_preview::ImagePreviewState, themes::colors::COLOR_BG_MAIN};
 use crate::ui::dialog_manager::dialog_manager::ModalDialog;
 
 pub struct ImagePreviewDialog {
@@ -224,7 +224,7 @@ impl ImagePreviewDialog {
 
 
         let custom_frame = Frame::NONE
-            .fill(Color32::from_rgb(16, 21, 25))
+            .fill(COLOR_BG_MAIN)
             .corner_radius(CornerRadius::same(10))
             .inner_margin(Margin::same(10));
 

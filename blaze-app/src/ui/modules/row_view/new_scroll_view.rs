@@ -1,8 +1,68 @@
 use std::{collections::HashMap, path::Path, sync::Arc};
-use egui::{Button, Color32, ColorImage, CursorIcon, FontId, Id, Key, Modifiers, PointerButton, Rect, RichText, ScrollArea, Sense, TextEdit, TextureOptions, Ui, pos2, scroll_area::ScrollSource, vec2};
+use egui::{
+    Button,
+    Color32,
+    ColorImage,
+    CursorIcon,
+    FontId,
+    Id,
+    Key,
+    Modifiers,
+    PointerButton,
+    Rect,
+    RichText,
+    ScrollArea,
+    Sense,
+    TextEdit,
+    TextureOptions,
+    Ui,
+    pos2,
+    scroll_area::ScrollSource,
+    vec2,
+};
 use file_id::FileId;
 use tracing::info;
-use crate::{core::{blaze_state::BlazeCoreState, bootstrap::configs::{config_manager::with_configs, platform::linux::conf_structs::OrderingMode}, files::{blaze_motor::motor_structs::FileEntry, file_extension::{DocType, FileExtension}}, runtime::{bus_structs::{SureTo, UiEvent}, event_bus::with_event_bus}, system::{extended_info::extended_info_manager::{ExtendedInfo, GitStatus}, trash_manager::trash_manager::get_backend}}, ui::{blaze_ui_state::BlazeUiState, icons_cache::{icons, thumbnails::thumbnails_manager::Thumbnail}, modules::custom_context_menu::context_state::ContextMenuKind}, utils::formating::{format_date, format_size}};
+use crate::{
+    core::{
+        blaze_state::BlazeCoreState,
+        bootstrap::configs::{
+            config_manager::with_configs,
+            platform::linux::conf_structs::OrderingMode
+        },
+        files::{
+            blaze_motor::motor_structs::FileEntry,
+        },
+        runtime::{
+            bus_structs::{
+                SureTo,
+                UiEvent
+            },
+            event_bus::with_event_bus
+        }, system::{
+            extended_info::extended_info_manager::{
+                ExtendedInfo,
+                GitStatus
+            },
+            trash_manager::trash_manager::get_backend
+        }
+    },
+    ui::{
+        blaze_ui_state::BlazeUiState,
+        icons_cache::{
+            thumbnails::thumbnails_manager::Thumbnail
+        }, 
+        modules::{
+            custom_context_menu::context_state::ContextMenuKind,
+            row_view::utilities::{
+                git_dot_color,
+                resolve_icon,
+                text_color_for_git
+            }
+        },
+        themes::colors::COLOR_MAIN_BUTTONS
+    },
+    utils::formating::{format_date, format_size}
+};
 
 
 
@@ -175,8 +235,6 @@ fn render_rename_field(ui: &mut Ui, file: &Arc<FileEntry>, state: &mut BlazeCore
         response.request_focus();
     }
 
-
-
     if response.has_focus() && ui.input(|i| i.key_pressed(Key::Enter)) {
         state.rename(&file.name);
         
@@ -199,56 +257,7 @@ fn render_rename_field(ui: &mut Ui, file: &Arc<FileEntry>, state: &mut BlazeCore
     }
 }
 
-fn resolve_icon(file: &Arc<FileEntry>, color_snapshot: &HashMap<FileId, Color32>) -> (String, &'static [u8], Color32) {
-    if file.is_dir() {
-        let (color, cache_key) = if let Some(file_id) = &file.unique_id {
-                let color = color_snapshot.get(file_id).copied().unwrap_or(Color32::YELLOW);
-                let cache_key = format!("folder-{:?}", file_id);
-                (color, cache_key)
-            } else {
-                (Color32::YELLOW, "folder-unknown".to_string())
-            };
-        return (cache_key, icons::ICON_FOLDER_OPEN, color);
-    } else {
-        match &file.extension {
-            FileExtension::Image(_) => ("image".to_string(), icons::ICON_IMAGE,    Color32::from_rgb(100, 200, 255)),
-            FileExtension::Document(DocType::Pdf) => ("pdf".to_string(),      icons::ICON_PDF, Color32::from_rgb(255, 80,  80)),
-            FileExtension::Document(_) => ("doc".to_string(), icons::ICON_DOC, Color32::from_rgb(100, 140, 255)),
-            FileExtension::Video(_) => ("video".to_string(), icons::ICON_VIDEO,    Color32::from_rgb(200, 100, 255)),
-            FileExtension::Audio(_) => ("audio".to_string(), icons::ICON_VIDEO,    Color32::from_rgb(255, 200, 80)),
-            FileExtension::Archive(_) => ("archive".to_string(), icons::ICON_ARCHIVE,  Color32::from_rgb(255, 160, 60)),
-            FileExtension::Code(_) => ("code".to_string(), icons::ICON_CODE,     Color32::from_rgb(100, 255, 150)),
-            FileExtension::Font(_) => ("font".to_string(), icons::ICON_FONT,     Color32::from_rgb(200, 200, 200)),
-            FileExtension::Executable(_) => ("exe".to_string(), icons::ICON_EXE,      Color32::from_rgb(255, 100, 100)),
-            FileExtension::Unknown => ("file".to_string(), icons::ICON_FILE, Color32::WHITE),
-        }
-    }
-}
 
-
-fn text_color_for_git(git: Option<&GitStatus>) -> Color32 {
-    match git {
-        Some(GitStatus::Modified)  => Color32::from_rgb(255, 200, 80),
-        Some(GitStatus::Staged)    => Color32::from_rgb(100, 220, 100),
-        Some(GitStatus::Untracked) => Color32::from_rgb(160, 160, 160),
-        Some(GitStatus::Ignored)   => Color32::from_rgb(100, 100, 100),
-        Some(GitStatus::Conflict)  => Color32::from_rgb(255, 80, 80),
-        Some(GitStatus::Deleted)   => Color32::from_rgb(255, 60, 60),
-        Some(GitStatus::Clean) | None => Color32::from_rgb(189, 189, 189),
-    }
-}
-
-fn git_dot_color(git: Option<&GitStatus>) -> Option<Color32> {
-    match git {
-        Some(GitStatus::Modified)  => Some(Color32::from_rgb(255, 200, 80)),
-        Some(GitStatus::Staged)    => Some(Color32::from_rgb(100, 220, 100)),
-        Some(GitStatus::Untracked) => Some(Color32::from_rgb(160, 160, 160)),
-        Some(GitStatus::Ignored)   => Some(Color32::from_rgb(80, 80, 80)),
-        Some(GitStatus::Conflict)  => Some(Color32::from_rgb(255, 80, 80)),
-        Some(GitStatus::Deleted)   => Some(Color32::from_rgb(255, 60, 60)),
-        Some(GitStatus::Clean) | None => None,
-    }
-}
 
 
 pub fn new_render_scrollview(ui: &mut Ui, files: &Vec<Arc<FileEntry>>, state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, row_height: f32, total_rows: usize, content_rect: Rect) {
@@ -358,6 +367,24 @@ pub fn new_render_scrollview(ui: &mut Ui, files: &Vec<Arc<FileEntry>>, state: &m
     new_ff_logic(state, ui);
 
 
+    if let Some(target_row) = state.pending_scroll_to.take() {
+        if !files.is_empty() {
+            let target_row = target_row.min(files.len() - 1);
+            let row_top = target_row as f32 * row_height;
+            let row_bottom = row_top + row_height;
+            
+            let viewport_top = state.scroll_offset;
+            let viewport_bottop = state.scroll_offset + state.row_view.viewport_height;
+
+            if row_top < viewport_top {
+                state.scroll_offset = row_top;
+            } else if row_bottom > viewport_bottop {
+                state.scroll_offset = row_bottom - state.row_view.viewport_height;
+            }
+        }
+    }
+
+
     let scroll_area = ScrollArea::vertical()
         .scroll_source(ScrollSource::MOUSE_WHEEL | ScrollSource::SCROLL_BAR)
         .auto_shrink([false, false])
@@ -445,12 +472,13 @@ pub fn new_render_scrollview(ui: &mut Ui, files: &Vec<Arc<FileEntry>>, state: &m
             }
 
             // --- Selección y hover ---
-            if state.is_selected(i) {
-                ui.painter().rect_filled(rect, 5.0, Color32::from_rgba_unmultiplied(100, 100, 255, 60));
-            }
             if response.hovered() {
                 ui.set_cursor_icon(CursorIcon::PointingHand);
-                ui.painter().rect_filled(rect, 5.0, Color32::from_rgba_unmultiplied(255, 255, 255, 15));
+                ui.painter().rect_filled(rect, 5.0, COLOR_MAIN_BUTTONS);
+            }
+
+            if state.is_selected(i) {
+                ui.painter().rect_filled(rect, 5.0, Color32::from_rgba_unmultiplied(100, 100, 255, 60));
             }
 
             // --- Toda la lógica de interacción original ---
@@ -674,4 +702,6 @@ pub fn new_render_scrollview(ui: &mut Ui, files: &Vec<Arc<FileEntry>>, state: &m
     if !state.rubber_band.is_rubber_banding {
         state.scroll_offset = scroll_output.state.offset.y;
     }
+
+    state.row_view.viewport_height = scroll_output.inner_rect.height();
 }

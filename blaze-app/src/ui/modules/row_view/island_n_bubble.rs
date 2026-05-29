@@ -1,107 +1,188 @@
 use std::sync::Arc;
 
-use egui::{Align2, Area, Color32, CornerRadius, FontId, Frame, Margin, Rect, RichText, ScrollArea, Sense, TextFormat, Ui, pos2, text::{LayoutJob, TextWrapping}, vec2};
-use crate::{core::{blaze_state::BlazeCoreState, files::blaze_motor::motor_structs::FileEntry}, ui::{blaze_ui_state::BlazeUiState, icons_cache::icons, task_manager::task_manager::TaskStatus}, utils::formating::format_size};
+use egui::{
+    Align2, Area, Color32, CornerRadius, FontId, Frame, Margin, Rect, RichText, ScrollArea, Sense, Stroke, TextFormat, Ui, pos2, text::{
+        LayoutJob,
+        TextWrapping
+    }, vec2
+};
+use crate::{
+    core::{
+        blaze_state::{BlazeCoreState, TagViewFilter},
+        files::blaze_motor::motor_structs::FileEntry
+    },
+    ui::{
+        blaze_ui_state::BlazeUiState,
+        icons_cache::icons,
+        task_manager::task_manager::TaskStatus, themes::colors::{COLOR_ACCENT_GLOW, COLOR_BG_PANEL}
+    },
+    utils::formating::format_size
+};
 
-pub fn render_island_bubble(ui: &mut Ui, state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, files: &Vec<Arc<FileEntry>>, bottom_padding: i8, tabs_height: i8) {
 
+
+fn ease_out_bounce(t: f32) -> f32 {
+    let n1 = 7.5625_f32;
+    let d1 = 2.75_f32;
+
+    if t < 1.0 / d1 {
+        n1 * t * t
+    } else if t < 2.0 / d1 {
+        let t = t - 1.5 / d1;
+        n1 * t * t + 0.75
+    } else if t < 2.5 / d1 {
+        let t = t - 2.25 / d1;
+        n1 * t * t + 0.9375
+    } else {
+        let t = t - 2.625 / d1;
+        n1 * t * t + 0.984375
+    }
+}
+
+fn ease_in_out_bounce(t: f32) -> f32 {
+    if t < 0.5 {
+        (1.0 - ease_out_bounce(1.0 - 2.0 * t)) / 2.0
+    } else {
+        (1.0 + ease_out_bounce(2.0 * t - 1.0)) / 2.0
+    }
+}
+
+
+
+pub fn generic_island<F>(
+        ui: &mut Ui,
+        state: &mut BlazeCoreState,
+        ui_state: &mut BlazeUiState,
+        bottom_padding: i8,
+        tabs_height: i8,
+        width: f32,
+        mut callback: F,
+    ) -> Rect 
+    where F: FnMut(&mut Ui, &mut BlazeUiState, &mut BlazeCoreState)
+    {
+    
     const ISLAND_GAP: f32 = 30.0;
-
-    let island_rect = Area::new("blaze_island".into())
-        .anchor(Align2::CENTER_BOTTOM, [0.0, -(bottom_padding as f32 + tabs_height as f32 + ISLAND_GAP)])
+    
+    Area::new("blaze_island".into())
+        .anchor(
+            Align2::CENTER_BOTTOM, 
+            [0.0, -(bottom_padding as f32 + tabs_height as f32 + ISLAND_GAP)]
+        )
         .order(egui::Order::Middle)
         .show(ui, |ui| {
 
             Frame::NONE
                 .inner_margin(egui::Margin::same(10))
-                .fill(Color32::from_rgb(36, 42, 47))
+                .fill(COLOR_BG_PANEL)
+                .stroke(Stroke::new(0.8, COLOR_ACCENT_GLOW))
                 .corner_radius(CornerRadius::same(20))
                 .show(ui, |ui| {
-                    ui.set_width(150.0);
+                    ui.set_width(width);
                     ui.set_min_height(20.0);
                     ui.set_max_height(20.0);
                     
                     ui.centered_and_justified(|ui|{
                         ui.horizontal_centered(|ui| {
-                            let icon_size = egui::vec2(14.0, 14.0);
-                            let (icon_rect, _) = ui.allocate_exact_size(icon_size, Sense::hover());
-                            let (icon_name, icon_bytes) = ("file", icons::ICON_FILE);
-                            let icon = ui_state.icon_cache.get_or_load(ui, icon_name, icon_bytes, Color32::GRAY);
-                            
-                            ui.painter().image(
-                                icon.id(),
-                                icon_rect,
-                                Rect::from_min_max(egui::pos2(0.0, 0.0), 
-                                pos2(1.0, 1.0)),
-                                Color32::WHITE,
-                            );
-
-                            ui.add_space(1.0);
-                            
-                            let total = files.len();
-                            ui.label(format!("{}", total));
-                            
-                            ui.add_space(5.0);
-                            
-
-                            let (icon_rect, _) = ui.allocate_exact_size(icon_size, Sense::hover());
-
-                            let (icon_name, icon_bytes) = ("list", icons::ICON_LIST);
-                            let icon = ui_state.icon_cache.get_or_load(ui, icon_name, icon_bytes, Color32::GRAY);
-
-                            ui.painter().image(
-                                icon.id(),
-                                icon_rect,
-                                Rect::from_min_max(egui::pos2(0.0, 0.0), 
-                                pos2(1.0, 1.0)),
-                                Color32::WHITE,
-                            );
-
-
-                            ui.add_space(1.0);
-                            
-                            let selected_count = state.selected_count(files.len());
-
-                            let selected_size: u64 = files.iter()
-                                .enumerate()
-                                .filter(|(i, _)| state.is_selected(*i))
-                                .map(|(_, f)| {
-                                    if f.is_dir() {
-                                        state.sizer_manager.cache_manager
-                                            .get_cached_size(&f.full_path)
-                                            .unwrap_or(0)
-                                    } else {
-                                        f.size
-                                    }
-                                })
-                                .sum();
-
-                            ui.label(format!("{}", selected_count));
-                            
-                            ui.add_space(5.0);
-                            
-                            let (icon_rect, _) = ui.allocate_exact_size(icon_size, Sense::hover());
-                            let (icon_name, icon_bytes) = ("database", icons::ICON_DATABASE);
-                            let icon = ui_state.icon_cache.get_or_load(ui, icon_name, icon_bytes, Color32::GRAY);
-                            
-                            ui.painter().image(
-                                icon.id(),
-                                icon_rect,
-                                Rect::from_min_max(egui::pos2(0.0, 0.0), 
-                                pos2(1.0, 1.0)),
-                                Color32::WHITE,
-                            );
-
-                            ui.add_space(1.0);
-                            
-                            ui.label(format_size(selected_size));
-
+                            callback(ui, ui_state, state);
                         });
                     });
                 });
-        }).response.rect;
+        }).response.rect
+}
 
 
+pub fn render_island_bubble(
+        ui: &mut Ui,
+        state: &mut BlazeCoreState,
+        ui_state: &mut BlazeUiState,
+        files: &Vec<Arc<FileEntry>>,
+        bottom_padding: i8,
+        tabs_height: i8
+    ) {
+
+    let island_rect = generic_island(
+        ui,
+        state,
+        ui_state,
+        bottom_padding,
+        tabs_height,
+        150.0,
+    |ui, ui_state, state| {
+                let icon_size = egui::vec2(14.0, 14.0);
+                let (icon_rect, _) = ui.allocate_exact_size(icon_size, Sense::hover());
+                let (icon_name, icon_bytes) = ("file", icons::ICON_FILE);
+                let icon = ui_state.icon_cache.get_or_load(ui, icon_name, icon_bytes, Color32::GRAY);
+                
+                ui.painter().image(
+                    icon.id(),
+                    icon_rect,
+                    Rect::from_min_max(egui::pos2(0.0, 0.0), 
+                    pos2(1.0, 1.0)),
+                    Color32::WHITE,
+                );
+
+                ui.add_space(1.0);
+                
+                let total = files.len();
+                ui.label(format!("{}", total));
+                
+                ui.add_space(5.0);
+                
+
+                let (icon_rect, _) = ui.allocate_exact_size(icon_size, Sense::hover());
+
+                let (icon_name, icon_bytes) = ("list", icons::ICON_LIST);
+                let icon = ui_state.icon_cache.get_or_load(ui, icon_name, icon_bytes, Color32::GRAY);
+
+                ui.painter().image(
+                    icon.id(),
+                    icon_rect,
+                    Rect::from_min_max(egui::pos2(0.0, 0.0), 
+                    pos2(1.0, 1.0)),
+                    Color32::WHITE,
+                );
+
+
+                ui.add_space(1.0);
+                
+                let selected_count = state.selected_count(files.len());
+
+                let selected_size: u64 = files.iter()
+                    .enumerate()
+                    .filter(|(i, _)| state.is_selected(*i))
+                    .map(|(_, f)| {
+                        if f.is_dir() {
+                            state.sizer_manager.cache_manager
+                                .get_cached_size(&f.full_path)
+                                .unwrap_or(0)
+                        } else {
+                            f.size
+                        }
+                    })
+                    .sum();
+
+                ui.label(format!("{}", selected_count));
+                
+                ui.add_space(5.0);
+                
+                let (icon_rect, _) = ui.allocate_exact_size(icon_size, Sense::hover());
+                let (icon_name, icon_bytes) = ("database", icons::ICON_DATABASE);
+                let icon = ui_state.icon_cache.get_or_load(ui, icon_name, icon_bytes, Color32::GRAY);
+                
+                ui.painter().image(
+                    icon.id(),
+                    icon_rect,
+                    Rect::from_min_max(egui::pos2(0.0, 0.0), 
+                    pos2(1.0, 1.0)),
+                    Color32::WHITE,
+                );
+
+                ui.add_space(1.0);
+                
+                ui.label(format_size(selected_size));
+
+            }
+        );
 
 
         let tasks = state.task_manager.get_tasks();
@@ -133,7 +214,8 @@ pub fn render_island_bubble(ui: &mut Ui, state: &mut BlazeCoreState, ui_state: &
 
                 Frame::NONE
                     .inner_margin(egui::Margin::same(10))
-                    .fill(Color32::from_rgb(36, 42, 47))
+                    .fill(COLOR_BG_PANEL)
+                    .stroke(Stroke::new(0.8, COLOR_ACCENT_GLOW))
                     .corner_radius(CornerRadius::same(20))
                     .show(ui, |ui| {
 
@@ -208,7 +290,8 @@ pub fn render_island_bubble(ui: &mut Ui, state: &mut BlazeCoreState, ui_state: &
                 .show(ui, |ui|{
                     Frame::new()
                         .inner_margin(Margin::symmetric(10, 4))
-                        .fill(Color32::from_rgb(36, 42, 47))
+                        .fill(COLOR_BG_PANEL)
+                        .stroke(Stroke::new(0.8, COLOR_ACCENT_GLOW))
                         .corner_radius(CornerRadius::same(20))
                         .show(ui, |ui|{
 
@@ -365,7 +448,8 @@ pub fn render_island_bubble(ui: &mut Ui, state: &mut BlazeCoreState, ui_state: &
                 .show(ui, |ui|{
                     Frame::new()
                         .inner_margin(Margin::symmetric(10, 4))
-                        .fill(Color32::from_rgb(36, 42, 47))
+                        .fill(COLOR_BG_PANEL)
+                        .stroke(Stroke::new(0.8, COLOR_ACCENT_GLOW))
                         .corner_radius(CornerRadius {
                                 nw: 10,
                                 ne: 10,
@@ -434,37 +518,70 @@ pub fn render_island_bubble(ui: &mut Ui, state: &mut BlazeCoreState, ui_state: &
                     });
             });
         }
-
-
-
-
-
 }
 
 
 
-fn ease_out_bounce(t: f32) -> f32 {
-    let n1 = 7.5625_f32;
-    let d1 = 2.75_f32;
+pub fn render_tags_island_bubble(
+        ui: &mut Ui,
+        state: &mut BlazeCoreState,
+        ui_state: &mut BlazeUiState,
+        bottom_padding: i8,
+        tabs_height: i8,
+        tag_len: usize,
+    ) {
 
-    if t < 1.0 / d1 {
-        n1 * t * t
-    } else if t < 2.0 / d1 {
-        let t = t - 1.5 / d1;
-        n1 * t * t + 0.75
-    } else if t < 2.5 / d1 {
-        let t = t - 2.25 / d1;
-        n1 * t * t + 0.9375
-    } else {
-        let t = t - 2.625 / d1;
-        n1 * t * t + 0.984375
-    }
-}
+    generic_island(
+        ui,
+        state,
+        ui_state,
+        bottom_padding,
+        tabs_height,
+        90.0,
+    |ui, ui_state, state| {
 
-fn ease_in_out_bounce(t: f32) -> f32 {
-    if t < 0.5 {
-        (1.0 - ease_out_bounce(1.0 - 2.0 * t)) / 2.0
-    } else {
-        (1.0 + ease_out_bounce(2.0 * t - 1.0)) / 2.0
-    }
+                let (tag_len, items_len) = match state.tag_filter {
+                    TagViewFilter::All { all_items_len } => (tag_len, all_items_len),
+                    TagViewFilter::Tag { items_len, .. } => (1, items_len),
+                };
+
+                let icon_size = egui::vec2(14.0, 14.0);
+                let (icon_rect, _) = ui.allocate_exact_size(icon_size, Sense::hover());
+                let (icon_name, icon_bytes) = ("tag", icons::ICON_TAG);
+                let icon = ui_state.icon_cache.get_or_load(ui, icon_name, icon_bytes, Color32::GRAY);
+                
+                ui.painter().image(
+                    icon.id(),
+                    icon_rect,
+                    Rect::from_min_max(egui::pos2(0.0, 0.0), 
+                    pos2(1.0, 1.0)),
+                    Color32::WHITE,
+                );
+
+                ui.add_space(1.0);
+                
+                ui.label(format!("{}", tag_len));
+                
+                ui.add_space(5.0);
+                
+
+                let (icon_rect, _) = ui.allocate_exact_size(icon_size, Sense::hover());
+
+                let (icon_name, icon_bytes) = ("list", icons::ICON_LIST);
+                let icon = ui_state.icon_cache.get_or_load(ui, icon_name, icon_bytes, Color32::GRAY);
+
+                ui.painter().image(
+                    icon.id(),
+                    icon_rect,
+                    Rect::from_min_max(egui::pos2(0.0, 0.0), 
+                    pos2(1.0, 1.0)),
+                    Color32::WHITE,
+                );
+
+
+                ui.add_space(1.0);
+                
+                ui.label(format!("{}", items_len));
+            }
+        );
 }

@@ -18,7 +18,7 @@
 
 use egui::{Color32, CornerRadius, Frame, Margin, Panel, Rect, RichText, Sense, Stroke, Ui, pos2, vec2};
 use std::path::PathBuf;
-use crate::{core::{blaze_state::BlazeCoreState, runtime::{bus_structs::UiEvent, event_bus::with_event_bus}}, ui::{blaze_ui_state::BlazeUiState, icons_cache::icons}};
+use crate::{core::{blaze_state::BlazeCoreState, runtime::{bus_structs::UiEvent, event_bus::with_event_bus}}, ui::{blaze_ui_state::BlazeUiState, icons_cache::icons, themes::colors::{COLOR_BG_MAIN, COLOR_BG_PANEL}}};
 
 
 fn render_bar_button<F>(ui: &mut Ui, total_height: f32, label: &'static str, bytes: &[u8], ui_state: &mut BlazeUiState, mut callback: F)
@@ -64,7 +64,7 @@ where F: FnMut(),
 
 pub fn toolbar_component(ui: &mut Ui, state: &mut BlazeCoreState, ui_state: &mut BlazeUiState) {
     Panel::top("toolbar")
-        .frame(Frame::new().fill(Color32::from_rgb(16, 21, 25)).inner_margin(10))
+        .frame(Frame::new().fill(COLOR_BG_MAIN).inner_margin(10))
         .exact_size(80.0)
         .show_separator_line(false)
         .show_inside(ui, |ui| {
@@ -79,7 +79,7 @@ pub fn toolbar_component(ui: &mut Ui, state: &mut BlazeCoreState, ui_state: &mut
                 Frame::new()
                 .corner_radius(20)
                 .inner_margin(Margin::same(10))
-                .fill(Color32::from_rgb(27, 31, 35))
+                .fill(COLOR_BG_PANEL)
                 .show(ui, |ui|{
                     ui.set_height(total_height);
                     ui.set_width(ui.available_width());

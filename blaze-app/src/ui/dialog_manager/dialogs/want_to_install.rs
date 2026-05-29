@@ -18,7 +18,7 @@
 
 use egui::{Color32, Ui, CornerRadius, Frame, Margin, Order, Window};
 use tracing::info;
-use crate::{core::{bootstrap::{configs::config_manager::with_configs, install_manager::installation_manager::with_installation_manager}, runtime::{bus_structs::UiEvent, event_bus::Dispatcher}}};
+use crate::{core::{bootstrap::{configs::config_manager::with_configs, install_manager::installation_manager::with_installation_manager}, runtime::{bus_structs::UiEvent, event_bus::Dispatcher}}, ui::themes::colors::COLOR_BG_MAIN};
 use crate::core::bootstrap::install_manager::installation_manager::InstallResult;
 use crate::ui::dialog_manager::dialog_manager::ModalDialog;
 
@@ -52,7 +52,7 @@ impl WantToInstallDialog {
     pub fn render_dialog(&mut self, ui: &mut Ui) {
         let mut should_close = false;        
         let custom_frame = Frame::NONE
-            .fill(Color32::from_rgb(16, 21, 25))
+            .fill(COLOR_BG_MAIN)
             .corner_radius(CornerRadius::same(10))
             .inner_margin(Margin::same(10));
 

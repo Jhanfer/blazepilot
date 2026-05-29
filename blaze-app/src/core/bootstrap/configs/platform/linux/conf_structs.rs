@@ -1,4 +1,3 @@
-use std::{path::Path, sync::Arc};
 use serde::{Serialize, Deserialize};
 
 
@@ -34,13 +33,4 @@ impl DisplayBackend {
             DisplayBackend::Wayland => "Wayland",
         }
     }
-}
-
-
-//--__--__--__--__ Enlaces Favs  __--__--__--__--__--__--__
-#[derive(Serialize, Deserialize, Debug, Clone, Hash, PartialEq, Eq)]
-pub struct FavoriteLinks {
-    pub name: String,
-    pub path: Arc<Path>,
-    pub is_dir: bool,
 }
