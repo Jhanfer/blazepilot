@@ -18,7 +18,11 @@ use crate::core::{
     system::clipboard::clipboard::TOKIO_RUNTIME,
 };
 use notify::{Event, EventKind, RecursiveMode, Watcher};
-use std::path::Path;
+use tokio::time::sleep;
+use std::{
+    path::Path, 
+    time::Duration
+};
 use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc,
@@ -135,9 +139,24 @@ impl FileWatcher {
         self.watcher = Some(Box::new(watcher) as Box<dyn Watcher + Send>);
 
         let handle = TOKIO_RUNTIME.spawn(async move {
+            let debounce_duration = Duration::from_millis(500);
+            
             while watching.load(Ordering::Acquire) {
                 if let Some(event) = fs_rx.recv().await {
-                    Self::handle_watcher_event(event, &sender)
+                    let mut last_event = event;
+                    loop {
+                        tokio::select! {
+                            biased;
+                            Some(next_event) = fs_rx.recv() => {
+                                last_event = next_event;
+                            }
+                            _ = sleep(debounce_duration) => {
+                                break;
+                            }
+                        }
+                    }
+
+                    Self::handle_watcher_event(last_event, &sender)
                 }
             }
         });
