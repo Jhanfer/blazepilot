@@ -1,7 +1,18 @@
 #!/bin/sh
 
-echo "→ Corriendo cargo fmt..."
-cargo fmt --all
-git add -u
+echo "→ Comprobando formato..."
 
-echo "✓ Formato hecho"
+if ! cargo fmt --all -- --check >/dev/null 2>&1; then
+    echo "⚠️ Formato incorrecto. Corrigiendo..."
+
+    cargo fmt --all || exit 1
+
+    git add -u
+
+    echo ""
+    echo "✓ Código formateado automáticamente."
+    echo "↻ Ejecuta nuevamente: git commit"
+    exit 1
+fi
+
+echo "✓ Formato correcto"
