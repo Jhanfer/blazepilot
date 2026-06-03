@@ -222,8 +222,9 @@ pub fn hot_keys_logic(
     }
 
     //búsqueda recursiva
-    if input.modifiers.alt && input.key_pressed(Key::R) && state.search_filter.is_empty()
-        || !ui.memory(|m| m.has_focus("search_bar".into()))
+    if input.modifiers.alt
+        && input.key_pressed(Key::R)
+        && (state.search_filter.is_empty() || !ui.memory(|m| m.has_focus("search_bar".into())))
     {
         state.set_search("rec:".to_owned());
 
