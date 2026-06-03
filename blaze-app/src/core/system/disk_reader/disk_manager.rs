@@ -12,16 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-
-
-
-
-use std::sync::Arc;
-use tracing::info;
 use crate::core::system::disk_reader::disk::Disk;
-use tokio::sync::{Mutex as TokioMutex};
-
-
+use std::sync::Arc;
+use tokio::sync::Mutex as TokioMutex;
+use tracing::info;
 
 #[cfg(target_os = "linux")]
 use crate::core::system::disk_reader::platform::linux::LinuxDisks;
@@ -49,7 +43,6 @@ impl DiskManager {
                 disks: PlatformDisks::Linux(TokioMutex::new(LinuxDisks::init().await).into()),
                 watcher_started: false,
             }
-
         }
 
         #[cfg(not(target_os = "linux"))]
@@ -59,12 +52,17 @@ impl DiskManager {
         }
     }
 
-
     #[cfg(target_os = "linux")]
-    pub async fn start_watcher_linux(&mut self, manager_arc: Arc<TokioMutex<DiskManager>>) -> anyhow::Result<()> {
-        if self.watcher_started { info!("Disk Watcher inciado."); return Ok(()); }
+    pub async fn start_watcher_linux(
+        &mut self,
+        manager_arc: Arc<TokioMutex<DiskManager>>,
+    ) -> anyhow::Result<()> {
+        if self.watcher_started {
+            info!("Disk Watcher inciado.");
+            return Ok(());
+        }
         info!("Inciando watcher");
-        
+
         let PlatformDisks::Linux(mutex_arc) = &self.disks;
         let linux_disks = mutex_arc.lock().await;
         linux_disks.start_disk_watcher(manager_arc).await?;
@@ -88,15 +86,13 @@ impl DiskManager {
     #[cfg(target_os = "linux")]
     pub async fn get_partitions(&self) -> Vec<Disk> {
         match &self.disks {
-            PlatformDisks::Linux(disks) => {
-                disks.lock().await.get_partitions()
-            }
+            PlatformDisks::Linux(disks) => disks.lock().await.get_partitions(),
         }
     }
 
     /// Monta un disco específico
     #[cfg(target_os = "linux")]
-    pub async fn mount_disk(&mut self, disk: &Disk, ) -> anyhow::Result<String> {
+    pub async fn mount_disk(&mut self, disk: &Disk) -> anyhow::Result<String> {
         match &mut self.disks {
             PlatformDisks::Linux(disks) => {
                 let result = disks.lock().await.mount(disk).await;
@@ -117,7 +113,7 @@ impl DiskManager {
     }
 
     #[cfg(target_os = "linux")]
-    pub async fn eject_disk(&mut self, disk: &Disk, ) -> anyhow::Result<String> {
+    pub async fn eject_disk(&mut self, disk: &Disk) -> anyhow::Result<String> {
         match &mut self.disks {
             PlatformDisks::Linux(disks) => {
                 let result = disks.lock().await.eject(disk).await;
@@ -143,9 +139,7 @@ impl DiskManager {
         match &self.disks {
             PlatformDisks::Linux(disks) => {
                 let partitions = disks.lock().await.get_partitions();
-                partitions.into_iter()
-                    .filter(|d| d.is_removable)
-                    .collect()
+                partitions.into_iter().filter(|d| d.is_removable).collect()
             }
         }
     }
@@ -161,13 +155,25 @@ impl DiskManager {
     }
 
     #[cfg(not(target_os = "linux"))]
-    pub async fn mount_disk(&mut self, _disk: &Disk, _ui: &slint::Weak<BlazeApp>) -> anyhow::Result<String> {
-        Err(anyhow::anyhow!("Gestión de discos no soportada en esta plataforma"))
+    pub async fn mount_disk(
+        &mut self,
+        _disk: &Disk,
+        _ui: &slint::Weak<BlazeApp>,
+    ) -> anyhow::Result<String> {
+        Err(anyhow::anyhow!(
+            "Gestión de discos no soportada en esta plataforma"
+        ))
     }
 
     #[cfg(not(target_os = "linux"))]
-    pub async fn unmount_disk(&mut self, _disk: &Disk, _ui: &slint::Weak<BlazeApp>) -> anyhow::Result<String> {
-        Err(anyhow::anyhow!("Gestión de discos no soportada en esta plataforma"))
+    pub async fn unmount_disk(
+        &mut self,
+        _disk: &Disk,
+        _ui: &slint::Weak<BlazeApp>,
+    ) -> anyhow::Result<String> {
+        Err(anyhow::anyhow!(
+            "Gestión de discos no soportada en esta plataforma"
+        ))
     }
 
     #[cfg(not(target_os = "linux"))]

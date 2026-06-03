@@ -1,24 +1,20 @@
-use std::path::Path;
-use std::sync::Arc;
-use egui::Color32;
-use file_id::FileId;
-use uuid::Uuid;
 use crate::core::bootstrap::quick_access_manager::platform::structs::QuickLinks;
 use crate::core::files::blaze_motor::motor_structs::FileEntry;
-use crate::core::system::fileopener_module::AppAssociation;
 use crate::core::system::fileopener_module::platform::linux::structs::AppsIconData;
+use crate::core::system::fileopener_module::AppAssociation;
 use crate::core::system::updater::updater::UpdateMessages;
 use crate::ui::image_preview::image_preview::ImagePreviewState;
-
-
-
-
+use egui::Color32;
+use file_id::FileId;
+use std::path::Path;
+use std::sync::Arc;
+use uuid::Uuid;
 
 #[derive(Debug)]
 pub enum FileOperation {
-    Move { 
-        sources: Vec<Arc<Path>>, 
-        dest: Arc<Path>, 
+    Move {
+        sources: Vec<Arc<Path>>,
+        dest: Arc<Path>,
     },
 
     PasteCut {
@@ -35,8 +31,8 @@ pub enum FileOperation {
         new_path: Arc<Path>,
     },
 
-    Trash { 
-        files: Vec<Arc<Path>> 
+    Trash {
+        files: Vec<Arc<Path>>,
     },
 
     CreateDir {
@@ -49,8 +45,8 @@ pub enum FileOperation {
 
     Update,
     UpdateDirSize {
-        full_path: Arc<Path>, 
-        size: u64, 
+        full_path: Arc<Path>,
+        size: u64,
         tab_id: Uuid,
     },
     RestoreDeletedFiles {
@@ -62,7 +58,7 @@ pub enum FileOperation {
     },
 
     ExtractHere {
-        entry: Arc<FileEntry>, 
+        entry: Arc<FileEntry>,
         dest_dir: Arc<Path>,
     },
 
@@ -86,10 +82,7 @@ pub enum SureTo {
 
 #[derive(Debug)]
 pub enum FileConflict {
-    AlreadyExist {
-        name: String,
-        path: Arc<Path>
-    }
+    AlreadyExist { name: String, path: Arc<Path> },
 }
 
 pub enum UiEvent {
@@ -105,7 +98,6 @@ pub enum UiEvent {
         full_path: Arc<Path>,
         tab_id: Uuid,
     },
-
 
     ShowImagePvw {
         pvw: Option<ImagePreviewState>,
@@ -137,23 +129,22 @@ pub enum UiEvent {
     QuickTagEvent(QuickTagEvent),
 }
 
-
 pub enum QuickTagEvent {
     CreateNewTag {
-        title: String, 
-        temp_color: Color32
+        title: String,
+        temp_color: Color32,
     },
-    AddQuickLinkToTag { 
-        quicks: Vec<QuickLinks>
+    AddQuickLinkToTag {
+        quicks: Vec<QuickLinks>,
     },
-    EditCurrentTag  {
+    EditCurrentTag {
         id: Uuid,
         title: String,
-        temp_color: Color32, 
+        temp_color: Color32,
     },
     DeleteCurrentTag {
         title: Box<str>,
-        id: Uuid
+        id: Uuid,
     },
 
     DeleteQuickLink {
@@ -165,7 +156,7 @@ pub enum QuickTagEvent {
     EditCurrentQuickLink {
         tag_id: Uuid,
         quick_id: Uuid,
-        title: String, 
+        title: String,
         temp_color: Color32,
     },
 }

@@ -12,38 +12,29 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-
-
-
-use uuid::Uuid;
 use std::cell::RefCell;
-use std::rc::Rc;
 use std::path::Path;
-use std::vec;
-use tracing::error;
+use std::rc::Rc;
 use std::sync::Arc;
+use std::vec;
 use tokio::sync::Mutex;
+use tracing::error;
+use uuid::Uuid;
 
 use crate::core::files::blaze_motor::error::MotorResult;
-use crate::core::system::disk_reader::disk_manager::DiskManager;
+use crate::core::files::blaze_motor::tab_state::{BlazeTabBuilder, BlazeTabState};
 use crate::core::runtime::event_bus::with_event_bus;
+use crate::core::system::disk_reader::disk_manager::DiskManager;
 use crate::core::system::knowndirs::knowndirs_manager::KnownDirsManager;
-use crate::core::files::blaze_motor::tab_state::{BlazeTabState, BlazeTabBuilder};
-
-
-
 
 #[must_use = "Llama .build() para construir motor"]
 pub struct BlazeMotorBuilder {
     start_path: Option<Arc<Path>>,
 }
 
-
 impl BlazeMotorBuilder {
     pub fn new() -> Self {
-        Self {
-            start_path: None,
-        }
+        Self { start_path: None }
     }
 
     pub fn with_start_path(mut self, path: Option<Arc<Path>>) -> Self {
@@ -91,39 +82,33 @@ impl Default for BlazeMotorBuilder {
     }
 }
 
-
-
 pub struct BlazeMotor {
     pub tabs: Vec<BlazeTabState>,
     pub active_tab_index: usize,
-    pub disk_manager: Arc<Mutex<DiskManager>>, 
+    pub disk_manager: Arc<Mutex<DiskManager>>,
     pub limit: usize,
 }
 
-
 thread_local! {
-    pub static MOTOR: RefCell<Option<Rc<RefCell<BlazeMotor>>>> = RefCell::new(None);
+    pub static MOTOR: RefCell<Option<Rc<RefCell<BlazeMotor>>>> = const { RefCell::new(None) };
 }
-pub fn with_motor<F, R>(f: F) -> R 
-    where F: FnOnce(&mut BlazeMotor) -> R {
-        MOTOR.with(|m|{
-            let motor_rc = m.borrow()
-                .as_ref()
-                .expect("Motor no inicializado")
-                .clone();
+pub fn with_motor<F, R>(f: F) -> R
+where
+    F: FnOnce(&mut BlazeMotor) -> R,
+{
+    MOTOR.with(|m| {
+        let motor_rc = m.borrow().as_ref().expect("Motor no inicializado").clone();
 
-            let mut motor = motor_rc.borrow_mut();
-            f(&mut *motor)
-        })
-    }
-
+        let mut motor = motor_rc.borrow_mut();
+        f(&mut motor)
+    })
+}
 
 impl BlazeMotor {
     fn set_active_index(&mut self, index: usize) {
         self.active_tab_index = index;
         crate::core::runtime::event_bus::set_active_tab(self.tabs[index].id);
     }
-
 
     pub fn active_tab_mut(&mut self) -> &mut BlazeTabState {
         &mut self.tabs[self.active_tab_index]
@@ -133,7 +118,7 @@ impl BlazeMotor {
         &self.tabs[self.active_tab_index]
     }
 
-    pub fn switch_to_tab(&mut self, index:usize) {
+    pub fn switch_to_tab(&mut self, index: usize) {
         if index < self.tabs.len() {
             self.set_active_index(index);
         }
@@ -150,21 +135,19 @@ impl BlazeMotor {
         if self.tabs.is_empty() || self.tabs.len() <= 1 {
             return;
         }
-        let next= if self.active_tab_index == 0 {
+        let next = if self.active_tab_index == 0 {
             self.tabs.len() - 1
         } else {
             self.active_tab_index - 1
         };
         self.set_active_index(next);
     }
-    
+
     fn remove_channels(&self, tab_id: Uuid) {
-        with_event_bus(|pool| {
-            pool.remove_tab(tab_id)
-        });
+        with_event_bus(|pool| pool.remove_tab(tab_id));
     }
 
-    pub fn close_tab(&mut self, index:usize) -> MotorResult<bool> {
+    pub fn close_tab(&mut self, index: usize) -> MotorResult<bool> {
         if self.tabs.len() <= 1 {
             return Ok(false);
         }
@@ -210,7 +193,7 @@ impl BlazeMotor {
 
         let insert_index = self.active_tab_index + 1;
         self.tabs.insert(insert_index, new_tab);
-        
+
         self.set_active_index(insert_index);
 
         self.start_tab_load(self.active_tab_index);
@@ -224,7 +207,7 @@ impl BlazeMotor {
         }
         let path = &KnownDirsManager::get().home;
         let tab_id = Uuid::new_v4();
-        
+
         let new_tab = BlazeTabBuilder::default()
             .with_start_path(path.to_owned())
             .with_uuid(tab_id)
@@ -240,22 +223,30 @@ impl BlazeMotor {
         Some(tab_id)
     }
 
-    pub fn tab_title(&self, index:usize) -> String {
-        self.tabs.get(index)
-        .and_then(|tab|tab.cwd.file_name())
-        .and_then(|name|name.to_str())
-        .unwrap_or("Home")
-        .to_owned()
+    pub fn tab_title(&self, index: usize) -> String {
+        self.tabs
+            .get(index)
+            .and_then(|tab| tab.cwd.file_name())
+            .and_then(|name| name.to_str())
+            .unwrap_or("Home")
+            .to_owned()
     }
-
 }
-
-
-
 
 #[cfg(test)]
 mod tests {
-    use crate::core::{files::{blaze_motor::{error::MotorError, motor_structs::{FileEntry, FileKind}}, file_extension::FileExtension}, system::{clipboard::clipboard::TOKIO_RUNTIME, trash_manager::trash_manager::init_trash_backend}};
+    use crate::core::{
+        files::{
+            blaze_motor::{
+                error::MotorError,
+                motor_structs::{FileEntry, FileKind},
+            },
+            file_extension::FileExtension,
+        },
+        system::{
+            clipboard::clipboard::TOKIO_RUNTIME, trash_manager::trash_manager::init_trash_backend,
+        },
+    };
 
     use super::*;
     use std::{sync::atomic::Ordering, time::Duration};
@@ -265,7 +256,6 @@ mod tests {
         init_trash_backend()?;
         Ok(())
     }
-
 
     fn make_tab(path: Arc<Path>) -> BlazeTabState {
         if let Err(e) = init_dir_trash() {
@@ -283,14 +273,21 @@ mod tests {
     fn test_stop_watching_does_not_leave_handle() {
         let mut tab = make_tab(std::env::temp_dir().into());
         // Simular que tenía un handle activo
-        let handle = TOKIO_RUNTIME.spawn(async { tokio::time::sleep(Duration::from_secs(60)).await });
+        let handle =
+            TOKIO_RUNTIME.spawn(async { tokio::time::sleep(Duration::from_secs(60)).await });
         tab.watcher.watching_handle = Some(handle);
         tab.watcher.watching.store(true, Ordering::Relaxed);
 
         tab.watcher.stop_watching();
 
-        assert!(!tab.watcher.watching.load(Ordering::Relaxed), "watching debe ser false");
-        assert!(tab.watcher.watching_handle.is_none(), "handle debe haberse consumido");
+        assert!(
+            !tab.watcher.watching.load(Ordering::Relaxed),
+            "watching debe ser false"
+        );
+        assert!(
+            tab.watcher.watching_handle.is_none(),
+            "handle debe haberse consumido"
+        );
         assert!(tab.watcher.watcher.is_none(), "watcher debe ser None");
     }
 
@@ -305,8 +302,14 @@ mod tests {
 
         tab.loader.cancel();
 
-        assert!(tab.loader.handles.is_empty(), "handles deben haberse drenado");
-        assert!(!tab.loading_flag.load(Ordering::Relaxed), "flag debe ser false");
+        assert!(
+            tab.loader.handles.is_empty(),
+            "handles deben haberse drenado"
+        );
+        assert!(
+            !tab.loading_flag.load(Ordering::Relaxed),
+            "flag debe ser false"
+        );
     }
 
     #[test]
@@ -315,9 +318,7 @@ mod tests {
             println!("El backend de la papelera ya se encuentra activo: {}", e);
         }
 
-        let mut motor = TOKIO_RUNTIME.block_on(
-            BlazeMotorBuilder::default().build()
-        );
+        let mut motor = TOKIO_RUNTIME.block_on(BlazeMotorBuilder::default().build());
         // Añadir un segundo tab para poder cerrar el primero
         motor.add_tab(&std::env::temp_dir());
         assert_eq!(motor.tabs.len(), 2);
@@ -325,29 +326,27 @@ mod tests {
         // Llenar datos en tab 0
 
         {
-            let mut file_guard = motor.tabs[0].files.write()
+            let mut file_guard = motor.tabs[0]
+                .files
+                .write()
                 .map_err(|_| MotorError::PoisonedLock)?;
             // simular con vec vacío, basta para el test
-            file_guard.push(
-                Arc::new(
-                FileEntry {
-                        name: "".into(),
-                        full_path: Path::new("").into(),
-                        extension: FileExtension::Unknown,
-                        kind: FileKind::File,
-                        size: 0,
-                        modified: 0,
-                        created: 0,
-                        is_hidden: false,
-                        unique_id: None,
-                        accessed: 0,
-                        permissions: 0,
-                        inode: 0,
-                        nlink: 0,
-                        device: 0,
-                    }
-                )
-            );
+            file_guard.push(Arc::new(FileEntry {
+                name: "".into(),
+                full_path: Path::new("").into(),
+                extension: FileExtension::Unknown,
+                kind: FileKind::File,
+                size: 0,
+                modified: 0,
+                created: 0,
+                is_hidden: false,
+                unique_id: None,
+                accessed: 0,
+                permissions: 0,
+                inode: 0,
+                nlink: 0,
+                device: 0,
+            }));
         }
 
         let closed = motor.close_tab(0)?;
@@ -364,9 +363,7 @@ mod tests {
             println!("El backend de la papelera ya se encuentra activo: {}", e);
         }
 
-        let mut motor = TOKIO_RUNTIME.block_on(
-            BlazeMotorBuilder::default().build()
-        );
+        let mut motor = TOKIO_RUNTIME.block_on(BlazeMotorBuilder::default().build());
         assert_eq!(motor.tabs.len(), 1);
 
         let result = motor.close_tab(0)?;
@@ -382,9 +379,7 @@ mod tests {
             println!("El backend de la papelera ya se encuentra activo: {}", e);
         }
 
-        let mut motor = TOKIO_RUNTIME.block_on(
-            BlazeMotorBuilder::default().build()
-        );
+        let mut motor = TOKIO_RUNTIME.block_on(BlazeMotorBuilder::default().build());
         motor.add_tab(&std::env::temp_dir());
         motor.add_tab(&std::env::temp_dir());
         // tabs: [0, 1, 2], active = 2
@@ -392,7 +387,10 @@ mod tests {
 
         motor.close_tab(2)?; // cierra el activo (el último)
 
-        assert_eq!(motor.active_tab_index, 1, "debe apuntar al nuevo último tab");
+        assert_eq!(
+            motor.active_tab_index, 1,
+            "debe apuntar al nuevo último tab"
+        );
 
         Ok(())
     }
@@ -417,7 +415,6 @@ mod tests {
         assert!(tab.watcher.watching_handle.is_none());
     }
 
-
     fn two_distinct_dirs() -> (Arc<Path>, Arc<Path>) {
         let base = std::env::temp_dir();
         let a = base.join("blaze_test_a");
@@ -426,7 +423,6 @@ mod tests {
         std::fs::create_dir_all(&b).ok();
         (a.into(), b.into())
     }
-
 
     #[test]
     fn test_navigate_to_updates_history() {

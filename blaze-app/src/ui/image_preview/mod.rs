@@ -1,2 +1,2 @@
-pub mod image_preview;
 mod error;
+pub mod image_preview;

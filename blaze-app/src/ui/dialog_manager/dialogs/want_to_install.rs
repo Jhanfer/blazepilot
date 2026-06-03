@@ -12,45 +12,52 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-
-
-
-
-use egui::{Color32, Ui, CornerRadius, Frame, Margin, Order, Window};
-use tracing::info;
-use crate::{core::{bootstrap::{configs::config_manager::with_configs, install_manager::installation_manager::with_installation_manager}, runtime::{bus_structs::UiEvent, event_bus::Dispatcher}}, ui::themes::colors::COLOR_BG_MAIN};
 use crate::core::bootstrap::install_manager::installation_manager::InstallResult;
 use crate::ui::dialog_manager::dialog_manager::ModalDialog;
-
+use crate::{
+    core::{
+        bootstrap::{
+            configs::config_manager::with_configs,
+            install_manager::installation_manager::with_installation_manager,
+        },
+        runtime::{bus_structs::UiEvent, event_bus::Dispatcher},
+    },
+    ui::themes::colors::COLOR_BG_MAIN,
+};
+use egui::{CornerRadius, Frame, Margin, Order, Ui, Window};
+use tracing::info;
 
 pub struct WantToInstallDialog {
     pub show_modal: bool,
 }
 
 impl ModalDialog for WantToInstallDialog {
-    fn is_open(&self) -> bool { self.show_modal }
-    fn close(&mut self) { self.close() }
-    fn render(&mut self, ui: &mut Ui) { self.render_dialog(ui); }
+    fn is_open(&self) -> bool {
+        self.show_modal
+    }
+    fn close(&mut self) {
+        self.close()
+    }
+    fn render(&mut self, ui: &mut Ui) {
+        self.render_dialog(ui);
+    }
 }
 
 impl WantToInstallDialog {
     pub fn new() -> Self {
-        Self {
-            show_modal: false,
-        }
+        Self { show_modal: false }
     }
 
     pub fn close(&mut self) {
-        self.show_modal = false; 
+        self.show_modal = false;
     }
 
     pub fn open(&mut self) {
         self.show_modal = true;
     }
 
-
     pub fn render_dialog(&mut self, ui: &mut Ui) {
-        let mut should_close = false;        
+        let mut should_close = false;
         let custom_frame = Frame::NONE
             .fill(COLOR_BG_MAIN)
             .corner_radius(CornerRadius::same(10))
@@ -63,20 +70,19 @@ impl WantToInstallDialog {
             .resizable(false)
             .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
             .open(&mut self.show_modal)
-            .show(ui, |ui|{
+            .show(ui, |ui| {
                 ui.set_min_width(250.0);
                 ui.set_min_height(100.0);
-                
-                ui.vertical_centered(|ui|{
+
+                ui.vertical_centered(|ui| {
                     ui.add_space(8.0);
                     ui.label("Esto creará un '.desktop' ");
 
                     ui.label("Puedes instalar desde configuraciones más tarde");
                 });
 
-
                 ui.add_space(50.0);
-                
+
                 ui.horizontal(|ui| {
                     let width = ui.available_width();
                     let button_width = 120.0;
@@ -86,22 +92,24 @@ impl WantToInstallDialog {
                     if ui.button("Sí").clicked() {
                         let dispatcher = Dispatcher::current();
 
-                        with_installation_manager(|im|{
+                        with_installation_manager(|im| {
                             let installresult = im.install();
                             match installresult {
-                                InstallResult::InstalledSystem(path) |
-                                InstallResult::InstalledLocal(path) => {
-                                    dispatcher.send(
-                                        UiEvent::ShowGeneric {
-                                            title: "!Instalado con éxito!".into(),
-                                            message: format!("Se ha instalado en: '{}'", path.display()).into(),
-                                        }
-                                    ).ok()
-                                },
+                                InstallResult::InstalledSystem(path)
+                                | InstallResult::InstalledLocal(path) => dispatcher
+                                    .send(UiEvent::ShowGeneric {
+                                        title: "!Instalado con éxito!".into(),
+                                        message: format!(
+                                            "Se ha instalado en: '{}'",
+                                            path.display()
+                                        )
+                                        .into(),
+                                    })
+                                    .ok(),
                                 InstallResult::Failed(e) => {
                                     dispatcher.send(UiEvent::ShowError(e)).ok()
-                                },
-                                _=>{None},
+                                }
+                                _ => None,
                             }
                         });
                         should_close = true;

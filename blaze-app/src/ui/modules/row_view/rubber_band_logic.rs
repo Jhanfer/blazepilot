@@ -1,40 +1,48 @@
+use crate::{
+    core::{blaze_state::BlazeCoreState, files::blaze_motor::motor_structs::FileEntry},
+    ui::themes::colors::COLOR_ACCENT_GLOW,
+};
+use egui::{pos2, vec2, Color32, Painter, Rect, Stroke};
 use std::sync::Arc;
-use egui::{Color32, Painter, Rect, Stroke, pos2, vec2};
-use crate::{core::{blaze_state::BlazeCoreState, files::blaze_motor::motor_structs::FileEntry}, ui::themes::colors::COLOR_ACCENT_GLOW};
 
-
-pub fn render_rubberband(state: &mut BlazeCoreState, files: &Vec<Arc<FileEntry>>, clipped_painter: &Painter, panel_top: f32, content_rect: Rect, row_height: f32) {
+pub fn render_rubberband(
+    state: &mut BlazeCoreState,
+    files: &[Arc<FileEntry>],
+    clipped_painter: &Painter,
+    panel_top: f32,
+    content_rect: Rect,
+    row_height: f32,
+) {
     if let (Some(start), Some(current)) = (
         state.rubber_band.rubber_band_start,
-        state.rubber_band.rubber_band_current
+        state.rubber_band.rubber_band_current,
     ) {
-
-        let start_screen_y = panel_top + state.rubber_band.rubber_band_start_content_y - state.scroll_offset;
+        let start_screen_y =
+            panel_top + state.rubber_band.rubber_band_start_content_y - state.scroll_offset;
         let start_screen = pos2(start.x, start_screen_y);
         let rect = Rect::from_two_pos(start_screen, current);
 
-
         clipped_painter.rect_filled(
-            rect, 
-            10.0, 
+            rect,
+            10.0,
             Color32::from_rgba_unmultiplied(
                 COLOR_ACCENT_GLOW.r(),
                 COLOR_ACCENT_GLOW.g(),
                 COLOR_ACCENT_GLOW.b(),
-                40
-            )
+                40,
+            ),
         );
 
         let mut points = Vec::new();
 
         let stroke = Stroke::new(
-            3.0, 
+            3.0,
             Color32::from_rgba_unmultiplied(
                 COLOR_ACCENT_GLOW.r(),
                 COLOR_ACCENT_GLOW.g(),
                 COLOR_ACCENT_GLOW.b(),
-                200
-            )
+                200,
+            ),
         );
         let radius = (rect.width().min(rect.height()) / 2.0).min(10.0);
         let steps = 8;
@@ -46,11 +54,16 @@ pub fn render_rubberband(state: &mut BlazeCoreState, files: &Vec<Arc<FileEntry>>
             }
         };
 
-        add_arc(rect.right_top() + vec2(-radius, radius), -std::f32::consts::FRAC_PI_2);
+        add_arc(
+            rect.right_top() + vec2(-radius, radius),
+            -std::f32::consts::FRAC_PI_2,
+        );
         add_arc(rect.right_bottom() + vec2(-radius, -radius), 0.0);
-        add_arc(rect.left_bottom() + vec2(radius, -radius), std::f32::consts::FRAC_PI_2);
+        add_arc(
+            rect.left_bottom() + vec2(radius, -radius),
+            std::f32::consts::FRAC_PI_2,
+        );
         add_arc(rect.left_top() + vec2(radius, radius), std::f32::consts::PI);
-
 
         for i in 0..points.len() {
             let p1 = points[i];
@@ -59,7 +72,7 @@ pub fn render_rubberband(state: &mut BlazeCoreState, files: &Vec<Arc<FileEntry>>
                 &[p1, p2],
                 stroke,
                 4.0, // largo del guion
-                4.0  // espacio
+                4.0, // espacio
             ));
         }
 
@@ -67,7 +80,8 @@ pub fn render_rubberband(state: &mut BlazeCoreState, files: &Vec<Arc<FileEntry>>
         state.resize_selection(files.len());
 
         for (i, _) in files.iter().enumerate() {
-            let file_y_min = state.row_view.scroll_area_origin_y + i as f32 * row_height - state.scroll_offset;
+            let file_y_min =
+                state.row_view.scroll_area_origin_y + i as f32 * row_height - state.scroll_offset;
             let file_y_max = file_y_min + row_height;
 
             let file_rect = Rect::from_min_max(

@@ -12,26 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-
-
-
-use std::sync::atomic::Ordering;
-use std::sync::{Arc, atomic::AtomicBool};
-use std::collections::HashMap;
-use std::path::Path;
-use std::time::Duration;
-use file_id::{get_file_id};
-use tokio::sync::Mutex;
-use tracing::warn;
 use crate::core::files::blaze_motor::error::{MotorError, MotorResult};
 use crate::core::files::blaze_motor::motor_structs::{FileEntry, FileLoadingMessage};
-use crate::core::runtime::event_bus::Dispatcher;
 use crate::core::files::blaze_motor::utilities::build_entry;
+use crate::core::runtime::event_bus::Dispatcher;
 use crate::core::system::clipboard::clipboard::TOKIO_RUNTIME;
-
-
-
-
+use file_id::get_file_id;
+use std::collections::HashMap;
+use std::path::Path;
+use std::sync::atomic::Ordering;
+use std::sync::{atomic::AtomicBool, Arc};
+use std::time::Duration;
+use tokio::sync::Mutex;
+use tracing::warn;
 
 #[derive(Clone)]
 enum FileOp {
@@ -42,39 +35,37 @@ enum FileOp {
     Modify(Arc<Path>),
 }
 
-
 type PathKey = Arc<Path>;
+
+#[derive(Default)]
 pub struct EventBuffer {
     map: HashMap<PathKey, FileOp>,
 }
 
-
 impl EventBuffer {
-    fn push(&mut self, path: &Path, op:FileOp) {
+    fn push(&mut self, path: &Path, op: FileOp) {
         use FileOp::*;
 
         match (self.map.remove(path), op) {
-
             //Crear - anula todo
             (_, Add(entry)) => {
                 self.map.insert(path.into(), Add(entry));
-            },
+            }
 
             //Borrar - anula todo
             (_, Remove(entry)) => {
                 self.map.insert(path.into(), Remove(entry));
-            },
+            }
 
             //modificar y fusionar en existentes
             (Some(Add(e)), Modify(_)) => {
                 self.map.insert(path.into(), Add(e));
-            },
+            }
 
             //modificar unico
             (_, Modify(p)) => {
                 self.map.insert(path.into(), Modify(p));
-            },
-
+            }
         }
     }
 
@@ -87,18 +78,10 @@ impl EventBuffer {
     }
 }
 
-impl Default for EventBuffer {
-    fn default() -> Self {
-        Self { map: HashMap::new() }
-    }
-}
-
-
-
 pub struct BlazeLoader {
     pub cancel: Arc<AtomicBool>,
     buffer: Arc<Mutex<EventBuffer>>,
-    pub handles: Vec<tokio::task::JoinHandle<()>>, 
+    pub handles: Vec<tokio::task::JoinHandle<()>>,
 }
 
 impl Default for BlazeLoader {
@@ -111,7 +94,6 @@ impl Default for BlazeLoader {
     }
 }
 
-
 impl BlazeLoader {
     pub fn cancel(&mut self) {
         self.cancel.store(true, Ordering::Release);
@@ -121,8 +103,12 @@ impl BlazeLoader {
         }
     }
 
-
-    pub fn load_path(&mut self, path: Arc<Path>, sender: Dispatcher, generation: u64) -> MotorResult<()> {
+    pub fn load_path(
+        &mut self,
+        path: Arc<Path>,
+        sender: Dispatcher,
+        generation: u64,
+    ) -> MotorResult<()> {
         //cancelar la carga anterior
         self.cancel();
 
@@ -134,7 +120,6 @@ impl BlazeLoader {
 
         //canales para avisar al dispatcher
         let (done_tx, done_rx) = tokio::sync::oneshot::channel::<MotorResult<()>>();
-
 
         //Tarea A:
         let scan_cancel = cancel.clone();
@@ -153,7 +138,10 @@ impl BlazeLoader {
         //Tarea B:
         let disp_cancel = cancel.clone();
         let handle2 = TOKIO_RUNTIME.spawn(async move {
-            if Self::dispatcher(buffer, sender, generation, disp_cancel, done_rx).await.is_err() {
+            if Self::dispatcher(buffer, sender, generation, disp_cancel, done_rx)
+                .await
+                .is_err()
+            {
                 warn!("Error en el dispatcher.");
             };
         });
@@ -163,13 +151,20 @@ impl BlazeLoader {
         Ok(())
     }
 
-    async fn scan_dir(path: Arc<Path>, buffer: Arc<Mutex<EventBuffer>>, cancel: Arc<AtomicBool>) -> MotorResult<()> {
+    async fn scan_dir(
+        path: Arc<Path>,
+        buffer: Arc<Mutex<EventBuffer>>,
+        cancel: Arc<AtomicBool>,
+    ) -> MotorResult<()> {
         let mut entries = match tokio::fs::read_dir(&path).await {
             Ok(e) => e,
             Err(e) => {
-                warn!("scan_dir: No se ha podido leer el directorio {:?}: {}", path, e);
+                warn!(
+                    "scan_dir: No se ha podido leer el directorio {:?}: {}",
+                    path, e
+                );
                 return Err(MotorError::Io(e));
-            },
+            }
         };
 
         while let Ok(Some(entry)) = entries.next_entry().await {
@@ -184,13 +179,13 @@ impl BlazeLoader {
                 Err(e) => return Err(MotorError::Io(e)),
             };
 
-            let file_entry = tokio::task::spawn_blocking(move ||{
+            let file_entry = tokio::task::spawn_blocking(move || {
                 let unique_id = get_file_id(&entry_path).ok();
                 let entry = build_entry(&entry_path, meta, unique_id);
                 Arc::new(entry)
             })
             .await
-            .map_err(|e| MotorError::ThreadError(e))?;
+            .map_err(MotorError::ThreadError)?;
 
             let path_key: Arc<Path> = Arc::from(file_entry.full_path.as_ref());
 
@@ -200,9 +195,13 @@ impl BlazeLoader {
         Ok(())
     }
 
-
-
-    async fn dispatcher(buffer: Arc<Mutex<EventBuffer>>, sender: Dispatcher, generation: u64, cancel: Arc<AtomicBool>, mut done_rx: tokio::sync::oneshot::Receiver<MotorResult<()>>) -> MotorResult<()> {
+    async fn dispatcher(
+        buffer: Arc<Mutex<EventBuffer>>,
+        sender: Dispatcher,
+        generation: u64,
+        cancel: Arc<AtomicBool>,
+        mut done_rx: tokio::sync::oneshot::Receiver<MotorResult<()>>,
+    ) -> MotorResult<()> {
         let mut interval = tokio::time::interval(Duration::from_millis(50));
         let mut scan_done = false;
 
@@ -220,7 +219,7 @@ impl BlazeLoader {
                     Self::flush_buffer(&buffer, &sender, generation).await?;
 
                     sender.send(FileLoadingMessage::Finished(generation))
-                        .map_err(|e| MotorError::SendFileBatchError(e))?;
+                        .map_err(MotorError::SendFileBatchError)?;
                     break;
                 }
             }
@@ -229,7 +228,11 @@ impl BlazeLoader {
         Ok(())
     }
 
-    async fn flush_buffer(buffer: &Arc<Mutex<EventBuffer>>, sender: &Dispatcher, generation: u64) -> MotorResult<()> {
+    async fn flush_buffer(
+        buffer: &Arc<Mutex<EventBuffer>>,
+        sender: &Dispatcher,
+        generation: u64,
+    ) -> MotorResult<()> {
         let batch = {
             let mut buf = buffer.lock().await;
             if buf.is_empty() {
@@ -244,7 +247,7 @@ impl BlazeLoader {
             match op {
                 FileOp::Add(entry) => {
                     adds.push(entry);
-                },
+                }
 
                 FileOp::Remove(path) => {
                     let name = path
@@ -252,22 +255,24 @@ impl BlazeLoader {
                         .map(|n| n.to_string_lossy().into_owned())
                         .unwrap_or_default();
                     if !name.is_empty() {
-                        sender.send(FileLoadingMessage::FileRemoved { name })
-                            .map_err(|e| MotorError::SendFileBatchError(e))?;
+                        sender
+                            .send(FileLoadingMessage::FileRemoved { name })
+                            .map_err(MotorError::SendFileBatchError)?;
                     }
-                },
+                }
 
                 FileOp::Modify(_) => {
-                    sender.send(FileLoadingMessage::FullRefresh)
-                        .map_err(|e| MotorError::SendFileBatchError(e))?;
-                },
-
+                    sender
+                        .send(FileLoadingMessage::FullRefresh)
+                        .map_err(MotorError::SendFileBatchError)?;
+                }
             }
         }
 
         if !adds.is_empty() {
-            sender.send(FileLoadingMessage::Batch(generation, adds))
-                .map_err(|e| MotorError::SendFileBatchError(e))?;
+            sender
+                .send(FileLoadingMessage::Batch(generation, adds))
+                .map_err(MotorError::SendFileBatchError)?;
         }
 
         Ok(())

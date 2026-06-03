@@ -12,24 +12,35 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-
-
-
-use std::{io::BufReader, path::{Path, PathBuf}, sync::{Arc, RwLock}, time::UNIX_EPOCH};
+use crate::core::{
+    runtime::{
+        bus_structs::FileOperation,
+        event_bus::{with_event_bus, Dispatcher},
+    },
+    system::{
+        cache::cache_manager::CacheManager,
+        clipboard::clipboard::TOKIO_RUNTIME,
+        extended_info::error::{ExtendedInfoError, ExtendedInfoResult},
+    },
+};
+use lru::LruCache;
 use serde::{Deserialize, Serialize};
+use std::num::NonZeroUsize;
+use std::{
+    io::BufReader,
+    path::{Path, PathBuf},
+    sync::{Arc, RwLock},
+    time::UNIX_EPOCH,
+};
 use tokio::sync::Semaphore;
 use tracing::{error, warn};
 use users::{get_group_by_gid, get_user_by_uid};
 use uuid::Uuid;
-use crate::core::{runtime::{bus_structs::FileOperation, event_bus::{Dispatcher, with_event_bus}}, system::{cache::cache_manager::CacheManager, clipboard::clipboard::TOKIO_RUNTIME, extended_info::error::{ExtendedInfoError, ExtendedInfoResult}}};
-use lru::LruCache;
-use std::num::NonZeroUsize;
 
 pub enum ExtendedInfoMessages {
     StartScan(Arc<Path>),
     ForceScan(Arc<Path>),
 }
-
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ExtendedInfoCache {
@@ -54,7 +65,6 @@ impl From<ExtendedInfo> for ExtendedInfoCache {
     }
 }
 
-
 #[derive(Clone, Debug, PartialEq, Eq, Default)]
 pub struct ExtendedInfo {
     pub owner: Option<String>,
@@ -63,7 +73,6 @@ pub struct ExtendedInfo {
     pub dimensions: Option<(u32, u32)>,
     pub git_status: Option<GitStatus>,
 }
-
 
 impl From<ExtendedInfoCache> for ExtendedInfo {
     fn from(cached: ExtendedInfoCache) -> Self {
@@ -89,14 +98,12 @@ pub enum GitStatus {
     Deleted,
 }
 
-
 const DEFAULT_INFO_CACHE_CAPACITY: usize = 2_000;
 pub struct ExtendedInfoManager {
     pub cache_manager: &'static CacheManager,
     pub info_map: Arc<RwLock<LruCache<Arc<Path>, ExtendedInfo>>>,
     pub semaphore: Arc<Semaphore>,
 }
-
 
 impl ExtendedInfoManager {
     pub fn new() -> Self {
@@ -108,34 +115,34 @@ impl ExtendedInfoManager {
         Self::with_capacity(DEFAULT_INFO_CACHE_CAPACITY, cache_manager)
     }
 
-    fn with_capacity(cap: usize, cache_manager: &'static CacheManager,) -> Self {
+    fn with_capacity(cap: usize, cache_manager: &'static CacheManager) -> Self {
         let def_cap = match NonZeroUsize::new(2000) {
             Some(cap) => cap,
             None => unreachable!(),
         };
-        let cap = NonZeroUsize::new(cap)
-            .unwrap_or(def_cap);
+        let cap = NonZeroUsize::new(cap).unwrap_or(def_cap);
 
         Self {
-            cache_manager, 
+            cache_manager,
             info_map: Arc::new(RwLock::new(LruCache::new(cap))),
             semaphore: Arc::new(tokio::sync::Semaphore::new(8)),
         }
     }
 
     pub fn clear_directory(&self, dir: &Path) {
-        let Ok(mut guard) = self.info_map.write() else {return;};
+        let Ok(mut guard) = self.info_map.write() else {
+            return;
+        };
 
         let to_move: Vec<Arc<Path>> = guard
             .iter()
-            .filter(|(k, _)| k.parent().map_or(false, |p| p == dir))
+            .filter(|(k, _)| k.parent() == Some(dir))
             .map(|(k, _)| k.clone())
             .collect();
 
         for key in to_move {
             guard.pop(&key);
         }
-
     }
 
     fn get_real_mtime(path: &Path) -> u64 {
@@ -145,12 +152,16 @@ impl ExtendedInfoManager {
             .unwrap_or(0)
     }
 
-
-    fn requst_scan(&self, path_buf: Arc<Path>, current_mtime: u64, sender: &Dispatcher, tab_id: Uuid) {
+    fn requst_scan(
+        &self,
+        path_buf: Arc<Path>,
+        current_mtime: u64,
+        sender: &Dispatcher,
+        tab_id: Uuid,
+    ) {
         let info_map = self.info_map.clone();
         let path_to_task = path_buf.clone();
         let sem = self.semaphore.clone();
-        let tab_id = tab_id.clone();
         let sender = sender.clone();
 
         TOKIO_RUNTIME.spawn(async move {
@@ -166,38 +177,37 @@ impl ExtendedInfoManager {
                 Ok(info) => {
                     match info_map.write() {
                         Ok(mut g) => {
-                            g.put(path_buf.clone().into(), info.clone());
-                        },
+                            g.put(path_buf.clone(), info.clone());
+                        }
                         Err(e) => {
                             warn!("info_map lock envenendado: {}", e);
-                            return ;
-                        },
+                            return;
+                        }
                     }
 
                     let mut cached: ExtendedInfoCache = info.into();
                     cached.modified = current_mtime;
-                    
-                    CacheManager::global().update_extended_info_cache(
-                        path_to_task.to_string_lossy().into_owned(),
-                        cached,
-                    ).await;
 
+                    CacheManager::global()
+                        .update_extended_info_cache(
+                            path_to_task.to_string_lossy().into_owned(),
+                            cached,
+                        )
+                        .await;
 
                     if let Err(e) = sender.send(FileOperation::ExtendedInfoReady {
-                        full_path: path_buf.into(),
+                        full_path: path_buf,
                         tab_id,
                     }) {
                         warn!("Error al enviar ExtendedInfo: {}", e);
                     }
-                },
+                }
                 Err(e) => {
                     warn!("Error escaneando {:?}: {e}", path_buf);
-                    return ;
                 }
             }
         });
     }
-
 
     pub fn process_messages(&self, active_id: Uuid, sender: Dispatcher) -> ExtendedInfoResult<()> {
         let messages: Vec<ExtendedInfoMessages> = with_event_bus(|pool| {
@@ -217,41 +227,41 @@ impl ExtendedInfoManager {
                     let key = path_buf.to_string_lossy();
                     let current_mtime = Self::get_real_mtime(&path_buf);
                     let tab_id = sender.tab_id;
-                    
-                    let cache_valid= match cm.extended_info_cache.try_read() {
-                        Ok(g) => {
-                            g.get(key.as_ref())
+
+                    let cache_valid = match cm.extended_info_cache.try_read() {
+                        Ok(g) => g
+                            .get(key.as_ref())
                             .map(|c| c.modified == current_mtime)
-                            .unwrap_or(false)
-                        },
+                            .unwrap_or(false),
                         Err(e) => {
                             warn!("No se ha podido validar la caché de 'ExtendedInfo': {}", e);
                             false
-                        },
+                        }
                     };
-
 
                     if cache_valid {
                         if let Some(cached) = cm.get_cached_extended_info(&path_buf) {
                             match self.info_map.write() {
                                 Ok(mut g) => {
-                                    g.put(path_buf.clone().into(), cached.into());
-                                },
+                                    g.put(path_buf.clone(), cached.into());
+                                }
                                 Err(e) => {
                                     warn!("info_map lock envenendado: {}", e);
                                     return Err(ExtendedInfoError::PoisonedLock);
-                                },
+                                }
                             }
 
-                            sender.send(FileOperation::ExtendedInfoReady {
-                                full_path: path_buf.into(),
-                                tab_id,
-                            }).map_err(|e| ExtendedInfoError::SendError(e))?;
+                            sender
+                                .send(FileOperation::ExtendedInfoReady {
+                                    full_path: path_buf,
+                                    tab_id,
+                                })
+                                .map_err(ExtendedInfoError::SendError)?;
                         }
                     } else {
                         self.requst_scan(path_buf, current_mtime, &sender, tab_id);
                     }
-                },
+                }
 
                 ExtendedInfoMessages::ForceScan(path_buf) => {
                     let current_mtime = Self::get_real_mtime(&path_buf);
@@ -262,7 +272,6 @@ impl ExtendedInfoManager {
             }
         }
 
-
         Ok(())
     }
 
@@ -270,9 +279,12 @@ impl ExtendedInfoManager {
         let m = match tokio::fs::symlink_metadata(&path).await {
             Ok(m) => m,
             Err(e) => {
-                warn!("No se ha podido leer metadata en 'ExtendedInfoManager::scan':  {}", e);
-                return Ok(ExtendedInfo::default())
-            },
+                warn!(
+                    "No se ha podido leer metadata en 'ExtendedInfoManager::scan':  {}",
+                    e
+                );
+                return Ok(ExtendedInfo::default());
+            }
         };
 
         let symlink_target = if m.file_type().is_symlink() {
@@ -281,7 +293,7 @@ impl ExtendedInfoManager {
                 Err(e) => {
                     warn!("Error leyendo los symlinks: {}", e);
                     return Err(ExtendedInfoError::SymlinkError);
-                },
+                }
             }
         } else {
             None
@@ -294,10 +306,9 @@ impl ExtendedInfoManager {
             let gid = m.gid();
 
             tokio::task::spawn(async move {
-                let owner = get_user_by_uid(uid)
-                    .map(|u| u.name().to_string_lossy().into_owned());
-                let group_name = get_group_by_gid(gid)
-                    .map(|g| g.name().to_string_lossy().into_owned());
+                let owner = get_user_by_uid(uid).map(|u| u.name().to_string_lossy().into_owned());
+                let group_name =
+                    get_group_by_gid(gid).map(|g| g.name().to_string_lossy().into_owned());
                 (owner, group_name)
             })
             .await
@@ -308,14 +319,27 @@ impl ExtendedInfoManager {
         let (owner, group_name) = (None, None);
 
         let dimensions = if m.is_file() {
-            let is_image = path.extension()
+            let is_image = path
+                .extension()
                 .and_then(|e| e.to_str())
-                .map(|e| matches!(e.to_lowercase().as_str(),
-                    "jpg" | "jpeg" | "png" | "gif" | "webp" |
-                    "bmp" | "tiff" | "tif" | "ico" | "avif" | "qoi"
-                ))
+                .map(|e| {
+                    matches!(
+                        e.to_lowercase().as_str(),
+                        "jpg"
+                            | "jpeg"
+                            | "png"
+                            | "gif"
+                            | "webp"
+                            | "bmp"
+                            | "tiff"
+                            | "tif"
+                            | "ico"
+                            | "avif"
+                            | "qoi"
+                    )
+                })
                 .unwrap_or(false);
-            
+
             if is_image {
                 let path_clone = path.clone();
                 let file = std::fs::File::open(&path_clone)?;
@@ -323,7 +347,8 @@ impl ExtendedInfoManager {
                     .with_guessed_format()
                     .map_err(|_| ExtendedInfoError::DimensionError)?;
 
-                let dims = reader.into_dimensions()
+                let dims = reader
+                    .into_dimensions()
                     .map_err(|_| ExtendedInfoError::DimensionError)?;
 
                 Some(dims)
@@ -334,48 +359,38 @@ impl ExtendedInfoManager {
             None
         };
 
-    
         let git_status = if path.starts_with(".git") || path.to_string_lossy().contains(".git") {
             let path_clone = path.clone();
-            let res = tokio::task::spawn(async move {
-                
-                Self::get_git_status(path_clone)
-            })
-            .await
-            .map_err(ExtendedInfoError::ThreadError)??;
+            let res = tokio::task::spawn(async move { Self::get_git_status(path_clone) })
+                .await
+                .map_err(ExtendedInfoError::ThreadError)??;
 
             Some(res)
         } else {
             None
         };
 
-
-        Ok(
-            ExtendedInfo {
-                owner,
-                group_name,
-                symlink_target,
-                dimensions,
-                git_status: git_status,
-            }
-        )
+        Ok(ExtendedInfo {
+            owner,
+            group_name,
+            symlink_target,
+            dimensions,
+            git_status,
+        })
     }
 
-
     fn get_git_status(path: Arc<Path>) -> ExtendedInfoResult<GitStatus> {
-        let repo = git2::Repository::discover(&path)
-            .map_err(|e| ExtendedInfoError::GitError(e))?;
+        let repo = git2::Repository::discover(&path).map_err(ExtendedInfoError::GitError)?;
 
         if path.is_dir() {
             return Ok(GitStatus::Clean);
         }
 
-        let workdir = repo.workdir()
-            .unwrap_or_else(|| Path::new("."));
-        let relative = path.strip_prefix(workdir)
-            .map_err(|e| ExtendedInfoError::StripPrefixError(e))?;
-        let statuses = repo.statuses(None)
-            .map_err(|e| ExtendedInfoError::GitError(e))?;
+        let workdir = repo.workdir().unwrap_or_else(|| Path::new("."));
+        let relative = path
+            .strip_prefix(workdir)
+            .map_err(ExtendedInfoError::StripPrefixError)?;
+        let statuses = repo.statuses(None).map_err(ExtendedInfoError::GitError)?;
 
         let status = statuses
             .iter()
@@ -401,5 +416,4 @@ impl ExtendedInfoManager {
 
         Ok(git_status)
     }
-
 }

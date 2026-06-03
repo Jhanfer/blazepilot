@@ -1,60 +1,55 @@
-use egui::{
-    CornerRadius, Frame, Margin, Panel, ScrollArea, Stroke, Ui, scroll_area::ScrollBarVisibility
-};
 use crate::{
     core::{
         blaze_state::BlazeCoreState,
         system::{
             clipboard::clipboard::TOKIO_RUNTIME,
             knowndirs::knowndirs_manager::KnownDirsManager,
-            trash_manager::trash_manager::{
-                TrashDestination,
-                get_backend
-            }
-        }
-    }, 
+            trash_manager::trash_manager::{get_backend, TrashDestination},
+        },
+    },
     ui::{
-        blaze_ui_state::BlazeUiState, modules::{
+        blaze_ui_state::BlazeUiState,
+        modules::{
             custom_context_menu::context_state::ContextMenuKind,
             sidebar_left_component::sidebar_components::{
-                render_drives_button, render_header_text,
-                render_local_buttons
-            }
-        }, 
+                render_drives_button, render_header_text, render_local_buttons,
+            },
+        },
         themes::colors::*,
-    }
+    },
+};
+use egui::{
+    scroll_area::ScrollBarVisibility, CornerRadius, Frame, Margin, Panel, ScrollArea, Stroke, Ui,
 };
 
-pub fn sidebar_left_component(ui: &mut Ui, state: &mut BlazeCoreState, ui_state: &mut BlazeUiState) {
-    let custom_frame = Frame::NONE
-        .fill(COLOR_BG_MAIN)
-        .inner_margin(Margin {
-            left: 15,
-            right: 0,
-            top: 0,
-            bottom: 10,
-        });
+pub fn sidebar_left_component(
+    ui: &mut Ui,
+    state: &mut BlazeCoreState,
+    ui_state: &mut BlazeUiState,
+) {
+    let custom_frame = Frame::NONE.fill(COLOR_BG_MAIN).inner_margin(Margin {
+        left: 15,
+        right: 0,
+        top: 0,
+        bottom: 10,
+    });
 
     Panel::left("LeftSidePanel")
         .show_separator_line(false)
         .resizable(false)
         .frame(custom_frame)
         .show_inside(ui, |ui| {
-
             ui.set_width(200.0);
 
             Frame::NONE
                 .inner_margin(egui::Margin::same(10))
                 .fill(COLOR_BG_PANEL)
                 .corner_radius(CornerRadius::same(20))
-                .stroke(
-                    Stroke {
-                        width: 0.5,
-                        color: COLOR_ACCENT_GLOW
-                    }
-                )
-                .show(ui, |ui|{
-
+                .stroke(Stroke {
+                    width: 0.5,
+                    color: COLOR_ACCENT_GLOW,
+                })
+                .show(ui, |ui| {
                     ui.set_width(200.0);
                     ui.set_height(ui.available_height());
 
@@ -68,14 +63,23 @@ pub fn sidebar_left_component(ui: &mut Ui, state: &mut BlazeCoreState, ui_state:
                             let kdm = KnownDirsManager::get();
                             let mut dirs = kdm.sidebar_dirs();
 
+                            let Some(trash) =
+                                get_backend().get_trash_files(&TrashDestination::Home).ok()
+                            else {
+                                return;
+                            };
 
-                            let Some(trash) = get_backend().get_trash_files(&TrashDestination::Home).ok() else {return;};
-                            
                             dirs.push(("Papelera", &trash));
 
                             for (label, path) in dirs {
                                 if path.exists() {
-                                    render_local_buttons(label, path.to_owned(), state, ui, ui_state);
+                                    render_local_buttons(
+                                        label,
+                                        path.to_owned(),
+                                        state,
+                                        ui,
+                                        ui_state,
+                                    );
                                 }
                             }
 
@@ -92,24 +96,20 @@ pub fn sidebar_left_component(ui: &mut Ui, state: &mut BlazeCoreState, ui_state:
                                 manager.get_partitions().await
                             });
 
-
-                        ui.vertical(|ui| {
-                            for drive in drives {
-
-                                render_drives_button(ui, state, drive, ui_state);
-                            }
-                        });
+                            ui.vertical(|ui| {
+                                for drive in drives {
+                                    render_drives_button(ui, state, drive, ui_state);
+                                }
+                            });
 
                             let mut ctx_menu = std::mem::take(&mut ui_state.context_menu_state);
-                            
-                            match ctx_menu.kind {
-                                ContextMenuKind::DrivesPanel => ctx_menu.render_drives_context(ui, state, ui_state),
-                                _ => {}
+
+                            if ctx_menu.kind == ContextMenuKind::DrivesPanel {
+                                ctx_menu.render_drives_context(ui, state, ui_state)
                             }
+
                             ui_state.context_menu_state = ctx_menu;
-                    });
+                        });
+                });
         });
-
-    });
-
 }

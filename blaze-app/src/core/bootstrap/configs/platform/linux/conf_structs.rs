@@ -1,5 +1,4 @@
-use serde::{Serialize, Deserialize};
-
+use serde::{Deserialize, Serialize};
 
 //--__--__--__--__ Modo de ordenado __--__--__--__--__--__--__
 #[derive(Serialize, Deserialize, Debug, Default, Clone, PartialEq)]
@@ -13,16 +12,13 @@ pub enum OrderingMode {
     DateDesc,
 }
 
-
-
-
 //--__--__--__--__ Backends  __--__--__--__--__--__--__
 #[derive(Serialize, Deserialize, Debug, Default, Clone, PartialEq)]
 pub enum DisplayBackend {
     #[default]
     Auto,
     X11,
-    Wayland
+    Wayland,
 }
 
 impl DisplayBackend {

@@ -1,7 +1,6 @@
 pub mod config_trait;
 pub use crate::core::bootstrap::configs::platform::config_trait::PlatformConfigTrait;
 
-
 #[cfg(target_os = "linux")]
 pub mod linux;
 #[cfg(target_os = "macos")]

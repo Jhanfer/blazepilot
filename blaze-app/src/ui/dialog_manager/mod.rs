@@ -1,2 +1,2 @@
-pub mod dialogs;
 pub mod dialog_manager;
+pub mod dialogs;

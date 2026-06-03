@@ -12,48 +12,42 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-
-
-
-
-
-
-use file_id::{get_file_id};
-use fuzzy_matcher::FuzzyMatcher;
+use file_id::get_file_id;
 use fuzzy_matcher::skim::SkimMatcherV2;
+use fuzzy_matcher::FuzzyMatcher;
 use jwalk::{Parallelism, WalkDir};
+use std::path::Path;
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::{Arc, RwLock};
 use tracing::{debug, warn};
 use uuid::Uuid;
-use std::path::Path;
-use std::sync::{Arc, RwLock};
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
+use crate::core::bootstrap::configs::{
+    config_manager::with_configs, platform::linux::conf_structs::OrderingMode,
+};
 use crate::core::files::blaze_motor::blaze_loader::BlazeLoader;
 use crate::core::files::blaze_motor::error::{MotorError, MotorResult};
-use crate::core::files::blaze_motor::motor_structs::{FileEntry, FileLoadingMessage, RecursiveMessages};
+use crate::core::files::blaze_motor::motor_structs::{
+    FileEntry, FileLoadingMessage, RecursiveMessages,
+};
 use crate::core::files::blaze_motor::utilities::build_entry;
 use crate::core::files::blaze_motor::watcher::FileWatcher;
 use crate::core::runtime::bus_structs::UiEvent;
+use crate::core::runtime::event_bus::{with_event_bus, Dispatcher};
 use crate::core::system::clipboard::clipboard::TOKIO_RUNTIME;
-use crate::core::runtime::event_bus::{Dispatcher, with_event_bus};
 use crate::core::system::knowndirs::knowndirs_manager::KnownDirsManager;
 use crate::core::system::sizer_manager::sizer_manager::SizerManager;
-use crate::core::bootstrap::configs::{platform::linux::conf_structs::OrderingMode, config_manager::with_configs};
-
-
 
 static NEXT_TASK: AtomicU64 = AtomicU64::new(1);
 pub fn new_task_id() -> u64 {
     NEXT_TASK.fetch_add(1, Ordering::Relaxed)
 }
 
-
 #[must_use = "llama .build() para construir la tab"]
 pub struct BlazeTabBuilder {
     start_path: Arc<Path>,
     tab_id: Uuid,
 }
-
 
 impl BlazeTabBuilder {
     pub fn new() -> Self {
@@ -105,7 +99,6 @@ impl Default for BlazeTabBuilder {
     }
 }
 
-
 pub struct BlazeTabState {
     pub id: Uuid,
     pub cwd: Arc<Path>,
@@ -127,15 +120,21 @@ pub struct BlazeTabState {
     pub loader: BlazeLoader,
 }
 
-
 impl BlazeTabState {
-    pub fn get_active_files(&self, search_filter: &str, needs_sort: bool, sizer_manager: &SizerManager) -> MotorResult<Vec<Arc<FileEntry>>> {
+    pub fn get_active_files(
+        &self,
+        search_filter: &str,
+        needs_sort: bool,
+        sizer_manager: &SizerManager,
+    ) -> MotorResult<Vec<Arc<FileEntry>>> {
         let show_hidden = with_configs(|c| c.get_show_hidden_files());
         let query_lower = search_filter.to_lowercase();
         let matcher = SkimMatcherV2::default();
 
         if self.is_recursive_active {
-            let recursive_guard = self.recursive_entries.read()
+            let recursive_guard = self
+                .recursive_entries
+                .read()
                 .map_err(|_| MotorError::PoisonedLock)?;
 
             let result = recursive_guard
@@ -144,7 +143,7 @@ impl BlazeTabState {
                     if !show_hidden && f.is_hidden {
                         return false;
                     }
-                    true 
+                    true
                 })
                 .cloned()
                 .collect();
@@ -154,10 +153,11 @@ impl BlazeTabState {
 
         self.ensure_sorted(needs_sort, sizer_manager)?;
 
-        let file_guard = self.files.read()
-            .map_err(|_| MotorError::PoisonedLock)?;
+        let file_guard = self.files.read().map_err(|_| MotorError::PoisonedLock)?;
 
-        let indices_guard = self.sorted_indices.read()
+        let indices_guard = self
+            .sorted_indices
+            .read()
             .map_err(|_| MotorError::PoisonedLock)?;
 
         let sorted = indices_guard
@@ -170,14 +170,14 @@ impl BlazeTabState {
                 if search_filter.is_empty() {
                     return true;
                 }
-                matcher.fuzzy_match(&f.name.to_lowercase(), &query_lower).is_some()
+                matcher
+                    .fuzzy_match(&f.name.to_lowercase(), &query_lower)
+                    .is_some()
             })
             .collect();
 
         Ok(sorted)
     }
-
-
 
     fn ensure_sorted(&self, needs_sort: bool, sizer_manager: &SizerManager) -> MotorResult<()> {
         if !needs_sort {
@@ -186,15 +186,16 @@ impl BlazeTabState {
 
         let mode = with_configs(|c| c.get_ordering_mode());
 
-        let file_guard = self.files.write()
-            .map_err(|_|MotorError::PoisonedLock)?;
+        let file_guard = self.files.write().map_err(|_| MotorError::PoisonedLock)?;
 
-        let mut indices_guard = self.sorted_indices.write()
-            .map_err(|_|MotorError::PoisonedLock)?;
+        let mut indices_guard = self
+            .sorted_indices
+            .write()
+            .map_err(|_| MotorError::PoisonedLock)?;
 
         let mut indices: Vec<usize> = (0..file_guard.len()).collect();
 
-        indices.sort_by(|&a, &b|{
+        indices.sort_by(|&a, &b| {
             let entry_a = &file_guard[a];
             let entry_b = &file_guard[b];
 
@@ -215,8 +216,14 @@ impl BlazeTabState {
                 }
             } else {
                 match mode {
-                    OrderingMode::Az => entry_a.name.to_lowercase().cmp(&entry_b.name.to_lowercase()),
-                    OrderingMode::Za => entry_b.name.to_lowercase().cmp(&entry_a.name.to_lowercase()),
+                    OrderingMode::Az => entry_a
+                        .name
+                        .to_lowercase()
+                        .cmp(&entry_b.name.to_lowercase()),
+                    OrderingMode::Za => entry_b
+                        .name
+                        .to_lowercase()
+                        .cmp(&entry_a.name.to_lowercase()),
                     OrderingMode::DateAsc => entry_a.modified.cmp(&entry_b.modified),
                     OrderingMode::DateDesc => entry_b.modified.cmp(&entry_a.modified),
                     _ => std::cmp::Ordering::Equal,
@@ -229,23 +236,25 @@ impl BlazeTabState {
         Ok(())
     }
 
-
     fn get_effective_size(&self, entry: &FileEntry, sizer_manager: &SizerManager) -> u64 {
         if !entry.is_dir() {
             return entry.size;
         }
         let key = entry.full_path.to_string_lossy();
-        sizer_manager.cache_manager.size_cache
+        sizer_manager
+            .cache_manager
+            .size_cache
             .try_read()
             .ok()
             .and_then(|g| g.get(key.as_ref()).map(|c| c.size))
             .unwrap_or(0)
     }
 
-
-    pub fn get_item_to_delete(&self, files: Vec<Arc<Path>>) -> MotorResult<Vec<(Arc<str>, Arc<Path>)>> {
-        let file_guard = self.files.read()
-            .map_err(|_|MotorError::PoisonedLock)?;
+    pub fn get_item_to_delete(
+        &self,
+        files: Vec<Arc<Path>>,
+    ) -> MotorResult<Vec<(Arc<str>, Arc<Path>)>> {
+        let file_guard = self.files.read().map_err(|_| MotorError::PoisonedLock)?;
 
         let ftd = file_guard
             .iter()
@@ -256,28 +265,27 @@ impl BlazeTabState {
         Ok(ftd)
     }
 
-
-
     pub fn update_dir_size(&self, full_path: Arc<Path>, new_size: u64) -> MotorResult<bool> {
-        let mut guard = self.files.write()
-            .map_err(|_| MotorError::PoisonedLock)?;
+        let mut guard = self.files.write().map_err(|_| MotorError::PoisonedLock)?;
 
-        if let Some(entry) = guard.iter_mut().find(|f| *f.full_path.as_ref() == *full_path) {
+        if let Some(entry) = guard
+            .iter_mut()
+            .find(|f| *f.full_path.as_ref() == *full_path)
+        {
             let mut new_entry = (**entry).clone();
             new_entry.size = new_size;
-            *entry = Arc::new(new_entry); 
+            *entry = Arc::new(new_entry);
         } else {
             return Ok(false);
         }
         Ok(true)
     }
 
-
-
-
     pub fn clear_recursive_files(&self) -> MotorResult<()> {
         {
-            let mut recursive_entries_guard = self.recursive_entries.write()
+            let mut recursive_entries_guard = self
+                .recursive_entries
+                .write()
                 .map_err(|_| MotorError::PoisonedLock)?;
             recursive_entries_guard.clear();
             recursive_entries_guard.shrink_to_fit();
@@ -287,16 +295,17 @@ impl BlazeTabState {
 
     pub fn clear_files(&self) -> MotorResult<()> {
         {
-            let mut file_guard = self.files.write()
-                .map_err(|_| MotorError::PoisonedLock)?;
+            let mut file_guard = self.files.write().map_err(|_| MotorError::PoisonedLock)?;
             file_guard.clear();
-        } 
+        }
         Ok(())
     }
 
     pub fn clear_sorted_indices(&self) -> MotorResult<()> {
         {
-            let mut sorted_indices_guard = self.sorted_indices.write()
+            let mut sorted_indices_guard = self
+                .sorted_indices
+                .write()
                 .map_err(|_| MotorError::PoisonedLock)?;
             sorted_indices_guard.clear();
         }
@@ -311,7 +320,6 @@ impl BlazeTabState {
         Ok(())
     }
 
-
     pub fn load_path(&mut self, _skip_cache: bool, sender: Dispatcher) -> MotorResult<()> {
         let path = self.cwd.clone();
 
@@ -320,26 +328,36 @@ impl BlazeTabState {
         }
 
         self.loading_generation += 1;
-        
+
         self.reset_for_new_path()?;
 
         self.active_generation = 0;
-        self.loader.load_path(path.clone(), sender.clone(), self.loading_generation)?;
+        self.loader
+            .load_path(path.clone(), sender.clone(), self.loading_generation)?;
 
         self.watcher.start_watching(path, sender)
     }
 
-
-    fn recursive_search(cwd: Arc<Path>, query: String, max_depth: usize, sender: Dispatcher, show_hidden: bool, loading_generation: u64, flag: Arc<AtomicBool>) {
+    fn recursive_search(
+        cwd: Arc<Path>,
+        query: String,
+        max_depth: usize,
+        sender: Dispatcher,
+        show_hidden: bool,
+        loading_generation: u64,
+        flag: Arc<AtomicBool>,
+    ) {
         TOKIO_RUNTIME.spawn(async move {
             let query_lower = query.to_lowercase().trim().to_string();
             let mut total_files = 0usize;
             let mut batch: Vec<Arc<FileEntry>> = Vec::with_capacity(150);
 
-            sender.send(RecursiveMessages::Started {
-                task_id: loading_generation as u64,
-                text: format!("Buscando \"{}\"...", query),
-            }).ok();
+            sender
+                .send(RecursiveMessages::Started {
+                    task_id: loading_generation,
+                    text: format!("Buscando \"{}\"...", query),
+                })
+                .ok();
 
             let cwd_clone = cwd.clone();
             let flag_clone = flag.clone();
@@ -356,7 +374,7 @@ impl BlazeTabState {
                     if !flag_clone.load(Ordering::Relaxed) {
                         return (vec![], total_files);
                     }
-                    
+
                     let entry = match entry {
                         Ok(e) => e,
                         Err(e) => {
@@ -382,13 +400,11 @@ impl BlazeTabState {
                     let name = entry.file_name().to_string_lossy().to_string();
                     let name_lower = name.to_lowercase();
 
-                    let is_match = query_lower.is_empty()
-                        || name_lower.contains(&query_lower)
-                        || {
-                            let name_norm = name_lower.replace(['-', '_', ' ', '.'], "");
-                            let query_norm = query_lower.replace(['-', '_', ' ', '.'], "");
-                            name_norm.contains(&query_norm)
-                        };
+                    let is_match = query_lower.is_empty() || name_lower.contains(&query_lower) || {
+                        let name_norm = name_lower.replace(['-', '_', ' ', '.'], "");
+                        let query_norm = query_lower.replace(['-', '_', ' ', '.'], "");
+                        name_norm.contains(&query_norm)
+                    };
 
                     if is_match {
                         if let Ok(metadata) = entry.metadata() {
@@ -404,42 +420,51 @@ impl BlazeTabState {
 
                             if batch.len() >= 150 {
                                 let send_batch = std::mem::take(&mut batch);
-                                sender_clone.send(FileLoadingMessage::RecursiveBatch {
-                                    generation: loading_generation,
-                                    batch: send_batch,
-                                    source_dir: cwd_clone.clone().into(),
-                                }).ok();
+                                sender_clone
+                                    .send(FileLoadingMessage::RecursiveBatch {
+                                        generation: loading_generation,
+                                        batch: send_batch,
+                                        source_dir: cwd_clone.clone(),
+                                    })
+                                    .ok();
                             }
                         }
                     }
                 }
                 (batch, total_files)
-            }).await;
+            })
+            .await;
 
-                match walk_result {
-                    Ok((remaining_batch, found_total)) => {
+            match walk_result {
+                Ok((remaining_batch, found_total)) => {
                     total_files = found_total;
 
                     if !remaining_batch.is_empty() {
-                        sender.send(FileLoadingMessage::RecursiveBatch {
-                            generation: loading_generation,
-                            batch: remaining_batch,
-                            source_dir: cwd.into(),
-                        }).ok();
+                        sender
+                            .send(FileLoadingMessage::RecursiveBatch {
+                                generation: loading_generation,
+                                batch: remaining_batch,
+                                source_dir: cwd,
+                            })
+                            .ok();
                     }
 
-                    sender.send(RecursiveMessages::Finished {
-                        task_id: loading_generation as u64,
-                        success: true,
-                        text: format!("Completado: {} archivos encontrados", total_files),
-                    }).ok();
+                    sender
+                        .send(RecursiveMessages::Finished {
+                            task_id: loading_generation,
+                            success: true,
+                            text: format!("Completado: {} archivos encontrados", total_files),
+                        })
+                        .ok();
 
                     debug!("Búsqueda recursiva completada: {} archivos", total_files);
                 }
                 Err(e) => {
-                    sender.send(
-                        UiEvent::ShowError(format!("Error buscando archivos: {}", e).into())
-                    ).ok();
+                    sender
+                        .send(UiEvent::ShowError(
+                            format!("Error buscando archivos: {}", e).into(),
+                        ))
+                        .ok();
                 }
             }
 
@@ -448,9 +473,16 @@ impl BlazeTabState {
         });
     }
 
-    pub fn start_recursive_search(&mut self, query: String, max_depth: usize, sender: Dispatcher) -> MotorResult<()> {
+    pub fn start_recursive_search(
+        &mut self,
+        query: String,
+        max_depth: usize,
+        sender: Dispatcher,
+    ) -> MotorResult<()> {
         {
-            let mut recursive_entries_guard = self.recursive_entries.write()
+            let mut recursive_entries_guard = self
+                .recursive_entries
+                .write()
                 .map_err(|_| MotorError::PoisonedLock)?;
             recursive_entries_guard.clear();
             recursive_entries_guard.shrink_to_fit();
@@ -467,12 +499,18 @@ impl BlazeTabState {
 
         let show_hidden = with_configs(|c| c.get_show_hidden_files());
 
-        Self::recursive_search(path, query, max_depth, sender, show_hidden, current_generation, flag);
+        Self::recursive_search(
+            path,
+            query,
+            max_depth,
+            sender,
+            show_hidden,
+            current_generation,
+            flag,
+        );
 
         Ok(())
     }
-
-
 
     pub fn navigate_to(&mut self, new_path: Arc<Path>) {
         if new_path.is_dir() && new_path != self.cwd {
@@ -487,17 +525,18 @@ impl BlazeTabState {
                 self.history.remove(0);
             }
 
-            self.cwd = new_path.into();
+            self.cwd = new_path;
         }
     }
-
 
     pub fn up(&mut self) {
         if let Some(new_path) = self.cwd.parent() {
             let old_path = self.cwd.clone();
 
-            if *new_path == *old_path { return; }
-            
+            if *new_path == *old_path {
+                return;
+            }
+
             self.history.push(old_path.clone());
 
             self.future.clear();
@@ -524,5 +563,4 @@ impl BlazeTabState {
             self.cwd = next;
         }
     }
-
 }

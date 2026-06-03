@@ -12,13 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-
-
-
-
-use std::collections::HashMap;
-use egui::{ColorImage, TextureHandle, Ui, vec2};
+use egui::{vec2, ColorImage, TextureHandle, Ui};
 use resvg::usvg::Options;
+use std::collections::HashMap;
 
 pub struct IconCache {
     cache: HashMap<String, TextureHandle>,
@@ -26,10 +22,18 @@ pub struct IconCache {
 
 impl IconCache {
     pub fn new() -> Self {
-        Self { cache: HashMap::new() }
+        Self {
+            cache: HashMap::new(),
+        }
     }
 
-    pub fn get_or_load(&mut self, ui: &mut Ui, name: &str, svg_bytes: &[u8], tint: egui::Color32) -> &TextureHandle {
+    pub fn get_or_load(
+        &mut self,
+        ui: &mut Ui,
+        name: &str,
+        svg_bytes: &[u8],
+        tint: egui::Color32,
+    ) -> &TextureHandle {
         let tint_key = format!("{:02X}{:02X}{:02X}", tint.r(), tint.g(), tint.b());
         let full_key = format!("{}-{}", name, tint_key);
 
@@ -43,27 +47,21 @@ impl IconCache {
 fn rasterize_svg(svg_bytes: &[u8], width: u32, height: u32, tint: egui::Color32) -> ColorImage {
     let opt = Options::default();
     let tree = resvg::usvg::Tree::from_data(svg_bytes, &opt).unwrap();
-    
+
     let mut pixmap = resvg::tiny_skia::Pixmap::new(width, height).unwrap();
-    
+
     let transform = resvg::tiny_skia::Transform::from_scale(
         width as f32 / tree.size().width(),
         height as f32 / tree.size().height(),
     );
-    
+
     resvg::render(&tree, transform, &mut pixmap.as_mut());
-    
+
     let pixels: Vec<egui::Color32> = pixmap
         .pixels()
         .iter()
-        .map(|p| {
-            egui::Color32::from_rgba_unmultiplied(
-                tint.r(),
-                tint.g(),
-                tint.b(),
-                p.alpha(),
-            )
-    }).collect();
+        .map(|p| egui::Color32::from_rgba_unmultiplied(tint.r(), tint.g(), tint.b(), p.alpha()))
+        .collect();
 
     ColorImage {
         size: [width as usize, height as usize],

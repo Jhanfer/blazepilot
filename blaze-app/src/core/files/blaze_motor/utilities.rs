@@ -1,15 +1,14 @@
+use crate::core::files::blaze_motor::motor_structs::{FileEntry, FileKind};
+use crate::core::files::file_extension::FileExtension;
+use file_id::FileId;
 use std::fs::Metadata;
 use std::path::Path;
 use std::time::SystemTime;
-use file_id::FileId;
-use crate::core::files::blaze_motor::motor_structs::{FileEntry, FileKind};
-use crate::core::files::file_extension::FileExtension;
 
 #[cfg(unix)]
 use std::os::unix::fs::MetadataExt;
 #[cfg(windows)]
 use std::os::windows::fs::MetadataExt;
-
 
 pub fn build_entry(path: &Path, m: Metadata, unique_id: Option<FileId>) -> FileEntry {
     let name = path
@@ -35,17 +34,12 @@ pub fn build_entry(path: &Path, m: Metadata, unique_id: Option<FileId>) -> FileE
     };
 
     #[cfg(unix)]
-    let (inode, nlink, device, permissions) = (
-        m.ino(),
-        m.nlink(),
-        m.dev(),
-        m.mode(),
-    );
+    let (inode, nlink, device, permissions) = (m.ino(), m.nlink(), m.dev(), m.mode());
 
     #[cfg(windows)]
     let attributes = m.file_attributes();
 
-    let extension = FileExtension::from_path(&path);
+    let extension = FileExtension::from_path(path);
 
     FileEntry {
         name: name.clone(),

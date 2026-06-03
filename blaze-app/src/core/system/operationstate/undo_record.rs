@@ -12,13 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-
-
-
-
 use std::{path::Path, sync::Arc};
 
-use crate::{core::{files::blaze_motor::{tab_state::new_task_id, motor_structs::TaskType}, runtime::{bus_structs::{FileOperation, UiEvent}, event_bus::Dispatcher}, system::clipboard::clipboard::TOKIO_RUNTIME}, ui::task_manager::task_manager::TaskMessage};
+use crate::{
+    core::{
+        files::blaze_motor::{motor_structs::TaskType, tab_state::new_task_id},
+        runtime::{
+            bus_structs::{FileOperation, UiEvent},
+            event_bus::Dispatcher,
+        },
+        system::clipboard::clipboard::TOKIO_RUNTIME,
+    },
+    ui::task_manager::task_manager::TaskMessage,
+};
 
 #[derive(Debug, Clone)]
 pub enum UndoRecord {
@@ -42,7 +48,7 @@ pub enum UndoRecord {
     //reverso de papelera
     RestoreFromTrash {
         file_names: Vec<String>,
-        trash_paths: Vec<Arc<Path>>
+        trash_paths: Vec<Arc<Path>>,
     },
 
     //reverso de crear carpeta
@@ -59,34 +65,35 @@ pub enum UndoRecord {
 impl UndoRecord {
     pub fn from_completed(op: &FileOperation) -> Option<Self> {
         match op {
-            FileOperation::Move { ..} => {None},
+            FileOperation::Move { .. } => None,
 
-            FileOperation::PasteCut {sources, final_targets, .. } => {
-                Some(
-                    Self::MoveBack { 
-                        from: final_targets.clone(),
-                        to: sources.clone(),
-                    }
-                )
-            },
+            FileOperation::PasteCut {
+                sources,
+                final_targets,
+                ..
+            } => Some(Self::MoveBack {
+                from: final_targets.clone(),
+                to: sources.clone(),
+            }),
 
-            FileOperation::PasteCopy { final_targets, .. } => {
-                Some(
-                    Self::DeleteCopied { paths: final_targets.clone() }
-                )
-            },
+            FileOperation::PasteCopy { final_targets, .. } => Some(Self::DeleteCopied {
+                paths: final_targets.clone(),
+            }),
 
+            FileOperation::Rename {
+                original_path,
+                new_path,
+            } => Some(Self::RenameBack {
+                current: new_path.clone(),
+                original: original_path.clone(),
+            }),
 
-            FileOperation::Rename { original_path, new_path } => {
-                Some(
-                    Self::RenameBack { current: new_path.clone(), original: original_path.clone() }
-                )
-            },
-
-
-            FileOperation::CreateDir  { path } => Some(Self::DeleteCreatedDir  { path: path.clone() }),
-            FileOperation::CreateFile  { path } => Some(Self::DeleteCreatedFile { path: path.clone() }),
-
+            FileOperation::CreateDir { path } => {
+                Some(Self::DeleteCreatedDir { path: path.clone() })
+            }
+            FileOperation::CreateFile { path } => {
+                Some(Self::DeleteCreatedFile { path: path.clone() })
+            }
 
             FileOperation::Trash { .. } => None,
 
@@ -95,22 +102,21 @@ impl UndoRecord {
     }
 }
 
-
 impl UndoRecord {
     pub fn execute_undo(self, sender: &Dispatcher) {
         let sender = sender.clone();
         let task_id = new_task_id();
 
-        sender.send(TaskMessage::Started {
-            task_id,
-            text:      "Deshaciendo operación...".to_string(),
-            task_type: TaskType::CopyPaste,
-        }).ok();
-    
-        
+        sender
+            .send(TaskMessage::Started {
+                task_id,
+                text: "Deshaciendo operación...".to_string(),
+                task_type: TaskType::CopyPaste,
+            })
+            .ok();
+
         TOKIO_RUNTIME.spawn(async move {
             let result = match self {
-                
                 UndoRecord::MoveBack { from, to } => {
                     for (src, original_target) in from.iter().zip(to.iter()) {
                         if let Some(parent) = original_target.parent() {
@@ -120,7 +126,7 @@ impl UndoRecord {
                         }
                     }
                     Ok(())
-                },
+                }
 
                 UndoRecord::DeleteCopied { paths } => {
                     let mut errors = Vec::new();
@@ -136,17 +142,23 @@ impl UndoRecord {
                             errors.push(format!("{:?}: {}", path.file_name(), e));
                         }
                     }
-                    if errors.is_empty() { Ok(()) }
-                    else { Err(errors.join(", ")) }
-                },
+                    if errors.is_empty() {
+                        Ok(())
+                    } else {
+                        Err(errors.join(", "))
+                    }
+                }
 
                 UndoRecord::RenameBack { current, original } => {
                     tokio::fs::rename(current.as_ref(), original.as_ref())
                         .await
                         .map_err(|e| e.to_string())
-                },
+                }
 
-                UndoRecord::RestoreFromTrash { file_names, trash_paths } => {
+                UndoRecord::RestoreFromTrash {
+                    file_names,
+                    trash_paths,
+                } => {
                     let mut files_to_restore = vec![];
 
                     for (path, name) in trash_paths.iter().zip(file_names.iter()) {
@@ -158,24 +170,21 @@ impl UndoRecord {
                     if files_to_restore.is_empty() {
                         Ok(())
                     } else {
-                        sender.send(
-                            FileOperation::RestoreDeletedFiles { file_names: files_to_restore }
-                        )
-                        .map_err(|e| e.to_string())
+                        sender
+                            .send(FileOperation::RestoreDeletedFiles {
+                                file_names: files_to_restore,
+                            })
+                            .map_err(|e| e.to_string())
                     }
-                },
+                }
 
-                UndoRecord::DeleteCreatedDir { path } => {
-                    tokio::fs::remove_dir(path.as_ref())
-                        .await
-                        .map_err(|e| e.to_string())
-                },
+                UndoRecord::DeleteCreatedDir { path } => tokio::fs::remove_dir(path.as_ref())
+                    .await
+                    .map_err(|e| e.to_string()),
 
-                UndoRecord::DeleteCreatedFile { path } => {
-                    tokio::fs::remove_file(path.as_ref())
-                        .await
-                        .map_err(|e| e.to_string())
-                },
+                UndoRecord::DeleteCreatedFile { path } => tokio::fs::remove_file(path.as_ref())
+                    .await
+                    .map_err(|e| e.to_string()),
             };
 
             let success = result.is_ok();
@@ -184,8 +193,8 @@ impl UndoRecord {
                 sender.send(UiEvent::ShowError(msg.into())).ok();
             }
 
-            sender.send(
-                TaskMessage::Finished {
+            sender
+                .send(TaskMessage::Finished {
                     task_id,
                     success,
                     task_type: TaskType::CopyPaste,
@@ -194,8 +203,8 @@ impl UndoRecord {
                     } else {
                         "Error al deshacer".to_string()
                     },
-                },
-            ).ok();
+                })
+                .ok();
         });
     }
 }

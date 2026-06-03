@@ -12,14 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-
-
-
-
-
-use egui::{Button, Color32, CornerRadius, Frame, Key, Margin, Order, Rect, ScrollArea, Sense, Ui, Vec2, Window, pos2, vec2};
-use crate::ui::{image_preview::image_preview::ImagePreviewState, themes::colors::COLOR_BG_MAIN};
 use crate::ui::dialog_manager::dialog_manager::ModalDialog;
+use crate::ui::{image_preview::image_preview::ImagePreviewState, themes::colors::COLOR_BG_MAIN};
+use egui::{
+    pos2, vec2, Button, Color32, CornerRadius, Frame, Key, Margin, Order, Rect, ScrollArea, Sense,
+    Ui, Vec2, Window,
+};
 
 pub struct ImagePreviewDialog {
     pub preview: Option<ImagePreviewState>,
@@ -28,9 +26,15 @@ pub struct ImagePreviewDialog {
 }
 
 impl ModalDialog for ImagePreviewDialog {
-    fn is_open(&self) -> bool { self.show_modal }
-    fn close(&mut self) { self.close() }
-    fn render(&mut self, ui: &mut Ui) { self.render_dialog(ui); }
+    fn is_open(&self) -> bool {
+        self.show_modal
+    }
+    fn close(&mut self) {
+        self.close()
+    }
+    fn render(&mut self, ui: &mut Ui) {
+        self.render_dialog(ui);
+    }
 }
 
 impl ImagePreviewDialog {
@@ -43,7 +47,7 @@ impl ImagePreviewDialog {
     }
 
     pub fn close(&mut self) {
-        self.show_modal = false; 
+        self.show_modal = false;
     }
 
     pub fn open(&mut self, img_pvw: ImagePreviewState) {
@@ -52,8 +56,12 @@ impl ImagePreviewDialog {
         self.needs_initial_load = true;
     }
 
-
-    fn render_preview(ui: &mut Ui, preview: &mut ImagePreviewState, needs_initial_load: &mut bool, should_close: &mut bool) {
+    fn render_preview(
+        ui: &mut Ui,
+        preview: &mut ImagePreviewState,
+        needs_initial_load: &mut bool,
+        should_close: &mut bool,
+    ) {
         if *needs_initial_load {
             preview.initial_load(ui);
             *needs_initial_load = false;
@@ -91,16 +99,13 @@ impl ImagePreviewDialog {
 
         let displayed_size = tex_size * preview.zoom;
 
-        let image_area = Rect::from_min_size(
-            ui.cursor().min,
-            available
-        );
+        let image_area = Rect::from_min_size(ui.cursor().min, available);
 
         let img_resp = ui.allocate_rect(image_area, Sense::click_and_drag());
 
         let max_offset_x = (displayed_size.x - available.x).max(0.0) / displayed_size.x;
         let max_offset_y = (displayed_size.y - available.y).max(0.0) / displayed_size.y;
-        
+
         preview.offset.x = preview.offset.x.clamp(0.0, max_offset_x);
         preview.offset.y = preview.offset.y.clamp(0.0, max_offset_y);
 
@@ -108,17 +113,12 @@ impl ImagePreviewDialog {
             pos2(preview.offset.x, preview.offset.y),
             pos2(
                 (preview.offset.x + available.x / displayed_size.x).min(1.0),
-                (preview.offset.y + available.y / displayed_size.y).min(1.0)
+                (preview.offset.y + available.y / displayed_size.y).min(1.0),
             ),
         );
 
-
-        ui.painter().image(
-            texture.id(),
-            image_area,
-            uv_rect,
-            egui::Color32::WHITE,
-        );
+        ui.painter()
+            .image(texture.id(), image_area, uv_rect, egui::Color32::WHITE);
 
         if img_resp.hovered() {
             let scroll = ui.input(|i| i.smooth_scroll_delta.y);
@@ -127,26 +127,28 @@ impl ImagePreviewDialog {
                 let zoom_factor = 1.0 + (scroll * 0.003);
                 let new_zoom = (preview.zoom * zoom_factor).clamp(min_zoom, max_zoom);
 
-                if (new_zoom - preview.zoom).abs() > 0.001  {
+                if (new_zoom - preview.zoom).abs() > 0.001 {
                     if let Some(cursor_pos) = img_resp.hover_pos() {
                         let cursor_ratio_x = (cursor_pos.x - image_area.min.x) / available.x;
                         let cursor_ratio_y = (cursor_pos.y - image_area.min.y) / available.y;
-                        
-                        let old_world_x = (preview.offset.x + cursor_ratio_x) * tex_size.x * preview.zoom;
-                        let old_world_y = (preview.offset.y + cursor_ratio_y) * tex_size.y * preview.zoom;
-                        
+
+                        let old_world_x =
+                            (preview.offset.x + cursor_ratio_x) * tex_size.x * preview.zoom;
+                        let old_world_y =
+                            (preview.offset.y + cursor_ratio_y) * tex_size.y * preview.zoom;
+
                         preview.zoom = new_zoom;
-                        
+
                         let new_uv_x = old_world_x / (tex_size.x * preview.zoom) - cursor_ratio_x;
                         let new_uv_y = old_world_y / (tex_size.y * preview.zoom) - cursor_ratio_y;
-                        
+
                         preview.offset.x = new_uv_x.clamp(0.0, max_offset_x);
                         preview.offset.y = new_uv_y.clamp(0.0, max_offset_y);
                     } else {
                         preview.zoom = new_zoom;
                     }
                 }
-            } 
+            }
 
             if img_resp.dragged() {
                 ui.set_cursor_icon(egui::CursorIcon::Grabbing);
@@ -207,27 +209,26 @@ impl ImagePreviewDialog {
         }
     }
 
-
     pub fn render_dialog(&mut self, ui: &mut Ui) {
         let mut should_close = false;
-        let Some(pvw) = self.preview.as_mut() else { return; };
-        
-        let is_portrait = pvw.current_texture.as_ref().map_or(false, |tex| {
+        let Some(pvw) = self.preview.as_mut() else {
+            return;
+        };
+
+        let is_portrait = pvw.current_texture.as_ref().is_some_and(|tex| {
             let size = tex.size_vec2();
             size.y > size.x * 1.5
         });
 
-        let is_landscape = pvw.current_texture.as_ref().map_or(false, |tex| {
+        let is_landscape = pvw.current_texture.as_ref().is_some_and(|tex| {
             let size = tex.size_vec2();
             size.x > size.y * 1.5
         });
-
 
         let custom_frame = Frame::NONE
             .fill(COLOR_BG_MAIN)
             .corner_radius(CornerRadius::same(10))
             .inner_margin(Margin::same(10));
-
 
         let mut window = Window::new(pvw.current_name())
             .frame(custom_frame)
@@ -245,7 +246,7 @@ impl ImagePreviewDialog {
             window = window.default_size([600.0, 600.0]);
         }
 
-        window.show(ui, |ui|{
+        window.show(ui, |ui| {
             let available_width = ui.available_width();
             let available_height = ui.available_height();
             ui.set_min_width(300.0);
@@ -255,50 +256,64 @@ impl ImagePreviewDialog {
 
             ScrollArea::vertical()
                 .max_height(available_height)
-                .show(ui, |ui|{
+                .show(ui, |ui| {
                     Frame::NONE
                         .fill(Color32::from_rgb(10, 15, 19))
                         .corner_radius(8.0)
                         .inner_margin(10.0)
-                        .show(ui, |ui|{
+                        .show(ui, |ui| {
                             ui.set_height(preview_height);
                             ui.set_width(available_width - 20.0);
 
-                            ui.centered_and_justified(|ui|{
-                                Self::render_preview(ui, pvw, &mut self.needs_initial_load, &mut should_close);
+                            ui.centered_and_justified(|ui| {
+                                Self::render_preview(
+                                    ui,
+                                    pvw,
+                                    &mut self.needs_initial_load,
+                                    &mut should_close,
+                                );
                             });
-                    });
-            });
+                        });
+                });
 
             ui.add_space(10.0);
 
             ui.horizontal_centered(|ui| {
                 ui.spacing_mut().item_spacing.x = 20.0;
 
-                if ui.add(Button::new("◀").min_size(vec2(120.0, 42.0))).clicked() {
+                if ui
+                    .add(Button::new("◀").min_size(vec2(120.0, 42.0)))
+                    .clicked()
+                {
                     pvw.zoom = 1.0;
                     pvw.offset = Vec2::ZERO;
                     pvw.prev(ui);
                 }
 
-                if ui.add(Button::new("▶").min_size(vec2(120.0, 42.0))).clicked() {
+                if ui
+                    .add(Button::new("▶").min_size(vec2(120.0, 42.0)))
+                    .clicked()
+                {
                     pvw.zoom = 1.0;
                     pvw.offset = Vec2::ZERO;
                     pvw.next(ui);
                 }
             });
-            
+
             ui.horizontal(|ui| {
                 let width = ui.available_width();
                 let button_width = 120.0;
                 let spacing = (width - button_width) / 2.0;
-                
+
                 ui.add_space(spacing);
-                if ui.add(Button::new("Cerrar").min_size(vec2(button_width, 42.0))).clicked() {
+                if ui
+                    .add(Button::new("Cerrar").min_size(vec2(button_width, 42.0)))
+                    .clicked()
+                {
                     should_close = true;
                 }
             });
-            
+
             ui.add_space(20.0);
         });
 

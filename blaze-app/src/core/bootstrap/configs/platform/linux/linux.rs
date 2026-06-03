@@ -12,26 +12,30 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-
-
-
-use std::{path::{Path, PathBuf}, time::SystemTime};
+use std::{
+    path::{Path, PathBuf},
+    time::SystemTime,
+};
 
 use directories::ProjectDirs;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
-use crate::core::bootstrap::configs::{error::{ConfigError, ConfigResult}, platform::{PlatformConfigTrait, linux::conf_structs::{DisplayBackend, OrderingMode}}};
-
-
+use crate::core::bootstrap::configs::{
+    error::{ConfigError, ConfigResult},
+    platform::{
+        linux::conf_structs::{DisplayBackend, OrderingMode},
+        PlatformConfigTrait,
+    },
+};
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct LinuxConfigs {    
+pub struct LinuxConfigs {
     #[serde(default)]
     pub app_ordering_mode: OrderingMode,
-    
+
     #[serde(default)]
     config_file_path: PathBuf,
-    
+
     #[serde(default)]
     pub show_hidden_files: bool,
 
@@ -69,7 +73,7 @@ impl LinuxConfigs {
             .ok_or(ConfigError::ProjectDirsNotFound)?;
 
         let dir = proj.config_dir();
-        std::fs::create_dir_all(dir).map_err(|e|ConfigError::Io(e))?;
+        std::fs::create_dir_all(dir).map_err(ConfigError::Io)?;
 
         let path = dir.join("config.json");
         if !path.exists() {
@@ -79,7 +83,6 @@ impl LinuxConfigs {
         Ok(path)
     }
 }
-
 
 impl Default for LinuxConfigs {
     fn default() -> Self {
@@ -101,14 +104,13 @@ impl Default for LinuxConfigs {
     }
 }
 
-
 impl PlatformConfigTrait for LinuxConfigs {
     fn config_dir(&self) -> &Path {
         self.config_file_path
             .parent()
             .unwrap_or_else(|| Path::new(""))
     }
-    
+
     fn load(&mut self) -> ConfigResult<()> {
         let path = self.config_file_path.clone();
 
@@ -116,31 +118,26 @@ impl PlatformConfigTrait for LinuxConfigs {
             return self.save();
         }
 
-        let data = std::fs::read_to_string(&path)
-            .map_err(|e| ConfigError::Io(e))?;
+        let data = std::fs::read_to_string(&path).map_err(ConfigError::Io)?;
 
         if data.trim().is_empty() {
             return self.save();
         }
 
-        let mut loaded: LinuxConfigs = serde_json::from_str(&data)
-            .map_err(|_| ConfigError::Deserialize)?;
+        let mut loaded: LinuxConfigs =
+            serde_json::from_str(&data).map_err(|_| ConfigError::Deserialize)?;
 
-        
         loaded.config_file_path = path;
         *self = loaded;
 
         Ok(())
     }
-    
-    fn save(&self) -> ConfigResult<()> {
-        let data = serde_json::to_string_pretty(self)
-            .map_err(|_|ConfigError::Serialize)?;
 
-        std::fs::write(&self.config_file_path, data)
-            .map_err(|e| ConfigError::Io(e))?;
+    fn save(&self) -> ConfigResult<()> {
+        let data = serde_json::to_string_pretty(self).map_err(|_| ConfigError::Serialize)?;
+
+        std::fs::write(&self.config_file_path, data).map_err(ConfigError::Io)?;
 
         Ok(())
     }
 }
-

@@ -12,12 +12,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-
-
-
-use crossbeam_channel::{Sender, Receiver};
-use crate::{core::{files::blaze_motor::motor_structs::{FileLoadingMessage, RecursiveMessages}, runtime::{bus_structs::*, event_bus::{ChannelGroup, ChannelPair}}, system::{extended_info::extended_info_manager::ExtendedInfoMessages, sizer_manager::sizer_manager::SizerMessages}}, ui::{icons_cache::thumbnails::thumbnails_manager::ThumbnailMessages, task_manager::task_manager::TaskMessage}};
-
+use crate::{
+    core::{
+        files::blaze_motor::motor_structs::{FileLoadingMessage, RecursiveMessages},
+        runtime::{
+            bus_structs::*,
+            event_bus::{ChannelGroup, ChannelPair},
+        },
+        system::{
+            extended_info::extended_info_manager::ExtendedInfoMessages,
+            sizer_manager::sizer_manager::SizerMessages,
+        },
+    },
+    ui::{
+        icons_cache::thumbnails::thumbnails_manager::ThumbnailMessages,
+        task_manager::task_manager::TaskMessage,
+    },
+};
+use crossbeam_channel::{Receiver, Sender};
 
 //trait y macro para el sender, ya no se usa una para cada una, send global
 pub trait Routable: Sized {

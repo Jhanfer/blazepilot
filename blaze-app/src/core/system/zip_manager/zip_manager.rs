@@ -12,20 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-
-
-
-use std::path::{Path, PathBuf};
-use crate::core::files::{blaze_motor::motor_structs::FileEntry, file_extension::{ArchiveType, FileExtension}};
-use thiserror::Error;
+use crate::core::files::{
+    blaze_motor::motor_structs::FileEntry,
+    file_extension::{ArchiveType, FileExtension},
+};
 use bzip2::read::BzDecoder;
+use std::path::{Path, PathBuf};
+use thiserror::Error;
 
 //Manejo de errores
 #[derive(Debug, Error)]
 pub enum ZipError {
     #[error("Error ZIP: {0}")]
     Zip(#[from] zip::result::ZipError),
-    
+
     #[error("I/O error: {0}")]
     Io(#[from] std::io::Error),
 
@@ -35,14 +35,11 @@ pub enum ZipError {
 
 pub type ZipResult<T> = Result<T, ZipError>;
 
-
-
 pub trait ArchiveExtractor {
     fn extract(&self, archive: &Path, dest: &Path) -> ZipResult<()>;
 }
 
 pub struct ZipExtractor;
-
 
 impl ArchiveExtractor for ZipExtractor {
     fn extract(&self, archive: &Path, dest: &Path) -> ZipResult<()> {
@@ -73,9 +70,7 @@ impl ArchiveExtractor for ZipExtractor {
     }
 }
 
-
-
-pub struct TarExtractor{
+pub struct TarExtractor {
     kind: ArchiveType,
 }
 
@@ -84,10 +79,10 @@ impl ArchiveExtractor for TarExtractor {
         let file = std::fs::File::open(archive)?;
 
         let reader: Box<dyn std::io::Read> = match self.kind {
-            ArchiveType::TarGz  => Box::new(flate2::read::GzDecoder::new(file)),
-            ArchiveType::TarXz  => Box::new(xz2::read::XzDecoder::new(file)),
+            ArchiveType::TarGz => Box::new(flate2::read::GzDecoder::new(file)),
+            ArchiveType::TarXz => Box::new(xz2::read::XzDecoder::new(file)),
             ArchiveType::TarBz2 => Box::new(BzDecoder::new(file)),
-            ArchiveType::Tar    => Box::new(file),
+            ArchiveType::Tar => Box::new(file),
             _ => unreachable!(),
         };
 
@@ -108,8 +103,6 @@ impl ArchiveExtractor for TarExtractor {
         Ok(())
     }
 }
-
-
 
 pub struct GzExtractor;
 
@@ -133,22 +126,17 @@ impl ArchiveExtractor for GzExtractor {
     }
 }
 
+#[derive(Default)]
 pub struct ZipManager;
 
-impl Default for ZipManager { 
-    fn default() -> Self { 
-        Self {} 
-    } 
-}
-
 impl ZipManager {
-    pub fn new() -> Self { Self::default() }
+    pub fn new() -> Self {
+        Self
+    }
 
     fn extractor_for(ext: &FileExtension) -> ZipResult<Box<dyn ArchiveExtractor>> {
         match ext {
-            FileExtension::Archive(ArchiveType::Zip) => {
-                Ok(Box::new(ZipExtractor))
-            },
+            FileExtension::Archive(ArchiveType::Zip) => Ok(Box::new(ZipExtractor)),
 
             FileExtension::Archive(t @ ArchiveType::Tar)
             | FileExtension::Archive(t @ ArchiveType::TarGz)
@@ -157,10 +145,7 @@ impl ZipManager {
                 Ok(Box::new(TarExtractor { kind: t.clone() }))
             }
 
-            FileExtension::Archive(ArchiveType::Gz) => {
-                Ok(Box::new(GzExtractor))
-            }
-
+            FileExtension::Archive(ArchiveType::Gz) => Ok(Box::new(GzExtractor)),
 
             //-- No soportados por el momento ------------
             FileExtension::Archive(ArchiveType::Rar)
@@ -171,10 +156,9 @@ impl ZipManager {
                 Err(ZipError::UnsupportedFormat(PathBuf::new()))
             }
 
-            _ => Err(ZipError::UnsupportedFormat(PathBuf::new()))
+            _ => Err(ZipError::UnsupportedFormat(PathBuf::new())),
         }
     }
-
 
     pub fn extract(&self, entry: &FileEntry, dest: &Path) -> ZipResult<()> {
         self.assert_archive(entry)?;
@@ -183,11 +167,10 @@ impl ZipManager {
         extractor.extract(&entry.full_path, dest)
     }
 
-
-    fn assert_archive(&self, entry: &FileEntry) -> ZipResult<()> { 
-        match &entry.extension { 
+    fn assert_archive(&self, entry: &FileEntry) -> ZipResult<()> {
+        match &entry.extension {
             FileExtension::Archive(_) => Ok(()),
-            _ => Err(ZipError::UnsupportedFormat(entry.full_path.to_path_buf())) 
-        } 
+            _ => Err(ZipError::UnsupportedFormat(entry.full_path.to_path_buf())),
+        }
     }
 }

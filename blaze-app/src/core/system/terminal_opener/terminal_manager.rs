@@ -12,19 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-
-
-
-
-
-
-use std::{path::Path, sync::Arc};
 use once_cell::sync::Lazy;
+use std::{path::Path, sync::Arc};
 use tokio::sync::Mutex;
 
 #[cfg(target_os = "linux")]
 use crate::core::system::terminal_opener::platform::linux::linux::LinuxTerminalOpener;
-
 
 #[derive(Clone)]
 enum PlatformTerminal {
@@ -32,11 +25,8 @@ enum PlatformTerminal {
     Linux(Arc<Mutex<LinuxTerminalOpener>>),
 }
 
-
-pub static GLOBAL_TERMINAL_MANAGER: Lazy<Arc<tokio::sync::Mutex<TerminalManager>>> = Lazy::new(|| {
-    Arc::new(tokio::sync::Mutex::new(TerminalManager::new()))
-});
-
+pub static GLOBAL_TERMINAL_MANAGER: Lazy<Arc<tokio::sync::Mutex<TerminalManager>>> =
+    Lazy::new(|| Arc::new(tokio::sync::Mutex::new(TerminalManager::new())));
 
 pub struct TerminalManager {
     terminal_opener: PlatformTerminal,
@@ -45,7 +35,7 @@ pub struct TerminalManager {
 impl TerminalManager {
     pub fn new() -> Self {
         Self {
-            terminal_opener : {
+            terminal_opener: {
                 #[cfg(target_os = "linux")]
                 {
                     use tracing::debug;
@@ -56,7 +46,7 @@ impl TerminalManager {
 
                     PlatformTerminal::Linux(LINUX_TERMINAL_OPENER.clone())
                 }
-            }
+            },
         }
     }
 
@@ -67,18 +57,22 @@ impl TerminalManager {
             PlatformTerminal::Linux(tm) => {
                 let guard = tm.lock().await;
                 guard.load_terminals()
-            },
+            }
         }
     }
 
     //lanzar la terminal
-    pub async fn request_open_terminal(&mut self, path: &Path, preferred_terminal: Option<String>) -> std::io::Result<()> {
+    pub async fn request_open_terminal(
+        &mut self,
+        path: &Path,
+        preferred_terminal: Option<String>,
+    ) -> std::io::Result<()> {
         match &mut self.terminal_opener {
             #[cfg(target_os = "linux")]
             PlatformTerminal::Linux(tm) => {
                 let guard = tm.lock().await;
                 guard.open_terminal(path, preferred_terminal.as_deref())
-            },
+            }
         }
     }
 }

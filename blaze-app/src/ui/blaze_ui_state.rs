@@ -12,23 +12,31 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::{collections::{HashMap, HashSet}, path::Path, sync::Arc};
 use egui::TextureHandle;
+use std::{
+    collections::{HashMap, HashSet},
+    path::Path,
+    sync::Arc,
+};
 use tracing::{debug, info};
 
 use crate::{
-    core::{files::blaze_motor::motor::with_motor, runtime::{bus_structs::{FileConflict, SureTo, UiEvent}, event_bus::with_event_bus}, system::{cache::color_cache::color_cache::FolderColorManager, updater::updater::UpdateMessages}}, 
+    core::{
+        files::blaze_motor::motor::with_motor,
+        runtime::{
+            bus_structs::{FileConflict, SureTo, UiEvent},
+            event_bus::with_event_bus,
+        },
+        system::{
+            cache::color_cache::color_cache::FolderColorManager, updater::updater::UpdateMessages,
+        },
+    },
     ui::{
-        dialog_manager::dialog_manager::DialogManager, 
-        icons_cache::{icon_cache::IconCache, thumbnails::thumbnails_manager::ThumbnailManager}, modules::{
-            custom_context_menu::context_state::ContextMenuState
-        }
-    }
+        dialog_manager::dialog_manager::DialogManager,
+        icons_cache::{icon_cache::IconCache, thumbnails::thumbnails_manager::ThumbnailManager},
+        modules::custom_context_menu::context_state::ContextMenuState,
+    },
 };
-
-
-
-
 
 pub struct BlazeUiState {
     pub dialog_manager: DialogManager,
@@ -53,7 +61,7 @@ impl Default for BlazeUiState {
 impl BlazeUiState {
     fn new() -> Self {
         let dialog_manager = DialogManager::new();
-        Self { 
+        Self {
             dialog_manager,
             icon_cache: IconCache::new(),
             folder_color_manager: FolderColorManager::new(),
@@ -69,9 +77,7 @@ impl BlazeUiState {
     }
 
     pub fn evict_thumbnail_cache_if_dir_changed(&mut self, cwd: &Path) {
-        let changed = self.last_thumb_cache_dir
-            .as_deref()
-            .map_or(true, |prev| prev != cwd);
+        let changed = self.last_thumb_cache_dir.as_deref() != Some(cwd);
 
         if changed {
             self.thumb_texture_cache.clear();
@@ -84,7 +90,8 @@ impl BlazeUiState {
     pub fn enforce_texture_cache_limit(&mut self, max_entries: usize) {
         if self.thumb_texture_cache.len() > max_entries {
             let to_remove = self.thumb_texture_cache.len() - max_entries;
-            let keys: Vec<Arc<Path>> = self.thumb_texture_cache
+            let keys: Vec<Arc<Path>> = self
+                .thumb_texture_cache
                 .keys()
                 .take(to_remove)
                 .cloned()
@@ -95,101 +102,120 @@ impl BlazeUiState {
         }
     }
 
-
     pub fn process_events(&mut self) {
-        let active_id = with_motor(|m|m.active_tab().id.clone());
+        let active_id = with_motor(|m| m.active_tab().id);
         let dispatcher = with_event_bus(|e| e.dispatcher(active_id));
 
         let events: Vec<UiEvent> = with_event_bus(|pool| {
             let mut msgs = Vec::new();
-            pool.drain(active_id, |msg|{
+            pool.drain(active_id, |msg| {
                 msgs.push(msg);
                 true
             });
             msgs
         });
 
-        self.thumbnail_manager.process_messages(active_id, dispatcher.clone());
-
+        self.thumbnail_manager
+            .process_messages(active_id, dispatcher.clone());
 
         for envent in events {
             match envent {
-                UiEvent::OpenWithSelector { path, mime, apps, icon_data, show_all_apps} => {
-                    self.dialog_manager.open_selector_dialog(path, mime, apps, icon_data, show_all_apps);
-                },
+                UiEvent::OpenWithSelector {
+                    path,
+                    mime,
+                    apps,
+                    icon_data,
+                    show_all_apps,
+                } => {
+                    self.dialog_manager.open_selector_dialog(
+                        path,
+                        mime,
+                        apps,
+                        icon_data,
+                        show_all_apps,
+                    );
+                }
                 UiEvent::ShowError(message) => {
                     info!("Error recibido");
                     self.dialog_manager.open_error_dialog(&message);
-                },
+                }
                 UiEvent::RefreshList => {
                     info!("RECIBIDO!!");
-                },
-                UiEvent::SureTo(sureto) => {
-                    match sureto {
-                        SureTo::SureToMove { files, dest, tab_id:_ } => {
-                            debug!("Mover {:?} → {:?}", files, dest);
-                            self.dialog_manager.open_sure_move_dialog(files, dest);
-                        },
-                        SureTo::SureToDelete{files, tab_id} => {
-                            self.dialog_manager.open_sure_to_delete(files, tab_id);
-                        },
+                }
+                UiEvent::SureTo(sureto) => match sureto {
+                    SureTo::SureToMove {
+                        files,
+                        dest,
+                        tab_id: _,
+                    } => {
+                        debug!("Mover {:?} → {:?}", files, dest);
+                        self.dialog_manager.open_sure_move_dialog(files, dest);
+                    }
+                    SureTo::SureToDelete { files, tab_id } => {
+                        self.dialog_manager.open_sure_to_delete(files, tab_id);
                     }
                 },
-                UiEvent::UpdateMessages(update_message) => {
-                    match update_message {
-                        UpdateMessages::NewVersionAvailable { current_version, new_version , tab_id} => {
-                            info!("NUEVA VERSIÓN {:?}", new_version);
-                            self.dialog_manager.open_updater_dialog(current_version, new_version, tab_id);
-                        },
-                        UpdateMessages::UpToDate => {
-                            info!("Estás en la última versión.");
-                        },
-                        UpdateMessages::ProcedToUpdate => {
-
-                        },
+                UiEvent::UpdateMessages(update_message) => match update_message {
+                    UpdateMessages::NewVersionAvailable {
+                        current_version,
+                        new_version,
+                        tab_id,
+                    } => {
+                        info!("NUEVA VERSIÓN {:?}", new_version);
+                        self.dialog_manager.open_updater_dialog(
+                            current_version,
+                            new_version,
+                            tab_id,
+                        );
                     }
+                    UpdateMessages::UpToDate => {
+                        info!("Estás en la última versión.");
+                    }
+                    UpdateMessages::ProcedToUpdate => {}
                 },
 
-                UiEvent::FileConflict(file_conflict) => {
-                    match file_conflict {
-                        FileConflict::AlreadyExist { name, path } => {
-                            info!("Ya existe {} en {:?}", name, path);
-                        },
+                UiEvent::FileConflict(file_conflict) => match file_conflict {
+                    FileConflict::AlreadyExist { name, path } => {
+                        info!("Ya existe {} en {:?}", name, path);
                     }
                 },
 
                 UiEvent::ShowFolderColorSelector { folder_id } => {
-                    self.dialog_manager.open_folder_color_selector_dialog(folder_id);
+                    self.dialog_manager
+                        .open_folder_color_selector_dialog(folder_id);
                 }
 
                 UiEvent::OpenConfigs => {
                     self.dialog_manager.open_configs();
-                },
+                }
 
-                UiEvent::ThumbnailReady { full_path, tab_id:_ } => {
+                UiEvent::ThumbnailReady {
+                    full_path,
+                    tab_id: _,
+                } => {
                     self.calculating_thumbnails.remove(&full_path);
                     self.calculated_thumbnails.insert(full_path.clone());
                     self.newly_calculated_thumbnails.insert(full_path);
                     self.needs_repaint = true;
-                },
+                }
 
                 UiEvent::ShowImagePvw { pvw } => {
                     if let Some(img_pvw) = pvw {
                         self.dialog_manager.open_img_pvw_dialog(img_pvw);
                     }
-                },
+                }
 
                 UiEvent::ShowWantToInstall => {
                     self.dialog_manager.open_want_to_install_dialog();
-                },
+                }
 
                 UiEvent::ShowGeneric { title, message } => {
                     self.dialog_manager.open_show_generic(&title, &message);
-                },
+                }
 
                 UiEvent::QuickTagEvent(event) => {
                     self.dialog_manager.open_quick_acc_dialog(event);
-                },
+                }
             }
         }
     }

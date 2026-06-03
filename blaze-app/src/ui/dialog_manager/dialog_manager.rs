@@ -2,35 +2,31 @@ use std::{path::Path, sync::Arc};
 
 use egui::{Area, Order, Sense, Ui};
 use file_id::FileId;
-use tracing::info;
 use uuid::Uuid;
 
-use crate::{core::{runtime::bus_structs::QuickTagEvent, system::fileopener_module::{AppAssociation, platform::linux::structs::AppsIconData}}, 
+use crate::{
+    core::{
+        runtime::bus_structs::QuickTagEvent,
+        system::fileopener_module::{platform::linux::structs::AppsIconData, AppAssociation},
+    },
     ui::{
         dialog_manager::dialogs::{
-            configs_dialog::ConfigDialog, 
-            error_dialog::ErrorDialog, 
-            folder_color_selector_dialog::FolderColorSelector, image_preview_dialog::ImagePreviewDialog, 
-            quick_dialogs::QuickAccDialog, 
-            selector_dialog::AppSelectorDialog, 
-            show_generic_message::ShowGenericDialog, 
-            sure_to_delete::SureToDeleteDialog, 
-            sure_to_move_to::SureToMoveToDialog, 
-            update_dialog::UpdateDialog, 
-            want_to_install::WantToInstallDialog
+            configs_dialog::ConfigDialog, error_dialog::ErrorDialog,
+            folder_color_selector_dialog::FolderColorSelector,
+            image_preview_dialog::ImagePreviewDialog, quick_dialogs::QuickAccDialog,
+            selector_dialog::AppSelectorDialog, show_generic_message::ShowGenericDialog,
+            sure_to_delete::SureToDeleteDialog, sure_to_move_to::SureToMoveToDialog,
+            update_dialog::UpdateDialog, want_to_install::WantToInstallDialog,
         },
-        image_preview::image_preview::ImagePreviewState
-    }
+        image_preview::image_preview::ImagePreviewState,
+    },
 };
-
-
 
 pub trait ModalDialog {
     fn is_open(&self) -> bool;
     fn close(&mut self);
     fn render(&mut self, ui: &mut Ui);
 }
-
 
 pub struct DialogManager {
     pub selector_dialog: AppSelectorDialog,
@@ -63,8 +59,16 @@ impl DialogManager {
         }
     }
 
-    pub fn open_selector_dialog(&mut self, path: Arc<Path>, mime: String, apps: Vec<AppAssociation>, icon_data: Vec<AppsIconData>, show_all_apps: bool) {
-        self.selector_dialog.open(path, mime, apps, icon_data, show_all_apps);
+    pub fn open_selector_dialog(
+        &mut self,
+        path: Arc<Path>,
+        mime: String,
+        apps: Vec<AppAssociation>,
+        icon_data: Vec<AppsIconData>,
+        show_all_apps: bool,
+    ) {
+        self.selector_dialog
+            .open(path, mime, apps, icon_data, show_all_apps);
     }
 
     pub fn open_sure_move_dialog(&mut self, sources: Vec<Arc<Path>>, dest: Arc<Path>) {
@@ -75,8 +79,14 @@ impl DialogManager {
         self.sure_to_delete_dialog.open(sources, tab_id);
     }
 
-    pub fn open_updater_dialog(&mut self, current_version: String, new_version: String, tab_id: Uuid) {
-        self.update_dialog.open(current_version, new_version, tab_id);
+    pub fn open_updater_dialog(
+        &mut self,
+        current_version: String,
+        new_version: String,
+        tab_id: Uuid,
+    ) {
+        self.update_dialog
+            .open(current_version, new_version, tab_id);
     }
 
     pub fn open_error_dialog(&mut self, message: &str) {
@@ -132,7 +142,7 @@ impl DialogManager {
                 .order(Order::Middle)
                 .sense(Sense::click())
                 .interactable(true)
-                .show(ui, |ui|{
+                .show(ui, |ui| {
                     let screen_rect = ui.ctx().content_rect();
                     ui.painter().rect_filled(
                         screen_rect,
@@ -140,11 +150,14 @@ impl DialogManager {
                         egui::Color32::from_rgba_unmultiplied(0, 0, 0, 180),
                     );
 
-                    if ui.allocate_rect(screen_rect, egui::Sense::click_and_drag()).clicked() {
+                    if ui
+                        .allocate_rect(screen_rect, egui::Sense::click_and_drag())
+                        .clicked()
+                    {
                         should_close = true;
                     }
                 });
-            
+
             if should_close {
                 dialog.close();
             }
@@ -152,5 +165,4 @@ impl DialogManager {
             dialog.render(ui);
         }
     }
-
 }

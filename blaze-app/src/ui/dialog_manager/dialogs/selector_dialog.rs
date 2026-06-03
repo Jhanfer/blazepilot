@@ -12,15 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-
-
-
-
+use egui::{
+    scroll_area::ScrollSource, ColorImage, Frame, Margin, Order, RichText, ScrollArea,
+    TextureOptions, Ui, Window,
+};
 use std::{path::Path, sync::Arc};
-use egui::{Color32, ColorImage, Ui, Frame, Margin, Order, RichText, ScrollArea, TextureOptions, Window, scroll_area::ScrollSource};
 use tracing::info;
 
-use crate::{core::system::{clipboard::clipboard::TOKIO_RUNTIME, fileopener_module::{AppAssociation, GLOBAL_FILE_OPENER, platform::linux::structs::AppsIconData}}, ui::{dialog_manager::dialog_manager::ModalDialog, themes::colors::COLOR_BG_MAIN}};
+use crate::{
+    core::system::{
+        clipboard::clipboard::TOKIO_RUNTIME,
+        fileopener_module::{
+            platform::linux::structs::AppsIconData, AppAssociation, GLOBAL_FILE_OPENER,
+        },
+    },
+    ui::{dialog_manager::dialog_manager::ModalDialog, themes::colors::COLOR_BG_MAIN},
+};
 
 pub struct SelectorData {
     pub path: Arc<Path>,
@@ -37,9 +44,15 @@ pub struct AppSelectorDialog {
 }
 
 impl ModalDialog for AppSelectorDialog {
-    fn is_open(&self) -> bool { self.show_modal }
-    fn close(&mut self) { self.close() }
-    fn render(&mut self, ui: &mut Ui) { self.render_app_selector(ui); }
+    fn is_open(&self) -> bool {
+        self.show_modal
+    }
+    fn close(&mut self) {
+        self.close()
+    }
+    fn render(&mut self, ui: &mut Ui) {
+        self.render_app_selector(ui);
+    }
 }
 
 impl AppSelectorDialog {
@@ -51,41 +64,53 @@ impl AppSelectorDialog {
     }
 
     pub fn close(&mut self) {
-        self.show_modal = false; 
+        self.show_modal = false;
         self.selector_data = None;
     }
 
-    pub fn open(&mut self, path: Arc<Path>
-        , mime: String, apps: Vec<AppAssociation>, icon_data: Vec<AppsIconData>, show_all_apps: bool) {
+    pub fn open(
+        &mut self,
+        path: Arc<Path>,
+        mime: String,
+        apps: Vec<AppAssociation>,
+        icon_data: Vec<AppsIconData>,
+        show_all_apps: bool,
+    ) {
         let textures = vec![None; apps.len()];
-        self.selector_data = Some(
-            SelectorData {
-                path,
-                mime, 
-                apps, 
-                icon_data, 
-                textures, 
-                show_all_apps 
-            }
-        );
+        self.selector_data = Some(SelectorData {
+            path,
+            mime,
+            apps,
+            icon_data,
+            textures,
+            show_all_apps,
+        });
 
         self.show_modal = true;
     }
 
     fn load_textures(&mut self, ui: &mut Ui) {
-        let Some(app_icon_data) = &mut self.selector_data else {return;};
-        
-        for (i, icon) in app_icon_data.icon_data.iter().enumerate(){
+        let Some(app_icon_data) = &mut self.selector_data else {
+            return;
+        };
+
+        for (i, icon) in app_icon_data.icon_data.iter().enumerate() {
             if app_icon_data.textures[i].is_some() {
                 continue;
             }
 
-            if let AppsIconData::Rgba { data, width, height } = icon {
-                let color_image = ColorImage::from_rgba_unmultiplied([*width as usize, *height as usize], &data);
+            if let AppsIconData::Rgba {
+                data,
+                width,
+                height,
+            } = icon
+            {
+                let color_image =
+                    ColorImage::from_rgba_unmultiplied([*width as usize, *height as usize], data);
 
                 let texture = ui.load_texture(
                     format!("icon_{}", app_icon_data.apps[i].id),
-                    color_image, 
+                    color_image,
                     TextureOptions::NEAREST,
                 );
 
@@ -94,7 +119,12 @@ impl AppSelectorDialog {
         }
     }
 
-    fn render_selector_button(ui: &mut egui::Ui, app: &AppAssociation, data: &SelectorData, index: usize,) -> bool {
+    fn render_selector_button(
+        ui: &mut egui::Ui,
+        app: &AppAssociation,
+        data: &SelectorData,
+        index: usize,
+    ) -> bool {
         let mut should_close = false;
         let opener = GLOBAL_FILE_OPENER.clone();
 
@@ -107,8 +137,7 @@ impl AppSelectorDialog {
 
             let br = ui.button(&app.name);
             if br.clicked() {
-
-                let app_owned = app.clone(); 
+                let app_owned = app.clone();
                 let path_owned = data.path.clone();
                 let opener_clone = opener.clone();
 
@@ -121,7 +150,7 @@ impl AppSelectorDialog {
                 info!("Abrir con {}", app.name);
             }
 
-            br.context_menu(|ui|{
+            br.context_menu(|ui| {
                 if ui.button("Seleccionar default").clicked() {
                     let app_name_owned = app.name.clone();
                     let app_owned = app.clone();
@@ -151,24 +180,28 @@ impl AppSelectorDialog {
         should_close
     }
 
-
     pub fn render_app_selector(&mut self, ui: &mut Ui) {
-        if self.selector_data.is_none() {return;}
+        if self.selector_data.is_none() {
+            return;
+        }
 
         let mut should_close = self.show_modal;
 
         self.load_textures(ui);
 
-        let Some(data) = &mut self.selector_data else { return; };
-        
+        let Some(data) = &mut self.selector_data else {
+            return;
+        };
+
         let custom_frame = Frame::NONE
             .fill(COLOR_BG_MAIN)
             .inner_margin(Margin::same(20));
 
-        let file_name = data.path.file_name()
+        let file_name = data
+            .path
+            .file_name()
             .map(|f| f.to_string_lossy().into_owned())
             .unwrap_or_else(|| data.mime.clone());
-
 
         let mut close_requested = false;
 
@@ -181,18 +214,17 @@ impl AppSelectorDialog {
             .min_size([400.0, 300.0])
             .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
             .open(&mut should_close)
-            .show(ui, |ui|{
+            .show(ui, |ui| {
                 ui.heading("Seleccionar aplicación");
                 ui.separator();
 
-                let height = if data.show_all_apps {320.0} else {50.0};
+                let height = if data.show_all_apps { 320.0 } else { 50.0 };
 
                 ScrollArea::vertical()
                     .scroll_source(ScrollSource::MOUSE_WHEEL | ScrollSource::SCROLL_BAR)
                     .auto_shrink([false, false])
                     .max_height(height)
                     .show(ui, |ui| {
-
                         ui.label(RichText::new("Recomendadas").strong());
                         ui.add_space(6.0);
 
@@ -202,23 +234,22 @@ impl AppSelectorDialog {
                             }
                         }
 
-
                         if data.show_all_apps {
                             ui.add_space(12.0);
                             ui.separator();
                             ui.add_space(12.0);
 
-                            ui.label(egui::RichText::new("Todas las apps").strong()); 
+                            ui.label(egui::RichText::new("Todas las apps").strong());
                             ui.add_space(6.0);
 
                             for (i, app) in data.apps.iter().enumerate() {
                                 if !app.is_recommended {
-                                    close_requested |= Self::render_selector_button(ui, &app, data, i);
+                                    close_requested |=
+                                        Self::render_selector_button(ui, app, data, i);
                                 }
                             }
                         }
-                });
-
+                    });
 
                 ui.separator();
 
@@ -228,7 +259,6 @@ impl AppSelectorDialog {
                     }
                 });
             });
-
 
         if close_requested {
             self.close();

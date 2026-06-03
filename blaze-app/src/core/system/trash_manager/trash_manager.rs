@@ -1,7 +1,6 @@
-use std::path::{PathBuf, Path};
-use std::sync::{Arc, OnceLock};
 use crate::core::system::trash_manager::error::{TrashError, TrashResult};
-
+use std::path::{Path, PathBuf};
+use std::sync::{Arc, OnceLock};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TrashDestination {
@@ -9,9 +8,7 @@ pub enum TrashDestination {
     External { mount_point: Arc<Path> },
 }
 
-
 pub trait TrashBackend: Send + Sync + std::fmt::Debug {
-
     fn is_in_trash(&self, path: &Path) -> bool;
 
     fn etched_in_trash_path(&self, path: &Path) -> bool;
@@ -34,22 +31,16 @@ pub trait TrashBackend: Send + Sync + std::fmt::Debug {
     fn get_trash_files(&self, destination: &TrashDestination) -> TrashResult<Arc<Path>>;
 }
 
-
-
 static TRASH_BACKEND: OnceLock<Box<dyn TrashBackend>> = OnceLock::new();
-
 
 pub fn get_backend() -> &'static dyn TrashBackend {
     let boxed_backend = TRASH_BACKEND.get().expect("TrashBackend no inicializado.");
     &**boxed_backend
 }
 
-
 pub fn init_trash_backend() -> TrashResult<()> {
     let backend: Box<dyn TrashBackend> = if cfg!(target_os = "linux") {
-        Box::new(
-            crate::core::system::trash_manager::platform::linux::LinuxTrashBackend::new()?
-        )
+        Box::new(crate::core::system::trash_manager::platform::linux::LinuxTrashBackend::new()?)
     // } else if cfg!(target_os = "macos") {
     //     Box::new(macos::MacOsTrashBackend::new()?)
     // } else if cfg!(target_os = "windows") {
@@ -57,12 +48,10 @@ pub fn init_trash_backend() -> TrashResult<()> {
     } else {
         return Err(TrashError::PlatformNotSupported);
     };
-    
-    TRASH_BACKEND.set(backend)
-        .map_err(|_| TrashError::Io(std::io::Error::new(
-            std::io::ErrorKind::Other,
-            "Trash backend already initialized"
-        )))?;
-    
+
+    TRASH_BACKEND
+        .set(backend)
+        .map_err(|_| TrashError::Io(std::io::Error::other("Trash backend already initialized")))?;
+
     Ok(())
 }

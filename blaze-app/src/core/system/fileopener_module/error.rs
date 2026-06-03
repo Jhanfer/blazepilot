@@ -20,10 +20,10 @@ pub enum OpenerError {
     ExecutableNotFound { name: String },
 
     #[error("Exec vacío o inválido en desktop file: {desktop_id}")]
-    InvalidExec{ desktop_id: String },
+    InvalidExec { desktop_id: String },
 
     #[error("No se pudo parsear el archivo de escritorio: {path}")]
-    DesktopParsedFaild { path: Arc<Path>},
+    DesktopParsedFaild { path: Arc<Path> },
 
     #[error("Error parseando argumentos de Exec: {raw}")]
     ExecParseFailed { raw: String },

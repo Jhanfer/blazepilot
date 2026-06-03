@@ -12,21 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-
-
-
-use std::path::Path;
-use std::sync::Arc;
-use eframe::Frame;
-use egui::{FontData, FontDefinitions, FontFamily, Ui};
-use tracing::{debug};
 use crate::core::blaze_state::{BlazeCoreBuilder, BlazeCoreState};
 use crate::core::system::clipboard::clipboard::TOKIO_RUNTIME;
 use crate::core::system::knowndirs::knowndirs_manager::KnownDirsManager;
 use crate::ui::blaze_ui_state::BlazeUiState;
 use crate::ui::modules::ui_callback::connect_ui_components_callback;
-
-
+use eframe::Frame;
+use egui::{FontData, FontDefinitions, FontFamily, Ui};
+use std::path::Path;
+use std::sync::Arc;
+use tracing::debug;
 
 #[must_use = "llama .build() para construir la aap"]
 pub struct BlazeAppBuilder {
@@ -46,11 +41,11 @@ impl BlazeAppBuilder {
     }
 
     #[must_use]
-    pub fn build(self) -> BlazeApp { 
+    pub fn build(self) -> BlazeApp {
         let state = TOKIO_RUNTIME.block_on(
             BlazeCoreBuilder::default()
                 .with_start_path(self.start_path)
-                .build()
+                .build(),
         );
         let ui_state = BlazeUiState::default();
 
@@ -64,12 +59,10 @@ impl Default for BlazeAppBuilder {
     }
 }
 
-
 pub struct BlazeApp {
-    pub state: BlazeCoreState, //motor, archivos, mover
+    pub state: BlazeCoreState,  //motor, archivos, mover
     pub ui_state: BlazeUiState, //visuales
 }
-
 
 impl BlazeApp {
     pub fn set_up_custom_font(&self, ui: &mut Ui) {
@@ -77,21 +70,24 @@ impl BlazeApp {
 
         fonts.font_data.insert(
             "NotoSans".to_owned(),
-            FontData::from_static(include_bytes!("./ui/assets/noto/NotoSans-Regular.ttf")).into()
+            FontData::from_static(include_bytes!("./ui/assets/noto/NotoSans-Regular.ttf")).into(),
         );
 
-        fonts.families.entry(FontFamily::Proportional)
+        fonts
+            .families
+            .entry(FontFamily::Proportional)
             .or_default()
             .insert(0, "NotoSans".to_owned());
-            
-        fonts.families.entry(FontFamily::Monospace)
+
+        fonts
+            .families
+            .entry(FontFamily::Monospace)
             .or_default()
             .insert(0, "NotoSans".to_owned());
-        
+
         ui.set_fonts(fonts);
     }
 }
-
 
 impl eframe::App for BlazeApp {
     fn ui(&mut self, ui: &mut Ui, _frame: &mut Frame) {
@@ -104,7 +100,8 @@ impl eframe::App for BlazeApp {
         //Dropeo de archivos
         if !ui.ctx().input(|i| i.raw.dropped_files.is_empty()) {
             debug!("Se dropea el objeto");
-            let dropped_files: Vec<Arc<Path>> = ui.input(|i| i.raw.dropped_files.clone())
+            let dropped_files: Vec<Arc<Path>> = ui
+                .input(|i| i.raw.dropped_files.clone())
                 .iter()
                 .map(|d| {
                     let path_buf = &d.path.clone().unwrap_or_default();
@@ -120,9 +117,8 @@ impl eframe::App for BlazeApp {
             ui.input_mut(|i| i.raw.dropped_files.clear());
         }
 
-
         self.state.process_messages();
-        
+
         self.ui_state.dialog_manager.render_area(ui);
         self.ui_state.process_events();
 

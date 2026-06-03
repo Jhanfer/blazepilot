@@ -12,31 +12,23 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-
-
-
-
+use parking_lot::Mutex;
 use std::collections::VecDeque;
 use std::sync::OnceLock;
-use parking_lot::Mutex;
 
 use crate::core::runtime::bus_structs::FileOperation;
 use crate::core::runtime::event_bus::Dispatcher;
 use crate::core::system::operationstate::undo_record::UndoRecord;
 
-
 static OPERATION_HISTORY: OnceLock<Mutex<OperationHistoryManager>> = OnceLock::new();
 
 fn operation_history() -> &'static Mutex<OperationHistoryManager> {
-    OPERATION_HISTORY.get_or_init(|| {
-        Mutex::new(OperationHistoryManager::new(50))
-    })
+    OPERATION_HISTORY.get_or_init(|| Mutex::new(OperationHistoryManager::new(50)))
 }
 
-
 pub fn with_history<F, R>(f: F) -> R
-    where
-        F: FnOnce(&mut OperationHistoryManager) -> R,
+where
+    F: FnOnce(&mut OperationHistoryManager) -> R,
 {
     f(&mut operation_history().lock())
 }
@@ -73,7 +65,6 @@ impl OperationHistoryManager {
         self.history.push_back(record);
     }
 
-
     pub fn push_completed(&mut self, op: &FileOperation) {
         if let Some(record) = UndoRecord::from_completed(op) {
             self.push(record);
@@ -97,5 +88,4 @@ impl OperationHistoryManager {
             false
         }
     }
-
 }

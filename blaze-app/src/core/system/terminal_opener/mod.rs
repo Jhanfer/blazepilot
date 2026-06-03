@@ -1,2 +1,2 @@
-pub mod terminal_manager;
 pub mod platform;
+pub mod terminal_manager;

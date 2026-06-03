@@ -12,14 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-
-
-
-
+use crate::{
+    core::runtime::{bus_structs::FileOperation, event_bus::Dispatcher},
+    ui::{dialog_manager::dialog_manager::ModalDialog, themes::colors::COLOR_BG_MAIN},
+};
+use egui::{CornerRadius, Frame, Margin, Order, RichText, Ui, Window};
 use std::{path::Path, sync::Arc};
-use egui::{Color32, CornerRadius, Frame, Margin, Order, RichText, Ui, Window};
-use crate::{core::runtime::{bus_structs::FileOperation, event_bus::Dispatcher}, ui::{dialog_manager::dialog_manager::ModalDialog, themes::colors::COLOR_BG_MAIN}};
-
 
 pub struct SureToMoveToDialog {
     pub sources: Option<Vec<Arc<Path>>>,
@@ -28,22 +26,28 @@ pub struct SureToMoveToDialog {
 }
 
 impl ModalDialog for SureToMoveToDialog {
-    fn is_open(&self) -> bool { self.show_modal }
-    fn close(&mut self) { self.close() }
-    fn render(&mut self, ui: &mut Ui) { self.render_dialog(ui); }
+    fn is_open(&self) -> bool {
+        self.show_modal
+    }
+    fn close(&mut self) {
+        self.close()
+    }
+    fn render(&mut self, ui: &mut Ui) {
+        self.render_dialog(ui);
+    }
 }
 
 impl SureToMoveToDialog {
     pub fn new() -> Self {
         Self {
-            sources: None, 
+            sources: None,
             dest: None,
             show_modal: false,
         }
     }
 
     pub fn close(&mut self) {
-        self.show_modal = false; 
+        self.show_modal = false;
     }
 
     pub fn open(&mut self, sources: Vec<Arc<Path>>, dest: Arc<Path>) {
@@ -52,12 +56,13 @@ impl SureToMoveToDialog {
         self.show_modal = true;
     }
 
-
     pub fn render_dialog(&mut self, ui: &mut Ui) {
         let mut should_close = false;
 
-        let (Some(sources), Some(dest)) = (self.sources.as_ref(), self.dest.as_ref()) else { return; };
-        
+        let (Some(sources), Some(dest)) = (self.sources.as_ref(), self.dest.as_ref()) else {
+            return;
+        };
+
         let custom_frame = Frame::NONE
             .fill(COLOR_BG_MAIN)
             .corner_radius(CornerRadius::same(10))
@@ -70,10 +75,10 @@ impl SureToMoveToDialog {
             .resizable(false)
             .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
             .open(&mut self.show_modal)
-            .show(ui, |ui|{
+            .show(ui, |ui| {
                 ui.set_min_width(250.0);
                 ui.set_min_height(100.0);
-                
+
                 ui.heading("¿Deseas mover...");
 
                 const MAX_SHOWN: usize = 5;
@@ -81,7 +86,8 @@ impl SureToMoveToDialog {
 
                 if total <= MAX_SHOWN {
                     for source in sources {
-                        let file_name = source.file_name()
+                        let file_name = source
+                            .file_name()
                             .map(|f| f.to_string_lossy().into_owned())
                             .unwrap_or_else(|| "Archivo".to_string());
 
@@ -89,7 +95,8 @@ impl SureToMoveToDialog {
                     }
                 } else {
                     for source in sources {
-                        let file_name = source.file_name()
+                        let file_name = source
+                            .file_name()
                             .map(|f| f.to_string_lossy().into_owned())
                             .unwrap_or_else(|| "Archivo".to_string());
 
@@ -102,7 +109,8 @@ impl SureToMoveToDialog {
                     );
                 }
 
-                let dest_name = dest.file_name()
+                let dest_name = dest
+                    .file_name()
                     .map(|f| f.to_string_lossy().into_owned())
                     .unwrap_or_else(|| dest.to_string_lossy().into_owned());
 
@@ -110,7 +118,7 @@ impl SureToMoveToDialog {
                 ui.label(format!("a {}", dest_name));
 
                 ui.add_space(50.0);
-                
+
                 ui.horizontal(|ui| {
                     let width = ui.available_width();
                     let button_width = 120.0;
@@ -123,14 +131,13 @@ impl SureToMoveToDialog {
 
                     ui.add_space(spacing);
                     if ui.button("Aceptar").clicked() {
-
-                        Dispatcher::current().send(
-                            FileOperation::Move { 
+                        Dispatcher::current()
+                            .send(FileOperation::Move {
                                 sources: sources.to_vec(),
                                 dest: dest.to_owned(),
-                            }
-                        ).ok();
-                        
+                            })
+                            .ok();
+
                         should_close = true;
                     }
                 });

@@ -12,16 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-
-
-
-
-use std::{path::Path, sync::Arc};
 use once_cell::sync::Lazy;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
+use std::{path::Path, sync::Arc};
 use tokio::sync::Mutex;
-use tracing::{error, debug};
-
+use tracing::{debug, error};
 
 #[cfg(target_os = "linux")]
 use crate::core::system::fileopener_module::platform::linux::linux::LinuxOpener;
@@ -29,22 +24,21 @@ use crate::core::system::fileopener_module::platform::linux::linux::LinuxOpener;
 #[cfg(target_os = "macos")]
 use crate::core::system::fileopener_module::platform::macos::{MacosOpener, MACOS_FILE_OPENER};
 
-#[cfg(target_os = "windows")]
-use crate::core::system::fileopener_module::platform::windows::{WindowsOpener, WINDOWS_FILE_OPENER};
 use crate::core::runtime::event_bus::Dispatcher;
-
-
+#[cfg(target_os = "windows")]
+use crate::core::system::fileopener_module::platform::windows::{
+    WindowsOpener, WINDOWS_FILE_OPENER,
+};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppAssociation {
     pub id: String,
-    pub name: String, 
+    pub name: String,
     pub exec: String,
     pub icon: Option<String>,
     pub is_private: bool,
-    pub is_recommended: bool
+    pub is_recommended: bool,
 }
-
 
 enum PlatformOpener {
     #[cfg(target_os = "linux")]
@@ -55,20 +49,16 @@ enum PlatformOpener {
     Windows(Arc<Mutex<WindowsOpener>>),
 }
 
-
-pub static GLOBAL_FILE_OPENER: Lazy<Arc<tokio::sync::Mutex<FileOpenerManager>>> = Lazy::new(|| {
-    Arc::new(tokio::sync::Mutex::new(FileOpenerManager::new()))
-});
-
+pub static GLOBAL_FILE_OPENER: Lazy<Arc<tokio::sync::Mutex<FileOpenerManager>>> =
+    Lazy::new(|| Arc::new(tokio::sync::Mutex::new(FileOpenerManager::new())));
 
 pub struct FileOpenerManager {
     opener: PlatformOpener,
 }
 
-
 impl FileOpenerManager {
     pub fn new() -> Self {
-        Self { 
+        Self {
             opener: {
                 #[cfg(target_os = "linux")]
                 {
@@ -89,10 +79,9 @@ impl FileOpenerManager {
                     debug!("Usando FileOpener Windows");
                     PlatformOpener::Windows(WINDOWS_FILE_OPENER.clone())
                 }
-            }
+            },
         }
     }
-
 
     pub async fn request_open_file(&mut self, path: Arc<Path>, sender: Dispatcher) {
         match &mut self.opener {
@@ -134,7 +123,6 @@ impl FileOpenerManager {
         }
     }
 
-
     pub async fn set_association(&mut self, mime: &str, app: AppAssociation) {
         match &mut self.opener {
             #[cfg(target_os = "linux")]
@@ -151,18 +139,17 @@ impl FileOpenerManager {
             #[cfg(target_os = "linux")]
             PlatformOpener::Linux(op) => {
                 op.lock().await.pending_default_app_name = Some(mime);
-            },
+            }
             #[cfg(target_os = "macos")]
             PlatformOpener::Macos(op) => {
                 op.lock().await.pending_default_app_name = Some(mime);
-            },
+            }
             #[cfg(target_os = "windows")]
             PlatformOpener::Windows(op) => {
                 op.lock().await.pending_default_app_name = Some(mime);
             }
         }
     }
-
 
     pub async fn request_launch(&mut self, app: &AppAssociation, path: Arc<Path>) {
         match &mut self.opener {

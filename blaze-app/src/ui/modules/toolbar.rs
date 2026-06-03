@@ -12,55 +12,67 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-
-
-
-
-use egui::{Color32, CornerRadius, Frame, Margin, Panel, Rect, RichText, Sense, Stroke, Ui, pos2, vec2};
+use crate::{
+    core::{
+        blaze_state::BlazeCoreState,
+        runtime::{bus_structs::UiEvent, event_bus::with_event_bus},
+    },
+    ui::{
+        blaze_ui_state::BlazeUiState,
+        icons_cache::icons,
+        themes::colors::{COLOR_BG_MAIN, COLOR_BG_PANEL},
+    },
+};
+use egui::{
+    pos2, vec2, Color32, CornerRadius, Frame, Margin, Panel, Rect, RichText, Sense, Stroke, Ui,
+};
 use std::path::PathBuf;
-use crate::{core::{blaze_state::BlazeCoreState, runtime::{bus_structs::UiEvent, event_bus::with_event_bus}}, ui::{blaze_ui_state::BlazeUiState, icons_cache::icons, themes::colors::{COLOR_BG_MAIN, COLOR_BG_PANEL}}};
 
-
-fn render_bar_button<F>(ui: &mut Ui, total_height: f32, label: &'static str, bytes: &[u8], ui_state: &mut BlazeUiState, mut callback: F)
-where F: FnMut(),
+fn render_bar_button<F>(
+    ui: &mut Ui,
+    total_height: f32,
+    label: &'static str,
+    bytes: &[u8],
+    ui_state: &mut BlazeUiState,
+    mut callback: F,
+) where
+    F: FnMut(),
 {
     let ball_size = 35.0;
     Frame::new()
-    .fill(Color32::from_rgb(80, 40, 140))
-    .corner_radius(CornerRadius::same((ball_size / 1.5) as u8))
-    .show(ui, |ui| {
-        ui.set_width(ball_size as f32);
-        ui.set_height(total_height);
+        .fill(Color32::from_rgb(80, 40, 140))
+        .corner_radius(CornerRadius::same((ball_size / 1.5) as u8))
+        .show(ui, |ui| {
+            ui.set_width(ball_size);
+            ui.set_height(total_height);
 
-        let (rect, resp) = ui.allocate_exact_size(
-            vec2(ball_size, total_height),
-            Sense::click(),
-        );
+            let (rect, resp) =
+                ui.allocate_exact_size(vec2(ball_size, total_height), Sense::click());
 
-        let icon = ui_state.icon_cache.get_or_load(ui, label, bytes, Color32::WHITE);
+            let icon = ui_state
+                .icon_cache
+                .get_or_load(ui, label, bytes, Color32::WHITE);
 
-        let icon_size = vec2(16.0, 16.0);
-        let icon_pos = rect.left_center() - vec2(-10.0, icon_size.y / 2.0);
-        let icon_rect = Rect::from_min_size(icon_pos, icon_size);
+            let icon_size = vec2(16.0, 16.0);
+            let icon_pos = rect.left_center() - vec2(-10.0, icon_size.y / 2.0);
+            let icon_rect = Rect::from_min_size(icon_pos, icon_size);
 
-        ui.painter().image(
-            icon.id(),
-            icon_rect,
-            Rect::from_min_max(pos2(0.0, 0.0),
-            pos2(1.0, 1.0)),
-            Color32::WHITE,
-        );
+            ui.painter().image(
+                icon.id(),
+                icon_rect,
+                Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
+                Color32::WHITE,
+            );
 
-        if resp.clicked() {
-            callback();
-        }
+            if resp.clicked() {
+                callback();
+            }
 
-        if resp.hovered() {
-            ui.set_cursor_icon(egui::CursorIcon::PointingHand);
-        }
-    });
+            if resp.hovered() {
+                ui.set_cursor_icon(egui::CursorIcon::PointingHand);
+            }
+        });
 }
-
 
 pub fn toolbar_component(ui: &mut Ui, state: &mut BlazeCoreState, ui_state: &mut BlazeUiState) {
     Panel::top("toolbar")
@@ -77,47 +89,73 @@ pub fn toolbar_component(ui: &mut Ui, state: &mut BlazeCoreState, ui_state: &mut
                 let cwd = state.cwd.clone();
 
                 Frame::new()
-                .corner_radius(20)
-                .inner_margin(Margin::same(10))
-                .fill(COLOR_BG_PANEL)
-                .show(ui, |ui|{
-                    ui.set_height(total_height);
-                    ui.set_width(ui.available_width());
+                    .corner_radius(20)
+                    .inner_margin(Margin::same(10))
+                    .fill(COLOR_BG_PANEL)
+                    .show(ui, |ui| {
+                        ui.set_height(total_height);
+                        ui.set_width(ui.available_width());
 
-                    render_bar_button(ui, total_height, "<", icons::ICON_ARROW_LEFT, ui_state, || state.back());
+                        render_bar_button(
+                            ui,
+                            total_height,
+                            "<",
+                            icons::ICON_ARROW_LEFT,
+                            ui_state,
+                            || state.back(),
+                        );
 
-                    render_bar_button(ui, total_height, ">", icons::ICON_ARROW_RIGHT, ui_state, || state.forward());
+                        render_bar_button(
+                            ui,
+                            total_height,
+                            ">",
+                            icons::ICON_ARROW_RIGHT,
+                            ui_state,
+                            || state.forward(),
+                        );
 
-                    render_bar_button(ui, total_height, "UP", icons::ICON_ARROW_UP, ui_state, || state.up());
+                        render_bar_button(
+                            ui,
+                            total_height,
+                            "UP",
+                            icons::ICON_ARROW_UP,
+                            ui_state,
+                            || state.up(),
+                        );
 
-                    render_bar_button(ui, total_height, "⚙️", icons::ICON_SETTINGS, ui_state, || {
-                        let tab_id = state.active_id;
-                        let dispatcher = with_event_bus(|e| e.dispatcher(tab_id));
-                        dispatcher.send(
-                            UiEvent::OpenConfigs
-                        ).ok();
-                    });
-                    
-                    
-                    Frame::new()
-                        .fill(Color32::from_rgb(80, 40, 140))
-                        .corner_radius(CornerRadius::same(20))
-                        .show(ui, |ui| {
-                            ui.set_width(ui.available_width());
-                            ui.set_height(total_height);
+                        render_bar_button(
+                            ui,
+                            total_height,
+                            "⚙️",
+                            icons::ICON_SETTINGS,
+                            ui_state,
+                            || {
+                                let tab_id = state.active_id;
+                                let dispatcher = with_event_bus(|e| e.dispatcher(tab_id));
+                                dispatcher.send(UiEvent::OpenConfigs).ok();
+                            },
+                        );
 
+                        Frame::new()
+                            .fill(Color32::from_rgb(80, 40, 140))
+                            .corner_radius(CornerRadius::same(20))
+                            .show(ui, |ui| {
+                                ui.set_width(ui.available_width());
+                                ui.set_height(total_height);
 
-                            ui.horizontal_centered(|ui| {
+                                ui.horizontal_centered(|ui| {
                                     ui.add_space(15.0);
-
 
                                     let components: Vec<_> = cwd.components().collect();
 
                                     let mut current_path = PathBuf::new();
 
                                     for (i, component) in components.iter().enumerate() {
-                                        let name = component.as_os_str().to_string_lossy().to_string();
-                                        if name.is_empty() { continue; }
+                                        let name =
+                                            component.as_os_str().to_string_lossy().to_string();
+                                        if name.is_empty() {
+                                            continue;
+                                        }
 
                                         current_path.push(component);
 
@@ -125,8 +163,12 @@ pub fn toolbar_component(ui: &mut Ui, state: &mut BlazeCoreState, ui_state: &mut
 
                                         let button = egui::Button::new(
                                             RichText::new(name)
-                                                .color(if is_last { Color32::WHITE } else { Color32::LIGHT_GRAY })
-                                                .strong()
+                                                .color(if is_last {
+                                                    Color32::WHITE
+                                                } else {
+                                                    Color32::LIGHT_GRAY
+                                                })
+                                                .strong(),
                                         )
                                         .frame(true)
                                         .fill(if is_last {
@@ -146,22 +188,20 @@ pub fn toolbar_component(ui: &mut Ui, state: &mut BlazeCoreState, ui_state: &mut
 
                                         // Separador ">"
                                         if !is_last {
-                                            ui.label(RichText::new("›").color(Color32::GRAY).size(16.0));
+                                            ui.label(
+                                                RichText::new("›").color(Color32::GRAY).size(16.0),
+                                            );
                                         }
                                     }
-                                
+                                });
 
+                                let remaining = ui.available_width();
+                                ui.add_space(remaining - 36.0);
+                                if ui.small_button("📋").clicked() {
+                                    ui.copy_text(cwd.to_string_lossy().to_string());
+                                }
                             });
-
-                            
-                            let remaining = ui.available_width();
-                            ui.add_space(remaining - 36.0);
-                            if ui.small_button("📋").clicked() {
-                                ui.copy_text(cwd.to_string_lossy().to_string());
-                            }
-
-                        });
-                });
+                    });
             });
         });
 }

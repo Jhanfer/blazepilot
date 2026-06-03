@@ -12,37 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-
-
-
-
-use std::{sync::Arc};
 use once_cell::sync::Lazy;
+use std::sync::Arc;
 
+pub static WINDOWS_FILE_OPENER: Lazy<Arc<tokio::sync::Mutex<WindowsOpener>>> =
+    Lazy::new(|| Arc::new(tokio::sync::Mutex::new(WindowsOpener::init())));
 
-
-pub static WINDOWS_FILE_OPENER: Lazy<Arc<tokio::sync::Mutex<WindowsOpener>>> = Lazy::new(|| {
-    Arc::new(tokio::sync::Mutex::new(WindowsOpener::init()))
-});
-
-
-pub struct WindowsOpener {
-}
-
+pub struct WindowsOpener {}
 
 impl WindowsOpener {
     fn init() -> Self {
-        Self {
-        }
+        Self {}
     }
 
     #[cfg(target_os = "windows")]
-    fn get_apps_for_mime_windows(&self, mime: &str) -> Vec<AppAssociation> {
-
-    }
+    fn get_apps_for_mime_windows(&self, mime: &str) -> Vec<AppAssociation> {}
 
     #[cfg(target_os = "windows")]
-    fn launch_app_windows(&self, app: &AppAssociation, path: &Path) -> std::io::Result<()> {
-    }
-    
+    fn launch_app_windows(&self, app: &AppAssociation, path: &Path) -> std::io::Result<()> {}
 }

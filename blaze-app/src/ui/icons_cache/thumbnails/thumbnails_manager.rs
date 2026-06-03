@@ -12,20 +12,29 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::{io::{BufReader, Read}, path::{Path, PathBuf}, sync::Arc, time::UNIX_EPOCH};
+use crate::core::{
+    runtime::{
+        bus_structs::UiEvent,
+        event_bus::{with_event_bus, Dispatcher},
+    },
+    system::{cache::cache_manager::CacheManager, clipboard::clipboard::TOKIO_RUNTIME},
+};
 use ffmpeg_sidecar::{download::auto_download, paths::ffmpeg_path};
+use lru::LruCache;
 use sha2::{Digest, Sha256};
+use std::num::NonZeroUsize;
+use std::{
+    io::{BufReader, Read},
+    path::{Path, PathBuf},
+    sync::Arc,
+    time::UNIX_EPOCH,
+};
 use thiserror::Error;
 use tokio::sync::{RwLock, Semaphore};
 use tracing::error;
 use uuid::Uuid;
-use crate::core::{runtime::{bus_structs::UiEvent, event_bus::{ Dispatcher, with_event_bus}}, system::{cache::cache_manager::CacheManager, clipboard::clipboard::TOKIO_RUNTIME}};
-use lru::LruCache;
-use std::num::NonZeroUsize;
-
 
 const DEFAULT_THUMB_CACHE_CAPACITY: usize = 400;
-
 
 #[derive(Debug, Error)]
 pub enum ThumbError {
@@ -54,7 +63,6 @@ pub enum ThumbError {
     ThumbsDirDoesNotExist,
 }
 
-
 pub enum ThumbnailMessages {
     RequestThumb(Arc<Path>),
 }
@@ -65,7 +73,6 @@ pub struct Thumbnail {
     pub width: u32,
     pub height: u32,
 }
-
 
 pub struct ThumbnailManager {
     pub thumb_map: Arc<RwLock<LruCache<Arc<Path>, Thumbnail>>>,
@@ -90,12 +97,11 @@ impl ThumbnailManager {
             Some(n) => n,
             None => unreachable!(),
         };
-        let cap = NonZeroUsize::new(cap)
-            .unwrap_or(def_cap);
+        let cap = NonZeroUsize::new(cap).unwrap_or(def_cap);
 
         Self {
             thumb_map: Arc::new(RwLock::new(LruCache::new(cap))),
-            semaphore: Arc::new(Semaphore::new(4)), 
+            semaphore: Arc::new(Semaphore::new(4)),
         }
     }
 
@@ -106,7 +112,8 @@ impl ThumbnailManager {
     fn path_hash(path: &Path) -> String {
         let mut hasher = Sha256::new();
         hasher.update(path.to_string_lossy().as_bytes());
-        hasher.finalize()
+        hasher
+            .finalize()
             .iter()
             .map(|b| format!("{:02x}", b))
             .collect()
@@ -123,30 +130,35 @@ impl ThumbnailManager {
             .unwrap_or(0)
     }
 
-
-
     fn is_image(path: &Path) -> bool {
         matches!(
-            path.extension().and_then(|e| e.to_str()).map(|e| e.to_lowercase()).as_deref(),
+            path.extension()
+                .and_then(|e| e.to_str())
+                .map(|e| e.to_lowercase())
+                .as_deref(),
             Some("png" | "jpg" | "jpeg" | "webp" | "gif")
         )
     }
 
     fn is_svg(path: &Path) -> bool {
-        path.extension().and_then(|e| e.to_str())
-            .map(|e| e.to_lowercase()) .as_deref() == Some("svg")
+        path.extension()
+            .and_then(|e| e.to_str())
+            .map(|e| e.to_lowercase())
+            .as_deref()
+            == Some("svg")
     }
 
     fn is_video(path: &Path) -> bool {
         matches!(
-            path.extension().and_then(|e| e.to_str()).map(|e| e.to_lowercase()).as_deref(),
+            path.extension()
+                .and_then(|e| e.to_str())
+                .map(|e| e.to_lowercase())
+                .as_deref(),
             Some("mp4" | "mkv" | "avi" | "mov" | "webm" | "flv" | "wmv")
         )
     }
 
-
-
-    fn is_cache_valid(cache_path: &PathBuf, current_mtime: u64) -> bool {
+    fn is_cache_valid(cache_path: &Path, current_mtime: u64) -> bool {
         if !cache_path.exists() {
             return false;
         }
@@ -157,13 +169,13 @@ impl ThumbnailManager {
         };
 
         let mut lines = content.lines();
-        let cached_mtime: u64 = lines.next()
+        let cached_mtime: u64 = lines
+            .next()
             .and_then(|s| s.trim().parse().ok())
-            .unwrap_or_else(|| 0);
+            .unwrap_or(0);
 
         cached_mtime == current_mtime
     }
-
 
     pub fn process_messages(&self, active_id: Uuid, sender: Dispatcher) {
         let messages: Vec<ThumbnailMessages> = with_event_bus(|pool| {
@@ -182,9 +194,7 @@ impl ThumbnailManager {
                         continue;
                     }
 
-                    if !Self::is_image(&path) && 
-                        !Self::is_svg(&path) && 
-                        !Self::is_video(&path) {
+                    if !Self::is_image(&path) && !Self::is_svg(&path) && !Self::is_video(&path) {
                         continue;
                     }
 
@@ -199,29 +209,24 @@ impl ThumbnailManager {
                     if Self::is_cache_valid(&cache_path, current_mtime) {
                         let thumb_map = thumb_map.clone();
                         TOKIO_RUNTIME.spawn(async move {
-                            let Ok(_permit) = sem
-                                .acquire_owned()
-                                .await 
-                            else {
+                            let Ok(_permit) = sem.acquire_owned().await else {
                                 return;
                             };
 
                             //lee la imagen en cache
                             if let Ok(thumb) = Self::load_from_cache(&cache_path).await {
                                 thumb_map.write().await.put(path.clone(), thumb);
-                                sender_clone.send(UiEvent::ThumbnailReady {
-                                    full_path: path,
-                                    tab_id,
-                                }).ok();
+                                sender_clone
+                                    .send(UiEvent::ThumbnailReady {
+                                        full_path: path,
+                                        tab_id,
+                                    })
+                                    .ok();
                             }
-
                         });
                     } else {
                         TOKIO_RUNTIME.spawn(async move {
-                            let Ok(_permit) = sem
-                                .acquire_owned()
-                                .await 
-                            else {
+                            let Ok(_permit) = sem.acquire_owned().await else {
                                 return;
                             };
 
@@ -236,51 +241,39 @@ impl ThumbnailManager {
 
                             if let Ok(thumb) = thumb {
                                 // Guardar en cache
-                                if let Err(e) = Self::save_to_cache(
-                                    &cache_path,
-                                    &thumb,
-                                    current_mtime,
-                                    &path
-                                ).await {
+                                if let Err(e) =
+                                    Self::save_to_cache(&cache_path, &thumb, current_mtime, &path)
+                                        .await
+                                {
                                     let err = format!("Error en el caché de miniaturas: {}", e);
                                     error!(err);
-                                    sender_clone.send(UiEvent::ShowError(
-                                        err.into()
-                                    )).ok();
+                                    sender_clone.send(UiEvent::ShowError(err.into())).ok();
                                 }
 
                                 thumb_map.write().await.put(path.clone(), thumb);
-                                sender_clone.send(UiEvent::ThumbnailReady {
-                                    full_path: path,
-                                    tab_id,
-                                }).ok();
+                                sender_clone
+                                    .send(UiEvent::ThumbnailReady {
+                                        full_path: path,
+                                        tab_id,
+                                    })
+                                    .ok();
                             }
                         });
                     }
-                },
+                }
             }
         }
     }
 
-    async fn load_from_cache(cache_path: &PathBuf) -> Result<Thumbnail, ThumbError>  {
-        let bytes = tokio::fs::read(cache_path)
-            .await
-            .map_err(ThumbError::Io)?;
+    async fn load_from_cache(cache_path: &PathBuf) -> Result<Thumbnail, ThumbError> {
+        let bytes = tokio::fs::read(cache_path).await.map_err(ThumbError::Io)?;
 
         if bytes.len() < 8 {
             return Err(ThumbError::ImageError);
         }
 
-        let w = u32::from_le_bytes(
-            bytes[0..4]
-                .try_into()
-                .map_err(|e| ThumbError::SliceError(e))?
-        );
-        let h = u32::from_le_bytes(
-            bytes[4..8]
-                .try_into()
-                .map_err(|e| ThumbError::SliceError(e))?
-        );
+        let w = u32::from_le_bytes(bytes[0..4].try_into().map_err(ThumbError::SliceError)?);
+        let h = u32::from_le_bytes(bytes[4..8].try_into().map_err(ThumbError::SliceError)?);
 
         if w == 0 || h == 0 || bytes.len() < 8 + (w as usize * h as usize * 4) {
             return Err(ThumbError::ImageError);
@@ -288,19 +281,22 @@ impl ThumbnailManager {
 
         let pixels = bytes[8..].to_vec();
 
-        Ok(
-            Thumbnail {
-                pixels: Arc::new(pixels),
-                width: w,
-                height: h,
-            }
-        )
+        Ok(Thumbnail {
+            pixels: Arc::new(pixels),
+            width: w,
+            height: h,
+        })
     }
 
-
-    async fn save_to_cache(cache_path: &Path, thumb: &Thumbnail, mtime: u64, original_path: &Path) -> Result<(), ThumbError> {
+    async fn save_to_cache(
+        cache_path: &Path,
+        thumb: &Thumbnail,
+        mtime: u64,
+        original_path: &Path,
+    ) -> Result<(), ThumbError> {
         if let Some(parent) = cache_path.parent() {
-            tokio::fs::create_dir_all(parent).await
+            tokio::fs::create_dir_all(parent)
+                .await
                 .map_err(ThumbError::Io)?;
         }
 
@@ -314,13 +310,12 @@ impl ThumbnailManager {
             buf.extend_from_slice(&w.to_le_bytes());
             buf.extend_from_slice(&h.to_le_bytes());
             buf.extend_from_slice(&pixels);
-            std::fs::write(&cache_path_clone, buf)
-                .map_err(ThumbError::Io)?;
-            
+            std::fs::write(&cache_path_clone, buf).map_err(ThumbError::Io)?;
+
             Ok(())
         })
         .await
-        .map_err(|e| ThumbError::ThreadError(e))??;
+        .map_err(ThumbError::ThreadError)??;
 
         // Guardar meta
         let meta_path = cache_path.with_extension("meta");
@@ -332,24 +327,19 @@ impl ThumbnailManager {
         Ok(())
     }
 
-
     async fn generate_image_thumb(path: &Path) -> Result<Thumbnail, ThumbError> {
         let path = path.to_path_buf();
         tokio::task::spawn_blocking(move || -> Result<Thumbnail, ThumbError> {
-
-            let mut file = std::fs::File::open(path.clone())
-                .map_err(|e| ThumbError::Io(e))?;
+            let mut file = std::fs::File::open(path.clone()).map_err(ThumbError::Io)?;
 
             let mut header = [0u8; 16];
 
-            let n = file.read(&mut header)
-                .map_err(|e| ThumbError::Io(e))?;
+            let n = file.read(&mut header).map_err(ThumbError::Io)?;
 
-            let real_format = image::guess_format(&header[..n])
-                .map_err(|_| ThumbError::UnsuportedFormat)?;
+            let real_format =
+                image::guess_format(&header[..n]).map_err(|_| ThumbError::UnsuportedFormat)?;
 
-            let file = std::fs::File::open(path.clone())
-                .map_err(|e| ThumbError::Io(e))?;
+            let file = std::fs::File::open(path.clone()).map_err(ThumbError::Io)?;
 
             let dynamic_image = image::ImageReader::with_format(BufReader::new(file), real_format)
                 .decode()
@@ -365,43 +355,38 @@ impl ThumbnailManager {
             })
         })
         .await
-        .map_err(|e| ThumbError::ThreadError(e))?
+        .map_err(ThumbError::ThreadError)?
     }
 
     async fn generate_svg_thumb(path: &Path) -> Result<Thumbnail, ThumbError> {
         let path = path.to_path_buf();
-        let out = tokio::task::spawn_blocking(
-            move || {
-                let data = std::fs::read(&path)
-                    .map_err(ThumbError::Io)?;
+        let out = tokio::task::spawn_blocking(move || {
+            let data = std::fs::read(&path).map_err(ThumbError::Io)?;
 
-                let opt = resvg::usvg::Options::default();
+            let opt = resvg::usvg::Options::default();
 
-                let tree = resvg::usvg::Tree::from_data(&data, &opt)
-                    .map_err(|_| ThumbError::ImageError)?;
+            let tree =
+                resvg::usvg::Tree::from_data(&data, &opt).map_err(|_| ThumbError::ImageError)?;
 
-                let mut pixmap = resvg::tiny_skia::Pixmap::new(64, 64)
-                    .ok_or(ThumbError::SvgError)?;
-                
-                let transform = resvg::tiny_skia::Transform::from_scale(
-                    64.0 / tree.size().width(),
-                    64.0 / tree.size().height(),
-                );
-                resvg::render(&tree, transform, &mut pixmap.as_mut());
+            let mut pixmap = resvg::tiny_skia::Pixmap::new(64, 64).ok_or(ThumbError::SvgError)?;
 
-                Ok(Thumbnail {
-                    pixels: Arc::new(pixmap.data().to_vec()),
-                    width: 64,
-                    height: 64,
-                })
-            }
-        )
+            let transform = resvg::tiny_skia::Transform::from_scale(
+                64.0 / tree.size().width(),
+                64.0 / tree.size().height(),
+            );
+            resvg::render(&tree, transform, &mut pixmap.as_mut());
+
+            Ok(Thumbnail {
+                pixels: Arc::new(pixmap.data().to_vec()),
+                width: 64,
+                height: 64,
+            })
+        })
         .await
-        .map_err(|e| ThumbError::ThreadError(e))?;
+        .map_err(ThumbError::ThreadError)?;
 
         out
     }
-
 
     async fn run_ffmpeg(args: &[&str]) -> Result<Vec<u8>, ThumbError> {
         let output = tokio::process::Command::new(ffmpeg_path())
@@ -423,30 +408,39 @@ impl ThumbnailManager {
         auto_download().map_err(|_| ThumbError::VideoError)?;
 
         let output = match Self::run_ffmpeg(&[
-                "-ss", "00:00:01",
-                "-i", &path_str,
-                "-vframes", "1",
-                "-f", "image2pipe",
-                "-vcodec", "png",
-                "-"
-            ])
-            .await
+            "-ss",
+            "00:00:01",
+            "-i",
+            &path_str,
+            "-vframes",
+            "1",
+            "-f",
+            "image2pipe",
+            "-vcodec",
+            "png",
+            "-",
+        ])
+        .await
         {
             Ok(out) => out,
             Err(_) => {
                 let fallback = Self::run_ffmpeg(&[
-                    "-i", &path_str,
-                    "-vframes", "1",
-                    "-f", "image2pipe",
-                    "-vcodec", "png",
-                    "-"
-                ]).await?;
+                    "-i",
+                    &path_str,
+                    "-vframes",
+                    "1",
+                    "-f",
+                    "image2pipe",
+                    "-vcodec",
+                    "png",
+                    "-",
+                ])
+                .await?;
                 fallback
             }
         };
 
-        let img = image::load_from_memory(&output)
-            .map_err(|_| ThumbError::VideoError)?;
+        let img = image::load_from_memory(&output).map_err(|_| ThumbError::VideoError)?;
         let resized = img.thumbnail(64, 64);
         let rgba = resized.to_rgba8();
         let (w, h) = rgba.dimensions();
@@ -458,14 +452,13 @@ impl ThumbnailManager {
         })
     }
 
-
     pub async fn cleanup_orphans() -> Result<(), ThumbError> {
         let dir = Self::thumb_cache_dir();
-        if !dir.exists() { return Err(ThumbError::ThumbsDirDoesNotExist); }
+        if !dir.exists() {
+            return Err(ThumbError::ThumbsDirDoesNotExist);
+        }
 
-        let mut entries = tokio::fs::read_dir(&dir)
-            .await
-            .map_err(ThumbError::Io)?;
+        let mut entries = tokio::fs::read_dir(&dir).await.map_err(ThumbError::Io)?;
 
         while let Ok(Some(entry)) = entries.next_entry().await {
             let meta_path = entry.path();
@@ -474,10 +467,14 @@ impl ThumbnailManager {
             }
 
             // esto lee "mtime\n/path/original"
-            let Ok(content) = tokio::fs::read_to_string(&meta_path).await else { continue };
+            let Ok(content) = tokio::fs::read_to_string(&meta_path).await else {
+                continue;
+            };
             let mut lines = content.lines();
             let Some(_) = lines.next() else { continue };
-            let Some(orig_str) = lines.next() else { continue };
+            let Some(orig_str) = lines.next() else {
+                continue;
+            };
 
             let orig_path = PathBuf::from(orig_str);
             if !orig_path.exists() {
@@ -494,10 +491,7 @@ impl ThumbnailManager {
 
         Ok(())
     }
-
 }
-
-
 
 #[test]
 fn test_path_hash_is_consistent() {
@@ -518,7 +512,6 @@ fn test_cache_path_generation() {
     assert!(cache.to_string_lossy().contains("thumbs"));
     assert!(cache.extension().unwrap() == "bin");
 }
-
 
 #[test]
 fn test_file_type_detection() {

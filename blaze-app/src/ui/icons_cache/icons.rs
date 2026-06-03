@@ -56,7 +56,8 @@ pub const ICON_USB: &[u8] = include_bytes!("../assets/icons/device-usb.svg");
 pub const ICON_EJECT: &[u8] = include_bytes!("../assets/icons/player-eject.svg");
 pub const ICON_EJECT_FILLED: &[u8] = include_bytes!("../assets/icons/player-eject-filled.svg");
 pub const ICON_OPEN_ARROW_UP: &[u8] = include_bytes!("../assets/icons/circle-open-arrow-up.svg");
-pub const ICON_OPEN_ARROW_DOWN: &[u8] = include_bytes!("../assets/icons/circle-open-arrow-down.svg");
+pub const ICON_OPEN_ARROW_DOWN: &[u8] =
+    include_bytes!("../assets/icons/circle-open-arrow-down.svg");
 pub const ICON_DEVICE_PC: &[u8] = include_bytes!("../assets/icons/devices-pc.svg");
 pub const ICON_EXTRACT: &[u8] = include_bytes!("../assets/icons/arrow-autofit-down.svg");
 pub const ICON_DATABASE: &[u8] = include_bytes!("../assets/icons/database.svg");

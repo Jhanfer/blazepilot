@@ -1,28 +1,12 @@
-use std::sync::Arc;
-use egui::{
-    CornerRadius, 
-    Frame, 
-    Margin, 
-    Rect, 
-    Stroke, 
-    Ui, 
-};
-use tracing::warn;
-use uuid::Uuid;
 use crate::{
     core::{
         blaze_state::BlazeCoreState,
-        files::{
-            blaze_motor::motor_structs::FileEntry,
-        }, 
-        runtime::{
-            event_bus::with_event_bus
-        },
+        files::blaze_motor::motor_structs::FileEntry,
+        runtime::event_bus::with_event_bus,
         system::{
             extended_info::extended_info_manager::ExtendedInfoMessages,
-            sizer_manager::sizer_manager::SizerMessages,
-            trash_manager::trash_manager::get_backend
-        }
+            sizer_manager::sizer_manager::SizerMessages, trash_manager::trash_manager::get_backend,
+        },
     },
     ui::{
         blaze_ui_state::BlazeUiState,
@@ -31,26 +15,42 @@ use crate::{
             custom_context_menu::context_state::ContextMenuKind,
             row_view::{
                 drag_drop_logic::drag_files, hot_keys::hot_keys_logic,
-                island_n_bubble::render_island_bubble,
-                new_scroll_view::new_render_scrollview,
-                render_drag::render_drag_files,
-                rubber_band_logic::render_rubberband,
-            }
+                island_n_bubble::render_island_bubble, new_scroll_view::new_render_scrollview,
+                render_drag::render_drag_files, rubber_band_logic::render_rubberband,
+            },
         },
         themes::colors::*,
-    }
+    },
 };
+use egui::{CornerRadius, Frame, Margin, Rect, Stroke, Ui};
+use std::sync::Arc;
+use tracing::warn;
+use uuid::Uuid;
 
-
-fn background_response_logic(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, files: &Vec<Arc<FileEntry>>, ui: &mut Ui, panel_top: f32, total_rows: usize, row_height: f32, content_rect: Rect) {
+fn background_response_logic(
+    state: &mut BlazeCoreState,
+    ui_state: &mut BlazeUiState,
+    files: &[Arc<FileEntry>],
+    ui: &mut Ui,
+    panel_top: f32,
+    total_rows: usize,
+    row_height: f32,
+    content_rect: Rect,
+) {
     let bg_id = ui.id().with("background_interact");
-    let bg_response = ui.interact(ui.available_rect_before_wrap(), bg_id, egui::Sense::click_and_drag());
+    let bg_response = ui.interact(
+        ui.available_rect_before_wrap(),
+        bg_id,
+        egui::Sense::click_and_drag(),
+    );
 
-    let dragged_by  = bg_response.drag_started_by(egui::PointerButton::Primary) || bg_response.drag_started_by(egui::PointerButton::Secondary);
-    
+    let dragged_by = bg_response.drag_started_by(egui::PointerButton::Primary)
+        || bg_response.drag_started_by(egui::PointerButton::Secondary);
+
     if dragged_by {
         if let Some(orgin) = ui.input(|i| i.pointer.press_origin()) {
-            state.rubber_band.rubber_band_start_content_y = orgin.y - panel_top + state.scroll_offset;
+            state.rubber_band.rubber_band_start_content_y =
+                orgin.y - panel_top + state.scroll_offset;
             state.rubber_band.rubber_band_start = Some(orgin);
         }
         state.rubber_band.is_rubber_banding = true;
@@ -92,8 +92,6 @@ fn background_response_logic(state: &mut BlazeCoreState, ui_state: &mut BlazeUiS
         state.rubber_band.rubber_band_current = None;
     }
 
-
-
     let cwd = state.cwd.clone();
     let is_in_trash = get_backend().etched_in_trash_path(&cwd);
 
@@ -117,8 +115,10 @@ fn background_response_logic(state: &mut BlazeCoreState, ui_state: &mut BlazeUiS
     let mut ctx_menu = std::mem::take(&mut ui_state.context_menu_state);
     match ctx_menu.kind {
         ContextMenuKind::BackgroundNormal => ctx_menu.background_context_menu(ui, state, ui_state),
-        ContextMenuKind::BackgroundTrash  => ctx_menu.background_context_menu_in_trash(ui, state, ui_state, files),
-        _ => {},
+        ContextMenuKind::BackgroundTrash => {
+            ctx_menu.background_context_menu_in_trash(ui, state, ui_state, files)
+        }
+        _ => {}
     }
     ui_state.context_menu_state = ctx_menu;
 
@@ -127,34 +127,33 @@ fn background_response_logic(state: &mut BlazeCoreState, ui_state: &mut BlazeUiS
     }
 }
 
-
-pub fn row_panel_frame(ui: &mut Ui, files: &Vec<Arc<FileEntry>>, state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, bottom_padding: i8, tabs_height: i8) {
+pub fn row_panel_frame(
+    ui: &mut Ui,
+    files: &Vec<Arc<FileEntry>>,
+    state: &mut BlazeCoreState,
+    ui_state: &mut BlazeUiState,
+    bottom_padding: i8,
+    tabs_height: i8,
+) {
     Frame::NONE
-        .inner_margin(
-            Margin {
-                left: 10,
-                right: 10,
-                top: 0,
-                bottom: 10,
-            }
-        )
+        .inner_margin(Margin {
+            left: 10,
+            right: 10,
+            top: 0,
+            bottom: 10,
+        })
         .fill(COLOR_BG_PANEL)
-        .corner_radius(
-            CornerRadius {
-                nw: 0,
-                ne: 0,
-                sw: 20,
-                se: 20,
-            }
-        )
-        .stroke(
-            Stroke {
-                width: 0.5,
-                color: COLOR_ACCENT_GLOW
-            }
-        )
+        .corner_radius(CornerRadius {
+            nw: 0,
+            ne: 0,
+            sw: 20,
+            se: 20,
+        })
+        .stroke(Stroke {
+            width: 0.5,
+            color: COLOR_ACCENT_GLOW,
+        })
         .show(ui, |ui| {
-
             let content_rect = ui.viewport_rect();
             let panel_top = content_rect.min.y;
             let clipped_painter = &ui.painter_at(content_rect);
@@ -162,79 +161,115 @@ pub fn row_panel_frame(ui: &mut Ui, files: &Vec<Arc<FileEntry>>, state: &mut Bla
             let row_height = 30.0;
             let total_rows = files.len();
 
-
             //Drag
             if state.row_view.is_dragging_files {
                 drag_files(ui, state, files, clipped_painter, content_rect, row_height);
             }
-            
-            //Rubberband 
-            if state.rubber_band.is_rubber_banding {
-                render_rubberband(state, files, clipped_painter, panel_top, content_rect, row_height);
-            }
 
+            //Rubberband
+            if state.rubber_band.is_rubber_banding {
+                render_rubberband(
+                    state,
+                    files,
+                    clipped_painter,
+                    panel_top,
+                    content_rect,
+                    row_height,
+                );
+            }
 
             if !ui.memory(|m| m.focused().is_some()) {
                 ui.memory_mut(|m| m.request_focus(ui.id()));
             }
 
-
             //Background
-            background_response_logic(state, ui_state, files, ui, panel_top, total_rows, row_height, content_rect);
+            background_response_logic(
+                state,
+                ui_state,
+                files,
+                ui,
+                panel_top,
+                total_rows,
+                row_height,
+                content_rect,
+            );
 
-            
             let tab_id = state.active_id;
             let dispatcher = with_event_bus(|e| e.dispatcher(tab_id));
 
             //Disparador de sizer
-            for i in state.row_view.first_visible..state.row_view.last_visible.min(files.len()) {
-                let file = &files[i];
-
-                if file.is_dir() 
-                    && !state.calculating_dir_sizes.contains(&file.full_path) 
-                    && !state.calculated_dir_sizes.contains(&file.full_path) 
+            for file in files
+                .iter()
+                .take(state.row_view.last_visible.min(files.len()))
+                .skip(state.row_view.first_visible)
+            {
+                if file.is_dir()
+                    && !state.calculating_dir_sizes.contains(&file.full_path)
+                    && !state.calculated_dir_sizes.contains(&file.full_path)
                 {
                     state.calculating_dir_sizes.insert(file.full_path.clone());
-                    if let Err(e) = dispatcher.send(SizerMessages::StartCal(file.full_path.to_owned(), Uuid::new_v4())) {
+                    if let Err(e) = dispatcher.send(SizerMessages::StartCal(
+                        file.full_path.to_owned(),
+                        Uuid::new_v4(),
+                    )) {
                         warn!("Error enviando Sizer: {}", e);
                     }
                 }
             }
-            
 
             //Disparador de Info extendida
-            for i in state.row_view.first_visible..state.row_view.last_visible.min(files.len()) {
-                let file = &files[i];
-                if !state.calculating_extended_info.contains(&file.full_path) && !state.calculated_extended_info.contains(&file.full_path) {
-                    state.calculating_extended_info.insert(file.full_path.clone());
-                    if let Err(e) = dispatcher.send(ExtendedInfoMessages::StartScan(file.full_path.to_owned())) {
+            for file in files
+                .iter()
+                .take(state.row_view.last_visible.min(files.len()))
+                .skip(state.row_view.first_visible)
+            {
+                if !state.calculating_extended_info.contains(&file.full_path)
+                    && !state.calculated_extended_info.contains(&file.full_path)
+                {
+                    state
+                        .calculating_extended_info
+                        .insert(file.full_path.clone());
+                    if let Err(e) =
+                        dispatcher.send(ExtendedInfoMessages::StartScan(file.full_path.to_owned()))
+                    {
                         warn!("Error enviando Sizer: {}", e);
                     }
                 }
             }
-            
 
             //disparador de thumbnails
-            for i in state.row_view.first_visible..state.row_view.last_visible.min(files.len()) {
-                let file = &files[i];
-
+            for file in files
+                .iter()
+                .take(state.row_view.last_visible.min(files.len()))
+                .skip(state.row_view.first_visible)
+            {
                 let img_vid = file.extension.is_image() || file.extension.is_video();
 
-                if !ui_state.calculating_thumbnails.contains(&file.full_path) && !ui_state.calculated_thumbnails.contains(&file.full_path) && img_vid {
-                    let sent = dispatcher.send(
-                        ThumbnailMessages::RequestThumb(file.full_path.clone())
-                    ).is_ok();
+                if !ui_state.calculating_thumbnails.contains(&file.full_path)
+                    && !ui_state.calculated_thumbnails.contains(&file.full_path)
+                    && img_vid
+                {
+                    let sent = dispatcher
+                        .send(ThumbnailMessages::RequestThumb(file.full_path.clone()))
+                        .is_ok();
                     if sent {
-                        ui_state.calculating_thumbnails.insert(file.full_path.clone());
+                        ui_state
+                            .calculating_thumbnails
+                            .insert(file.full_path.clone());
                     }
                 }
             }
-            
-
 
             //Scrollview
-            new_render_scrollview(ui, files, state, ui_state, row_height, total_rows, content_rect);
-
+            new_render_scrollview(
+                ui,
+                files,
+                state,
+                ui_state,
+                row_height,
+                total_rows,
+                content_rect,
+            );
 
             if state.row_view.is_dragging_files && !ui.input(|i| i.pointer.any_down()) {
                 state.row_view.is_dragging_files = false;
@@ -245,12 +280,11 @@ pub fn row_panel_frame(ui: &mut Ui, files: &Vec<Arc<FileEntry>>, state: &mut Bla
 
             //Renderizado de archivos drag
             render_drag_files(state, files, clipped_painter, content_rect, row_height);
-            
+
             //Isla y burbuja y las tabs
             render_island_bubble(ui, state, ui_state, files, bottom_padding, tabs_height);
 
             //hotkeys
             hot_keys_logic(state, ui_state, files, ui, total_rows);
-
-    });
+        });
 }

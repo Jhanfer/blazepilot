@@ -12,23 +12,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-
-
-
-use std::{os::unix::fs::PermissionsExt, path::{Path, PathBuf}, process::Command, sync::Arc};
+use crate::core::bootstrap::install_manager::{
+    installation_manager::InstallResult, platform::installation_trait::InstallationTrait,
+};
+use std::{
+    os::unix::fs::PermissionsExt,
+    path::{Path, PathBuf},
+    process::Command,
+    sync::Arc,
+};
 use tracing::{info, warn};
-use crate::core::bootstrap::install_manager::{installation_manager::InstallResult, platform::installation_trait::InstallationTrait};
-
 
 const INSTALL_PATH: &str = "/usr/local/bin/blazepilot";
 const FALLBACK_PATH: &str = ".local/bin/blazepilot";
-
 
 pub struct LinuxInstallation {
     pub installation_path: PathBuf,
     pub fallback_path: PathBuf,
 }
-
 
 impl Default for LinuxInstallation {
     fn default() -> Self {
@@ -36,13 +37,12 @@ impl Default for LinuxInstallation {
             .map(|h| PathBuf::from(h).join(FALLBACK_PATH))
             .unwrap_or_else(|| PathBuf::from(FALLBACK_PATH));
 
-        Self { 
+        Self {
             installation_path: PathBuf::from(INSTALL_PATH),
             fallback_path: fallback,
         }
     }
 }
-
 
 impl InstallationTrait for LinuxInstallation {
     fn installation_path(&self) -> &Path {
@@ -85,37 +85,36 @@ impl InstallationTrait for LinuxInstallation {
     }
 }
 
-
 impl LinuxInstallation {
     fn try_direct_copy(&self, src: &PathBuf, dst: &PathBuf) -> bool {
         match std::fs::copy(src, dst) {
-            Ok(_) => {
-                match std::fs::set_permissions(dst, std::fs::Permissions::from_mode(0o755)) {
-                    Ok(_) => {
-                        return true;
-                    },
+            Ok(_) => match std::fs::set_permissions(dst, std::fs::Permissions::from_mode(0o755)) {
+                Ok(_) => true,
 
-                    Err(e) => {
-                        warn!("Ha ocurrido un error poniendo los permisos al binario: {e}");
-                        return false;
-                    }
+                Err(e) => {
+                    warn!("Ha ocurrido un error poniendo los permisos al binario: {e}");
+                    false
                 }
             },
 
             Err(e) => {
                 warn!("Ha ocurrido un error copiando el binario: {e}");
-                return false;
+                false
             }
         }
     }
 
-    fn try_pkexec_install(&self, src: &PathBuf, dst: &PathBuf) -> bool {
+    fn try_pkexec_install(&self, src: &Path, dst: &Path) -> bool {
         let mut cmd = Command::new("pkexec");
 
         cmd.envs(std::env::vars());
 
         cmd.args([
-            "install", "-m", "755", "-o", "root",
+            "install",
+            "-m",
+            "755",
+            "-o",
+            "root",
             src.to_str().unwrap_or(""),
             dst.to_str().unwrap_or(""),
         ]);
@@ -127,10 +126,10 @@ impl LinuxInstallation {
             Ok(s) => {
                 warn!("pkexec terminó con código: {:?}", s.code());
                 false
-            },
+            }
             Err(e) => {
                 warn!("Ha ocurrido un error ejecutando pkexec: {e}");
-                return false;
+                false
             }
         }
     }
@@ -138,7 +137,7 @@ impl LinuxInstallation {
     fn try_local_install(&self, src: &PathBuf) -> Option<PathBuf> {
         if let Some(parent) = self.fallback_path.parent() {
             match std::fs::create_dir_all(parent) {
-                Ok(_) => {},
+                Ok(_) => {}
                 Err(e) => {
                     warn!("No se ha podido crear carpeta en '{:?}': {e}", parent);
                     return None;
@@ -147,19 +146,24 @@ impl LinuxInstallation {
         }
 
         if std::fs::copy(src, &self.fallback_path).is_ok() {
-            match std::fs::set_permissions(&self.fallback_path, std::fs::Permissions::from_mode(0o755)) {
-                Ok(_) => {},
+            match std::fs::set_permissions(
+                &self.fallback_path,
+                std::fs::Permissions::from_mode(0o755),
+            ) {
+                Ok(_) => {}
                 Err(e) => {
-                    warn!("No se han podido dar permisos a '{:?}': {e}", self.fallback_path);
+                    warn!(
+                        "No se han podido dar permisos a '{:?}': {e}",
+                        self.fallback_path
+                    );
                     return None;
-                },
+                }
             }
             Some(self.fallback_path.clone())
         } else {
             None
         }
     }
-
 
     fn get_data_home(&self) -> Arc<Path> {
         if let Some(path) = std::env::var_os("XDG_DATA_HOME") {
@@ -172,13 +176,12 @@ impl LinuxInstallation {
             return Path::new(&home).join(".local/share").into();
         }
 
-        return Path::new(&"/tmp").into();
+        Path::new(&"/tmp").into()
     }
-
 
     fn write_desktop_file(&self, desktop_path: Arc<Path>) -> Result<(), String> {
         std::fs::File::create_new(&desktop_path)
-            .map_err(|e|format!("No se ha podido crear '.desktop': {e}"))?;
+            .map_err(|e| format!("No se ha podido crear '.desktop': {e}"))?;
 
         let fallback_path = Path::new(&std::env::var_os("HOME").unwrap_or_default())
             .join(self.fallback_path.clone());
@@ -189,7 +192,7 @@ impl LinuxInstallation {
             fallback_path
         } else {
             std::fs::remove_file(&desktop_path)
-                .map_err(|e|format!("No se ha podido borrar el '.desktop': {e}"))?;
+                .map_err(|e| format!("No se ha podido borrar el '.desktop': {e}"))?;
             return Err("No existe instalación".to_string());
         };
 
@@ -212,7 +215,6 @@ impl LinuxInstallation {
 
         Ok(())
     }
-    
 
     pub fn generate_desktop_file(&self) -> Result<(), String> {
         let data_home = self.get_data_home();
@@ -220,7 +222,7 @@ impl LinuxInstallation {
         let blz_desktop_file = apps_dir.join("blazepilot.desktop");
 
         std::fs::create_dir_all(&apps_dir)
-            .map_err(|e|format!("No se ha podido crear directorio: {e}"))?;
+            .map_err(|e| format!("No se ha podido crear directorio: {e}"))?;
 
         if blz_desktop_file.exists() {
             info!("Hola Mundo! Existe, usar")
@@ -232,30 +234,38 @@ impl LinuxInstallation {
         Ok(())
     }
 
-
     pub fn register_mime_default(&self) {
         let data_home = self.get_data_home();
         let apps_dir = data_home.join("applications");
 
         match Command::new("update-desktop-database")
             .arg(&apps_dir)
-            .status() {
-                Ok(s) if s.success() => {info!("Actualizado database: {}",apps_dir.display())},
-                Ok(s) => {
-                    info!("Salidio con código: {s}")
-                }
-                Err(e) => {warn!("Ha ocurrido un error actualizando database: {e}")}
+            .status()
+        {
+            Ok(s) if s.success() => {
+                info!("Actualizado database: {}", apps_dir.display())
             }
-        
+            Ok(s) => {
+                info!("Salidio con código: {s}")
+            }
+            Err(e) => {
+                warn!("Ha ocurrido un error actualizando database: {e}")
+            }
+        }
+
         match Command::new("xdg-mime")
             .args(["default", "blazepilot.desktop", "inode/directory"])
-            .status() {
-                Ok(s) if s.success() => {info!("'xdg-mime default' ha sido un éxito: {s}")},
-                Ok(s) => {
-                    info!("Salidio con código: {s}")
-                }
-                Err(e) => {warn!("Ha ocurrido un error actualizando database: {e}")}
+            .status()
+        {
+            Ok(s) if s.success() => {
+                info!("'xdg-mime default' ha sido un éxito: {s}")
             }
+            Ok(s) => {
+                info!("Salidio con código: {s}")
+            }
+            Err(e) => {
+                warn!("Ha ocurrido un error actualizando database: {e}")
+            }
+        }
     }
-
 }

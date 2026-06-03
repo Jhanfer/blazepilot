@@ -1,5 +1,5 @@
-use std::path::Path;
 use crate::core::bootstrap::configs::error::ConfigResult;
+use std::path::Path;
 
 pub trait PlatformConfigTrait: Send + Sync {
     fn config_dir(&self) -> &Path;

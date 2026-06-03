@@ -1,7 +1,6 @@
+use crate::core::system::trash_manager::error::TrashError;
 use std::{path::Path, sync::Arc};
 use thiserror::Error;
-use crate::core::system::trash_manager::error::TrashError;
-
 
 #[derive(Debug, Error)]
 pub enum ClipBoardError {

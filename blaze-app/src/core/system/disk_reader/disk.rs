@@ -9,7 +9,7 @@ pub struct Disk {
     pub available: u64,
     pub total: u64,
     pub used_percent: f32,
-    
+
     pub is_removable: bool,
     pub is_partition: bool,
     pub size: u64,

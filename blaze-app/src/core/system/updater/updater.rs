@@ -12,11 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-
-
-
-use std::{error::Error, sync::{Arc, atomic::{AtomicBool, Ordering}}};
 use self_update::cargo_crate_version;
+use std::{
+    error::Error,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
+};
 use tracing::{error, info};
 use uuid::Uuid;
 
@@ -47,7 +50,7 @@ impl Updater {
         Self {
             version: cargo_crate_version!().to_string(),
             owner: "Jhanfer".to_string(),
-            repo:"blazepilot".to_string(),
+            repo: "blazepilot".to_string(),
             is_updating: Arc::new(AtomicBool::new(false)),
         }
     }
@@ -55,8 +58,8 @@ impl Updater {
     fn is_newer_version(current: &str, new: &str) -> bool {
         let parse = |v: &str| -> Vec<u32> {
             v.split(".")
-            .map(|s| s.parse::<u32>().unwrap_or(0))
-            .collect()
+                .map(|s| s.parse::<u32>().unwrap_or(0))
+                .collect()
         };
 
         let curr = parse(current);
@@ -91,33 +94,30 @@ impl Updater {
                     if let Some(new_ver) = new_ver {
                         let tab_id = sender.tab_id;
                         if Self::is_newer_version(&version, &new_ver) {
-                            sender.send(
-                                    UiEvent::UpdateMessages(
-                                        UpdateMessages::NewVersionAvailable { 
-                                        current_version: version, 
+                            sender
+                                .send(UiEvent::UpdateMessages(
+                                    UpdateMessages::NewVersionAvailable {
+                                        current_version: version,
                                         new_version: new_ver,
                                         tab_id,
-                                    }
-                                )
-                            ).ok();
+                                    },
+                                ))
+                                .ok();
                         } else {
-                            sender.send(
-                                    UiEvent::UpdateMessages(
-                                        UpdateMessages::UpToDate
-                                )
-                            ).ok();
+                            sender
+                                .send(UiEvent::UpdateMessages(UpdateMessages::UpToDate))
+                                .ok();
                         }
                     } else {
                         info!("App actualizada a la última versión.");
                     }
-                },
+                }
                 Err(e) => {
                     info!("Error al buscar actualización: {}.", e);
                 }
             }
         });
     }
-
 
     pub fn start_update_process(&mut self) {
         if self.is_updating.load(Ordering::SeqCst) {
@@ -132,20 +132,20 @@ impl Updater {
         let flag = self.is_updating.clone();
         std::thread::spawn(move || {
             let status = self_update::backends::github::Update::configure()
-                    .repo_owner(&owner)
-                    .repo_name(&repo)
-                    .bin_name("blazepilot")
-                    .show_download_progress(true)
-                    .current_version(&version)
-                    .no_confirm(true)
-                    .build()
-                    .and_then(|u| u.update());
+                .repo_owner(&owner)
+                .repo_name(&repo)
+                .bin_name("blazepilot")
+                .show_download_progress(true)
+                .current_version(&version)
+                .no_confirm(true)
+                .build()
+                .and_then(|u| u.update());
 
             match status {
                 Ok(s) if s.updated() => {
                     info!("Actualizado a {}. Reinicia el programa.", s.version());
                     std::process::exit(0)
-                },
+                }
 
                 Ok(_) => info!("Ya estás actualizado"),
 

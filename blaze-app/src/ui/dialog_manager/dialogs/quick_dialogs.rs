@@ -12,14 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-
-
-
-
+use crate::{
+    core::{
+        bootstrap::quick_access_manager::manager::with_quick_tags,
+        runtime::bus_structs::QuickTagEvent,
+    },
+    ui::{dialog_manager::dialog_manager::ModalDialog, themes::colors::COLOR_BG_MAIN},
+};
 use egui::{Color32, CornerRadius, Frame, Margin, Modal, Order, TextEdit, Ui, Window};
 use tracing::info;
-use crate::{core::{bootstrap::quick_access_manager::manager::with_quick_tags, runtime::bus_structs::QuickTagEvent}, ui::{dialog_manager::dialog_manager::ModalDialog, themes::colors::COLOR_BG_MAIN}};
-
 
 pub struct QuickAccDialog {
     event: Option<QuickTagEvent>,
@@ -30,9 +31,15 @@ pub struct QuickAccDialog {
 }
 
 impl ModalDialog for QuickAccDialog {
-    fn is_open(&self) -> bool { self.show_modal }
-    fn close(&mut self) { self.close() }
-    fn render(&mut self, ui: &mut Ui) { self.process_events(ui); }
+    fn is_open(&self) -> bool {
+        self.show_modal
+    }
+    fn close(&mut self) {
+        self.close()
+    }
+    fn render(&mut self, ui: &mut Ui) {
+        self.process_events(ui);
+    }
 }
 
 impl QuickAccDialog {
@@ -47,7 +54,7 @@ impl QuickAccDialog {
     }
 
     pub fn close(&mut self) {
-        self.show_modal = false; 
+        self.show_modal = false;
     }
 
     pub fn open(&mut self, event: QuickTagEvent) {
@@ -56,45 +63,46 @@ impl QuickAccDialog {
     }
 
     fn show_warn(&mut self, message: &str, ui: &mut Ui) {
-        Modal::new("warn_modal".into())
-            .show(ui, |ui|{
-                ui.label(message);
-                if ui.button("Cerrar").clicked() {
-                    self.show_warn = false;
-                }
+        Modal::new("warn_modal".into()).show(ui, |ui| {
+            ui.label(message);
+            if ui.button("Cerrar").clicked() {
+                self.show_warn = false;
+            }
         });
     }
 
     fn process_events(&mut self, ui: &mut Ui) {
-        let Some(event) = self.event.take() else {return;};
+        let Some(event) = self.event.take() else {
+            return;
+        };
 
         match event {
-
             QuickTagEvent::AddQuickLinkToTag { quicks } => {
                 let mut accepted = false;
-                let mut show_warn= self.show_warn;
+                let mut show_warn = self.show_warn;
                 let mut message = std::mem::take(&mut self.warn_message);
 
-                let tags = with_quick_tags(|qtm|{
-                    qtm.get_tags()
-                });
+                let tags = with_quick_tags(|qtm| qtm.get_tags());
 
                 let mut selected_index = self.selected_tag_index;
 
                 self.render_dialog(ui, "Añadir al tag", |ui, mut should_close| {
                     ui.set_min_width(250.0);
                     ui.set_min_height(100.0);
-                    
-                    ui.vertical_centered(|ui|{
+
+                    ui.vertical_centered(|ui| {
                         egui::ComboBox::from_label("Seleccionar tag")
                             .selected_text(
                                 tags.get(selected_index)
                                     .map(|t| t.title.as_ref())
-                                    .unwrap_or("Seleccionar tag")
+                                    .unwrap_or("Seleccionar tag"),
                             )
-                            .show_ui(ui, |ui|{
+                            .show_ui(ui, |ui| {
                                 for (i, tag) in tags.iter().enumerate() {
-                                    if ui.selectable_label(selected_index == i, &*tag.title).clicked() {
+                                    if ui
+                                        .selectable_label(selected_index == i, &*tag.title)
+                                        .clicked()
+                                    {
                                         selected_index = i;
                                     }
                                 }
@@ -103,9 +111,8 @@ impl QuickAccDialog {
                         ui.add_space(8.0);
                     });
 
-
                     ui.add_space(50.0);
-                    
+
                     ui.horizontal(|ui| {
                         let width = ui.available_width();
                         let button_width = 120.0;
@@ -117,11 +124,10 @@ impl QuickAccDialog {
                         }
 
                         if ui.button("Aceptar").clicked() {
-
-                            with_quick_tags(|qtm|{
+                            with_quick_tags(|qtm| {
                                 let tag = tags.get(selected_index);
                                 if let Some(tag) = tag {
-                                    let added = qtm.add_quicks_to_tag(tag.id, &quicks); 
+                                    let added = qtm.add_quicks_to_tag(tag.id, &quicks);
                                     if !added {
                                         show_warn = true;
                                         message = "Ya existe dentro del tag".into();
@@ -146,27 +152,29 @@ impl QuickAccDialog {
                 }
 
                 if accepted {
-
                 } else if self.show_modal {
                     self.event = Some(QuickTagEvent::AddQuickLinkToTag { quicks });
                 }
-            },
+            }
 
-            QuickTagEvent::CreateNewTag{ mut title, mut temp_color} => {
+            QuickTagEvent::CreateNewTag {
+                mut title,
+                mut temp_color,
+            } => {
                 let mut accepted = false;
-                let mut show_warn= self.show_warn;
+                let mut show_warn = self.show_warn;
                 let mut message = std::mem::take(&mut self.warn_message);
 
                 self.render_dialog(ui, "Crear nuevo tag", |ui, mut should_close| {
                     ui.set_min_width(250.0);
                     ui.set_min_height(100.0);
-                    
-                    ui.vertical_centered(|ui|{
+
+                    ui.vertical_centered(|ui| {
                         ui.add(
                             TextEdit::singleline(&mut title)
                                 .id("quick_tag_name".into())
                                 .hint_text("Nombre del tag:")
-                                .margin(Margin::symmetric(8, 4))
+                                .margin(Margin::symmetric(8, 4)),
                         );
                         ui.add_space(8.0);
 
@@ -176,7 +184,6 @@ impl QuickAccDialog {
                             temp_color.b() as f32 / 255.0,
                         ];
 
-
                         if ui.color_edit_button_rgb(&mut rgb).changed() {
                             temp_color = Color32::from_rgb(
                                 (rgb[0] * 255.0) as u8,
@@ -184,12 +191,10 @@ impl QuickAccDialog {
                                 (rgb[2] * 255.0) as u8,
                             );
                         }
-
                     });
 
-
                     ui.add_space(50.0);
-                    
+
                     ui.horizontal(|ui| {
                         let width = ui.available_width();
                         let button_width = 120.0;
@@ -205,9 +210,8 @@ impl QuickAccDialog {
                                 show_warn = true;
                                 message = "El título está vacío".into();
                             } else {
-                                let created = with_quick_tags(|qtm|{
-                                    qtm.create_tag(&title, temp_color)
-                                });
+                                let created =
+                                    with_quick_tags(|qtm| qtm.create_tag(&title, temp_color));
 
                                 if !created {
                                     show_warn = true;
@@ -235,20 +239,24 @@ impl QuickAccDialog {
                 } else if self.show_modal {
                     self.event = Some(QuickTagEvent::CreateNewTag { title, temp_color });
                 }
-            },
+            }
 
-            QuickTagEvent::EditCurrentTag { id, mut title, mut temp_color } => {
+            QuickTagEvent::EditCurrentTag {
+                id,
+                mut title,
+                mut temp_color,
+            } => {
                 let mut accepted = false;
-                let mut show_warn= self.show_warn;
+                let mut show_warn = self.show_warn;
                 let mut message = std::mem::take(&mut self.warn_message);
 
                 self.render_dialog(ui, "Editar Tag", |ui, mut should_close| {
-                    ui.vertical_centered(|ui|{
+                    ui.vertical_centered(|ui| {
                         ui.add(
                             TextEdit::singleline(&mut title)
                                 .id("quick_tag_name".into())
                                 .hint_text("Nombre del tag:")
-                                .margin(Margin::symmetric(8, 4))
+                                .margin(Margin::symmetric(8, 4)),
                         );
                         ui.add_space(8.0);
 
@@ -258,7 +266,6 @@ impl QuickAccDialog {
                             temp_color.b() as f32 / 255.0,
                         ];
 
-
                         if ui.color_edit_button_rgb(&mut rgb).changed() {
                             temp_color = Color32::from_rgb(
                                 (rgb[0] * 255.0) as u8,
@@ -266,7 +273,6 @@ impl QuickAccDialog {
                                 (rgb[2] * 255.0) as u8,
                             );
                         }
-
                     });
 
                     ui.add_space(50.0);
@@ -314,92 +320,112 @@ impl QuickAccDialog {
                     self.show_warn(&message, ui);
                 }
 
-
                 if !accepted && self.show_modal {
-                    self.event = Some(QuickTagEvent::EditCurrentTag { id, title, temp_color });
+                    self.event = Some(QuickTagEvent::EditCurrentTag {
+                        id,
+                        title,
+                        temp_color,
+                    });
                 }
-            },
+            }
 
-            
             QuickTagEvent::DeleteCurrentTag { id, title } => {
                 let mut accepted = false;
-                self.render_dialog(ui, &format!("¿Desea eliminar el tag: '{}'?", title), |ui, mut should_close| {
-                    ui.add_space(50.0);
+                self.render_dialog(
+                    ui,
+                    &format!("¿Desea eliminar el tag: '{}'?", title),
+                    |ui, mut should_close| {
+                        ui.add_space(50.0);
 
-                    ui.horizontal(|ui| {
-                        let width = ui.available_width();
-                        let button_width = 120.0;
-                        let spacing = (width - button_width * 2.0) / 2.0;
+                        ui.horizontal(|ui| {
+                            let width = ui.available_width();
+                            let button_width = 120.0;
+                            let spacing = (width - button_width * 2.0) / 2.0;
 
-                        ui.add_space(spacing);
-                        if ui.button("Cerrar").clicked() {
-                            should_close = true;
-                        }
+                            ui.add_space(spacing);
+                            if ui.button("Cerrar").clicked() {
+                                should_close = true;
+                            }
 
-                        if ui.button("Eliminar").clicked() {
-                            with_quick_tags(|qtm| {
-                                qtm.remove_tag(id);
-                            });
-                            should_close = true;
-                            accepted = true;
-                        }
+                            if ui.button("Eliminar").clicked() {
+                                with_quick_tags(|qtm| {
+                                    qtm.remove_tag(id);
+                                });
+                                should_close = true;
+                                accepted = true;
+                            }
+                        });
 
-                    });
-
-                    should_close
-                });
+                        should_close
+                    },
+                );
 
                 if !accepted && self.show_modal {
                     self.event = Some(QuickTagEvent::DeleteCurrentTag { id, title });
                 }
-            },
+            }
 
-            QuickTagEvent::DeleteQuickLink { tag_id, quick_title, quick_id } => {
+            QuickTagEvent::DeleteQuickLink {
+                tag_id,
+                quick_title,
+                quick_id,
+            } => {
                 let mut accepted = false;
-                self.render_dialog(ui, &format!("¿Desea eliminar el link: '{}'?", quick_title), |ui, mut should_close| {
-                    ui.add_space(50.0);
+                self.render_dialog(
+                    ui,
+                    &format!("¿Desea eliminar el link: '{}'?", quick_title),
+                    |ui, mut should_close| {
+                        ui.add_space(50.0);
 
-                    ui.horizontal(|ui| {
-                        let width = ui.available_width();
-                        let button_width = 120.0;
-                        let spacing = (width - button_width * 2.0) / 2.0;
+                        ui.horizontal(|ui| {
+                            let width = ui.available_width();
+                            let button_width = 120.0;
+                            let spacing = (width - button_width * 2.0) / 2.0;
 
-                        ui.add_space(spacing);
-                        if ui.button("Cerrar").clicked() {
-                            should_close = true;
-                        }
-                        
-                        if ui.button("Eliminar").clicked() {
-                            with_quick_tags(|qtm| {
-                                qtm.remove_quick_to_tag(tag_id, quick_id);
-                            });
-                            should_close = true;
-                            accepted = true;
-                        }
+                            ui.add_space(spacing);
+                            if ui.button("Cerrar").clicked() {
+                                should_close = true;
+                            }
 
-                    });
+                            if ui.button("Eliminar").clicked() {
+                                with_quick_tags(|qtm| {
+                                    qtm.remove_quick_to_tag(tag_id, quick_id);
+                                });
+                                should_close = true;
+                                accepted = true;
+                            }
+                        });
 
-                    should_close
-                });
+                        should_close
+                    },
+                );
 
                 if !accepted && self.show_modal {
-                    self.event = Some(QuickTagEvent::DeleteQuickLink { tag_id, quick_title, quick_id });
+                    self.event = Some(QuickTagEvent::DeleteQuickLink {
+                        tag_id,
+                        quick_title,
+                        quick_id,
+                    });
                 }
-            },
+            }
 
-
-            QuickTagEvent::EditCurrentQuickLink { tag_id, quick_id, mut title, mut temp_color } => {
+            QuickTagEvent::EditCurrentQuickLink {
+                tag_id,
+                quick_id,
+                mut title,
+                mut temp_color,
+            } => {
                 let mut accepted = false;
-                let mut show_warn= self.show_warn;
+                let mut show_warn = self.show_warn;
                 let mut message = std::mem::take(&mut self.warn_message);
 
                 self.render_dialog(ui, "Editar Quick", |ui, mut should_close| {
-                    ui.vertical_centered(|ui|{
+                    ui.vertical_centered(|ui| {
                         ui.add(
                             TextEdit::singleline(&mut title)
                                 .id("quick_tag_name".into())
                                 .hint_text("Nombre del quick:")
-                                .margin(Margin::symmetric(8, 4))
+                                .margin(Margin::symmetric(8, 4)),
                         );
                         ui.add_space(8.0);
 
@@ -409,7 +435,6 @@ impl QuickAccDialog {
                             temp_color.b() as f32 / 255.0,
                         ];
 
-
                         if ui.color_edit_button_rgb(&mut rgb).changed() {
                             temp_color = Color32::from_rgb(
                                 (rgb[0] * 255.0) as u8,
@@ -417,7 +442,6 @@ impl QuickAccDialog {
                                 (rgb[2] * 255.0) as u8,
                             );
                         }
-
                     });
 
                     ui.add_space(50.0);
@@ -465,18 +489,22 @@ impl QuickAccDialog {
                     self.show_warn(&message, ui);
                 }
 
-
                 if !accepted && self.show_modal {
-                    self.event = Some(QuickTagEvent::EditCurrentQuickLink { tag_id, quick_id,title, temp_color  });
+                    self.event = Some(QuickTagEvent::EditCurrentQuickLink {
+                        tag_id,
+                        quick_id,
+                        title,
+                        temp_color,
+                    });
                 }
-            },
+            }
         }
     }
 
-    
-
     pub fn render_dialog<F>(&mut self, ui: &mut Ui, title: &str, mut callback: F)
-    where F: FnMut(&mut Ui,bool) -> bool {
+    where
+        F: FnMut(&mut Ui, bool) -> bool,
+    {
         let mut should_close = false;
 
         let custom_frame = Frame::NONE
@@ -491,7 +519,7 @@ impl QuickAccDialog {
             .resizable(false)
             .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
             .open(&mut self.show_modal)
-            .show(ui, |ui|{
+            .show(ui, |ui| {
                 should_close = callback(ui, should_close);
             });
 

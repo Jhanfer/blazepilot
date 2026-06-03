@@ -12,26 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-
-
-use std::cell::Cell;
-use std::sync::Arc;
-use dashmap::DashMap;
-use once_cell::sync::Lazy;
-use uuid::Uuid;
-use crossbeam_channel::{Receiver, SendError, Sender};
 use crate::core::files::blaze_motor::motor_structs::{FileLoadingMessage, RecursiveMessages};
 use crate::core::system::extended_info::extended_info_manager::ExtendedInfoMessages;
 use crate::core::system::sizer_manager::sizer_manager::SizerMessages;
 use crate::ui::icons_cache::thumbnails::thumbnails_manager::ThumbnailMessages;
 use crate::ui::task_manager::task_manager::TaskMessage;
-use tracing::{info, warn};
 use crossbeam_channel::unbounded;
+use crossbeam_channel::{Receiver, SendError, Sender};
+use dashmap::DashMap;
+use once_cell::sync::Lazy;
+use std::cell::Cell;
+use std::sync::Arc;
+use tracing::{info, warn};
+use uuid::Uuid;
 
-use crate::core::runtime::bus_structs::*;
 use crate::core::runtime::bus_macros::*;
-
-
+use crate::core::runtime::bus_structs::*;
 
 //Inicializador del par de canales
 pub struct ChannelPair<M> {
@@ -45,7 +41,6 @@ impl<M> ChannelPair<M> {
         Self { sender, receiver }
     }
 }
-
 
 pub struct ChannelGroup {
     pub file: ChannelPair<FileLoadingMessage>,
@@ -76,23 +71,20 @@ impl ChannelGroup {
     }
 }
 
-
 pub struct EventBus {
     pub tabs: DashMap<Uuid, ChannelGroup>,
 }
 
-static EVENT_BUS: Lazy<EventBus> = Lazy::new(|| {
-    EventBus { tabs: DashMap::new() }
+static EVENT_BUS: Lazy<EventBus> = Lazy::new(|| EventBus {
+    tabs: DashMap::new(),
 });
 
 pub fn with_event_bus<R>(f: impl FnOnce(&EventBus) -> R) -> R {
     f(&EVENT_BUS)
 }
 
-
-
 thread_local! {
-    static ACTIVE_TAB_ID: Cell<Uuid> = Cell::new(Uuid::nil());
+    static ACTIVE_TAB_ID: Cell<Uuid> = const { Cell::new(Uuid::nil()) };
 }
 
 pub fn set_active_tab(id: Uuid) {
@@ -103,36 +95,35 @@ tokio::task_local! {
     static TASK_TAB_ID: Uuid;
 }
 
-
 #[derive(Clone)]
 pub struct Dispatcher {
     pub tab_id: Uuid,
 }
 
-
 impl Dispatcher {
     pub fn current() -> Self {
         let tab_id = TASK_TAB_ID
             .try_with(|id| *id)
-            .unwrap_or_else(|_|{
-                ACTIVE_TAB_ID.with(|c| c.get())
-            });
+            .unwrap_or_else(|_| ACTIVE_TAB_ID.with(|c| c.get()));
 
         Self { tab_id }
     }
 
-    pub fn _spawn_for_tab<F>(tab_id: Uuid, future: F) -> tokio::task::JoinHandle<F::Output> 
-        where 
-            F: std::future::Future + Send + 'static,
-            F::Output: Send + 'static,
-        {
+    pub fn _spawn_for_tab<F>(tab_id: Uuid, future: F) -> tokio::task::JoinHandle<F::Output>
+    where
+        F: std::future::Future + Send + 'static,
+        F::Output: Send + 'static,
+    {
         tokio::spawn(TASK_TAB_ID.scope(tab_id, future))
     }
 
     pub fn send<M: Routable>(&self, msg: M) -> Result<(), SendError<M>> {
         let Some(group) = EVENT_BUS.tabs.get(&self.tab_id) else {
-            warn!("Error en send: No se ha encontrado 'ChannelGroup' con esta id: {}", self.tab_id);
-            return Err(SendError(msg))
+            warn!(
+                "Error en send: No se ha encontrado 'ChannelGroup' con esta id: {}",
+                self.tab_id
+            );
+            return Err(SendError(msg));
         };
         let res = M::sender(&group).send(msg);
         if res.is_ok() {
@@ -144,7 +135,6 @@ impl Dispatcher {
         res
     }
 }
-
 
 impl EventBus {
     pub fn create_tab(&self, tab_id: Uuid) {

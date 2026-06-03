@@ -1,24 +1,20 @@
-use std::{
-    path::{
-        Path,
-        PathBuf
-    }, sync::{Arc, Mutex, atomic::{AtomicBool, Ordering}}, time::{
-        Duration, Instant, SystemTime
-    }
-};
 use egui::Color32;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
+use std::{
+    path::{Path, PathBuf},
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc, Mutex,
+    },
+    time::{Duration, Instant, SystemTime},
+};
 use tracing::warn;
 use uuid::Uuid;
 
 use crate::core::{
-    files::blaze_motor::motor_structs::FileKind, 
-    system::{
-        clipboard::clipboard::TOKIO_RUNTIME, 
-        sizer_manager::sizer_manager::SizerManager
-    }
+    files::blaze_motor::motor_structs::FileKind,
+    system::{clipboard::clipboard::TOKIO_RUNTIME, sizer_manager::sizer_manager::SizerManager},
 };
-
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CachedMeta {
@@ -26,7 +22,6 @@ pub struct CachedMeta {
     pub modified: SystemTime,
     pub refreshed_at: Instant,
 }
-
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct QuickLinks {
@@ -57,7 +52,8 @@ impl QuickLinks {
     }
 
     pub fn needs_refresh(&self, ttl: Duration) -> bool {
-        self.meta.lock()
+        self.meta
+            .lock()
             .ok()
             .and_then(|g| g.as_ref().map(|m| m.refreshed_at.elapsed() > ttl))
             .unwrap_or(true)
@@ -87,10 +83,10 @@ impl QuickLinks {
                                 });
                             }
                         }
-                    },
+                    }
                     Err(e) => {
                         warn!("No se ha podido extraer el tamaño: {e}")
-                    },
+                    }
                 }
             });
         } else {
@@ -124,8 +120,6 @@ impl QuickLinks {
     }
 }
 
-
-
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct QuickTag {
     pub id: Uuid,
@@ -136,6 +130,11 @@ pub struct QuickTag {
 
 impl QuickTag {
     pub fn new(title: impl Into<Box<str>>, color: Color32) -> Self {
-        Self { title: title.into(), color, items: Vec::new(), id: Uuid::new_v4() }
+        Self {
+            title: title.into(),
+            color,
+            items: Vec::new(),
+            id: Uuid::new_v4(),
+        }
     }
 }

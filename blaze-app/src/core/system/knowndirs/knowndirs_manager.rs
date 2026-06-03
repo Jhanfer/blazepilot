@@ -1,8 +1,8 @@
 use directories::{BaseDirs, ProjectDirs, UserDirs};
-use tracing::warn;
 use std::fs;
-use std::path::{PathBuf, Path};
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, OnceLock};
+use tracing::warn;
 
 pub struct KnownDirsManager {
     pub home: Arc<Path>,
@@ -27,10 +27,10 @@ static INSTANCE: OnceLock<KnownDirsManager> = OnceLock::new();
 impl KnownDirsManager {
     pub fn init() {
         let instance = INSTANCE.get_or_init(|| {
-
             let user = UserDirs::new();
 
-            let home = user.as_ref()
+            let home = user
+                .as_ref()
                 .map(|u| u.home_dir().to_path_buf())
                 .or_else(|| std::env::var_os("HOME").map(PathBuf::from))
                 .or_else(|| std::env::var_os("USERPROFILE").map(PathBuf::from))
@@ -42,42 +42,38 @@ impl KnownDirsManager {
                     }
                 });
 
-            let (app_config, app_cache, app_data, data_local) = match ProjectDirs::from("com", "blazepilot", "blazepilotapp") {
-                Some(proj) => (
-                    proj.config_dir().to_path_buf(),
-                    proj.cache_dir().to_path_buf(),
-                    proj.data_dir().to_path_buf(),
-                    proj.data_local_dir().to_path_buf(),
-                ),
-                None => {
-                    if cfg!(target_os = "windows") {
-                        let roaming = home.join("AppData").join("Roaming").join("blazepilot");
+            let (app_config, app_cache, app_data, data_local) =
+                match ProjectDirs::from("com", "blazepilot", "blazepilotapp") {
+                    Some(proj) => (
+                        proj.config_dir().to_path_buf(),
+                        proj.cache_dir().to_path_buf(),
+                        proj.data_dir().to_path_buf(),
+                        proj.data_local_dir().to_path_buf(),
+                    ),
+                    None => {
+                        if cfg!(target_os = "windows") {
+                            let roaming = home.join("AppData").join("Roaming").join("blazepilot");
 
-                        let local = home.join("AppData").join("Local").join("blazepilot");
-                        (
-                            roaming.clone(),
-                            local.join("cache"),
-                            roaming.clone(),
-                            local,
-                        )
-                    } else if cfg!(target_os = "macos") {
-                        let app_support = home.join("Library/Application Support/blazepilot");
-                        (
-                            app_support.clone(),
-                            home.join("Library/Caches/blazepilot"),
-                            app_support.clone(),
-                            app_support,
-                        )
-                    } else {
-                        (
-                            home.join(".config/blazepilot"),
-                            home.join(".cache/blazepilot"),
-                            home.join(".local/share/blazepilot"),
-                            home.join(".local/share/blazepilot"),
-                        )
+                            let local = home.join("AppData").join("Local").join("blazepilot");
+                            (roaming.clone(), local.join("cache"), roaming.clone(), local)
+                        } else if cfg!(target_os = "macos") {
+                            let app_support = home.join("Library/Application Support/blazepilot");
+                            (
+                                app_support.clone(),
+                                home.join("Library/Caches/blazepilot"),
+                                app_support.clone(),
+                                app_support,
+                            )
+                        } else {
+                            (
+                                home.join(".config/blazepilot"),
+                                home.join(".cache/blazepilot"),
+                                home.join(".local/share/blazepilot"),
+                                home.join(".local/share/blazepilot"),
+                            )
+                        }
                     }
-                }
-            };
+                };
 
             let (sys_config, sys_cache) = match BaseDirs::new() {
                 Some(base) => (
@@ -86,22 +82,16 @@ impl KnownDirsManager {
                 ),
                 None => {
                     if cfg!(target_os = "windows") {
-                        (
-                            PathBuf::from("C:\\ProgramData"),
-                            std::env::temp_dir(),
-                        )
+                        (PathBuf::from("C:\\ProgramData"), std::env::temp_dir())
                     } else if cfg!(target_os = "macos") {
                         (
                             PathBuf::from("/Library/Preferences"),
                             PathBuf::from("/Library/Caches"),
                         )
                     } else {
-                        (
-                            home.join(".config"),
-                            home.join(".cache"),
-                        )
+                        (home.join(".config"), home.join(".cache"))
                     }
-                },
+                }
             };
 
             let opt = |f: Option<&Path>| f.map(|p| p.into());
@@ -146,7 +136,9 @@ impl KnownDirsManager {
 
     #[inline]
     pub fn get() -> &'static KnownDirsManager {
-        INSTANCE.get().expect("KnownDirsManager::init() no fue llamado")
+        INSTANCE
+            .get()
+            .expect("KnownDirsManager::init() no fue llamado")
     }
 
     pub fn sidebar_dirs(&'static self) -> Vec<(&'static str, &'static Arc<Path>)> {
@@ -160,14 +152,14 @@ impl KnownDirsManager {
             };
         }
 
-        push_opt!("Escritorio",   self.desktop);
+        push_opt!("Escritorio", self.desktop);
         push_opt!("Descargas", self.downloads);
         push_opt!("Documentos", self.documents);
-        push_opt!("Imágenes",  self.pictures);
-        push_opt!("Vídeos",    self.videos);
-        push_opt!("Música",     self.music);
-        push_opt!("Público",    self.public);
+        push_opt!("Imágenes", self.pictures);
+        push_opt!("Vídeos", self.videos);
+        push_opt!("Música", self.music);
+        push_opt!("Público", self.public);
 
         dirs
-    } 
+    }
 }

@@ -12,15 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-
-
-
-use std::{io::{BufReader, Read}, path::{Path, PathBuf}};
-use crossbeam_channel::{Receiver, bounded};
+use crate::{
+    core::system::clipboard::clipboard::TOKIO_RUNTIME,
+    ui::image_preview::error::{ImagePreviewError, ImagePreviewResult},
+};
+use crossbeam_channel::{bounded, Receiver};
 use egui::{ColorImage, TextureHandle, TextureOptions, Ui, Vec2};
+use std::{
+    io::{BufReader, Read},
+    path::{Path, PathBuf},
+};
 use tracing::warn;
-use crate::{core::system::clipboard::clipboard::TOKIO_RUNTIME, ui::image_preview::error::{ImagePreviewError, ImagePreviewResult}};
-
 
 pub struct ImagePreviewState {
     pub image_paths: Vec<PathBuf>,
@@ -38,7 +40,8 @@ pub struct ImagePreviewState {
 
 impl ImagePreviewState {
     pub fn new(clicked_path: PathBuf, all_images: Vec<PathBuf>) -> Self {
-        let current_index = all_images.iter()
+        let current_index = all_images
+            .iter()
             .position(|p| p == &clicked_path)
             .unwrap_or(0);
 
@@ -68,7 +71,6 @@ impl ImagePreviewState {
         self.offset = Vec2::ZERO;
     }
 
-
     pub fn initial_load(&mut self, ui: &mut Ui) {
         if self.image_paths.is_empty() {
             self.loading = false;
@@ -82,13 +84,14 @@ impl ImagePreviewState {
         if self.image_paths.len() > 1 {
             self.next_rx = Self::spawn_load(self.path_at(self.next_index()), ui);
         }
-        
+
         self.loading = true;
     }
 
-
     pub fn next(&mut self, ui: &mut Ui) {
-        if self.image_paths.len() <= 1 {return;}
+        if self.image_paths.len() <= 1 {
+            return;
+        }
 
         //rotar texturas
         self.prev_texture = self.current_texture.take();
@@ -104,7 +107,9 @@ impl ImagePreviewState {
     }
 
     pub fn prev(&mut self, ui: &mut Ui) {
-        if self.image_paths.len() <= 1 {return;}
+        if self.image_paths.len() <= 1 {
+            return;
+        }
 
         //rotar texturas al revés
         self.next_texture = self.current_texture.take();
@@ -120,15 +125,36 @@ impl ImagePreviewState {
     }
 
     pub fn poll_loading(&mut self, ui: &mut Ui) {
-        Self::poll_rx(&mut self.current_rx, &mut self.current_texture, &mut self.loading, "preview_current", ui);
+        Self::poll_rx(
+            &mut self.current_rx,
+            &mut self.current_texture,
+            &mut self.loading,
+            "preview_current",
+            ui,
+        );
 
-        Self::poll_rx_silent(&mut self.prev_rx, &mut self.prev_texture, "preview_prev", ui);
+        Self::poll_rx_silent(
+            &mut self.prev_rx,
+            &mut self.prev_texture,
+            "preview_prev",
+            ui,
+        );
 
-        Self::poll_rx_silent(&mut self.next_rx, &mut self.next_texture, "preview_next", ui);
+        Self::poll_rx_silent(
+            &mut self.next_rx,
+            &mut self.next_texture,
+            "preview_next",
+            ui,
+        );
     }
 
-
-    fn poll_rx(rx: &mut Option<Receiver<Option<ColorImage>>>, texture: &mut Option<TextureHandle>, loading: &mut bool, name: &str, ui: &mut Ui) {
+    fn poll_rx(
+        rx: &mut Option<Receiver<Option<ColorImage>>>,
+        texture: &mut Option<TextureHandle>,
+        loading: &mut bool,
+        name: &str,
+        ui: &mut Ui,
+    ) {
         if let Some(r) = rx {
             if let Ok(Some(img)) = r.try_recv() {
                 *texture = Some(ui.load_texture(name, img, TextureOptions::LINEAR));
@@ -138,8 +164,12 @@ impl ImagePreviewState {
         }
     }
 
-
-    fn poll_rx_silent(rx: &mut Option<Receiver<Option<ColorImage>>>, texture: &mut Option<TextureHandle>, name: &str, ui: &mut Ui) {
+    fn poll_rx_silent(
+        rx: &mut Option<Receiver<Option<ColorImage>>>,
+        texture: &mut Option<TextureHandle>,
+        name: &str,
+        ui: &mut Ui,
+    ) {
         if let Some(r) = rx {
             if let Ok(Some(img)) = r.try_recv() {
                 *texture = Some(ui.load_texture(name, img, TextureOptions::LINEAR));
@@ -148,36 +178,30 @@ impl ImagePreviewState {
         }
     }
 
-
     fn img_handler(path: &Path) -> ImagePreviewResult<ColorImage> {
-        let mut file = std::fs::File::open(path)
-            .map_err(|e| ImagePreviewError::Io(e))?;
+        let mut file = std::fs::File::open(path).map_err(ImagePreviewError::Io)?;
 
         let mut header = [0u8; 16];
 
-        let n = file.read(&mut header)
-            .map_err(|e| ImagePreviewError::Io(e))?;
+        let n = file.read(&mut header).map_err(ImagePreviewError::Io)?;
 
-        let real_format = image::guess_format(&header[..n])
-            .map_err(|_| ImagePreviewError::UnsuportedFormat)?;
+        let real_format =
+            image::guess_format(&header[..n]).map_err(|_| ImagePreviewError::UnsuportedFormat)?;
 
-        let file = std::fs::File::open(path)
-            .map_err(|e| ImagePreviewError::Io(e))?;
+        let file = std::fs::File::open(path).map_err(ImagePreviewError::Io)?;
 
         let dynamic_image = image::ImageReader::with_format(BufReader::new(file), real_format)
             .decode()
-            .map_err(|e| ImagePreviewError::ImageError(e))?;
-    
+            .map_err(ImagePreviewError::ImageError)?;
+
         let rgba = dynamic_image.to_rgba8();
         let (w, h) = rgba.dimensions();
-        Ok(
-            ColorImage::from_rgba_unmultiplied(
-                [w as usize, h as usize],
-                &rgba.into_raw(),
-            )
-        )
+        Ok(ColorImage::from_rgba_unmultiplied(
+            [w as usize, h as usize],
+            &rgba.into_raw(),
+        ))
     }
-    
+
     fn svg_handler(path: PathBuf) -> ImagePreviewResult<ColorImage> {
         let data = std::fs::read(&path)?;
         let opt = resvg::usvg::Options::default();
@@ -185,9 +209,8 @@ impl ImagePreviewState {
         let size = tree.size();
 
         const MAX_SIZE: u32 = 1024;
-        
-        let scale = (MAX_SIZE as f32 / size.width())
-            .min(MAX_SIZE as f32 / size.height());
+
+        let scale = (MAX_SIZE as f32 / size.width()).min(MAX_SIZE as f32 / size.height());
 
         let target_width = (size.width() * scale).ceil() as u32;
         let target_height = (size.height() * scale).ceil() as u32;
@@ -196,37 +219,35 @@ impl ImagePreviewState {
             .ok_or_else(|| ImagePreviewError::DimensionError)?;
 
         let transform = resvg::tiny_skia::Transform::from_scale(scale, scale);
-        
+
         resvg::render(&tree, transform, &mut pixmap.as_mut());
 
         let image_data = pixmap.take();
 
-        Ok(
-            ColorImage::from_rgba_unmultiplied(
-                [target_width as usize, target_height as usize],
-                &image_data,
-            )
-        )
+        Ok(ColorImage::from_rgba_unmultiplied(
+            [target_width as usize, target_height as usize],
+            &image_data,
+        ))
     }
 
-    fn spawn_load(path: Option<PathBuf>, ui: &mut Ui,) -> Option<Receiver<Option<ColorImage>>> {
-        let path = path
-            .unwrap_or_default();
+    fn spawn_load(path: Option<PathBuf>, ui: &mut Ui) -> Option<Receiver<Option<ColorImage>>> {
+        let path = path.unwrap_or_default();
         let ui_clone = ui.clone();
         let (tx, rx) = bounded(1);
-        let ext = path.extension()
+        let ext = path
+            .extension()
             .and_then(|e| e.to_str())
             .map(|s| s.to_lowercase())
             .unwrap_or_default();
 
         TOKIO_RUNTIME.spawn(async move {
             let image = tokio::task::spawn_blocking(move || {
-
                 if ext.as_str() == "svg" {
                     return Self::svg_handler(path);
                 }
 
-                let is_image_ext = matches!(ext.as_str(),
+                let is_image_ext = matches!(
+                    ext.as_str(),
                     "png" | "jpg" | "jpeg" | "webp" | "gif" | "bmp" | "tiff"
                 );
 
@@ -258,7 +279,6 @@ impl ImagePreviewState {
         Some(rx)
     }
 
-
     fn path_at(&self, index: usize) -> Option<PathBuf> {
         self.image_paths.get(index).cloned()
     }
@@ -280,5 +300,4 @@ impl ImagePreviewState {
             .and_then(|n| n.to_str())
             .unwrap_or("?")
     }
-
 }

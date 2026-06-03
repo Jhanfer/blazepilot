@@ -5,7 +5,6 @@ pub use crate::core::bootstrap::quick_access_manager::platform::structs::QuickTa
 
 pub use crate::core::bootstrap::quick_access_manager::platform::quick_acc_trait::QuickAccessTrait;
 
-
 #[cfg(target_os = "linux")]
 pub mod linux;
 #[cfg(target_os = "macos")]

@@ -1,17 +1,16 @@
-use std::{num::NonZeroUsize, sync::Arc};
-use tokio::sync::RwLock;
 use lru::LruCache;
 use once_cell::sync::Lazy;
+use std::{num::NonZeroUsize, sync::Arc};
+use tokio::sync::RwLock;
 
 use crate::core::system::fileopener_module::AppAssociation;
 
 pub enum OpenStrategy {
-    LaunchDirect, // ELF ejecutable, AppImage
-    LaunchWithApp(AppAssociation),  // app conocida del assoc_manager o mimeapps
+    LaunchDirect,                      // ELF ejecutable, AppImage
+    LaunchWithApp(AppAssociation),     // app conocida del assoc_manager o mimeapps
     ShowSelector(Vec<AppAssociation>), // varias opciones
-    Fallback, // xdg-open fallback
+    Fallback,                          // xdg-open fallback
 }
-
 
 pub struct DesktopEntry {
     pub name: String,
@@ -20,7 +19,6 @@ pub struct DesktopEntry {
     pub mimes: Vec<String>,
     pub is_private: bool,
 }
-
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum OpenerFileKind {
@@ -42,9 +40,9 @@ pub enum OpenerFileKind {
 impl OpenerFileKind {
     pub fn mime(&self) -> &'static str {
         match self {
-            OpenerFileKind::AppImage(_)  => "application/x-executable",
+            OpenerFileKind::AppImage(_) => "application/x-executable",
             OpenerFileKind::ElfExecutable => "application/x-executable",
-            OpenerFileKind::ShellScript  => "application/x-shellscript",
+            OpenerFileKind::ShellScript => "application/x-shellscript",
             OpenerFileKind::PythonScript => "text/x-python",
             OpenerFileKind::RubyScript => "text/x-ruby",
             OpenerFileKind::PerlScript => "text/x-perl",
@@ -59,19 +57,24 @@ impl OpenerFileKind {
     }
 
     pub fn is_directly_executable(&self) -> bool {
-        matches!(self, OpenerFileKind::AppImage(_) | OpenerFileKind::ElfExecutable)
+        matches!(
+            self,
+            OpenerFileKind::AppImage(_) | OpenerFileKind::ElfExecutable
+        )
     }
 }
 
-
 #[derive(Debug, Clone)]
 pub enum AppsIconData {
-    Rgba { data: Vec<u8>, width: f32, height: f32 },
+    Rgba {
+        data: Vec<u8>,
+        width: f32,
+        height: f32,
+    },
     #[allow(unused)]
     Path(String),
     None,
 }
 
-pub static APPS_ICON_CACHE: Lazy<RwLock<LruCache<String, Arc<AppsIconData>>>> = Lazy::new(|| {
-    RwLock::new(LruCache::new(NonZeroUsize::new(80).unwrap()))
-});
+pub static APPS_ICON_CACHE: Lazy<RwLock<LruCache<String, Arc<AppsIconData>>>> =
+    Lazy::new(|| RwLock::new(LruCache::new(NonZeroUsize::new(80).unwrap())));

@@ -12,15 +12,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-
-
-
-
-use core::f32;
-use egui::{Area, CentralPanel, Color32, ComboBox, CornerRadius, Frame, Key, Margin, OpenUrl, Order, Panel, RichText, TextEdit, Ui, Window, pos2};
-use crate::{core::{bootstrap::configs::{config_manager::with_configs, platform::linux::conf_structs::DisplayBackend}, system::{ clipboard::clipboard::TOKIO_RUNTIME, terminal_opener::terminal_manager::GLOBAL_TERMINAL_MANAGER}}, ui::themes::colors::COLOR_BG_MAIN};
 use crate::ui::dialog_manager::dialog_manager::ModalDialog;
-
+use crate::{
+    core::{
+        bootstrap::configs::{
+            config_manager::with_configs, platform::linux::conf_structs::DisplayBackend,
+        },
+        system::{
+            clipboard::clipboard::TOKIO_RUNTIME,
+            terminal_opener::terminal_manager::GLOBAL_TERMINAL_MANAGER,
+        },
+    },
+    ui::themes::colors::COLOR_BG_MAIN,
+};
+use core::f32;
+use egui::{
+    pos2, Area, CentralPanel, Color32, ComboBox, CornerRadius, Frame, Key, Margin, OpenUrl, Order,
+    Panel, RichText, TextEdit, Ui, Window,
+};
 
 #[derive(PartialEq, Clone, Copy)]
 enum CurrentConfigTab {
@@ -44,7 +53,7 @@ impl CurrentConfigTab {
 
     pub fn matches_search(&self, query: &str) -> bool {
         if query.is_empty() {
-            return  true;
+            return true;
         }
 
         let q = query.to_lowercase();
@@ -55,24 +64,65 @@ impl CurrentConfigTab {
             CurrentConfigTab::General => false,
 
             CurrentConfigTab::Terminal => [
-                "terminal", "shell", "bash", "zsh", "cmd", "powershell",
-                "prompt", "font", "tamaño", "size", "command",
-            ].iter().any(|&k| k.contains(&q) || q.contains(k)),
+                "terminal",
+                "shell",
+                "bash",
+                "zsh",
+                "cmd",
+                "powershell",
+                "prompt",
+                "font",
+                "tamaño",
+                "size",
+                "command",
+            ]
+            .iter()
+            .any(|&k| k.contains(&q) || q.contains(k)),
 
             CurrentConfigTab::Backend => [
-                "backend", "gpu", "cpu", "render", "vulkan", "opengl",
-                "direui", "metal", "renderer", "aceleración", "protocolo de pantalla",
-            ].iter().any(|&k| k.contains(&q) || q.contains(k)),
+                "backend",
+                "gpu",
+                "cpu",
+                "render",
+                "vulkan",
+                "opengl",
+                "direui",
+                "metal",
+                "renderer",
+                "aceleración",
+                "protocolo de pantalla",
+            ]
+            .iter()
+            .any(|&k| k.contains(&q) || q.contains(k)),
 
             CurrentConfigTab::Appearance => [
-                "color", "tema", "theme", "dark", "light", "font",
-                "icono", "icon", "background", "fondo",
-            ].iter().any(|&k| k.contains(&q) || q.contains(k)),
+                "color",
+                "tema",
+                "theme",
+                "dark",
+                "light",
+                "font",
+                "icono",
+                "icon",
+                "background",
+                "fondo",
+            ]
+            .iter()
+            .any(|&k| k.contains(&q) || q.contains(k)),
 
             CurrentConfigTab::Behavior => [
-                "auto", "guardar", "save", "backup", "comportamiento",
-                "confirm", "confirmar", "undo", "deshacer",
-            ].iter().any(|&k| k.contains(&q) || q.contains(k)),
+                "auto",
+                "guardar",
+                "save",
+                "backup",
+                "comportamiento",
+                "confirm",
+                "confirmar",
+                "undo",
+                "deshacer",
+            ]
+            .iter()
+            .any(|&k| k.contains(&q) || q.contains(k)),
         };
 
         name_matches || content_matches
@@ -90,9 +140,15 @@ pub struct ConfigDialog {
 }
 
 impl ModalDialog for ConfigDialog {
-    fn is_open(&self) -> bool { self.show_modal }
-    fn close(&mut self) { self.close() }
-    fn render(&mut self, ui: &mut Ui) { self.render_dialog(ui); }
+    fn is_open(&self) -> bool {
+        self.show_modal
+    }
+    fn close(&mut self) {
+        self.close()
+    }
+    fn render(&mut self, ui: &mut Ui) {
+        self.render_dialog(ui);
+    }
 }
 
 impl ConfigDialog {
@@ -109,7 +165,7 @@ impl ConfigDialog {
     }
 
     pub fn close(&mut self) {
-        self.show_modal = false; 
+        self.show_modal = false;
     }
 
     pub fn open(&mut self) {
@@ -117,11 +173,9 @@ impl ConfigDialog {
     }
 
     fn render_config_sidebar(&mut self, ui: &mut Ui) {
-        let frame = Frame::new()
-            .inner_margin(20.0);
-        frame.show(ui, |ui|{
-
-                ui.add_space(6.0);
+        let frame = Frame::new().inner_margin(20.0);
+        frame.show(ui, |ui| {
+            ui.add_space(6.0);
 
             let search_id = egui::Id::new("config_search_bar");
 
@@ -130,7 +184,7 @@ impl ConfigDialog {
                     .id(search_id)
                     .hint_text("Buscar configs...")
                     .desired_width(f32::INFINITY)
-                    .margin(Margin::symmetric(8, 4))
+                    .margin(Margin::symmetric(8, 4)),
             );
 
             if resp.clicked() || resp.gained_focus() {
@@ -140,7 +194,7 @@ impl ConfigDialog {
             }
 
             if !self.config_search.is_empty() {
-                ui.horizontal(|ui|{
+                ui.horizontal(|ui| {
                     ui.add_space(ui.available_width() - 24.0);
                     if ui.small_button("X").clicked() {
                         self.config_search.clear();
@@ -166,9 +220,9 @@ impl ConfigDialog {
             let filtered: Vec<CurrentConfigTab> = all_tabs
                 .iter()
                 .copied()
-                .filter(|&tab|{tab.matches_search(&query)})
+                .filter(|&tab| tab.matches_search(&query))
                 .collect();
-            
+
             for tab in &filtered {
                 let is_selected = self.current_config_tab == *tab;
 
@@ -183,17 +237,13 @@ impl ConfigDialog {
                     ui.label(egui::RichText::new("No se encontraron resultados").weak());
                 });
             }
-
         });
-
-
     }
-
 
     fn render_general_settings(&self, ui: &mut Ui, _query: &str, frame: Frame) {
         ui.add_space(10.0);
-        frame.show(ui, |ui|{
-            ui.vertical(|ui|{
+        frame.show(ui, |ui| {
+            ui.vertical(|ui| {
                 ui.add_space(20.0);
 
                 ui.heading("BlazePilot");
@@ -207,36 +257,39 @@ impl ConfigDialog {
 
                 ui.label("Gracias por usar BlazePilot!");
                 ui.label("Hecho con ❤️ por Jhanfer");
-                
+
                 ui.add_space(20.0);
-                
+
                 ui.horizontal(|ui| {
                     if ui.link("GitHub").clicked() {
                         ui.open_url(OpenUrl::new_tab("https://github.com/Jhanfer/blazepilot"));
                     }
                     ui.label("•");
                     if ui.link("Reportar bug").clicked() {
-                        ui.open_url(OpenUrl::new_tab("https://github.com/Jhanfer/blazepilot/issues"));
+                        ui.open_url(OpenUrl::new_tab(
+                            "https://github.com/Jhanfer/blazepilot/issues",
+                        ));
                     }
                 });
-                
+
                 ui.add_space(20.0);
                 ui.separator();
                 ui.add_space(12.0);
-                
+
                 ui.collapsing("Información del sistema", |ui| {
                     ui.monospace(format!("OS: {}", std::env::consts::OS));
                     ui.monospace(format!("Arch: {}", std::env::consts::ARCH));
                 });
-                
-                ui.add_space(20.0);
-                ui.label(RichText::new("Las configuraciones son limitadas por ahora.").italics().weak());
 
+                ui.add_space(20.0);
+                ui.label(
+                    RichText::new("Las configuraciones son limitadas por ahora.")
+                        .italics()
+                        .weak(),
+                );
             });
         });
     }
-
-
 
     fn get_selected_terminal_text(&self) -> String {
         with_configs(|c| {
@@ -249,11 +302,8 @@ impl ConfigDialog {
     }
 
     fn is_terminal_selected(&self, term: &str) -> bool {
-        with_configs(|c| {
-            c.get_default_terminal() == term
-        })
+        with_configs(|c| c.get_default_terminal() == term)
     }
-
 
     fn render_terminal_settings(&mut self, ui: &mut Ui, _query: &str, frame: Frame) {
         ui.add_space(10.0);
@@ -279,8 +329,8 @@ impl ConfigDialog {
             }
         }
 
-        frame.show(ui, |ui|{
-            ui.vertical(|ui|{
+        frame.show(ui, |ui| {
+            ui.vertical(|ui| {
                 ui.heading("Seleccionar terminal");
                 ui.add_space(8.0);
 
@@ -296,29 +346,25 @@ impl ConfigDialog {
                     ui.label("No se encontraron terminales.");
                 }
 
-            egui::ComboBox::from_label("Terminal predeterminado")
-                .selected_text(self.get_selected_terminal_text())
-                .show_ui(ui, |ui| {
-                    for term in &self.available_terminals {
-                        let is_selected = self.is_terminal_selected(term);
+                egui::ComboBox::from_label("Terminal predeterminado")
+                    .selected_text(self.get_selected_terminal_text())
+                    .show_ui(ui, |ui| {
+                        for term in &self.available_terminals {
+                            let is_selected = self.is_terminal_selected(term);
 
-                        if ui.selectable_label(is_selected, term).clicked() {
-                            with_configs(|c| {
-                                c.set_default_terminal(term.to_string());
-                            });
+                            if ui.selectable_label(is_selected, term).clicked() {
+                                with_configs(|c| {
+                                    c.set_default_terminal(term.to_string());
+                                });
+                            }
                         }
-                    }
-                });
+                    });
 
                 ui.add_space(12.0);
                 ui.label("Aquí puede seleccionar la terminal predeterminada para abrir.");
             });
         });
     }
-
-
-
-
 
     fn render_backend_settings(&mut self, ui: &mut Ui, _query: &str, frame: Frame) {
         ui.add_space(10.0);
@@ -356,23 +402,18 @@ impl ConfigDialog {
         });
     }
 
-
-
-
-
-
     pub fn render_dialog(&mut self, ui: &mut Ui) {
         let mut config_open = self.show_modal;
 
         if !self.show_modal {
             return;
         }
-        
+
         let custom_frame = Frame::NONE
             .fill(Color32::from_rgba_unmultiplied(16, 21, 25, 0))
             .corner_radius(CornerRadius::same(10))
-            .inner_margin(Margin::same(10));                
-        
+            .inner_margin(Margin::same(10));
+
         let screen_rect = ui.viewport_rect();
         let desired_width = screen_rect.width() * 0.68;
         let desired_height = screen_rect.height() * 0.65;
@@ -394,9 +435,7 @@ impl ConfigDialog {
             .resizable(false)
             .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
             .open(&mut config_open)
-            .show(ui, |ui|{
-                
-                
+            .show(ui, |ui| {
                 ui.set_width(ui.available_width());
                 ui.set_height(ui.available_height());
 
@@ -404,57 +443,53 @@ impl ConfigDialog {
                     .show_separator_line(false)
                     .resizable(false)
                     .frame(frame)
-                    .show_inside(ui, |ui|{
-
+                    .show_inside(ui, |ui| {
                         ui.set_width(160.0);
                         ui.add_space(8.0);
 
                         self.render_config_sidebar(ui);
-                });
+                    });
 
-                let central = CentralPanel::default()
-                    .frame(frame)
-                    .show_inside(ui, |ui|{
-                        ui.set_width(ui.available_width());
-                        ui.set_height(ui.available_height());
+                let central = CentralPanel::default().frame(frame).show_inside(ui, |ui| {
+                    ui.set_width(ui.available_width());
+                    ui.set_height(ui.available_height());
 
-                        let query = self.config_search.trim().to_lowercase();
-                        let frame = Frame::new()
-                            .inner_margin(20.0);
+                    let query = self.config_search.trim().to_lowercase();
+                    let frame = Frame::new().inner_margin(20.0);
 
-                        match self.current_config_tab {
-                            CurrentConfigTab::General => self.render_general_settings(ui, &query, frame),
-                            CurrentConfigTab::Terminal => self.render_terminal_settings(ui, &query, frame),
-                            CurrentConfigTab::Backend => self.render_backend_settings(ui, &query, frame),
-                            CurrentConfigTab::Appearance => {},
-                            CurrentConfigTab::Behavior => {},
+                    match self.current_config_tab {
+                        CurrentConfigTab::General => {
+                            self.render_general_settings(ui, &query, frame)
                         }
+                        CurrentConfigTab::Terminal => {
+                            self.render_terminal_settings(ui, &query, frame)
+                        }
+                        CurrentConfigTab::Backend => {
+                            self.render_backend_settings(ui, &query, frame)
+                        }
+                        CurrentConfigTab::Appearance => {}
+                        CurrentConfigTab::Behavior => {}
+                    }
                 });
 
                 let all_rect = side.response.rect.union(central.response.rect);
 
                 Area::new("cerrar".into())
                     .order(Order::Middle)
-                    .fixed_pos(pos2(
-                        all_rect.center().x,
-                        all_rect.bottom() + 8.0,
-                    ))
-                    .show(ui, |ui|{
-
+                    .fixed_pos(pos2(all_rect.center().x, all_rect.bottom() + 8.0))
+                    .show(ui, |ui| {
                         if ui.button("cerrar").clicked() {
                             close_requested = true;
                         }
-                });
+                    });
             });
 
         self.show_modal = config_open;
-        
+
         let input = ui.input(|i| i.clone());
 
         if input.key_pressed(Key::Escape) || close_requested {
             self.close();
         }
-
-        
     }
 }

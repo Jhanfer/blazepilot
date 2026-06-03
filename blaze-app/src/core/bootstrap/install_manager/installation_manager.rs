@@ -12,15 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-
-
-
 use parking_lot::Mutex;
+use std::{
+    path::Path,
+    sync::{Arc, LazyLock},
+};
 use tracing::{debug, info, warn};
-use std::{path::Path, sync::{Arc, LazyLock}};
 
-use crate::core::bootstrap::install_manager::platform::{PlatformInstallation, installation_trait::InstallationTrait};
-
+use crate::core::bootstrap::install_manager::platform::{
+    installation_trait::InstallationTrait, PlatformInstallation,
+};
 
 pub static GLOBAL_INSTALLATION_MANAGER: LazyLock<Mutex<InstallationManager>> =
     LazyLock::new(|| Mutex::new(InstallationManager::new()));
@@ -29,7 +30,6 @@ pub fn with_installation_manager<R>(f: impl FnOnce(&InstallationManager) -> R) -
     f(&GLOBAL_INSTALLATION_MANAGER.lock())
 }
 
-
 pub enum InstallResult {
     AlreadyInstalled,
     InstalledSystem(Arc<Path>),
@@ -37,15 +37,13 @@ pub enum InstallResult {
     Failed(Box<str>),
 }
 
-
 pub struct InstallationManager {
     platform: PlatformInstallation,
 }
 
-
 impl InstallationManager {
     pub fn new() -> Self {
-        Self { 
+        Self {
             platform: PlatformInstallation::default(),
         }
     }
@@ -57,18 +55,21 @@ impl InstallationManager {
             Err(_) => return false,
         };
 
-        let system   = self.platform.installation_path();
+        let system = self.platform.installation_path();
         let fallback = self.platform.fallback_path();
 
         let runs_from_installation = (current == system || current == fallback) && current.exists();
 
-        let exists_in_system_paths = (system.exists() && system.is_file()) || (fallback.exists() && fallback.is_file());
+        let exists_in_system_paths =
+            (system.exists() && system.is_file()) || (fallback.exists() && fallback.is_file());
 
-        debug!("Está instalado? {}", runs_from_installation || exists_in_system_paths);
+        debug!(
+            "Está instalado? {}",
+            runs_from_installation || exists_in_system_paths
+        );
 
         runs_from_installation || exists_in_system_paths
     }
-
 
     #[must_use]
     pub fn install(&self) -> InstallResult {
@@ -79,8 +80,7 @@ impl InstallationManager {
         let result = self.platform.install();
 
         match &result {
-            InstallResult::InstalledSystem(path) | 
-            InstallResult::InstalledLocal(path) => {
+            InstallResult::InstalledSystem(path) | InstallResult::InstalledLocal(path) => {
                 if let Err(e) = self.platform.post_install() {
                     warn!("post_install failed: {e}");
                 } else {

@@ -3,7 +3,6 @@ use thiserror::Error;
 
 use crate::core::runtime::bus_structs::FileOperation;
 
-
 #[derive(Error, Debug)]
 pub enum ExtendedInfoError {
     #[error("I/O error: {0}")]
@@ -28,7 +27,7 @@ pub enum ExtendedInfoError {
     SendError(#[from] crossbeam_channel::SendError<FileOperation>),
 
     #[error("Error dividiendo el path: {0}")]
-    StripPrefixError(#[from] std::path::StripPrefixError)
+    StripPrefixError(#[from] std::path::StripPrefixError),
 }
 
 pub type ExtendedInfoResult<T> = Result<T, ExtendedInfoError>;

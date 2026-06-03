@@ -12,35 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-
-
-
-
+use crate::core::bootstrap::configs::{
+    error::ConfigResult,
+    platform::{
+        linux::conf_structs::{DisplayBackend, OrderingMode},
+        PlatformConfigTrait, PlatformConfigs,
+    },
+};
 use parking_lot::Mutex;
-use std::{ 
-    path::Path, 
-    sync::LazyLock,
-    time::SystemTime
-};
+use std::{path::Path, sync::LazyLock, time::SystemTime};
 use tracing::warn;
-use crate::core::bootstrap::{
-    configs::{
-        error::ConfigResult, 
-        platform::{
-            PlatformConfigTrait, 
-            PlatformConfigs, 
-            linux::conf_structs::{
-                DisplayBackend,
-                OrderingMode
-            }
-        }
-    }
-};
 
-
-pub static GLOBAL_CONFIGS: LazyLock<Mutex<ConfigManager>> = LazyLock::new(|| {
-    Mutex::new(ConfigManager::new())
-});
+pub static GLOBAL_CONFIGS: LazyLock<Mutex<ConfigManager>> =
+    LazyLock::new(|| Mutex::new(ConfigManager::new()));
 
 pub fn with_configs<R>(f: impl FnOnce(&mut ConfigManager) -> R) -> R {
     f(&mut GLOBAL_CONFIGS.lock())
@@ -68,7 +52,7 @@ impl ConfigManager {
         self.platform.config_dir()
     }
 
-//--__--__--__--__ Getters  __--__--__--__--__--__--__
+    //--__--__--__--__ Getters  __--__--__--__--__--__--__
 
     pub fn get_ordering_mode(&self) -> OrderingMode {
         self.platform.app_ordering_mode.to_owned()
@@ -94,7 +78,7 @@ impl ConfigManager {
         self.platform.last_time_asked_installation
     }
 
-//--__--__--__--__ Setters  __--__--__--__--__--__--__
+    //--__--__--__--__ Setters  __--__--__--__--__--__--__
 
     pub fn set_ordering_mode(&mut self, mode: OrderingMode) {
         self.platform.app_ordering_mode = mode;
@@ -121,8 +105,7 @@ impl ConfigManager {
         self.platform.save().ok();
     }
 
-//--__--__--__--__ Recarga y Guardado  __--__--__--__--__--__--__
-
+    //--__--__--__--__ Recarga y Guardado  __--__--__--__--__--__--__
 
     #[must_use]
     pub fn save(&self) -> ConfigResult<()> {

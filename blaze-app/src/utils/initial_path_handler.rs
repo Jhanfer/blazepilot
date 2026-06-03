@@ -1,4 +1,7 @@
-use std::{path::{PathBuf, Path}, sync::Arc};
+use std::{
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 use tracing::warn;
 
 pub fn parse_initial_path() -> Option<Arc<Path>> {
@@ -7,9 +10,8 @@ pub fn parse_initial_path() -> Option<Arc<Path>> {
     let path = if let Some(stripped) = arg.strip_prefix("file://") {
         PathBuf::from(
             urlencoding::decode(stripped)
-                .unwrap_or(std::borrow::Cow::Borrowed(stripped)
-            )
-            .as_ref()
+                .unwrap_or(std::borrow::Cow::Borrowed(stripped))
+                .as_ref(),
         )
     } else {
         PathBuf::from(&arg)

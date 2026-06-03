@@ -4,7 +4,7 @@ use thiserror::Error;
 pub enum QuickAccError {
     #[error("I/O error: {0}")]
     Io(#[from] std::io::Error),
-    
+
     #[error("No se ha encontrado la ruta de configuración")]
     ProjectDirsNotFound,
 

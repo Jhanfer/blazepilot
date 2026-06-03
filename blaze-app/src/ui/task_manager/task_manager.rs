@@ -12,19 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-
-
-use std::{collections::HashMap, sync::{Mutex, OnceLock}, time::{Duration, Instant}};
+use crate::{
+    core::files::blaze_motor::motor_structs::TaskType, core::runtime::event_bus::with_event_bus,
+};
+use std::{
+    collections::HashMap,
+    sync::{Mutex, OnceLock},
+    time::{Duration, Instant},
+};
 use uuid::Uuid;
-use crate::{core::files::blaze_motor::motor_structs::TaskType, core::runtime::event_bus::with_event_bus};
 
 #[derive(Clone, Debug)]
 pub enum TaskStatus {
     Running,
     FinishedSuccess,
-    FinishedError
+    FinishedError,
 }
-
 
 #[derive(Clone, Debug)]
 pub struct TaskProgress {
@@ -33,7 +36,7 @@ pub struct TaskProgress {
     pub progress: f32,
     pub status: TaskStatus,
     pub task_kind: TaskType,
-    pub finished_at: Option<Instant>
+    pub finished_at: Option<Instant>,
 }
 
 #[derive(Debug, Clone)]
@@ -54,17 +57,15 @@ pub enum TaskMessage {
         success: bool,
         task_type: TaskType,
         #[allow(unused)]
-        text: String
-    }
+        text: String,
+    },
 }
 
 pub struct TaskManager {
     tasks: Mutex<HashMap<u64, TaskProgress>>,
 }
 
-
 static TASK_MANAGER: OnceLock<TaskManager> = OnceLock::new();
-
 
 impl TaskManager {
     pub fn global() -> &'static Self {
@@ -76,14 +77,17 @@ impl TaskManager {
     pub fn start_task(&self, task_id: u64, text: String, task_kind: TaskType) {
         let mut tasks = self.tasks.lock().unwrap();
 
-        tasks.insert(task_id, TaskProgress { 
-            progress: 0.0, 
-            status: TaskStatus::Running, 
-            task_id: task_id, 
-            text: text.into(),
-            task_kind: task_kind,
-            finished_at: None,
-        });
+        tasks.insert(
+            task_id,
+            TaskProgress {
+                progress: 0.0,
+                status: TaskStatus::Running,
+                task_id,
+                text,
+                task_kind,
+                finished_at: None,
+            },
+        );
     }
 
     pub fn update_task(&self, task_id: u64, progress: f32, text: String, _task_kind: TaskType) {
@@ -110,30 +114,31 @@ impl TaskManager {
     pub fn get_tasks(&self) -> Vec<TaskProgress> {
         let mut tasks = self.tasks.lock().unwrap();
 
-        tasks.retain(|_, task|{
+        tasks.retain(|_, task| {
             if let Some(finished_at) = task.finished_at {
-                finished_at.elapsed() < Duration::from_secs(3) 
+                finished_at.elapsed() < Duration::from_secs(3)
             } else {
                 true
             }
         });
 
-        tasks.values()
+        tasks
+            .values()
             .map(|t| TaskProgress {
                 task_id: t.task_id,
-                text: t.text.clone().into(),
+                text: t.text.clone(),
                 progress: t.progress,
                 status: t.status.clone(),
                 task_kind: t.task_kind.clone(),
                 finished_at: t.finished_at,
-            }).collect()
+            })
+            .collect()
     }
 
     pub fn process_message(&self, active_id: Uuid) {
-
-        let tasks_messages: Vec<TaskMessage> = with_event_bus(|pool|{
+        let tasks_messages: Vec<TaskMessage> = with_event_bus(|pool| {
             let mut msgs = Vec::new();
-            pool.drain(active_id, |msg|{
+            pool.drain(active_id, |msg| {
                 msgs.push(msg);
                 true
             });
@@ -142,17 +147,30 @@ impl TaskManager {
 
         for msg in tasks_messages {
             match msg {
-                TaskMessage::Started { task_id, text, task_type } => {
+                TaskMessage::Started {
+                    task_id,
+                    text,
+                    task_type,
+                } => {
                     self.start_task(task_id, text, task_type);
-                },
-                TaskMessage::Progress { task_id, progress, text, task_type } => {
+                }
+                TaskMessage::Progress {
+                    task_id,
+                    progress,
+                    text,
+                    task_type,
+                } => {
                     self.update_task(task_id, progress, text, task_type);
-                },
-                TaskMessage::Finished { task_id, success,task_type, text:_ } => {
+                }
+                TaskMessage::Finished {
+                    task_id,
+                    success,
+                    task_type,
+                    text: _,
+                } => {
                     self.finish_task(task_id, success, task_type);
                 }
             }
         }
-
     }
 }

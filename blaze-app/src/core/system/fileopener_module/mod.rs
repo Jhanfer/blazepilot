@@ -1,5 +1,5 @@
+mod error;
 pub mod fileopener_manager;
 pub mod platform;
-mod error;
 
 pub use fileopener_manager::{AppAssociation, FileOpenerManager, GLOBAL_FILE_OPENER};

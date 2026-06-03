@@ -12,15 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-
-
-
-
-use egui::{Color32, Ui, CornerRadius, Frame, Margin, Order, Window};
-use file_id::FileId;
-use crate::{core::system::{cache::cache_manager, clipboard::clipboard::TOKIO_RUNTIME,}, ui::themes::colors::COLOR_BG_MAIN};
 use crate::ui::dialog_manager::dialog_manager::ModalDialog;
-
+use crate::{
+    core::system::{cache::cache_manager, clipboard::clipboard::TOKIO_RUNTIME},
+    ui::themes::colors::COLOR_BG_MAIN,
+};
+use egui::{Color32, CornerRadius, Frame, Margin, Order, Ui, Window};
+use file_id::FileId;
 
 pub struct FolderColorSelector {
     pub folder_id: Option<FileId>,
@@ -29,9 +27,15 @@ pub struct FolderColorSelector {
 }
 
 impl ModalDialog for FolderColorSelector {
-    fn is_open(&self) -> bool { self.show_modal }
-    fn close(&mut self) { self.close() }
-    fn render(&mut self, ui: &mut Ui) { self.render_dialog(ui); }
+    fn is_open(&self) -> bool {
+        self.show_modal
+    }
+    fn close(&mut self) {
+        self.close()
+    }
+    fn render(&mut self, ui: &mut Ui) {
+        self.render_dialog(ui);
+    }
 }
 
 impl FolderColorSelector {
@@ -44,7 +48,7 @@ impl FolderColorSelector {
     }
 
     pub fn close(&mut self) {
-        self.show_modal = false; 
+        self.show_modal = false;
     }
 
     pub fn open(&mut self, folder_id: FileId) {
@@ -56,13 +60,16 @@ impl FolderColorSelector {
         self.show_modal = true;
     }
 
-
     pub fn render_dialog(&mut self, ui: &mut Ui) {
         let mut should_close = false;
 
-        let Some(folder_id) = self.folder_id.as_ref() else { return; };
-        let Some(temp_color) = &mut self.temp_color else { return; };
-        
+        let Some(folder_id) = self.folder_id.as_ref() else {
+            return;
+        };
+        let Some(temp_color) = &mut self.temp_color else {
+            return;
+        };
+
         let custom_frame = Frame::NONE
             .fill(COLOR_BG_MAIN)
             .corner_radius(CornerRadius::same(10))
@@ -75,7 +82,7 @@ impl FolderColorSelector {
             .resizable(false)
             .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
             .open(&mut self.show_modal)
-            .show(ui, |ui|{
+            .show(ui, |ui| {
                 ui.set_min_width(250.0);
                 ui.set_min_height(100.0);
 
@@ -94,7 +101,7 @@ impl FolderColorSelector {
                 );
 
                 ui.add_space(50.0);
-                
+
                 ui.horizontal(|ui| {
                     let width = ui.available_width();
                     let button_width = 110.0;
@@ -105,7 +112,7 @@ impl FolderColorSelector {
                     if ui.button("Restaurar predeterminado").clicked() {
                         *temp_color = Color32::YELLOW;
                     }
-                    
+
                     if ui.button("Cancelar").clicked() {
                         should_close = true;
                     }
@@ -114,12 +121,10 @@ impl FolderColorSelector {
                         let cm = cache_manager::CacheManager::global();
                         let (folder_id, temp_color) = (*folder_id, *temp_color);
 
-
                         TOKIO_RUNTIME.spawn(async move {
                             cm.update_color_cache(folder_id, temp_color).await;
                             cm.save_color_cache().await;
                         });
-                        
 
                         ui.ctx().request_repaint();
                         should_close = true;

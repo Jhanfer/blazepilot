@@ -1,12 +1,10 @@
-use std::path::PathBuf;
 use directories::ProjectDirs;
 use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 
 use crate::core::bootstrap::quick_access_manager::{
-    error::{
-        QuickAccError, QuickAccResult
-    }, 
-    platform::{QuickAccessTrait, QuickTag}
+    error::{QuickAccError, QuickAccResult},
+    platform::{QuickAccessTrait, QuickTag},
 };
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -24,7 +22,7 @@ impl QuickAccessLinux {
             .ok_or(QuickAccError::ProjectDirsNotFound)?;
 
         let dir = proj.config_dir();
-        std::fs::create_dir_all(dir).map_err(|e|QuickAccError::Io(e))?;
+        std::fs::create_dir_all(dir).map_err(QuickAccError::Io)?;
 
         let path = dir.join("quick_access.json");
         if !path.exists() {
@@ -38,13 +36,12 @@ impl QuickAccessLinux {
 impl Default for QuickAccessLinux {
     fn default() -> Self {
         let path = Self::init_config_path().unwrap_or_default();
-        Self { 
+        Self {
             tags: Vec::new(),
             file_path: path,
         }
     }
 }
-
 
 impl QuickAccessTrait for QuickAccessLinux {
     fn load(&mut self) -> QuickAccResult<()> {
@@ -54,15 +51,14 @@ impl QuickAccessTrait for QuickAccessLinux {
             return self.save();
         }
 
-        let data = std::fs::read_to_string(&path)
-            .map_err(|e| QuickAccError::Io(e))?;
+        let data = std::fs::read_to_string(&path).map_err(QuickAccError::Io)?;
 
         if data.trim().is_empty() {
             return self.save();
         }
 
-        let mut loaded: QuickAccessLinux = serde_json::from_str(&data)
-            .map_err(|_| QuickAccError::Deserialize)?;
+        let mut loaded: QuickAccessLinux =
+            serde_json::from_str(&data).map_err(|_| QuickAccError::Deserialize)?;
 
         loaded.file_path = path;
         *self = loaded;
@@ -71,11 +67,9 @@ impl QuickAccessTrait for QuickAccessLinux {
     }
 
     fn save(&mut self) -> QuickAccResult<()> {
-        let data = serde_json::to_string_pretty(&self)
-            .map_err(|_| QuickAccError::Serialize)?;
+        let data = serde_json::to_string_pretty(&self).map_err(|_| QuickAccError::Serialize)?;
 
-        std::fs::write(&self.file_path.clone(), data)
-            .map_err(|e|QuickAccError::Io(e))?;
+        std::fs::write(self.file_path.clone(), data).map_err(QuickAccError::Io)?;
 
         Ok(())
     }

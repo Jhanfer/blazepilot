@@ -1,5 +1,11 @@
-use std::{env, fs, collections::HashSet, path::PathBuf};
-use crate::core::system::{fileopener_module::{error::{OpenerError, OpenerResult}, platform::linux::mimeappsfile::MimeAppsFile}, knowndirs::knowndirs_manager::KnownDirsManager};
+use crate::core::system::{
+    fileopener_module::{
+        error::{OpenerError, OpenerResult},
+        platform::linux::mimeappsfile::MimeAppsFile,
+    },
+    knowndirs::knowndirs_manager::KnownDirsManager,
+};
+use std::{collections::HashSet, env, fs, path::PathBuf};
 
 pub struct MimeApps {
     _files: Vec<PathBuf>,
@@ -47,7 +53,7 @@ impl MimeApps {
             }
         }
 
-        // XDG_DATA_HOME/applications/mimeapps.list 
+        // XDG_DATA_HOME/applications/mimeapps.list
         let data_home = env::var_os("XDG_DATA_HOME")
             .map(PathBuf::from)
             .unwrap_or_else(|| {
@@ -73,7 +79,9 @@ impl MimeApps {
         } else {
             // valor por defecto de XDG_DATA_DIRS es "/usr/local/share:/usr/share"
             for dir in &["/usr/local/share", "/usr/share"] {
-                let path = PathBuf::from(dir).join("applications").join("mimeapps.list");
+                let path = PathBuf::from(dir)
+                    .join("applications")
+                    .join("mimeapps.list");
                 if path.is_file() {
                     files.push(path);
                 }
@@ -86,14 +94,20 @@ impl MimeApps {
                 Ok(content) => {
                     let mf = MimeAppsFile::parse(&content);
                     parsed.push(mf);
-                },
+                }
                 Err(e) => {
-                    return Err(OpenerError::Io { path: path.to_path_buf().into(), source: e });
+                    return Err(OpenerError::Io {
+                        path: path.to_path_buf().into(),
+                        source: e,
+                    });
                 }
             }
         }
 
-        Ok(Self { _files: files, parsed })
+        Ok(Self {
+            _files: files,
+            parsed,
+        })
     }
 
     pub fn apps_for_mime(&self, mime: &str) -> Vec<String> {
@@ -138,7 +152,8 @@ impl MimeApps {
 
     pub fn is_removed(&self, mime: &str, desktop_id: &str) -> bool {
         self.parsed.iter().any(|mf| {
-            mf.removed.get(mime)
+            mf.removed
+                .get(mime)
                 .map(|v| v.iter().any(|d| d == desktop_id))
                 .unwrap_or(false)
         })

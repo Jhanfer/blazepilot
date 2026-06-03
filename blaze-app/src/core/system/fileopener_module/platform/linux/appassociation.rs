@@ -12,16 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-
-
-
-
+use crate::core::{
+    bootstrap::configs::config_manager::with_configs,
+    system::fileopener_module::{
+        error::{OpenerError, OpenerResult},
+        fileopener_manager::AppAssociation,
+    },
+};
+use std::{collections::HashMap, fs, path::PathBuf};
 use tracing::warn;
-use crate::core::{bootstrap::configs::config_manager::with_configs, system::fileopener_module::{error::{OpenerError, OpenerResult}, fileopener_manager::AppAssociation}};
-use std::{fs, path::PathBuf, collections::HashMap};
 
 pub type UserAssociations = HashMap<String, AppAssociation>;
-
 
 pub struct AssociationManager {
     associations: UserAssociations,
@@ -49,7 +50,6 @@ impl AssociationManager {
         }
     }
 
-
     pub fn get_associations(&self, mime: &str) -> Option<&AppAssociation> {
         self.associations.get(mime)
     }
@@ -63,17 +63,20 @@ impl AssociationManager {
 
     fn save(&self) -> OpenerResult<()> {
         if let Some(parent) = self.config_path.parent() {
-            fs::create_dir_all(parent)
-                .map_err(|e| OpenerError::Io { path: parent.into(), source: e })?;
+            fs::create_dir_all(parent).map_err(|e| OpenerError::Io {
+                path: parent.into(),
+                source: e,
+            })?;
         }
-        
-        let json = serde_json::to_string_pretty(&self.associations)
-            .map_err(|e| OpenerError::SerdeError(e))?;
 
-        fs::write(&self.config_path, json)
-            .map_err(|e| OpenerError::Io { path: self.config_path.to_owned().into(), source: e })?;
-        
+        let json =
+            serde_json::to_string_pretty(&self.associations).map_err(OpenerError::SerdeError)?;
+
+        fs::write(&self.config_path, json).map_err(|e| OpenerError::Io {
+            path: self.config_path.to_owned().into(),
+            source: e,
+        })?;
+
         Ok(())
     }
 }
-

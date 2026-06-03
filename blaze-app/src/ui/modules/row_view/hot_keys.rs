@@ -1,34 +1,33 @@
-use std::sync::Arc;
-use egui::{ Color32, Key, PointerButton, Ui};
-use tracing::warn;
 use crate::{
     core::{
-        blaze_state::{
-            BlazeCoreState,
-            NewItemType,
-            ViewMode
-        },
+        blaze_state::{BlazeCoreState, NewItemType, ViewMode},
         files::blaze_motor::motor_structs::FileEntry,
         runtime::{
             bus_structs::{QuickTagEvent, SureTo, UiEvent},
-            event_bus::with_event_bus
+            event_bus::with_event_bus,
         },
         system::{
-            cache::cache_manager::CacheManager,
-            operationstate::operation_manager::with_history,
-            trash_manager::trash_manager::get_backend
-        }
+            cache::cache_manager::CacheManager, operationstate::operation_manager::with_history,
+            trash_manager::trash_manager::get_backend,
+        },
     },
-    ui::blaze_ui_state::BlazeUiState
+    ui::blaze_ui_state::BlazeUiState,
 };
-
+use egui::{Color32, Key, PointerButton, Ui};
+use std::sync::Arc;
+use tracing::warn;
 
 fn get_focus(ui: &mut Ui, id: &'static str) -> bool {
     ui.memory(|m| m.has_focus(id.into()))
 }
 
-
-pub fn hot_keys_logic(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, files: &Vec<Arc<FileEntry>>, ui: &mut Ui, _total_rows: usize) {
+pub fn hot_keys_logic(
+    state: &mut BlazeCoreState,
+    ui_state: &mut BlazeUiState,
+    files: &[Arc<FileEntry>],
+    ui: &mut Ui,
+    _total_rows: usize,
+) {
     let input = ui.input(|i| i.clone());
     let disable_keys = state.renaming_file.is_none() && state.creating_new.is_none();
 
@@ -51,9 +50,12 @@ pub fn hot_keys_logic(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, f
                 i - 1
             }
         } else {
-            state.row_view.last_visible.min(files.len().saturating_sub(1))
+            state
+                .row_view
+                .last_visible
+                .min(files.len().saturating_sub(1))
         };
-        
+
         state.deselect_all();
         state.resize_selection(files.len());
 
@@ -69,18 +71,20 @@ pub fn hot_keys_logic(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, f
         }
     }
 
-
     //tecla de abajo
     if input.key_pressed(Key::ArrowDown) && disable_keys {
         let next = if let Some(i) = state.last_selected_index {
-            ( i + 1).min(files.len().saturating_sub(1))
+            (i + 1).min(files.len().saturating_sub(1))
         } else {
-            state.row_view.first_visible.min(files.len().saturating_sub(1))
+            state
+                .row_view
+                .first_visible
+                .min(files.len().saturating_sub(1))
         };
 
         state.deselect_all();
         state.resize_selection(files.len());
-        
+
         if files.is_empty() {
             state.last_selected_index = None;
             state.selection_anchor = None;
@@ -93,8 +97,6 @@ pub fn hot_keys_logic(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, f
         }
     }
 
-
-
     //tecla enter
     if ui.input(|i| i.key_pressed(Key::Enter)) && disable_keys {
         if let Some(idx) = state.last_selected_index {
@@ -103,7 +105,7 @@ pub fn hot_keys_logic(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, f
                 if file.is_dir() {
                     state.navigate_to(file.full_path.to_owned());
                 } else {
-                    state.open_file(&file);
+                    state.open_file(file);
                 }
             } else {
                 state.last_selected_index = None;
@@ -116,10 +118,10 @@ pub fn hot_keys_logic(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, f
         state.toggle_select_all(files.len());
     }
 
-
     //Recargar
-    if (input.key_pressed(Key::F5) || 
-    (input.modifiers.command && input.key_pressed(Key::R))) && disable_keys {
+    if (input.key_pressed(Key::F5) || (input.modifiers.command && input.key_pressed(Key::R)))
+        && disable_keys
+    {
         {
             let motor = state.motor.borrow();
             let tab = motor.active_tab();
@@ -136,7 +138,6 @@ pub fn hot_keys_logic(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, f
         state.refresh();
     }
 
-
     //Botones del ratón
     if input.pointer.button_pressed(PointerButton::Extra1) && disable_keys {
         state.back();
@@ -146,8 +147,7 @@ pub fn hot_keys_logic(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, f
         state.forward();
     }
 
-
-    //eliminar 
+    //eliminar
     if input.key_pressed(Key::Delete) && disable_keys {
         let sources = state.get_selected_paths(files);
         let cwd = state.cwd.clone();
@@ -157,16 +157,13 @@ pub fn hot_keys_logic(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, f
             let tab_id = state.active_id;
             let dispatcher = with_event_bus(|e| e.dispatcher(tab_id));
             let tab_id = state.motor.borrow_mut().active_tab().id;
-            dispatcher.send(
-                UiEvent::SureTo(
-                    SureTo::SureToDelete { 
-                        files: sources, 
-                        tab_id 
-                    }
-                )
-            ).ok();
-            
-        } else if !sources.is_empty(){
+            dispatcher
+                .send(UiEvent::SureTo(SureTo::SureToDelete {
+                    files: sources,
+                    tab_id,
+                }))
+                .ok();
+        } else if !sources.is_empty() {
             let items = files
                 .iter()
                 .enumerate()
@@ -177,7 +174,6 @@ pub fn hot_keys_logic(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, f
         }
     }
 
-
     let (mut do_copy, mut do_cut, mut do_paste) = (false, false, false);
     for event in &input.events {
         match event {
@@ -187,7 +183,7 @@ pub fn hot_keys_logic(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, f
             _ => {}
         }
     }
-    
+
     //Undo
     if input.modifiers.ctrl && input.key_pressed(egui::Key::Z) {
         with_history(|h| h.undo_last(&dispatcher));
@@ -208,11 +204,11 @@ pub fn hot_keys_logic(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, f
         let cwd = state.cwd.clone();
         state.paste(cwd);
     }
-    
+
     //creación de nueva carpeta
     if input.modifiers.command && input.modifiers.shift && input.key_pressed(Key::N) {
         state.creating_new = Some(NewItemType::Folder);
-        state.new_item_buffer = "nueva carpeta".to_string(); 
+        state.new_item_buffer = "nueva carpeta".to_string();
     }
 
     //creación de nuevo archivo
@@ -221,22 +217,20 @@ pub fn hot_keys_logic(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, f
         state.new_item_buffer = "nuevo archivo".to_string();
     }
 
-
     if input.modifiers.alt && input.key_pressed(Key::T) {
         state.open_terminal_here();
     }
 
     //búsqueda recursiva
-    if input.modifiers.alt && input.key_pressed(Key::R) {
-        if state.search_filter.is_empty() || !ui.memory(|m| m.has_focus("search_bar".into())) {
-            state.set_search("rec:".to_owned());
-            
-            ui.ctx().memory_mut(|mem| {
-                mem.request_focus("search_bar".into());
-            });
-        }
-    }
+    if input.modifiers.alt && input.key_pressed(Key::R) && state.search_filter.is_empty()
+        || !ui.memory(|m| m.has_focus("search_bar".into()))
+    {
+        state.set_search("rec:".to_owned());
 
+        ui.ctx().memory_mut(|mem| {
+            mem.request_focus("search_bar".into());
+        });
+    }
 
     //Tags
     if input.modifiers.ctrl && input.key_pressed(Key::T) && !input.modifiers.shift {
@@ -247,18 +241,22 @@ pub fn hot_keys_logic(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, f
     }
 
     if input.modifiers.ctrl && input.modifiers.shift && input.key_pressed(Key::T) {
-        dispatcher.send(
-            UiEvent::QuickTagEvent(
-                QuickTagEvent::CreateNewTag { title: String::new(), temp_color: Color32::GRAY }
-            )
-        ).ok();
+        dispatcher
+            .send(UiEvent::QuickTagEvent(QuickTagEvent::CreateNewTag {
+                title: String::new(),
+                temp_color: Color32::GRAY,
+            }))
+            .ok();
     }
-
 
     // ---- Pestañas ----
 
     // nueva pestaña
-    if input.modifiers.command && !input.modifiers.shift && input.key_pressed(Key::N) && disable_keys {
+    if input.modifiers.command
+        && !input.modifiers.shift
+        && input.key_pressed(Key::N)
+        && disable_keys
+    {
         state.create_tab();
     }
 
@@ -271,61 +269,111 @@ pub fn hot_keys_logic(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, f
 
     // cambiar de pestaña y encender búsqueda
 
-    let text_edit_focused = get_focus(ui, "search_bar") || get_focus(ui, "search_ctx_menu") || get_focus(ui, "creating_new") || get_focus(ui, "rename_space") || get_focus(ui, "quick_tag_name");
+    let text_edit_focused = get_focus(ui, "search_bar")
+        || get_focus(ui, "search_ctx_menu")
+        || get_focus(ui, "creating_new")
+        || get_focus(ui, "rename_space")
+        || get_focus(ui, "quick_tag_name");
 
     if !text_edit_focused {
         for event in &input.events {
-            match event {
-                egui::Event::Key { key, pressed, modifiers , ..} => {
-                    if !pressed {
-                        return;
-                    }
+            if let egui::Event::Key {
+                key,
+                pressed,
+                modifiers,
+                ..
+            } = event
+            {
+                if !pressed {
+                    return;
+                }
 
-                    match key {
-                        Key::Tab => {
-                            if modifiers.shift {
-                                state.prev_tab();
-                                state.refresh();
-                            } else {
-                                state.next_tab();
-                                state.refresh();
-                            }
+                match key {
+                    Key::Tab => {
+                        if modifiers.shift {
+                            state.prev_tab();
+                            state.refresh();
+                        } else {
+                            state.next_tab();
+                            state.refresh();
                         }
-                        Key::Num1 if modifiers.ctrl => {state.switch_to_tab(0); state.refresh();},
-                        Key::Num2 if modifiers.ctrl => {state.switch_to_tab(1); state.refresh();},
-                        Key::Num3 if modifiers.ctrl => {state.switch_to_tab(2); state.refresh();},
-                        Key::Num4 if modifiers.ctrl => {state.switch_to_tab(3); state.refresh();},
-                        Key::Num5 if modifiers.ctrl => {state.switch_to_tab(4); state.refresh();},
-
-                        Key::ArrowLeft if modifiers.ctrl => {state.prev_tab();},
-                        Key::ArrowRight if modifiers.ctrl => {state.next_tab();},
-
-                        Key::A | Key::B | Key::C | Key::D | Key::E | Key::F | Key::G | Key::H | Key::I |
-                        Key::J | Key::K | Key::L | Key::M | Key::N | Key::O | Key::P | Key::Q | Key::R |
-                        Key::S | Key::T | Key::U | Key::V | Key::W | Key::X | Key::Y | Key::Z 
-                        if !modifiers.ctrl && !modifiers.shift && !modifiers.alt => {
-
-                            let config_search_has_focus = ui.memory(|m| m.has_focus(egui::Id::new("config_search_bar")));
-
-                            let context_menu_open = ui_state.context_menu_state.open;
-
-                            if !config_search_has_focus
-                            && !context_menu_open
-                            && (state.search_filter.is_empty() || !ui.memory(|m| m.has_focus("search_bar".into())))
-                            {
-                                state.set_search(key.name().to_lowercase());
-                                
-                                ui.memory_mut(|mem| {
-                                    mem.request_focus("search_bar".into());
-                                });
-                            }
-                        },
-                        _ => {}
                     }
-                },
-                _ => {},
+                    Key::Num1 if modifiers.ctrl => {
+                        state.switch_to_tab(0);
+                        state.refresh();
+                    }
+                    Key::Num2 if modifiers.ctrl => {
+                        state.switch_to_tab(1);
+                        state.refresh();
+                    }
+                    Key::Num3 if modifiers.ctrl => {
+                        state.switch_to_tab(2);
+                        state.refresh();
+                    }
+                    Key::Num4 if modifiers.ctrl => {
+                        state.switch_to_tab(3);
+                        state.refresh();
+                    }
+                    Key::Num5 if modifiers.ctrl => {
+                        state.switch_to_tab(4);
+                        state.refresh();
+                    }
+
+                    Key::ArrowLeft if modifiers.ctrl => {
+                        state.prev_tab();
+                    }
+                    Key::ArrowRight if modifiers.ctrl => {
+                        state.next_tab();
+                    }
+
+                    Key::A
+                    | Key::B
+                    | Key::C
+                    | Key::D
+                    | Key::E
+                    | Key::F
+                    | Key::G
+                    | Key::H
+                    | Key::I
+                    | Key::J
+                    | Key::K
+                    | Key::L
+                    | Key::M
+                    | Key::N
+                    | Key::O
+                    | Key::P
+                    | Key::Q
+                    | Key::R
+                    | Key::S
+                    | Key::T
+                    | Key::U
+                    | Key::V
+                    | Key::W
+                    | Key::X
+                    | Key::Y
+                    | Key::Z
+                        if !modifiers.ctrl && !modifiers.shift && !modifiers.alt =>
+                    {
+                        let config_search_has_focus =
+                            ui.memory(|m| m.has_focus(egui::Id::new("config_search_bar")));
+
+                        let context_menu_open = ui_state.context_menu_state.open;
+
+                        if !config_search_has_focus
+                            && !context_menu_open
+                            && (state.search_filter.is_empty()
+                                || !ui.memory(|m| m.has_focus("search_bar".into())))
+                        {
+                            state.set_search(key.name().to_lowercase());
+
+                            ui.memory_mut(|mem| {
+                                mem.request_focus("search_bar".into());
+                            });
+                        }
+                    }
+                    _ => {}
+                }
             }
-            
         }
     }
 }

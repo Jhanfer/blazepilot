@@ -12,10 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-
-
-
-
 use std::collections::HashMap;
 
 #[derive(Debug, Default)]
@@ -43,13 +39,15 @@ impl MimeAppsFile {
             }
 
             let group = match current_group.as_deref() {
-                Some("Default Applications") |
-                Some("Added Associations") | 
-                Some("Removed Associations") => current_group.as_deref(),
+                Some("Default Applications")
+                | Some("Added Associations")
+                | Some("Removed Associations") => current_group.as_deref(),
                 _ => None,
             };
 
-            if group.is_none() {continue;}
+            if group.is_none() {
+                continue;
+            }
 
             let mut parts = line.splitn(2, "=");
             let key = match parts.next() {
@@ -67,18 +65,20 @@ impl MimeAppsFile {
                 .filter(|s| !s.is_empty())
                 .map(|s| s.to_string())
                 .collect();
-            if apps.is_empty() {continue;}
+            if apps.is_empty() {
+                continue;
+            }
 
             match group.unwrap() {
                 "Default Applications" => {
                     file.default_apps.insert(key.to_string(), apps);
-                },
+                }
                 "Added Associations" => {
                     file.added.insert(key.to_string(), apps);
-                },
+                }
                 "Removed Associations" => {
                     file.removed.insert(key.to_string(), apps);
-                },
+                }
                 _ => {}
             }
         }

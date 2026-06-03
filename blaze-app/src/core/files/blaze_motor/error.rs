@@ -1,7 +1,6 @@
+use crate::core::files::blaze_motor::motor_structs::FileLoadingMessage;
 use std::{path::Path, sync::Arc};
 use thiserror::Error;
-use crate::core::files::blaze_motor::motor_structs::FileLoadingMessage;
-
 
 #[derive(Debug, Error)]
 pub enum MotorError {

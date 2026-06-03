@@ -12,36 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-
-
-
-
-use std::{sync::Arc};
 use once_cell::sync::Lazy;
+use std::sync::Arc;
 
+pub static MACOS_FILE_OPENER: Lazy<Arc<tokio::sync::Mutex<MacosOpener>>> =
+    Lazy::new(|| Arc::new(tokio::sync::Mutex::new(MacosOpener::init())));
 
-pub static MACOS_FILE_OPENER: Lazy<Arc<tokio::sync::Mutex<MacosOpener>>> = Lazy::new(|| {
-    Arc::new(tokio::sync::Mutex::new(MacosOpener::init()))
-});
-
-
-pub struct MacosOpener {
-}
-
+pub struct MacosOpener {}
 
 impl MacosOpener {
     fn init() -> Self {
-        Self {
-        }
+        Self {}
     }
 
     #[cfg(target_os = "macos")]
-    fn get_apps_for_mime_macos(&self, mime: &str) -> Vec<AppAssociation> {
-
-    }
+    fn get_apps_for_mime_macos(&self, mime: &str) -> Vec<AppAssociation> {}
 
     #[cfg(target_os = "macos")]
-    fn launch_app_macos(&self, app: &AppAssociation, path: &Path) -> std::io::Result<()> {
-
-    }
+    fn launch_app_macos(&self, app: &AppAssociation, path: &Path) -> std::io::Result<()> {}
 }

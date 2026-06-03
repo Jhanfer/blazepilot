@@ -12,17 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-
-
-
-
-
 use std::{path::Path, sync::Arc};
 
-use egui::{Color32, CornerRadius, Frame, Margin, Order, RichText, Ui, Window};
-use uuid::Uuid;
-use crate::{core::runtime::{bus_structs::FileOperation, event_bus::Dispatcher}, ui::themes::colors::COLOR_BG_MAIN};
 use crate::ui::dialog_manager::dialog_manager::ModalDialog;
+use crate::{
+    core::runtime::{bus_structs::FileOperation, event_bus::Dispatcher},
+    ui::themes::colors::COLOR_BG_MAIN,
+};
+use egui::{CornerRadius, Frame, Margin, Order, RichText, Ui, Window};
+use uuid::Uuid;
 
 pub struct SureToDeleteDialog {
     pub sources: Option<Vec<Arc<Path>>>,
@@ -31,22 +29,28 @@ pub struct SureToDeleteDialog {
 }
 
 impl ModalDialog for SureToDeleteDialog {
-    fn is_open(&self) -> bool { self.show_modal }
-    fn close(&mut self) { self.close() }
-    fn render(&mut self, ui: &mut Ui) { self.render_dialog(ui); }
+    fn is_open(&self) -> bool {
+        self.show_modal
+    }
+    fn close(&mut self) {
+        self.close()
+    }
+    fn render(&mut self, ui: &mut Ui) {
+        self.render_dialog(ui);
+    }
 }
 
 impl SureToDeleteDialog {
     pub fn new() -> Self {
         Self {
-            sources: None, 
+            sources: None,
             tab_id: None,
             show_modal: false,
         }
     }
 
     pub fn close(&mut self) {
-        self.show_modal = false; 
+        self.show_modal = false;
     }
 
     pub fn open(&mut self, sources: Vec<Arc<Path>>, tab_id: Uuid) {
@@ -55,12 +59,13 @@ impl SureToDeleteDialog {
         self.show_modal = true;
     }
 
-
     pub fn render_dialog(&mut self, ui: &mut Ui) {
         let mut should_close = false;
 
-        let (Some(sources), Some(_)) = (self.sources.as_ref(), self.tab_id.as_ref()) else { return; };
-        
+        let (Some(sources), Some(_)) = (self.sources.as_ref(), self.tab_id.as_ref()) else {
+            return;
+        };
+
         let custom_frame = Frame::NONE
             .fill(COLOR_BG_MAIN)
             .corner_radius(CornerRadius::same(10))
@@ -73,17 +78,18 @@ impl SureToDeleteDialog {
             .resizable(false)
             .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
             .open(&mut self.show_modal)
-            .show(ui, |ui|{
+            .show(ui, |ui| {
                 ui.set_min_width(250.0);
                 ui.set_min_height(100.0);
-                
+
                 ui.heading("¿Deseas eliminar permanentemente?");
 
                 const MAX_SHOWN: usize = 5;
                 let total = sources.len();
 
                 for source in sources.iter().take(MAX_SHOWN) {
-                    let file_name = source.file_name()
+                    let file_name = source
+                        .file_name()
                         .map(|f| f.to_string_lossy().into_owned())
                         .unwrap_or_else(|| "Archivo".to_string());
 
@@ -99,7 +105,7 @@ impl SureToDeleteDialog {
                 }
 
                 ui.add_space(50.0);
-                
+
                 ui.horizontal(|ui| {
                     let width = ui.available_width();
                     let button_width = 120.0;
@@ -112,12 +118,11 @@ impl SureToDeleteDialog {
 
                     ui.add_space(spacing);
                     if ui.button("Aceptar").clicked() {
-
-                        Dispatcher::current().send(
-                            FileOperation::Trash { 
-                                files: sources.to_vec()
-                            }
-                        ).ok();
+                        Dispatcher::current()
+                            .send(FileOperation::Trash {
+                                files: sources.to_vec(),
+                            })
+                            .ok();
 
                         should_close = true;
                     }
