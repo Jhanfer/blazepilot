@@ -30,6 +30,8 @@ use egui::{
     pos2, Area, CentralPanel, Color32, ComboBox, CornerRadius, Frame, Key, Margin, OpenUrl, Order,
     Panel, RichText, TextEdit, Ui, Window,
 };
+use std::time::Duration;
+use tracing::warn;
 
 #[derive(PartialEq, Clone, Copy)]
 enum CurrentConfigTab {
@@ -137,6 +139,10 @@ pub struct ConfigDialog {
     available_terminals: Vec<String>,
     loading_terminals: bool,
     terminal_rx: Option<tokio::sync::mpsc::Receiver<Vec<String>>>,
+    terminals_loaded: bool,
+    no_terminals_error: bool,
+    retry_count: u8,
+    max_retries: u8,
 }
 
 impl ModalDialog for ConfigDialog {
@@ -161,6 +167,10 @@ impl ConfigDialog {
             available_terminals: Vec::new(),
             loading_terminals: false,
             terminal_rx: None,
+            terminals_loaded: false,
+            no_terminals_error: false,
+            retry_count: 0,
+            max_retries: 3,
         }
     }
 
@@ -305,27 +315,63 @@ impl ConfigDialog {
         with_configs(|c| c.get_default_terminal() == term)
     }
 
+    fn reset_terminal_loading_state(&mut self) {
+        self.available_terminals.clear();
+        self.loading_terminals = false;
+        self.terminals_loaded = false;
+        self.no_terminals_error = false;
+        self.terminal_rx = None;
+    }
+
     fn render_terminal_settings(&mut self, ui: &mut Ui, _query: &str, frame: Frame) {
         ui.add_space(10.0);
-        if self.available_terminals.is_empty() && !self.loading_terminals {
+
+        if self.available_terminals.is_empty()
+            && !self.loading_terminals
+            && !self.terminals_loaded
+            && (self.retry_count < self.max_retries)
+        {
             self.loading_terminals = true;
+            self.retry_count += 1;
+
             let (tx, rx) = tokio::sync::mpsc::channel(1);
             self.terminal_rx = Some(rx);
 
             let tm_manager = GLOBAL_TERMINAL_MANAGER.clone();
 
             TOKIO_RUNTIME.spawn(async move {
-                let mut manager = tm_manager.lock().await;
-                let terminals = manager.request_load_terminals().await;
-                let _ = tx.send(terminals).await;
+                let result = tokio::time::timeout(Duration::from_secs(5), async {
+                    let mut manager = tm_manager.lock().await;
+                    manager.request_load_terminals().await
+                })
+                .await;
+
+                match result {
+                    Ok(terminals) => {
+                        tx.send(terminals).await.ok();
+                    }
+                    Err(_) => {
+                        tx.send(Vec::new()).await.ok();
+                    }
+                }
             });
         }
 
         if let Some(rx) = &mut self.terminal_rx {
             if let Ok(terminals) = rx.try_recv() {
-                self.available_terminals = terminals;
+                self.available_terminals = terminals.clone();
                 self.loading_terminals = false;
+                self.terminals_loaded = true;
                 self.terminal_rx = None;
+
+                if terminals.is_empty() {
+                    self.no_terminals_error = true;
+                    if self.retry_count >= self.max_retries {
+                        warn!("Máximo de reintentos alcanzado para cargar terminales");
+                    }
+                } else {
+                    self.no_terminals_error = false;
+                }
             }
         }
 
@@ -337,14 +383,42 @@ impl ConfigDialog {
                 if self.loading_terminals {
                     ui.horizontal(|ui| {
                         ui.spinner();
-                        ui.label("Cargando terminales...");
+                        ui.label(format!("Cargando terminales... (Intento {}/{})", 
+                        self.retry_count, self.max_retries));
                     });
                     return;
                 }
 
                 if self.available_terminals.is_empty() {
-                    ui.label("No se encontraron terminales.");
+                    let mut show_retry = false;
+
+                    if self.no_terminals_error {
+                        ui.colored_label(Color32::RED,"⚠️ No se han encontrado terminales en el sistema.");
+
+                        if self.retry_count < self.max_retries {
+                            show_retry = true;
+
+                            if ui.button("Reintentar").clicked() {
+                                self.reset_terminal_loading_state();
+                            }
+                        } else {
+                            ui.colored_label(Color32::from_rgb(255, 165, 0),
+                                "❌ No se ha podido encontrar ninguna terminal después de varios intentos.");
+                            ui.label("Por favor, verifique que tenga al menos una terminal instalada.");
+                        }
+                    } else {
+                        ui.label("No se encontraron terminales.");
+                    }
+
+                    if show_retry {
+                        ui.add_space(8.0);
+                        ui.colored_label(egui::Color32::from_rgb(255, 165, 0),
+                        "💡 Sugerencia: Instale una terminal como gnome-terminal, konsole, o alacritty");
+                    }
+
+                    return;
                 }
+
 
                 egui::ComboBox::from_label("Terminal predeterminado")
                     .selected_text(self.get_selected_terminal_text())
