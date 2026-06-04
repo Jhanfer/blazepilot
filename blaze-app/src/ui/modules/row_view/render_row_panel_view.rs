@@ -154,11 +154,9 @@ pub fn row_panel_frame(
             color: COLOR_ACCENT_GLOW,
         })
         .show(ui, |ui| {
-
             let original_clip = ui.clip_rect();
             let frame_rect = ui.max_rect();
             ui.set_clip_rect(frame_rect);
-
 
             let content_rect = ui.viewport_rect();
             let panel_top = content_rect.min.y;

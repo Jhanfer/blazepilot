@@ -27,7 +27,11 @@ use crate::core::{
 use lru::LruCache;
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, num::NonZeroUsize, time::{Duration, Instant}};
+use std::{
+    collections::HashMap,
+    num::NonZeroUsize,
+    time::{Duration, Instant},
+};
 use std::{
     io::BufReader,
     path::{Path, PathBuf},
@@ -103,13 +107,13 @@ pub enum GitStatus {
 impl GitStatus {
     fn priority(&self) -> u8 {
         match self {
-            Self::Conflict => 6, 
-            Self::Staged => 5, 
-            Self::Modified => 4, 
-            Self::Deleted => 3, 
-            Self::Untracked => 2, 
-            Self::Ignored => 1, 
-            Self::Clean => 0, 
+            Self::Conflict => 6,
+            Self::Staged => 5,
+            Self::Modified => 4,
+            Self::Deleted => 3,
+            Self::Untracked => 2,
+            Self::Ignored => 1,
+            Self::Clean => 0,
         }
     }
 }
@@ -129,14 +133,16 @@ impl RepoStatusCache {
 
         let mut files: HashMap<PathBuf, GitStatus> = HashMap::new();
         let mut dirs: HashMap<PathBuf, GitStatus> = HashMap::new();
-        
+
         for entry in statuses.iter() {
             let status = entry.status();
-            if status.is_empty() { continue; }
+            if status.is_empty() {
+                continue;
+            }
 
             let rel: PathBuf = match entry.path() {
                 Some(p) => PathBuf::from(p),
-                None => continue
+                None => continue,
             };
 
             let git_status = Self::classify(status);
@@ -145,18 +151,22 @@ impl RepoStatusCache {
 
             let mut current = rel.parent();
             while let Some(dir) = current {
-                if dir == Path::new("") { break; };
-                let entry = dirs.entry(dir.to_path_buf())
-                    .or_insert(GitStatus::Clean);
+                if dir == Path::new("") {
+                    break;
+                };
+                let entry = dirs.entry(dir.to_path_buf()).or_insert(GitStatus::Clean);
                 if git_status.priority() > entry.priority() {
                     *entry = git_status.clone();
                 }
                 current = dir.parent();
             }
-
         }
 
-        Self { files, dirs, refreshed_at: Instant::now() }
+        Self {
+            files,
+            dirs,
+            refreshed_at: Instant::now(),
+        }
     }
 
     fn empty() -> Self {
@@ -170,8 +180,7 @@ impl RepoStatusCache {
     fn classify(status: git2::Status) -> GitStatus {
         if status.is_conflicted() {
             GitStatus::Conflict
-        } else if status.is_index_new() || status.is_index_modified()
-            || status.is_index_deleted() {
+        } else if status.is_index_new() || status.is_index_modified() || status.is_index_deleted() {
             GitStatus::Staged
         } else if status.is_wt_modified() {
             GitStatus::Modified
@@ -190,8 +199,6 @@ impl RepoStatusCache {
         self.refreshed_at.elapsed() > REPO_CACHE_TTL
     }
 }
-
-
 
 const DEFAULT_INFO_CACHE_CAPACITY: usize = 2_000;
 pub struct ExtendedInfoManager {
@@ -281,11 +288,14 @@ impl ExtendedInfoManager {
                                 let mut current_parent = path_buf.parent();
                                 while let Some(parent) = current_parent {
                                     let parent_arc: Arc<Path> = parent.into();
-                                    let parent_info = g.get(&parent_arc).cloned().unwrap_or_default();
+                                    let parent_info =
+                                        g.get(&parent_arc).cloned().unwrap_or_default();
 
                                     let needs_update = match &parent_info.git_status {
                                         None => true,
-                                        Some(existing) => git_status.priority() > existing.priority()
+                                        Some(existing) => {
+                                            git_status.priority() > existing.priority()
+                                        }
                                     };
 
                                     if needs_update {
@@ -490,11 +500,10 @@ impl ExtendedInfoManager {
         let git_status = {
             let path_clone = path.clone();
             let cache_clone = repo_cache.clone();
-            let res = tokio::task::spawn_blocking(
-                move || Self::get_git_status(path_clone, &cache_clone)
-            )
-            .await
-            .map_err(ExtendedInfoError::ThreadError)?;
+            let res =
+                tokio::task::spawn_blocking(move || Self::get_git_status(path_clone, &cache_clone))
+                    .await
+                    .map_err(ExtendedInfoError::ThreadError)?;
 
             match res {
                 Ok(status) => Some(status),
@@ -514,18 +523,15 @@ impl ExtendedInfoManager {
 
     fn get_git_status(
         path: Arc<Path>,
-        repo_cache: &Mutex<HashMap<PathBuf, RepoStatusCache>>
+        repo_cache: &Mutex<HashMap<PathBuf, RepoStatusCache>>,
     ) -> ExtendedInfoResult<GitStatus> {
-        let repo = git2::Repository::discover(&path)
-            .map_err(ExtendedInfoError::GitError)?;
+        let repo = git2::Repository::discover(&path).map_err(ExtendedInfoError::GitError)?;
 
         if path.to_string_lossy().contains("/.git/") {
             return Ok(GitStatus::Clean);
         }
 
-        let workdir = repo.workdir()
-            .unwrap_or(Path::new("."))
-            .to_path_buf();
+        let workdir = repo.workdir().unwrap_or(Path::new(".")).to_path_buf();
 
         let relative = path
             .strip_prefix(&workdir)
@@ -533,9 +539,9 @@ impl ExtendedInfoManager {
             .to_path_buf();
 
         let mut cache_guard = repo_cache.lock();
-        let entry = cache_guard.entry(workdir).or_insert_with(||{
-            RepoStatusCache::build(&repo)
-        });
+        let entry = cache_guard
+            .entry(workdir)
+            .or_insert_with(|| RepoStatusCache::build(&repo));
 
         if entry.is_stale() {
             *entry = RepoStatusCache::build(&repo);

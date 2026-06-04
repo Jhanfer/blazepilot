@@ -25,16 +25,20 @@ pub fn parse_initial_path() -> Option<Arc<Path>> {
             Err(e) => {
                 warn!("No se ha podido obtener el directorio actual: {}", e);
                 return None;
-            },
+            }
         }
     };
 
     let final_path = match absolute_path.canonicalize() {
         Ok(p) => p,
         Err(e) => {
-            warn!("No se ha podido canonicalizar la ruta: '{}': {}", absolute_path.display(), e);
+            warn!(
+                "No se ha podido canonicalizar la ruta: '{}': {}",
+                absolute_path.display(),
+                e
+            );
             absolute_path
-        },
+        }
     };
 
     if final_path.is_dir() {
