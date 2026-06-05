@@ -12,15 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::core::bootstrap::configs::{
-    error::ConfigResult,
-    platform::{
-        linux::conf_structs::{DisplayBackend, OrderingMode},
-        PlatformConfigTrait, PlatformConfigs,
+use crate::core::bootstrap::{
+    configs::{
+        error::ConfigResult,
+        platform::{
+            linux::conf_structs::{DisplayBackend, OrderingMode},
+            PlatformConfigTrait, PlatformConfigs,
+        },
     },
+    i18n::I18n,
 };
 use parking_lot::Mutex;
-use std::{path::Path, sync::LazyLock, time::SystemTime};
+use std::{
+    path::Path,
+    sync::{Arc, LazyLock},
+    time::SystemTime,
+};
 use tracing::warn;
 
 pub static GLOBAL_CONFIGS: LazyLock<Mutex<ConfigManager>> =
@@ -78,34 +85,52 @@ impl ConfigManager {
         self.platform.last_time_asked_installation
     }
 
+    pub fn get_locale(&self) -> Box<str> {
+        self.platform.locale.to_owned()
+    }
+
+    pub fn get_i18n(&self) -> Arc<I18n> {
+        self.platform.i18n.clone()
+    }
+
     //--__--__--__--__ Setters  __--__--__--__--__--__--__
 
     pub fn set_ordering_mode(&mut self, mode: OrderingMode) {
         self.platform.app_ordering_mode = mode;
-        self.platform.save().ok();
+        self.save().ok();
     }
 
     pub fn set_show_hidden_files(&mut self, show: bool) {
         self.platform.show_hidden_files = show;
-        self.platform.save().ok();
+        self.save().ok();
     }
 
     pub fn set_display_backend(&mut self, backend: DisplayBackend) {
         self.platform.display_backend = backend;
-        self.platform.save().ok();
+        self.save().ok();
     }
 
     pub fn set_default_terminal(&mut self, terminal: String) {
         self.platform.default_terminal = terminal;
-        self.platform.save().ok();
+        self.save().ok();
     }
 
     pub fn set_should_ask_install(&mut self, ask: bool) {
         self.platform.should_ask_to_install = ask;
-        self.platform.save().ok();
+        self.save().ok();
+    }
+
+    pub fn set_locale(&mut self, locale: &str) {
+        self.platform.locale = locale.into();
+        self.switch_i18n(locale);
+        self.save().ok();
     }
 
     //--__--__--__--__ Recarga y Guardado  __--__--__--__--__--__--__
+
+    fn switch_i18n(&self, locale: &str) {
+        self.platform.i18n.switch_locale(locale);
+    }
 
     #[must_use]
     pub fn save(&self) -> ConfigResult<()> {

@@ -1,0 +1,218 @@
+[app]
+title = "BlazePilot"
+loading = "Загрузка..."
+
+[left_sidebar]
+root = "Корень"
+locals = "Локальные"
+home = "Домой"
+desktop = "Рабочий стол"
+downloads = "Загрузки"
+documents = "Документы"
+pictures = "Изображения"
+videos = "Видео"
+music = "Музыка"
+public = "Общие"
+trash = "Корзина" 
+disks = "Диски"
+
+[right_sidebar]
+info = "Информация"
+ext = "Расширение: {query}"
+type = "Тип: {query}"
+size = "Размер: {query}"
+owner = "Владелец: {query}"
+group_name = "Группа: {query}"
+dimensions = "Размеры: {w} x {h}"
+git_status = "Статус Git: {query}"
+
+[search]
+placeholder = "Поиск файлов..."
+no_results = "Нет результатов для \"{query}\""
+searching = "Поиск..."
+
+[bg_ctx_menu]
+new_tab = "Новая вкладка"
+open_terminal_here = "Открыть терминал здесь"
+new_folder = "Новая папка"
+new_file = "Новый файл"
+
+[file_ctx_menu]
+preview = "Предпросмотр"
+open = "Открыть"
+open_with = "Открыть с помощью..."
+open_in_new_tab = "Открыть в новой вкладке"
+add_to_tag = "Добавить к тегу"
+
+[file_ops]
+copy = "Копировать"
+cut = "Вырезать"
+paste = "Вставить"
+paste_here = "Вставить сюда"
+extract_here = "Извлечь сюда"
+folder_color = "Цвет папки"
+rename = "Переименовать"
+restore = "Восстановить"
+move_to_trash = "Переместить в корзину"
+delete = "Удалить"
+delete_confirm = "Удалить {count} файл(ов)?"
+
+[tools]
+name = "Имя"
+modified = "Изменён"
+size = "Размер"
+
+[tags_quick]
+new = "Новый"
+all = "Все"
+edit = "Редактировать"
+delete = "Удалить"
+empty = "Здесь ничего нет."
+add_something = "Может быть, вы хотите что-то добавить."
+count = "{query} элемент(ов)"
+
+[git_status]
+modified = "Изменён"
+staged = "Проиндексирован"
+untracked = "Не отслеживается"
+ignored = "Игнорируется"
+conflict = "Конфликт"
+deleted = "Удалён"
+clean = "Чистый"
+
+[modified_date_formating]
+now = "Сейчас"
+min = "{query} мин"
+hour = "{query} ч"
+day = "{query} д"
+week = "{query} нед"
+month = "{query} мес"
+year = "{query} г"
+
+[configs]
+title = "Настройки"
+general = "Общие"
+terminal = "Терминал"
+backend = "Бэкенд"
+appearance = "Внешний вид"
+behavior = "Поведение"
+language = "Язык"
+
+[configs_general]
+gratitude = "Спасибо за использование BlazePilot!"
+made_for = "Сделано с ❤ от Jhanfer. :D"
+report = "Сообщить об ошибке"
+sys_info = "Информация о системе"
+disclaimer = "Настройки пока ограничены. Мы всё ещё работаем над этим."
+
+[configs_terminal]
+title = "Выберите терминал"
+selection = "Выберите терминал"
+message = "Здесь вы можете выбрать терминал по умолчанию."
+loading_message = "Загрузка терминалов... (Попытка {retry_count}/{max_retries})"
+no_terminals_error = "⚠️ Терминалы не найдены в системе."
+max_retries_error = "❌ Не удалось найти ни один терминал после нескольких попыток."
+verify_terminals_message = "Пожалуйста, проверьте, что у вас установлен хотя бы один терминал."
+suggestion_message = "💡 Совет: Установите терминал, например gnome-terminal, konsole или alacritty"
+retry = "Повторить"
+max_retries = 3
+timeout_seconds = 5
+combo_box_label = "Терминал по умолчанию"
+
+
+[configs_backend]
+title = "Протокол отображения"
+selection = "Бэкенд"
+hint = "Какой бэкенд использовать?"
+message = """
+Авто: Рекомендуется для большинства пользователей.
+Wayland: Лучшая производительность и качество изображения.
+X11: Большая совместимость со старыми приложениями. Позволяет перетаскивание из других приложений.
+"""
+disclaimer = "Эти изменения требуют перезапуска приложения."
+
+[configs_appearance]
+title = "В разработке :D"
+
+[configs_behavior]
+title = "В разработке :D"
+
+[configs_language]
+title = "Изменить язык"
+selection = "Язык"
+message = "Выберите язык, который сделает ваш интерфейс уютным и понятным 🏡✨"
+
+[general_dialog]
+accept = "Принять"
+cancel = "Отмена"
+close = "Закрыть"
+
+[error_dialog]
+title = "Произошла ошибка!"
+
+[select_folder_color_dialog]
+title = "Выберите цвет"
+reset_pred = "Восстановить по умолчанию"
+
+[quick_tag_dialog_add]
+title = "Добавить к тегу"
+selection = "Выберите тег"
+
+[quick_tag_dialog_create]
+title = "Создать новый тег"
+selection = "Выберите тег"
+name = "Название тега: "
+
+[quick_tag_dialog_edit]
+title = "Редактировать тег"
+selection = "Выберите тег"
+name = "Название тега: "
+
+[quick_tag_dialog_delete]
+title = "Вы хотите удалить тег: \"{query}\"?"
+
+[quick_tag_dialog_delete_quick]
+title = "Вы хотите удалить ссылку: \"{query}\"?"
+
+[quick_tag_dialog_edit_quick]
+title = "Редактировать быстрый доступ"
+name = "Название быстрого доступа: "
+
+
+[search_keywords_terminal]
+terminal = "терминал"
+shell = "оболочка"
+size = "размер"
+font = "шрифт"
+command = "команда"
+prompt = "приглашение"
+
+[search_keywords_backend]
+backend = "бэкенд"
+gpu = "видеокарта"
+cpu = "процессор"
+render = "рендер"
+renderer = "рендерер"
+acceleration = "ускорение"
+display_protocol = "протокол отображения"
+
+[search_keywords_appearance]
+color = "цвет"
+theme = "тема"
+dark = "тёмная"
+light = "светлая"
+font = "шрифт"
+icon = "иконка"
+background = "фон"
+
+[search_keywords_behavior]
+auto = "авто"
+save = "сохранить"
+backup = "резервная копия"
+behavior = "поведение"
+confirm = "подтвердить"
+undo = "отменить"
+
+[search_keywords_language]
+language = "язык"
+idiom = "идиома"

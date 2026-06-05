@@ -1,6 +1,7 @@
 use crate::{
     core::{
         blaze_state::BlazeCoreState,
+        bootstrap::configs::config_manager::with_configs,
         system::{
             clipboard::clipboard::TOKIO_RUNTIME,
             knowndirs::knowndirs_manager::KnownDirsManager,
@@ -27,6 +28,8 @@ pub fn sidebar_left_component(
     state: &mut BlazeCoreState,
     ui_state: &mut BlazeUiState,
 ) {
+    let i18n = with_configs(|c| c.get_i18n());
+
     let custom_frame = Frame::NONE.fill(COLOR_BG_MAIN).inner_margin(Margin {
         left: 15,
         right: 0,
@@ -56,7 +59,12 @@ pub fn sidebar_left_component(
                     ScrollArea::vertical()
                         .scroll_bar_visibility(ScrollBarVisibility::AlwaysHidden)
                         .show(ui, |ui| {
-                            render_header_text("Locales", ui, ui_state);
+                            render_header_text(
+                                "locals",
+                                &i18n.t("left_sidebar.locals"),
+                                ui,
+                                ui_state,
+                            );
 
                             ui.add_space(10.0);
 
@@ -69,12 +77,13 @@ pub fn sidebar_left_component(
                                 return;
                             };
 
-                            dirs.push(("Papelera", &trash));
+                            dirs.push(("trash", i18n.t("left_sidebar.trash").into(), &trash));
 
-                            for (label, path) in dirs {
+                            for (key, label, path) in dirs {
                                 if path.exists() {
                                     render_local_buttons(
-                                        label,
+                                        key,
+                                        &label,
                                         path.to_owned(),
                                         state,
                                         ui,
@@ -87,7 +96,12 @@ pub fn sidebar_left_component(
                             ui.separator();
 
                             ui.add_space(10.0);
-                            render_header_text("Discos", ui, ui_state);
+                            render_header_text(
+                                "disks",
+                                &i18n.t("left_sidebar.disks"),
+                                ui,
+                                ui_state,
+                            );
                             ui.add_space(10.0);
 
                             let manager = state.motor.borrow_mut().disk_manager.clone();

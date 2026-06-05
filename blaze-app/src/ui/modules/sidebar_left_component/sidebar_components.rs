@@ -13,28 +13,26 @@ use std::{
     sync::Arc,
 };
 
-fn get_folder_icon(label: &str) -> (&'static str, &'static [u8]) {
-    let label_lower = label.to_lowercase();
-    match label_lower.as_str() {
+fn get_folder_icon(key: &str) -> (&'static str, &'static [u8]) {
+    match key {
         "home" => ("home", ICON_HOME),
-        "escritorio" | "desktop" => ("desktop", ICON_DESKTOP),
-        "descargas" | "downloads" => ("donwloads", ICON_DOWNLOADS),
-        "documentos" | "documents" => ("documents", ICON_ARCHIVE),
-        "imágenes" | "imagenes" | "pictures" | "images" => ("images", ICON_POLAROID),
-        "papelera" | "trash" | "basura" => ("trash", ICON_TRASH),
-        "videos" | "vídeos" => ("videos", ICON_VIDEO),
-        "public" | "público" | "publico" => ("public", ICON_PUBLIC),
-        "musica" | "music" | "música" => ("music", ICON_MUSIC),
+        "desktop" => ("desktop", ICON_DESKTOP),
+        "downloads" => ("downloads", ICON_DOWNLOADS),
+        "documents" => ("documents", ICON_ARCHIVE),
+        "pictures" | "images" => ("images", ICON_POLAROID),
+        "trash" => ("trash", ICON_TRASH),
+        "videos" => ("videos", ICON_VIDEO),
+        "public" => ("public", ICON_PUBLIC),
+        "music" => ("music", ICON_MUSIC),
         _ => ("default", ICON_HOME),
     }
 }
 
-fn get_herader_icon(label: &str) -> (&'static str, &'static [u8]) {
-    let label_lower = label.to_lowercase();
-    match label_lower.as_str() {
-        "locales" | "locals" => ("locales", ICON_USER),
-        "favoritos" | "favorites" => ("favorites", ICON_STAR),
-        "discos" | "disks" => ("disks", ICON_SERVER),
+fn get_header_icon(key: &str) -> (&'static str, &'static [u8]) {
+    match key {
+        "locals" => ("locales", ICON_USER),
+        "favorites" => ("favorites", ICON_STAR),
+        "disks" => ("disks", ICON_SERVER),
         _ => ("default", ICON_HOME),
     }
 }
@@ -63,10 +61,10 @@ pub fn render_icon(
     );
 }
 
-pub fn render_header_text(label: &str, ui: &mut Ui, ui_state: &mut BlazeUiState) {
+pub fn render_header_text(icon_key: &str, label: &str, ui: &mut Ui, ui_state: &mut BlazeUiState) {
     let (rect, _resp) = ui.allocate_exact_size(vec2(ui.available_width(), 24.0), Sense::hover());
 
-    let (icon_name, icon_bytes) = get_herader_icon(label);
+    let (icon_name, icon_bytes) = get_header_icon(icon_key);
     let color = Color32::WHITE;
 
     render_icon(ui, ui_state, icon_name, color, icon_bytes, rect);
@@ -81,6 +79,7 @@ pub fn render_header_text(label: &str, ui: &mut Ui, ui_state: &mut BlazeUiState)
 }
 
 pub fn render_local_buttons(
+    icon_key: &str,
     label: &str,
     path: Arc<Path>,
     state: &mut BlazeCoreState,
@@ -130,7 +129,7 @@ pub fn render_local_buttons(
         state.navigate_to(path);
     }
 
-    let (icon_name, icon_bytes) = get_folder_icon(label);
+    let (icon_name, icon_bytes) = get_folder_icon(icon_key);
 
     render_icon(ui, ui_state, icon_name, icon_color, icon_bytes, rect);
 

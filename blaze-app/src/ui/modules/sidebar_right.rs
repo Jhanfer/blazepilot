@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use crate::core::blaze_state::BlazeCoreState;
+use crate::core::bootstrap::configs::config_manager::with_configs;
 use crate::core::files::blaze_motor::motor_structs::FileEntry;
 use crate::core::system::extended_info::extended_info_manager::ExtendedInfo;
 use crate::ui::themes::colors::*;
@@ -22,6 +23,7 @@ use std::sync::Arc;
 use tracing::error;
 
 pub fn sidebar_right_component(ui: &mut Ui, state: &mut BlazeCoreState, files: &[Arc<FileEntry>]) {
+    let i18n = with_configs(|c| c.get_i18n());
     let custom_frame = Frame::NONE.fill(COLOR_BG_MAIN).inner_margin(Margin {
         left: 0,
         right: 15,
@@ -50,7 +52,7 @@ pub fn sidebar_right_component(ui: &mut Ui, state: &mut BlazeCoreState, files: &
                         let response = ui.add(
                             TextEdit::singleline(&mut search)
                                 .id("search_bar".into())
-                                .hint_text("Búsqueda")
+                                .hint_text(i18n.t("search.placeholder"))
                                 .desired_width(150.0),
                         );
 
@@ -72,17 +74,23 @@ pub fn sidebar_right_component(ui: &mut Ui, state: &mut BlazeCoreState, files: &
                     {
                         let file = &files[first_selected_idx];
 
-                        ui.heading("Info");
+                        ui.heading(i18n.t("right_sidebar.info"));
                         ui.separator();
 
                         ui.heading(file.name.clone());
                         ui.label(format_date(file.modified));
 
                         if file.is_dir() {
-                            ui.label("Tipo: Carpeta");
+                            ui.label(i18n.t("right_sidebar.info"));
                         } else {
-                            ui.label(format!("Tipo: {:?}", file.extension));
-                            ui.label(format!("Tamaño: {:?}", format_size(file.size)));
+                            ui.label(i18n.t_args(
+                                "right_sidebar.ext",
+                                &[("query", &format!("{:?}", file.extension))],
+                            ));
+                            ui.label(i18n.t_args(
+                                "right_sidebar.size",
+                                &[("query", &format_size(file.size))],
+                            ));
                         }
 
                         let extended_info =
@@ -115,22 +123,39 @@ pub fn sidebar_right_component(ui: &mut Ui, state: &mut BlazeCoreState, files: &
 
                         if let Some(extended_info) = extended_info {
                             if let Some(owner) = extended_info.owner {
-                                ui.label(format!("Owner: {}", owner));
+                                ui.label(i18n.t_args("right_sidebar.owner", &[("query", &owner)]));
                             }
                             if let Some(group_name) = extended_info.group_name {
-                                ui.label(format!("Group name: {}", group_name));
+                                ui.label(
+                                    i18n.t_args(
+                                        "right_sidebar.group_name",
+                                        &[("query", &group_name)],
+                                    ),
+                                );
                             }
                             if let Some(symlink_target) = extended_info.symlink_target {
-                                ui.label(format!("Tipo: {:?}", symlink_target));
-                            }
-                            if let Some(dimensions) = extended_info.dimensions {
-                                ui.label(format!(
-                                    "Dimensión: {:?} x {:?}",
-                                    dimensions.0, dimensions.1
+                                ui.label(i18n.t_args(
+                                    "right_sidebar.type",
+                                    &[("query", &symlink_target.display().to_string())],
                                 ));
                             }
+                            if let Some(dimensions) = extended_info.dimensions {
+                                let w_str = dimensions.0.to_string();
+                                let h_str = dimensions.1.to_string();
+
+                                let text = i18n.t_args(
+                                    "right_sidebar.dimensions",
+                                    &[("w", &w_str), ("h", &h_str)],
+                                );
+                                ui.label(&*text);
+                            }
                             if let Some(git_status) = extended_info.git_status {
-                                ui.label(format!("GitStatus: {:?}", git_status));
+                                let status_debug = format!("{:?}", git_status);
+                                let text = i18n.t_args(
+                                    "right_sidebar.git_status",
+                                    &[("query", &status_debug)],
+                                );
+                                ui.label(&*text);
                             }
                         }
                     }

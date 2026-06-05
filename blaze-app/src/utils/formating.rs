@@ -1,6 +1,8 @@
 use chrono::{DateTime, Local, TimeDelta};
 use std::time::{Duration, UNIX_EPOCH};
 
+use crate::core::bootstrap::configs::config_manager::with_configs;
+
 pub fn format_size(size: u64) -> String {
     const KB: u64 = 1000;
     const MB: u64 = KB * 1000;
@@ -21,22 +23,43 @@ pub fn format_size(size: u64) -> String {
     }
 }
 
-pub fn format_date(seconds: u64) -> String {
+// Asumiendo que tienes acceso a tu struct I18n
+pub fn format_date(seconds: u64) -> Box<str> {
+    let i18n = with_configs(|c| c.get_i18n());
     let d = UNIX_EPOCH + Duration::from_secs(seconds);
     let Ok(elapsed) = d.elapsed() else {
-        return "—".to_string();
+        return "—".into();
     };
 
     let secs = elapsed.as_secs();
+    let query = |val: u64| val.to_string();
 
     match secs {
-        0..=59 => "Ahora".to_string(),
-        60..=3599 => format!("{} m", secs / 60),
-        3600..=86399 => format!("{} h", secs / 3600),
-        86400..=604799 => format!("{} d", secs / 86400),
-        604800..=2591999 => format!("{} sem", secs / 604800),
-        2592000..=31535999 => format!("{} mes", secs / 2592000),
-        _ => format!("{} a", secs / 31536000),
+        0..=59 => i18n.t("modified_date_formating.now"),
+        60..=3599 => i18n.t_args(
+            "modified_date_formating.min",
+            &[("query", &query(secs / 60))],
+        ),
+        3600..=86399 => i18n.t_args(
+            "modified_date_formating.hour",
+            &[("query", &query(secs / 3600))],
+        ),
+        86400..=604799 => i18n.t_args(
+            "modified_date_formating.day",
+            &[("query", &query(secs / 86400))],
+        ),
+        604800..=2591999 => i18n.t_args(
+            "modified_date_formating.week",
+            &[("query", &query(secs / 604800))],
+        ),
+        2592000..=31535999 => i18n.t_args(
+            "modified_date_formating.month",
+            &[("query", &query(secs / 2592000))],
+        ),
+        _ => i18n.t_args(
+            "modified_date_formating.year",
+            &[("query", &query(secs / 31536000))],
+        ),
     }
 }
 

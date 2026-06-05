@@ -14,18 +14,23 @@
 
 use std::{
     path::{Path, PathBuf},
+    sync::Arc,
     time::SystemTime,
 };
 
 use directories::ProjectDirs;
 use serde::{Deserialize, Serialize};
+use tracing::info;
 
-use crate::core::bootstrap::configs::{
-    error::{ConfigError, ConfigResult},
-    platform::{
-        linux::conf_structs::{DisplayBackend, OrderingMode},
-        PlatformConfigTrait,
+use crate::core::bootstrap::{
+    configs::{
+        error::{ConfigError, ConfigResult},
+        platform::{
+            linux::conf_structs::{DisplayBackend, OrderingMode},
+            PlatformConfigTrait,
+        },
     },
+    i18n::I18n,
 };
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -65,6 +70,12 @@ pub struct LinuxConfigs {
 
     #[serde(default)]
     pub last_time_asked_installation: Option<SystemTime>,
+
+    #[serde(default)]
+    pub locale: Box<str>,
+
+    #[serde(skip)]
+    pub i18n: Arc<I18n>,
 }
 
 impl LinuxConfigs {
@@ -87,6 +98,13 @@ impl LinuxConfigs {
 impl Default for LinuxConfigs {
     fn default() -> Self {
         let path = Self::init_config_path().unwrap_or_default();
+
+        let lang = std::env::var("LANG").unwrap_or(String::from("en_US.UTF-8"));
+        let locale = lang.split("_").next().unwrap_or("en");
+
+        let i18n = Arc::new(I18n::load(&locale));
+        info!("Llamando i18n en default");
+
         Self {
             app_ordering_mode: OrderingMode::Az,
             config_file_path: path,
@@ -100,6 +118,8 @@ impl Default for LinuxConfigs {
             confirm_on_delete: true,
             should_ask_to_install: true,
             last_time_asked_installation: None,
+            locale: locale.into(),
+            i18n,
         }
     }
 }
@@ -126,6 +146,11 @@ impl PlatformConfigTrait for LinuxConfigs {
 
         let mut loaded: LinuxConfigs =
             serde_json::from_str(&data).map_err(|_| ConfigError::Deserialize)?;
+
+        let locale = &loaded.locale;
+        let i18n = Arc::new(I18n::load(locale));
+        loaded.i18n = i18n;
+        info!("Llamando i18n en load de linux");
 
         loaded.config_file_path = path;
         *self = loaded;

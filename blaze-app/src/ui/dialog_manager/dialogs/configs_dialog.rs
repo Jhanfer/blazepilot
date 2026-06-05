@@ -40,20 +40,24 @@ enum CurrentConfigTab {
     Backend,
     Appearance,
     Behavior,
+    Language,
 }
 
 impl CurrentConfigTab {
-    pub fn name(&self) -> &'static str {
+    pub fn name(&self) -> Box<str> {
+        let i18n = with_configs(|c| c.get_i18n());
         match self {
-            CurrentConfigTab::General => "General",
-            CurrentConfigTab::Terminal => "Terminal",
-            CurrentConfigTab::Backend => "Backend",
-            CurrentConfigTab::Appearance => "Apariencia",
-            CurrentConfigTab::Behavior => "Comportamiento",
+            CurrentConfigTab::General => i18n.t("configs.general"),
+            CurrentConfigTab::Terminal => i18n.t("configs.terminal"),
+            CurrentConfigTab::Backend => i18n.t("configs.backend"),
+            CurrentConfigTab::Appearance => i18n.t("configs.appearance"),
+            CurrentConfigTab::Behavior => i18n.t("configs.behavior"),
+            CurrentConfigTab::Language => i18n.t("configs.language"),
         }
     }
 
     pub fn matches_search(&self, query: &str) -> bool {
+        let i18n = with_configs(|c| c.get_i18n());
         if query.is_empty() {
             return true;
         }
@@ -65,66 +69,77 @@ impl CurrentConfigTab {
         let content_matches = match self {
             CurrentConfigTab::General => false,
 
-            CurrentConfigTab::Terminal => [
-                "terminal",
-                "shell",
-                "bash",
-                "zsh",
-                "cmd",
-                "powershell",
-                "prompt",
-                "font",
-                "tamaño",
-                "size",
-                "command",
-            ]
-            .iter()
-            .any(|&k| k.contains(&q) || q.contains(k)),
-
-            CurrentConfigTab::Backend => [
-                "backend",
-                "gpu",
-                "cpu",
-                "render",
-                "vulkan",
-                "opengl",
-                "direui",
-                "metal",
-                "renderer",
-                "aceleración",
-                "protocolo de pantalla",
-            ]
-            .iter()
-            .any(|&k| k.contains(&q) || q.contains(k)),
-
-            CurrentConfigTab::Appearance => [
-                "color",
-                "tema",
-                "theme",
-                "dark",
-                "light",
-                "font",
-                "icono",
-                "icon",
-                "background",
-                "fondo",
-            ]
-            .iter()
-            .any(|&k| k.contains(&q) || q.contains(k)),
-
-            CurrentConfigTab::Behavior => [
-                "auto",
-                "guardar",
-                "save",
-                "backup",
-                "comportamiento",
-                "confirm",
-                "confirmar",
-                "undo",
-                "deshacer",
-            ]
-            .iter()
-            .any(|&k| k.contains(&q) || q.contains(k)),
+            CurrentConfigTab::Terminal => {
+                let keywords = [
+                    i18n.t("search_keywords_terminal.terminal"),
+                    i18n.t("search_keywords_terminal.shell"),
+                    "bash".into(),
+                    "zsh".into(),
+                    "cmd".into(),
+                    "powershell".into(),
+                    i18n.t("search_keywords_terminal.prompt"),
+                    i18n.t("search_keywords_terminal.font"),
+                    i18n.t("search_keywords_terminal.size"),
+                    i18n.t("search_keywords_terminal.command"),
+                ];
+                keywords
+                    .iter()
+                    .any(|k| k.contains(&q) || q.contains(&k.to_string()))
+            }
+            CurrentConfigTab::Backend => {
+                let keywords = [
+                    i18n.t("search_keywords_backend.backend"),
+                    "gpu".into(),
+                    "cpu".into(),
+                    i18n.t("search_keywords_backend.render"),
+                    "vulkan".into(),
+                    "opengl".into(),
+                    "direui".into(),
+                    "metal".into(),
+                    i18n.t("search_keywords_backend.renderer"),
+                    i18n.t("search_keywords_backend.acceleration"),
+                    i18n.t("search_keywords_backend.display_protocol"),
+                ];
+                keywords
+                    .iter()
+                    .any(|k| k.contains(&q) || q.contains(&k.to_string()))
+            }
+            CurrentConfigTab::Appearance => {
+                let keywords = [
+                    i18n.t("search_keywords_appearance.color"),
+                    i18n.t("search_keywords_appearance.theme"),
+                    i18n.t("search_keywords_appearance.dark"),
+                    i18n.t("search_keywords_appearance.light"),
+                    i18n.t("search_keywords_appearance.font"),
+                    i18n.t("search_keywords_appearance.icon"),
+                    i18n.t("search_keywords_appearance.background"),
+                ];
+                keywords
+                    .iter()
+                    .any(|k| k.contains(&q) || q.contains(&k.to_string()))
+            }
+            CurrentConfigTab::Behavior => {
+                let keywords = [
+                    i18n.t("search_keywords_behavior.auto"),
+                    i18n.t("search_keywords_behavior.save"),
+                    i18n.t("search_keywords_behavior.backup"),
+                    i18n.t("search_keywords_behavior.behavior"),
+                    i18n.t("search_keywords_behavior.confirm"),
+                    i18n.t("search_keywords_behavior.undo"),
+                ];
+                keywords
+                    .iter()
+                    .any(|k| k.contains(&q) || q.contains(&k.to_string()))
+            }
+            CurrentConfigTab::Language => {
+                let keywords = [
+                    i18n.t("search_keywords_language.language"),
+                    i18n.t("search_keywords_language.idiom"),
+                ];
+                keywords
+                    .iter()
+                    .any(|k| k.contains(&q) || q.contains(&k.to_string()))
+            }
         };
 
         name_matches || content_matches
@@ -225,6 +240,7 @@ impl ConfigDialog {
                 CurrentConfigTab::Backend,
                 CurrentConfigTab::Appearance,
                 CurrentConfigTab::Behavior,
+                CurrentConfigTab::Language,
             ];
 
             let filtered: Vec<CurrentConfigTab> = all_tabs
@@ -251,6 +267,8 @@ impl ConfigDialog {
     }
 
     fn render_general_settings(&self, ui: &mut Ui, _query: &str, frame: Frame) {
+        let i18n = with_configs(|c| c.get_i18n());
+
         ui.add_space(10.0);
         frame.show(ui, |ui| {
             ui.vertical(|ui| {
@@ -265,8 +283,8 @@ impl ConfigDialog {
                 ui.separator();
                 ui.add_space(20.0);
 
-                ui.label("Gracias por usar BlazePilot!");
-                ui.label("Hecho con ❤️ por Jhanfer");
+                ui.label(i18n.t("configs_general.gratitude"));
+                ui.label(i18n.t("configs_general.made_for"));
 
                 ui.add_space(20.0);
 
@@ -275,7 +293,7 @@ impl ConfigDialog {
                         ui.open_url(OpenUrl::new_tab("https://github.com/Jhanfer/blazepilot"));
                     }
                     ui.label("•");
-                    if ui.link("Reportar bug").clicked() {
+                    if ui.link(i18n.t("configs_general.report")).clicked() {
                         ui.open_url(OpenUrl::new_tab(
                             "https://github.com/Jhanfer/blazepilot/issues",
                         ));
@@ -286,14 +304,14 @@ impl ConfigDialog {
                 ui.separator();
                 ui.add_space(12.0);
 
-                ui.collapsing("Información del sistema", |ui| {
+                ui.collapsing(i18n.t("configs_general.sys_info"), |ui| {
                     ui.monospace(format!("OS: {}", std::env::consts::OS));
                     ui.monospace(format!("Arch: {}", std::env::consts::ARCH));
                 });
 
                 ui.add_space(20.0);
                 ui.label(
-                    RichText::new("Las configuraciones son limitadas por ahora.")
+                    RichText::new(i18n.t("configs_general.disclaimer"))
                         .italics()
                         .weak(),
                 );
@@ -301,10 +319,10 @@ impl ConfigDialog {
         });
     }
 
-    fn get_selected_terminal_text(&self) -> String {
+    fn get_selected_terminal_text(&self, label: &str) -> String {
         with_configs(|c| {
             if c.get_default_terminal().trim().is_empty() {
-                "Seleccionar terminal".to_string()
+                label.to_string()
             } else {
                 c.get_default_terminal()
             }
@@ -324,6 +342,8 @@ impl ConfigDialog {
     }
 
     fn render_terminal_settings(&mut self, ui: &mut Ui, _query: &str, frame: Frame) {
+        let i18n = with_configs(|c| c.get_i18n());
+
         ui.add_space(10.0);
 
         if self.available_terminals.is_empty()
@@ -377,14 +397,19 @@ impl ConfigDialog {
 
         frame.show(ui, |ui| {
             ui.vertical(|ui| {
-                ui.heading("Seleccionar terminal");
+                ui.heading(i18n.t("configs_terminal.title"));
                 ui.add_space(8.0);
 
                 if self.loading_terminals {
                     ui.horizontal(|ui| {
                         ui.spinner();
-                        ui.label(format!("Cargando terminales... (Intento {}/{})", 
-                        self.retry_count, self.max_retries));
+                        ui.label(i18n.t_args(
+                            "configs_terminal.loading_message",
+                            &[
+                                ("query", &self.retry_count.to_string()),
+                                ("query", &self.max_retries.to_string()),
+                            ],
+                        ));
                     });
                     return;
                 }
@@ -393,35 +418,43 @@ impl ConfigDialog {
                     let mut show_retry = false;
 
                     if self.no_terminals_error {
-                        ui.colored_label(Color32::RED,"⚠️ No se han encontrado terminales en el sistema.");
+                        ui.colored_label(
+                            Color32::RED,
+                            i18n.t("configs_terminal.no_terminals_error"),
+                        );
 
                         if self.retry_count < self.max_retries {
                             show_retry = true;
 
-                            if ui.button("Reintentar").clicked() {
+                            if ui.button(i18n.t("configs_terminal.retry")).clicked() {
                                 self.reset_terminal_loading_state();
                             }
                         } else {
-                            ui.colored_label(Color32::from_rgb(255, 165, 0),
-                                "❌ No se ha podido encontrar ninguna terminal después de varios intentos.");
-                            ui.label("Por favor, verifique que tenga al menos una terminal instalada.");
+                            ui.colored_label(
+                                Color32::from_rgb(255, 165, 0),
+                                i18n.t("configs_terminal.max_retries_error"),
+                            );
+                            ui.label(i18n.t("configs_terminal.verify_terminals_message"));
                         }
                     } else {
-                        ui.label("No se encontraron terminales.");
+                        ui.label(i18n.t("configs_terminal.no_terminals_error"));
                     }
 
                     if show_retry {
                         ui.add_space(8.0);
-                        ui.colored_label(egui::Color32::from_rgb(255, 165, 0),
-                        "💡 Sugerencia: Instale una terminal como gnome-terminal, konsole, o alacritty");
+                        ui.colored_label(
+                            egui::Color32::from_rgb(255, 165, 0),
+                            i18n.t("configs_terminal.suggestion_message"),
+                        );
                     }
 
                     return;
                 }
 
-
-                egui::ComboBox::from_label("Terminal predeterminado")
-                    .selected_text(self.get_selected_terminal_text())
+                egui::ComboBox::from_label(i18n.t("configs_terminal.combo_box_label"))
+                    .selected_text(
+                        self.get_selected_terminal_text(&i18n.t("configs_terminal.selection")),
+                    )
                     .show_ui(ui, |ui| {
                         for term in &self.available_terminals {
                             let is_selected = self.is_terminal_selected(term);
@@ -435,50 +468,80 @@ impl ConfigDialog {
                     });
 
                 ui.add_space(12.0);
-                ui.label("Aquí puede seleccionar la terminal predeterminada para abrir.");
+                ui.label(i18n.t("configs_terminal.message"));
             });
         });
     }
 
     fn render_backend_settings(&mut self, ui: &mut Ui, _query: &str, frame: Frame) {
+        let i18n = with_configs(|c| c.get_i18n());
+
         ui.add_space(10.0);
-        frame.show(ui, |ui|{
-            ui.vertical(|ui|{
+        frame.show(ui, |ui| {
+            ui.vertical(|ui| {
+                ui.heading(i18n.t("configs_backend.title"));
 
-            ui.heading("Protocolo de pantalla");
+                ui.add_space(8.0);
 
-            ui.add_space(8.0);
+                let current = with_configs(|c| c.get_display_backend());
 
-            let current = with_configs(|c|c.get_display_backend());
-
-            ComboBox::from_label("Backend")
-                .selected_text(current.name())
-                .show_ui(ui, |ui| {
-                    for (name, backend) in [("Auto", DisplayBackend::Auto), ("Wayland", DisplayBackend::Wayland), ("X11", DisplayBackend::X11)] {
-
-                        if ui.selectable_label(current == backend, name).clicked() {
-                            with_configs(|c| {
-                                c.set_display_backend(backend);
-                            });
+                ComboBox::from_label(i18n.t("configs_backend.selection"))
+                    .selected_text(current.name())
+                    .show_ui(ui, |ui| {
+                        for (name, backend) in [
+                            ("Auto", DisplayBackend::Auto),
+                            ("Wayland", DisplayBackend::Wayland),
+                            ("X11", DisplayBackend::X11),
+                        ] {
+                            if ui.selectable_label(current == backend, name).clicked() {
+                                with_configs(|c| {
+                                    c.set_display_backend(backend);
+                                });
+                            }
                         }
-                    }
-                });
+                    });
             });
 
             ui.add_space(12.0);
-            ui.label(egui::RichText::new("¿Qué backend debería usar?").strong());
-            ui.label("Auto: Recomendado para la mayoría de usuarios.");
-            ui.label("Wayland: Mejor rendimiento y calidad visual.");
-            ui.label("X11: Mayor compatibilidad con apps antiguas. Permite el drag & drop desde otras aplicaciones.");
+            ui.label(egui::RichText::new(i18n.t("configs_backend.hint")).strong());
+            ui.label(i18n.t("configs_backend.message"));
+        });
+    }
 
-            ui.add_space(20.0);
-            ui.label("Estos cambios requieren de reiniciar la app.");
+    fn render_language_settings(&mut self, ui: &mut Ui, _query: &str, frame: Frame) {
+        let i18n = with_configs(|c| c.get_i18n());
+
+        ui.add_space(10.0);
+        frame.show(ui, |ui| {
+            ui.vertical(|ui| {
+                ui.heading(i18n.t("configs_language.title"));
+
+                ui.add_space(8.0);
+
+                let current = with_configs(|c| c.get_locale());
+
+                let languages = ["en", "es", "it", "ru", "fr", "de"];
+
+                ComboBox::from_label(i18n.t("configs_language.selection"))
+                    .selected_text(&current)
+                    .show_ui(ui, |ui| {
+                        for lang in languages {
+                            if ui.selectable_label(current == lang.into(), lang).clicked() {
+                                with_configs(|c| {
+                                    c.set_locale(lang);
+                                });
+                            }
+                        }
+                    });
+            });
+
+            ui.label(i18n.t("configs_language.message"))
         });
     }
 
     pub fn render_dialog(&mut self, ui: &mut Ui) {
+        let i18n = with_configs(|c| c.get_i18n());
         let mut config_open = self.show_modal;
-
         if !self.show_modal {
             return;
         }
@@ -499,7 +562,7 @@ impl ConfigDialog {
 
         let mut close_requested = false;
 
-        Window::new("Configuraciones")
+        Window::new(i18n.t("configs.title"))
             .frame(custom_frame)
             .order(Order::Foreground)
             .default_size([desired_width, desired_height])
@@ -543,16 +606,19 @@ impl ConfigDialog {
                         }
                         CurrentConfigTab::Appearance => {}
                         CurrentConfigTab::Behavior => {}
+                        CurrentConfigTab::Language => {
+                            self.render_language_settings(ui, &query, frame)
+                        }
                     }
                 });
 
                 let all_rect = side.response.rect.union(central.response.rect);
 
-                Area::new("cerrar".into())
+                Area::new("close".into())
                     .order(Order::Middle)
                     .fixed_pos(pos2(all_rect.center().x, all_rect.bottom() + 8.0))
                     .show(ui, |ui| {
-                        if ui.button("cerrar").clicked() {
+                        if ui.button(i18n.t("general_dialog.close")).clicked() {
                             close_requested = true;
                         }
                     });

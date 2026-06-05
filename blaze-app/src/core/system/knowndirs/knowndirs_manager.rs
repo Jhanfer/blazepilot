@@ -1,3 +1,4 @@
+use crate::core::bootstrap::configs::config_manager::with_configs;
 use directories::{BaseDirs, ProjectDirs, UserDirs};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -141,24 +142,26 @@ impl KnownDirsManager {
             .expect("KnownDirsManager::init() no fue llamado")
     }
 
-    pub fn sidebar_dirs(&'static self) -> Vec<(&'static str, &'static Arc<Path>)> {
-        let mut dirs = vec![("Home", &self.home)];
+    pub fn sidebar_dirs(&'static self) -> Vec<(&'static str, Box<str>, &'static Arc<Path>)> {
+        let i18n = with_configs(|c| c.get_i18n());
+
+        let mut dirs = vec![("home", i18n.t("left_sidebar.home"), &self.home)];
 
         macro_rules! push_opt {
-            ($label:expr, $field:expr) => {
+            ($key:expr, $label_key:expr, $field:expr) => {
                 if let Some(ref p) = $field {
-                    dirs.push(($label, p));
+                    dirs.push(($key, i18n.t($label_key).into(), p));
                 }
             };
         }
 
-        push_opt!("Escritorio", self.desktop);
-        push_opt!("Descargas", self.downloads);
-        push_opt!("Documentos", self.documents);
-        push_opt!("Imágenes", self.pictures);
-        push_opt!("Vídeos", self.videos);
-        push_opt!("Música", self.music);
-        push_opt!("Público", self.public);
+        push_opt!("desktop", "left_sidebar.desktop", &self.desktop);
+        push_opt!("downloads", "left_sidebar.downloads", &self.downloads);
+        push_opt!("documents", "left_sidebar.documents", &self.documents);
+        push_opt!("pictures", "left_sidebar.pictures", &self.pictures);
+        push_opt!("videos", "left_sidebar.videos", &self.videos);
+        push_opt!("music", "left_sidebar.music", &self.music);
+        push_opt!("public", "left_sidebar.public", &self.public);
 
         dirs
     }

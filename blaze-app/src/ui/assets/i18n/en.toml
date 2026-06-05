@@ -1,0 +1,218 @@
+[app]
+title = "BlazePilot"
+loading = "Loading..."
+
+[left_sidebar]
+root = "Root"
+locals = "Locals"
+home = "Home"
+desktop = "Desktop"
+downloads = "Downloads"
+documents = "Documents"
+pictures = "Pictures"
+videos = "Videos"
+music = "Music"
+public = "Public"
+trash = "Trash" 
+disks = "Disks"
+
+[right_sidebar]
+info = "Information"
+ext = "Extension: {query}"
+type = "Type: {query}"
+size = "Size: {query}"
+owner = "Owner: {query}"
+group_name = "Group name: {query}"
+dimensions = "Dimensions: {w} x {h}"
+git_status = "Git status: {query}"
+
+[search]
+placeholder = "Search files..."
+no_results = "No results for \"{query}\""
+searching = "Searching..."
+
+[bg_ctx_menu]
+new_tab = "New tab"
+open_terminal_here = "Open terminal here"
+new_folder = "New folder"
+new_file = "New file"
+
+[file_ctx_menu]
+preview = "Preview"
+open = "Open"
+open_with = "Open with..."
+open_in_new_tab = "Open in new tab"
+add_to_tag = "Add to tag"
+
+[file_ops]
+copy = "Copy"
+cut = "Cut"
+paste = "Paste"
+paste_here = "Paste here"
+extract_here = "Extract here"
+folder_color = "Folder color"
+rename = "Rename"
+restore = "Restore"
+move_to_trash = "Move to trash"
+delete = "Delete"
+delete_confirm = "Delete {count} file(s)?"
+
+[tools]
+name = "Name"
+modified = "Modified"
+size = "Size"
+
+[tags_quick]
+new = "New"
+all = "All"
+edit = "Edit"
+delete = "Delete"
+empty = "Nothing to see here."
+add_something = "Maybe you want to add something."
+count = "{query} items"
+
+[git_status]
+modified = "Modified"
+staged = "Staged"
+untracked = "Untracked"
+ignored = "Ignored"
+conflict = "Conflict"
+deleted = "Deleted"
+clean = "Clean"
+
+[modified_date_formating]
+now = "Now"
+min = "{query} min"
+hour = "{query} h"
+day = "{query} d"
+week = "{query} w"
+month = "{query} mo"
+year = "{query} y"
+
+[configs]
+title = "Settings"
+general = "General"
+terminal = "Terminal"
+backend = "Backend"
+appearance = "Appearance"
+behavior = "Behavior"
+language = "Language"
+
+[configs_general]
+gratitude = "Thank you for using BlazePilot!"
+made_for = "Made with ❤ by Jhanfer. :D"
+report = "Report a bug"
+sys_info = "System information"
+disclaimer = "Settings are limited for now. We are still working on it."
+
+[configs_terminal]
+title = "Select terminal"
+selection = "Select a terminal"
+message = "Here you can select the default terminal to open."
+loading_message = "Loading terminals... (Attempt {retry_count}/{max_retries})"
+no_terminals_error = "⚠️ No terminals found on the system."
+max_retries_error = "❌ Could not find any terminal after several attempts."
+verify_terminals_message = "Please verify that you have at least one terminal installed."
+suggestion_message = "💡 Suggestion: Install a terminal like gnome-terminal, konsole, or alacritty"
+retry = "Retry"
+max_retries = 3
+timeout_seconds = 5
+combo_box_label = "Default terminal"
+
+
+[configs_backend]
+title = "Display protocol"
+selection = "Backend"
+hint = "Which backend should be used?"
+message = """
+Auto: Recommended for most users.
+Wayland: Better performance and visual quality.
+X11: Greater compatibility with older apps. Allows drag & drop from other applications.
+"""
+disclaimer = "These changes require restarting the app."
+
+[configs_appearance]
+title = "WIP :D"
+
+[configs_behavior]
+title = "WIP :D"
+
+[configs_language]
+title = "Change language"
+selection = "Language"
+message = "Pick a language that makes your interface feel like home 🏡✨"
+
+[general_dialog]
+accept = "Accept"
+cancel = "Cancel"
+close = "Close"
+
+[error_dialog]
+title = "An error has occurred!"
+
+[select_folder_color_dialog]
+title = "Select a color"
+reset_pred = "Restore default"
+
+[quick_tag_dialog_add]
+title = "Add to tag"
+selection = "Select tag"
+
+[quick_tag_dialog_create]
+title = "Create new tag"
+selection = "Select tag"
+name = "Tag name: "
+
+[quick_tag_dialog_edit]
+title = "Edit tag"
+selection = "Select tag"
+name = "Tag name: "
+
+[quick_tag_dialog_delete]
+title = "Do you want to delete the tag: \"{query}\"?"
+
+[quick_tag_dialog_delete_quick]
+title = "Do you want to delete the link: \"{query}\"?"
+
+[quick_tag_dialog_edit_quick]
+title = "Edit quick"
+name = "Quick name: "
+
+
+[search_keywords_terminal]
+terminal = "terminal"
+shell = "shell"
+size = "size"
+font = "font"
+command = "command"
+prompt = "prompt"
+
+[search_keywords_backend]
+backend = "backend"
+gpu = "gpu"
+cpu = "cpu"
+render = "render"
+renderer = "renderer"
+acceleration = "acceleration"
+display_protocol = "display protocol"
+
+[search_keywords_appearance]
+color = "color"
+theme = "theme"
+dark = "dark"
+light = "light"
+font = "font"
+icon = "icon"
+background = "background"
+
+[search_keywords_behavior]
+auto = "auto"
+save = "save"
+backup = "backup"
+behavior = "behavior"
+confirm = "confirm"
+undo = "undo"
+
+[search_keywords_language]
+language = "language"
+idiom = "idiom"

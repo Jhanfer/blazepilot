@@ -9,7 +9,10 @@ use tracing::{info, warn};
 use crate::{
     core::{
         blaze_state::{BlazeCoreState, NewItemType},
-        bootstrap::quick_access_manager::platform::structs::QuickLinks,
+        bootstrap::{
+            configs::config_manager::with_configs,
+            quick_access_manager::platform::structs::QuickLinks,
+        },
         files::blaze_motor::motor_structs::FileEntry,
         runtime::{
             bus_structs::{FileOperation, QuickTagEvent, SureTo, UiEvent},
@@ -460,6 +463,8 @@ impl ContextMenuState {
         ui_state: &mut BlazeUiState,
         files: &[Arc<FileEntry>],
     ) {
+        let i18n = with_configs(|c| c.get_i18n());
+
         if !self.open {
             return;
         }
@@ -487,7 +492,7 @@ impl ContextMenuState {
 
                 let icon = ("restore", icons::ICON_RESTORE);
 
-                let label = "Restaurar";
+                let label = i18n.t("file_ops.restore");
                 let hint = "";
 
                 let action: Cell<Option<u8>> = Cell::new(None);
@@ -495,7 +500,7 @@ impl ContextMenuState {
                 Self::render_context_button(
                     ui,
                     ui_state,
-                    label,
+                    &label,
                     hint,
                     icon,
                     enable,
@@ -518,7 +523,7 @@ impl ContextMenuState {
                 let enable = !sources.is_empty();
 
                 let icon = ("trash-forever", icons::ICON_TRASH);
-                let label = "Eliminar";
+                let label = i18n.t("file_ops.delete");
                 let hint = "Supr";
 
                 let action: Cell<Option<u8>> = Cell::new(None);
@@ -526,7 +531,7 @@ impl ContextMenuState {
                 Self::render_context_button(
                     ui,
                     ui_state,
-                    label,
+                    &label,
                     hint,
                     icon,
                     enable,
@@ -555,6 +560,8 @@ impl ContextMenuState {
         state: &mut BlazeCoreState,
         ui_state: &mut BlazeUiState,
     ) {
+        let i18n = with_configs(|c| c.get_i18n());
+
         if !self.open {
             return;
         }
@@ -598,7 +605,7 @@ impl ContextMenuState {
 
                 let text_edit = TextEdit::singleline(&mut state.search_filter)
                     .id(search_id)
-                    .hint_text("Buscar...")
+                    .hint_text(i18n.t("search.placeholder"))
                     .font(FontId::proportional(13.0))
                     .desired_width(text_rect.width());
 
@@ -613,7 +620,7 @@ impl ContextMenuState {
             ui.horizontal(|ui| {
                 let icon = ("tab-icon", icons::ICON_TAB_ICON);
 
-                let label = "Nueva pestaña";
+                let label = i18n.t("bg_ctx_menu.new_tab");
                 let hint = "Ctrl + N";
 
                 let action: Cell<Option<u8>> = Cell::new(None);
@@ -621,7 +628,7 @@ impl ContextMenuState {
                 Self::render_context_button(
                     ui,
                     ui_state,
-                    label,
+                    &label,
                     hint,
                     icon,
                     true,
@@ -654,7 +661,7 @@ impl ContextMenuState {
                     ("clipboard-disabled", icons::ICON_CLIPBOARD_DISABLE)
                 };
 
-                let label = "Pegar aquí";
+                let label = i18n.t("file_ops.paste_here");
                 let hint = "Ctrl + V";
 
                 let action: Cell<Option<u8>> = Cell::new(None);
@@ -662,7 +669,7 @@ impl ContextMenuState {
                 Self::render_context_button(
                     ui,
                     ui_state,
-                    label,
+                    &label,
                     hint,
                     icon,
                     enable,
@@ -684,7 +691,7 @@ impl ContextMenuState {
             ui.horizontal(|ui| {
                 let icon = ("terminal", icons::ICON_TERMINAL);
 
-                let label = "Abrir terminal aqui";
+                let label = i18n.t("bg_ctx_menu.open_terminal_here");
                 let hint = "Alt + T";
 
                 let action: Cell<Option<u8>> = Cell::new(None);
@@ -692,7 +699,7 @@ impl ContextMenuState {
                 Self::render_context_button(
                     ui,
                     ui_state,
-                    label,
+                    &label,
                     hint,
                     icon,
                     true,
@@ -712,7 +719,7 @@ impl ContextMenuState {
             ui.horizontal(|ui| {
                 let icon = ("plus-folder", icons::ICON_PLUS_FOLDER);
 
-                let label = "Nueva carpeta";
+                let label = i18n.t("bg_ctx_menu.new_folder");
                 let hint = "Ctrl + Shfit + N";
 
                 let action: Cell<Option<u8>> = Cell::new(None);
@@ -720,7 +727,7 @@ impl ContextMenuState {
                 Self::render_context_button(
                     ui,
                     ui_state,
-                    label,
+                    &label,
                     hint,
                     icon,
                     true,
@@ -732,7 +739,7 @@ impl ContextMenuState {
 
                 if let Some(0) = action.get() {
                     state.creating_new = Some(NewItemType::Folder);
-                    state.new_item_buffer = "nueva carpeta".to_string();
+                    state.new_item_buffer = label.to_string();
                     should_close = true;
                 }
             });
@@ -740,7 +747,7 @@ impl ContextMenuState {
             ui.horizontal(|ui| {
                 let icon = ("plus-file", icons::ICON_PLUS_FILE);
 
-                let label = "Nuevo archivo";
+                let label = i18n.t("bg_ctx_menu.new_file");
                 let hint = "Ctrl + Shfit + F";
 
                 let action: Cell<Option<u8>> = Cell::new(None);
@@ -748,7 +755,7 @@ impl ContextMenuState {
                 Self::render_context_button(
                     ui,
                     ui_state,
-                    label,
+                    &label,
                     hint,
                     icon,
                     true,
@@ -760,7 +767,7 @@ impl ContextMenuState {
 
                 if let Some(0) = action.get() {
                     state.creating_new = Some(NewItemType::File);
-                    state.new_item_buffer = "nuevo archivo".to_string();
+                    state.new_item_buffer = label.to_string();
                     should_close = true;
                 }
             });
@@ -781,6 +788,8 @@ impl ContextMenuState {
         ui_state: &mut BlazeUiState,
         files: &[Arc<FileEntry>],
     ) {
+        let i18n = with_configs(|c| c.get_i18n());
+
         if !self.open {
             return;
         }
@@ -808,7 +817,7 @@ impl ContextMenuState {
 
                 let icon = ("restore", icons::ICON_RESTORE);
 
-                let label = "Restaurar";
+                let label = i18n.t("file_ops.restore");
                 let hint = "";
 
                 let action: Cell<Option<u8>> = Cell::new(None);
@@ -816,7 +825,7 @@ impl ContextMenuState {
                 Self::render_context_button(
                     ui,
                     ui_state,
-                    label,
+                    &label,
                     hint,
                     icon,
                     enable,
@@ -843,7 +852,7 @@ impl ContextMenuState {
 
                 let icon = ("trash-forever", icons::ICON_TRASH);
 
-                let label = "Eliminar";
+                let label = i18n.t("file_ops.delete");
                 let hint = "Supr";
 
                 let action: Cell<Option<u8>> = Cell::new(None);
@@ -851,7 +860,7 @@ impl ContextMenuState {
                 Self::render_context_button(
                     ui,
                     ui_state,
-                    label,
+                    &label,
                     hint,
                     icon,
                     enable,
@@ -891,6 +900,8 @@ impl ContextMenuState {
         ui_state: &mut BlazeUiState,
         files: &[Arc<FileEntry>],
     ) {
+        let i18n = with_configs(|c| c.get_i18n());
+
         if !self.open {
             return;
         }
@@ -906,7 +917,7 @@ impl ContextMenuState {
                 ui.horizontal(|ui| {
                     let icon = ("polaroid", icons::ICON_POLAROID);
 
-                    let label = "Previsualizar";
+                    let label = i18n.t("file_ctx_menu.preview");
                     let hint = "";
 
                     let action: Cell<Option<u8>> = Cell::new(None);
@@ -914,7 +925,7 @@ impl ContextMenuState {
                     Self::render_context_button(
                         ui,
                         ui_state,
-                        label,
+                        &label,
                         hint,
                         icon,
                         true,
@@ -946,7 +957,7 @@ impl ContextMenuState {
             ui.horizontal(|ui| {
                 if !file.is_dir() {
                     let icon = ("external-link", icons::ICON_EXTERNAL_LINK);
-                    let label = "Abrir";
+                    let label = i18n.t("file_ctx_menu.open");
                     let hint = "Enter";
 
                     let action: Cell<Option<u8>> = Cell::new(None);
@@ -954,7 +965,7 @@ impl ContextMenuState {
                     Self::render_context_button(
                         ui,
                         ui_state,
-                        label,
+                        &label,
                         hint,
                         icon,
                         true,
@@ -963,13 +974,13 @@ impl ContextMenuState {
                         },
                         Some(|ui: &mut Ui, ui_state: &mut BlazeUiState| {
                             let icon = ("external-link", icons::ICON_EXTERNAL_LINK);
-                            let label = "Abrir con...";
+                            let label = i18n.t("file_ctx_menu.open_with");
                             let hint = "";
 
                             Self::render_context_button(
                                 ui,
                                 ui_state,
-                                label,
+                                &label,
                                 hint,
                                 icon,
                                 true,
@@ -1001,7 +1012,7 @@ impl ContextMenuState {
                     }
                 } else {
                     let icon = ("folder-open", icons::ICON_FOLDER_OPEN);
-                    let label = "Abrir";
+                    let label = i18n.t("file_ctx_menu.open");
                     let hint = "Enter";
 
                     let action: Cell<Option<u8>> = Cell::new(None);
@@ -1009,7 +1020,7 @@ impl ContextMenuState {
                     Self::render_context_button(
                         ui,
                         ui_state,
-                        label,
+                        &label,
                         hint,
                         icon,
                         true,
@@ -1018,13 +1029,13 @@ impl ContextMenuState {
                         },
                         Some(|ui: &mut Ui, ui_state: &mut BlazeUiState| {
                             let icon = ("folder-open", icons::ICON_FOLDER_OPEN);
-                            let label = "Abrir nueva pestaña";
+                            let label = i18n.t("file_ctx_menu.open_in_new_tab");
                             let hint = "";
 
                             Self::render_context_button(
                                 ui,
                                 ui_state,
-                                label,
+                                &label,
                                 hint,
                                 icon,
                                 true,
@@ -1068,7 +1079,7 @@ impl ContextMenuState {
                     ("clipboard-disable", icons::ICON_CLIPBOARD_DISABLE)
                 };
 
-                let label = "Pegar aquí";
+                let label = i18n.t("file_ops.paste_here");
                 let hint = "";
 
                 let action: Cell<Option<u8>> = Cell::new(None);
@@ -1076,7 +1087,7 @@ impl ContextMenuState {
                 Self::render_context_button(
                     ui,
                     ui_state,
-                    label,
+                    &label,
                     hint,
                     icon,
                     enable,
@@ -1098,7 +1109,7 @@ impl ContextMenuState {
             ui.horizontal(|ui| {
                 let icon = ("copy", icons::ICON_COPY);
 
-                let label = "Copiar";
+                let label = i18n.t("file_ops.copy");
                 let hint = "Ctrl + C";
 
                 let action: Cell<Option<u8>> = Cell::new(None);
@@ -1106,7 +1117,7 @@ impl ContextMenuState {
                 Self::render_context_button(
                     ui,
                     ui_state,
-                    label,
+                    &label,
                     hint,
                     icon,
                     true,
@@ -1128,7 +1139,7 @@ impl ContextMenuState {
             ui.horizontal(|ui| {
                 let icon = ("scissors", icons::ICON_SCISSORS);
 
-                let label = "Cortar";
+                let label = i18n.t("file_ops.cut");
                 let hint = "Ctrl + X";
 
                 let action: Cell<Option<u8>> = Cell::new(None);
@@ -1136,7 +1147,7 @@ impl ContextMenuState {
                 Self::render_context_button(
                     ui,
                     ui_state,
-                    label,
+                    &label,
                     hint,
                     icon,
                     true,
@@ -1158,7 +1169,7 @@ impl ContextMenuState {
                 ui.horizontal(|ui| {
                     let icon = ("extract", icons::ICON_EXTRACT);
 
-                    let label = "Extraer aqui";
+                    let label = i18n.t("file_ops.extract_here");
                     let hint = "";
 
                     let action: Cell<Option<u8>> = Cell::new(None);
@@ -1166,7 +1177,7 @@ impl ContextMenuState {
                     Self::render_context_button(
                         ui,
                         ui_state,
-                        label,
+                        &label,
                         hint,
                         icon,
                         true,
@@ -1196,7 +1207,7 @@ impl ContextMenuState {
                 ui.horizontal(|ui| {
                     let icon = ("palette", icons::ICON_PALETTE);
 
-                    let label = "Color de carpeta";
+                    let label = i18n.t("file_ops.folder_color");
                     let hint = "";
 
                     let action: Cell<Option<u8>> = Cell::new(None);
@@ -1204,7 +1215,7 @@ impl ContextMenuState {
                     Self::render_context_button(
                         ui,
                         ui_state,
-                        label,
+                        &label,
                         hint,
                         icon,
                         true,
@@ -1235,8 +1246,7 @@ impl ContextMenuState {
             ui.horizontal(|ui| {
                 let icon = ("star-row", icons::ICON_STAR);
 
-                let label = "Agregar a tag";
-
+                let label = i18n.t("file_ctx_menu.add_to_tag");
                 let hint = "";
 
                 let action: Cell<Option<u8>> = Cell::new(None);
@@ -1244,7 +1254,7 @@ impl ContextMenuState {
                 Self::render_context_button(
                     ui,
                     ui_state,
-                    label,
+                    &label,
                     hint,
                     icon,
                     true,
@@ -1278,7 +1288,7 @@ impl ContextMenuState {
             ui.horizontal(|ui| {
                 let icon = ("trash", icons::ICON_TRASH);
 
-                let label = "Mover a Papelera";
+                let label = i18n.t("file_ops.move_to_trash");
                 let hint = "Supr";
 
                 let action: Cell<Option<u8>> = Cell::new(None);
@@ -1286,7 +1296,7 @@ impl ContextMenuState {
                 Self::render_context_button(
                     ui,
                     ui_state,
-                    label,
+                    &label,
                     hint,
                     icon,
                     true,
@@ -1314,7 +1324,7 @@ impl ContextMenuState {
             ui.horizontal(|ui| {
                 let icon = ("edit", icons::ICON_EDIT);
 
-                let label = "Renombrar";
+                let label = i18n.t("file_ops.rename");
                 let hint = "";
 
                 let action: Cell<Option<u8>> = Cell::new(None);
@@ -1322,7 +1332,7 @@ impl ContextMenuState {
                 Self::render_context_button(
                     ui,
                     ui_state,
-                    label,
+                    &label,
                     hint,
                     icon,
                     true,

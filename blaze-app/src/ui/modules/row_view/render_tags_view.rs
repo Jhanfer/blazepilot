@@ -1,7 +1,9 @@
 use crate::{
     core::{
         blaze_state::{BlazeCoreState, TagViewFilter, ViewMode},
-        bootstrap::quick_access_manager::manager::with_quick_tags,
+        bootstrap::{
+            configs::config_manager::with_configs, quick_access_manager::manager::with_quick_tags,
+        },
         runtime::{
             bus_structs::{FileOperation, QuickTagEvent, UiEvent},
             event_bus::with_event_bus,
@@ -41,6 +43,8 @@ pub fn tag_views(
     tabs_height: i8,
 ) {
     let mut tag_len: usize = 0;
+
+    let i18n = with_configs(|c| c.get_i18n());
 
     Frame::NONE
         .inner_margin(Margin {
@@ -100,7 +104,7 @@ pub fn tag_views(
                     |ui| {
                         render_button(
                             ui,
-                            "Nuevo",
+                            &i18n.t("tags_quick.new"),
                             COLOR_BG_MAIN,
                             COLOR_ACCENT_GLOW,
                             Some(|| {
@@ -116,7 +120,7 @@ pub fn tag_views(
 
                         render_button(
                             ui,
-                            "Todas",
+                            &i18n.t("tags_quick.all"),
                             COLOR_BG_MAIN,
                             COLOR_ACCENT_GLOW,
                             Some(|| {
@@ -166,7 +170,7 @@ pub fn tag_views(
                                                 };
                                             }),
                                             Some(|ui: &mut Ui| {
-                                                if ui.button("Editar").clicked() {
+                                                if ui.button(&i18n.t("tags_quick.edit")).clicked() {
                                                     dispatcher
                                                         .send(UiEvent::QuickTagEvent(
                                                             QuickTagEvent::EditCurrentTag {
@@ -178,7 +182,8 @@ pub fn tag_views(
                                                         .ok();
                                                 }
 
-                                                if ui.button("Eliminar").clicked() {
+                                                if ui.button(&i18n.t("tags_quick.delete")).clicked()
+                                                {
                                                     dispatcher
                                                         .send(UiEvent::QuickTagEvent(
                                                             QuickTagEvent::DeleteCurrentTag {
@@ -202,7 +207,7 @@ pub fn tag_views(
                         egui::Layout::centered_and_justified(egui::Direction::TopDown),
                         |ui| {
                             ui.label(
-                                egui::RichText::new("No hay nada que ver aquí.")
+                                egui::RichText::new(&*i18n.t("tags_quick.empty"))
                                     .color(COLOR_TEXT_SECONDARY)
                                     .size(14.0)
                                     .strong(),
@@ -251,9 +256,12 @@ pub fn tag_views(
 
                                     ui.add(
                                         Label::new(
-                                            RichText::new(format!("{} elememtos", tag.items.len()))
-                                                .color(COLOR_TEXT_SECONDARY)
-                                                .size(11.0),
+                                            RichText::new(&*i18n.t_args(
+                                                "tags_quick.count",
+                                                &[("query", &tag.items.len().to_string())],
+                                            ))
+                                            .color(COLOR_TEXT_SECONDARY)
+                                            .size(11.0),
                                         )
                                         .selectable(false),
                                     );
@@ -316,10 +324,12 @@ pub fn tag_views(
                                             ),
                                             |ui| {
                                                 ui.label(
-                                                    RichText::new("Quizá quieras añadir algo.")
-                                                        .color(COLOR_TEXT_SECONDARY)
-                                                        .size(14.0)
-                                                        .strong(),
+                                                    RichText::new(
+                                                        &*i18n.t("tags_quick.add_something"),
+                                                    )
+                                                    .color(COLOR_TEXT_SECONDARY)
+                                                    .size(14.0)
+                                                    .strong(),
                                                 );
                                             },
                                         );
@@ -380,7 +390,7 @@ pub fn tag_views(
                                         };
 
                                         response.context_menu(|ui| {
-                                            if ui.button("Editar").clicked() {
+                                            if ui.button(&i18n.t("tags_quick.edit")).clicked() {
                                                 dispatcher
                                                     .send(UiEvent::QuickTagEvent(
                                                         QuickTagEvent::EditCurrentQuickLink {
@@ -393,7 +403,7 @@ pub fn tag_views(
                                                     .ok();
                                             }
 
-                                            if ui.button("Eliminar").clicked() {
+                                            if ui.button(&i18n.t("tags_quick.delete")).clicked() {
                                                 dispatcher
                                                     .send(UiEvent::QuickTagEvent(
                                                         QuickTagEvent::DeleteQuickLink {

@@ -1,0 +1,218 @@
+[app]
+title = "BlazePilot"
+loading = "Chargement..."
+
+[left_sidebar]
+root = "Racine"
+locals = "Locaux"
+home = "Accueil"
+desktop = "Bureau"
+downloads = "Téléchargements"
+documents = "Documents"
+pictures = "Images"
+videos = "Vidéos"
+music = "Musique"
+public = "Public"
+trash = "Corbeille" 
+disks = "Disques"
+
+[right_sidebar]
+info = "Informations"
+ext = "Extension : {query}"
+type = "Type : {query}"
+size = "Taille : {query}"
+owner = "Propriétaire : {query}"
+group_name = "Nom du groupe : {query}"
+dimensions = "Dimensions : {w} x {h}"
+git_status = "Statut Git : {query}"
+
+[search]
+placeholder = "Rechercher des fichiers..."
+no_results = "Aucun résultat pour \"{query}\""
+searching = "Recherche en cours..."
+
+[bg_ctx_menu]
+new_tab = "Nouvel onglet"
+open_terminal_here = "Ouvrir le terminal ici"
+new_folder = "Nouveau dossier"
+new_file = "Nouveau fichier"
+
+[file_ctx_menu]
+preview = "Aperçu"
+open = "Ouvrir"
+open_with = "Ouvrir avec..."
+open_in_new_tab = "Ouvrir dans un nouvel onglet"
+add_to_tag = "Ajouter au tag"
+
+[file_ops]
+copy = "Copier"
+cut = "Couper"
+paste = "Coller"
+paste_here = "Coller ici"
+extract_here = "Extraire ici"
+folder_color = "Couleur du dossier"
+rename = "Renommer"
+restore = "Restaurer"
+move_to_trash = "Déplacer vers la corbeille"
+delete = "Supprimer"
+delete_confirm = "Supprimer {count} fichier(s) ?"
+
+[tools]
+name = "Nom"
+modified = "Modifié"
+size = "Taille"
+
+[tags_quick]
+new = "Nouveau"
+all = "Tous"
+edit = "Modifier"
+delete = "Supprimer"
+empty = "Rien à voir ici."
+add_something = "Peut-être voulez-vous ajouter quelque chose."
+count = "{query} éléments"
+
+[git_status]
+modified = "Modifié"
+staged = "Indexé"
+untracked = "Non suivi"
+ignored = "Ignoré"
+conflict = "Conflit"
+deleted = "Supprimé"
+clean = "Propre"
+
+[modified_date_formating]
+now = "Maintenant"
+min = "{query} min"
+hour = "{query} h"
+day = "{query} j"
+week = "{query} sem"
+month = "{query} mois"
+year = "{query} a"
+
+[configs]
+title = "Paramètres"
+general = "Général"
+terminal = "Terminal"
+backend = "Backend"
+appearance = "Apparence"
+behavior = "Comportement"
+language = "Langue"
+
+[configs_general]
+gratitude = "Merci d'utiliser BlazePilot !"
+made_for = "Fait avec ❤ par Jhanfer. :D"
+report = "Signaler un bug"
+sys_info = "Informations système"
+disclaimer = "Les paramètres sont limités pour l'instant. Nous travaillons encore dessus."
+
+[configs_terminal]
+title = "Sélectionner le terminal"
+selection = "Sélectionnez un terminal"
+message = "Ici, vous pouvez sélectionner le terminal par défaut à ouvrir."
+loading_message = "Chargement des terminaux... (Tentative {retry_count}/{max_retries})"
+no_terminals_error = "⚠️ Aucun terminal trouvé sur le système."
+max_retries_error = "❌ Impossible de trouver un terminal après plusieurs tentatives."
+verify_terminals_message = "Veuillez vérifier qu'au moins un terminal est installé."
+suggestion_message = "💡 Conseil : Installez un terminal comme gnome-terminal, konsole ou alacritty"
+retry = "Réessayer"
+max_retries = 3
+timeout_seconds = 5
+combo_box_label = "Terminal par défaut"
+
+
+[configs_backend]
+title = "Protocole d'affichage"
+selection = "Backend"
+hint = "Quel backend doit être utilisé ?"
+message = """
+Auto : Recommandé pour la plupart des utilisateurs.
+Wayland : Meilleures performances et qualité visuelle.
+X11 : Plus grande compatibilité avec les anciennes applications. Permet le glisser-déposer depuis d'autres applications.
+"""
+disclaimer = "Ces modifications nécessitent un redémarrage de l'application."
+
+[configs_appearance]
+title = "En cours :D"
+
+[configs_behavior]
+title = "En cours :D"
+
+[configs_language]
+title = "Changer de langue"
+selection = "Langue"
+message = "Quelle langue fera battre votre interface aujourd'hui ? 💓"
+
+[general_dialog]
+accept = "Accepter"
+cancel = "Annuler"
+close = "Fermer"
+
+[error_dialog]
+title = "Une erreur est survenue !"
+
+[select_folder_color_dialog]
+title = "Sélectionner une couleur"
+reset_pred = "Restaurer par défaut"
+
+[quick_tag_dialog_add]
+title = "Ajouter au tag"
+selection = "Sélectionner un tag"
+
+[quick_tag_dialog_create]
+title = "Créer un nouveau tag"
+selection = "Sélectionner un tag"
+name = "Nom du tag : "
+
+[quick_tag_dialog_edit]
+title = "Modifier le tag"
+selection = "Sélectionner un tag"
+name = "Nom du tag : "
+
+[quick_tag_dialog_delete]
+title = "Voulez-vous supprimer le tag : \"{query}\" ?"
+
+[quick_tag_dialog_delete_quick]
+title = "Voulez-vous supprimer le lien : \"{query}\" ?"
+
+[quick_tag_dialog_edit_quick]
+title = "Modifier quick"
+name = "Nom du quick : "
+
+
+[search_keywords_terminal]
+terminal = "terminal"
+shell = "shell"
+size = "taille"
+font = "police"
+command = "commande"
+prompt = "invite"
+
+[search_keywords_backend]
+backend = "backend"
+gpu = "GPU"
+cpu = "CPU"
+render = "rendu"
+renderer = "moteur de rendu"
+acceleration = "accélération"
+display_protocol = "protocole d'affichage"
+
+[search_keywords_appearance]
+color = "couleur"
+theme = "thème"
+dark = "sombre"
+light = "clair"
+font = "police"
+icon = "icône"
+background = "arrière-plan"
+
+[search_keywords_behavior]
+auto = "auto"
+save = "sauvegarder"
+backup = "sauvegarde"
+behavior = "comportement"
+confirm = "confirmer"
+undo = "annuler"
+
+[search_keywords_language]
+language = "langue"
+idiom = "idiome"

@@ -246,6 +246,8 @@ pub fn new_render_scrollview(
     total_rows: usize,
     content_rect: Rect,
 ) {
+    let i18n = with_configs(|c| c.get_i18n());
+
     ui_state.evict_thumbnail_cache_if_dir_changed(&state.cwd);
     ui_state.enforce_texture_cache_limit(500);
 
@@ -278,9 +280,9 @@ pub fn new_render_scrollview(
     // Botón Nombre
     let name_btn_rect = Rect::from_min_size(header_rect.min, vec2(name_w, header_height));
     let name_label = match current_order {
-        OrderingMode::Az => "Nombre ↑",
-        OrderingMode::Za => "Nombre ↓",
-        _ => "Nombre",
+        OrderingMode::Az => format!("{} ↑", i18n.t("tools.name")),
+        OrderingMode::Za => format!("{} ↓", i18n.t("tools.name")),
+        _ => i18n.t("tools.name").to_string(),
     };
     if ui
         .put(
@@ -308,9 +310,9 @@ pub fn new_render_scrollview(
     let date_btn_rect =
         Rect::from_min_size(pos2(date_x, header_rect.min.y), vec2(date_w, header_height));
     let date_label = match current_order {
-        OrderingMode::DateAsc => "Modificado ↑",
-        OrderingMode::DateDesc => "Modificado ↓",
-        _ => "Modificado",
+        OrderingMode::DateAsc => format!("{} ↑", i18n.t("tools.modified")),
+        OrderingMode::DateDesc => format!("{} ↓", i18n.t("tools.modified")),
+        _ => i18n.t("tools.modified").to_string(),
     };
     if ui
         .put(
@@ -338,9 +340,9 @@ pub fn new_render_scrollview(
     let size_btn_rect =
         Rect::from_min_size(pos2(size_x, header_rect.min.y), vec2(size_w, header_height));
     let size_label = match current_order {
-        OrderingMode::SizeAsc => "Tamaño ↑",
-        OrderingMode::SizeDesc => "Tamaño ↓",
-        _ => "Tamaño",
+        OrderingMode::SizeAsc => format!("{} ↑", i18n.t("tools.size")),
+        OrderingMode::SizeDesc => format!("{} ↓", i18n.t("tools.size")),
+        _ => i18n.t("tools.size").to_string(),
     };
     if ui
         .put(
@@ -637,13 +639,13 @@ pub fn new_render_scrollview(
                 let dot_rect = Rect::from_center_size(dot_center, vec2(dot_size, dot_size));
                 if let Some(git_status) = git {
                     let label = match git_status {
-                        GitStatus::Modified => "Modificado",
-                        GitStatus::Staged => "Preparado",
-                        GitStatus::Untracked => "No rastreado",
-                        GitStatus::Ignored => "Ignorado",
-                        GitStatus::Conflict => "Conflicto",
-                        GitStatus::Deleted => "Eliminado",
-                        GitStatus::Clean => "Limpio",
+                        GitStatus::Modified => i18n.t("git_status.modified"),
+                        GitStatus::Staged => i18n.t("git_status.staged"),
+                        GitStatus::Untracked => i18n.t("git_status.untracked"),
+                        GitStatus::Ignored => i18n.t("git_status.ignored"),
+                        GitStatus::Conflict => i18n.t("git_status.conflict"),
+                        GitStatus::Deleted => i18n.t("git_status.deleted"),
+                        GitStatus::Clean => i18n.t("git_status.clean"),
                     };
                     ui.interact(dot_rect, ui.id().with(("dot", i)), Sense::hover())
                         .on_hover_text(label);
@@ -682,7 +684,7 @@ pub fn new_render_scrollview(
             );
             let date_galley = ui.fonts_mut(|f| {
                 f.layout_no_wrap(
-                    format_date(file.modified),
+                    format_date(file.modified).to_string(),
                     FontId::proportional(12.0),
                     Color32::from_rgb(109, 108, 111),
                 )
