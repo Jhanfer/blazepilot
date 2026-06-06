@@ -40,11 +40,21 @@ jobs:
           cp target/x86_64-unknown-linux-gnu/release/blazepilot "./$FILE"
           echo "file=$FILE" >> "$GITHUB_OUTPUT"
 
+      - name: Extraer changelog de esta versión
+        id: changelog
+        run: |
+          VERSION=${GITHUB_REF_NAME#v}
+          BODY=$(awk "/^## \[${VERSION}\]/{found=1; next} found && /^## \[/{exit} found{print}" CHANGELOG.md)
+          echo "body<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$BODY" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
       - name: Subir binario al Release
         uses: softprops/action-gh-release@v2
         with:
           files: ${{ steps.rename.outputs.file }}
           tag_name: ${{ github.ref_name }}
           name: Release ${{ github.ref_name }}
+          body: ${{ steps.changelog.outputs.body }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
