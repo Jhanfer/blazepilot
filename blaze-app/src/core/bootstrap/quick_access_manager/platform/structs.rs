@@ -35,6 +35,8 @@ pub struct QuickLinks {
     pub meta: Arc<Mutex<Option<CachedMeta>>>,
     #[serde(skip)]
     pub cancel: Arc<AtomicBool>,
+    #[serde(skip)]
+    pub is_computing: Arc<AtomicBool>,
 }
 
 impl QuickLinks {
@@ -48,6 +50,7 @@ impl QuickLinks {
             meta: Arc::new(None.into()),
             cancel: Arc::new(AtomicBool::new(false)),
             kind: FileKind::File,
+            is_computing: AtomicBool::new(false).into(),
         }
     }
 
@@ -60,18 +63,22 @@ impl QuickLinks {
     }
 
     pub fn refresh_meta(&self) {
-        self.cancel.store(true, Ordering::Release);
+        if self.is_computing.load(Ordering::Acquire) {
+            return;
+        }
+        self.is_computing.store(true, Ordering::Release);
+        self.cancel.store(false, Ordering::Release);
 
-        let cancel = Arc::new(AtomicBool::new(false));
+        let cancel_clone = self.cancel.clone();
+        let is_computing = self.is_computing.clone();
 
         let path = self.path.clone();
         let meta_arc = self.meta.clone();
-        let cancel_clone = cancel.clone();
 
         if self.is_dir {
             TOKIO_RUNTIME.spawn(async move {
                 let size_res = SizerManager::calc_size_for(path.clone(), cancel_clone).await;
-
+                is_computing.store(false, Ordering::Release);
                 match size_res {
                     Ok(size) => {
                         if let Ok(m) = std::fs::metadata(&path) {
@@ -100,6 +107,7 @@ impl QuickLinks {
                         });
                     }
                 }
+                is_computing.store(false, Ordering::Release);
             });
         }
     }

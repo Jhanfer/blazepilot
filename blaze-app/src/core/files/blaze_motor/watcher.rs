@@ -113,15 +113,13 @@ impl FileWatcher {
         let watching = Arc::new(AtomicBool::new(true));
         self.watching = watching.clone();
 
-        let (fs_tx, mut fs_rx) = tokio::sync::mpsc::channel(100);
+        let (fs_tx, mut fs_rx) = tokio::sync::mpsc::channel(1);
 
         // se crea el watcher
         let mut watcher = notify::recommended_watcher(move |res| match res {
             Ok(ev) => match fs_tx.try_send(ev) {
                 Ok(_) => {}
-                Err(tokio::sync::mpsc::error::TrySendError::Full(_)) => {
-                    error!("!Canales de watcher llenos!");
-                }
+                Err(tokio::sync::mpsc::error::TrySendError::Full(_)) => {}
 
                 Err(tokio::sync::mpsc::error::TrySendError::Closed(_)) => {
                     error!("watcher channel cerrado");
@@ -136,24 +134,11 @@ impl FileWatcher {
         self.watcher = Some(Box::new(watcher) as Box<dyn Watcher + Send>);
 
         let handle = TOKIO_RUNTIME.spawn(async move {
-            let debounce_duration = Duration::from_millis(500);
-
             while watching.load(Ordering::Acquire) {
                 if let Some(event) = fs_rx.recv().await {
-                    let mut last_event = event;
-                    loop {
-                        tokio::select! {
-                            biased;
-                            Some(next_event) = fs_rx.recv() => {
-                                last_event = next_event;
-                            }
-                            _ = sleep(debounce_duration) => {
-                                break;
-                            }
-                        }
-                    }
-
-                    Self::handle_watcher_event(last_event, &sender)
+                    while let Ok(_extra) = fs_rx.try_recv() {}
+                    sleep(Duration::from_millis(300)).await;
+                    Self::handle_watcher_event(event, &sender);
                 }
             }
         });

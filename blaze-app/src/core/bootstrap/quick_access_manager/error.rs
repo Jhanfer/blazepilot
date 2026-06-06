@@ -8,10 +8,10 @@ pub enum QuickAccError {
     #[error("No se ha encontrado la ruta de configuración")]
     ProjectDirsNotFound,
 
-    #[error("Error al deserializar el 'config.json'")]
+    #[error("Error al deserializar el 'quick_access.json'")]
     Deserialize,
 
-    #[error("Error al serializar el 'config.json'")]
+    #[error("Error al serializar el 'quick_access.json'")]
     Serialize,
 }
 
