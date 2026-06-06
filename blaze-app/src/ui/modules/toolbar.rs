@@ -19,7 +19,7 @@ use crate::{
     },
     ui::{
         blaze_ui_state::BlazeUiState,
-        icons_cache::icons,
+        icons_cache::icons::{self},
         themes::colors::{COLOR_BG_MAIN, COLOR_BG_PANEL},
     },
 };
@@ -45,21 +45,25 @@ fn render_bar_button<F>(
         .show(ui, |ui| {
             ui.set_width(ball_size);
             ui.set_height(total_height);
-
+            let icon_size = vec2(16.0, 16.0);
             let (rect, resp) =
                 ui.allocate_exact_size(vec2(ball_size, total_height), Sense::click());
 
-            let icon = ui_state
-                .icon_cache
-                .get_or_load(ui, label, bytes, Color32::WHITE);
-
-            let icon_size = vec2(16.0, 16.0);
             let icon_pos = rect.left_center() - vec2(-10.0, icon_size.y / 2.0);
             let icon_rect = Rect::from_min_size(icon_pos, icon_size);
 
+            let rounded_rect = Rect::from_min_max(
+                pos2(icon_rect.min.x.round(), icon_rect.min.y.round()),
+                pos2(icon_rect.max.x.round(), icon_rect.max.y.round()),
+            );
+
+            let icon = ui_state
+                .icon_cache
+                .get_or_load(ui, label, bytes, Color32::WHITE, icon_size);
+
             ui.painter().image(
                 icon.id(),
-                icon_rect,
+                rounded_rect,
                 Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
                 Color32::WHITE,
             );

@@ -251,20 +251,26 @@ impl ContextMenuState {
 
         let icon_pos = rect.left_top() + vec2(padding, (rect.height() - icon_size.x) / 2.0);
         let icon_rect = Rect::from_min_size(icon_pos, icon_size);
+
+        let rounded_rect = Rect::from_min_max(
+            pos2(icon_rect.min.x.round(), icon_rect.min.y.round()),
+            pos2(icon_rect.max.x.round(), icon_rect.max.y.round()),
+        );
+
         let icon = ui_state
             .icon_cache
-            .get_or_load(ui, icon.0, icon.1, Color32::GRAY);
+            .get_or_load(ui, icon.0, icon.1, Color32::GRAY, icon_size);
 
         let painter = ui.painter();
 
         painter.image(
             icon.id(),
-            icon_rect,
+            rounded_rect,
             Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
             Color32::WHITE,
         );
 
-        let text_pos = pos2(icon_rect.right() + 6.0, rect.center().y);
+        let text_pos = pos2(rounded_rect.right() + 6.0, rect.center().y);
 
         ui.painter().text(
             text_pos,
@@ -583,19 +589,26 @@ impl ContextMenuState {
 
                 let icon_pos = rect.left_top() + vec2(padding, (rect.height() - icon_size.y) / 2.0);
                 let icon_rect = Rect::from_min_size(icon_pos, icon_size);
-                let icon = ui_state
-                    .icon_cache
-                    .get_or_load(ui, icon.0, icon.1, Color32::GRAY);
+
+                let rounded_rect = Rect::from_min_max(
+                    pos2(icon_rect.min.x.round(), icon_rect.min.y.round()),
+                    pos2(icon_rect.max.x.round(), icon_rect.max.y.round()),
+                );
+
+                let icon =
+                    ui_state
+                        .icon_cache
+                        .get_or_load(ui, icon.0, icon.1, Color32::GRAY, icon_size);
 
                 ui.painter().image(
                     icon.id(),
-                    icon_rect,
+                    rounded_rect,
                     Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
                     Color32::WHITE,
                 );
 
                 let text_rect = Rect::from_min_max(
-                    pos2(icon_rect.right() + 6.0, rect.min.y + 4.0),
+                    pos2(rounded_rect.right() + 6.0, rect.min.y + 4.0),
                     pos2(rect.max.x - padding, rect.max.y - 4.0),
                 );
 

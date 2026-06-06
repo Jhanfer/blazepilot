@@ -16,7 +16,7 @@ use crate::{
             row_view::{
                 drag_drop_logic::drag_files, hot_keys::hot_keys_logic,
                 island_n_bubble::render_island_bubble, new_scroll_view::new_render_scrollview,
-                render_drag::render_drag_files, rubber_band_logic::render_rubberband,
+                rubber_band_logic::render_rubberband,
             },
         },
         themes::colors::*,
@@ -281,9 +281,6 @@ pub fn row_panel_frame(
                 state.row_view.drop_target = None;
                 state.row_view.drop_invalid_target = None;
             }
-
-            //Renderizado de archivos drag
-            render_drag_files(state, files, clipped_painter, content_rect, row_height);
 
             //Isla y burbuja y las tabs
             render_island_bubble(ui, state, ui_state, files, bottom_padding, tabs_height);

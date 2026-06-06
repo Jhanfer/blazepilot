@@ -45,17 +45,22 @@ pub fn render_icon(
     icon_bytes: &[u8],
     rect: Rect,
 ) {
-    let icon: &egui::TextureHandle = ui_state
-        .icon_cache
-        .get_or_load(ui, icon_name, icon_bytes, color);
-
     let icon_size = vec2(16.0, 16.0);
     let icon_pos = rect.left_center() - vec2(-10.0, icon_size.y / 2.0);
     let icon_rect = Rect::from_min_size(icon_pos, icon_size);
 
+    let rounded_rect = Rect::from_min_max(
+        pos2(icon_rect.min.x.round(), icon_rect.min.y.round()),
+        pos2(icon_rect.max.x.round(), icon_rect.max.y.round()),
+    );
+
+    let icon: &egui::TextureHandle = ui_state
+        .icon_cache
+        .get_or_load(ui, icon_name, icon_bytes, color, icon_size);
+
     ui.painter().image(
         icon.id(),
-        icon_rect,
+        rounded_rect,
         Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
         Color32::WHITE,
     );
@@ -65,9 +70,15 @@ pub fn render_header_text(icon_key: &str, label: &str, ui: &mut Ui, ui_state: &m
     let (rect, _resp) = ui.allocate_exact_size(vec2(ui.available_width(), 24.0), Sense::hover());
 
     let (icon_name, icon_bytes) = get_header_icon(icon_key);
-    let color = Color32::WHITE;
 
-    render_icon(ui, ui_state, icon_name, color, icon_bytes, rect);
+    render_icon(
+        ui,
+        ui_state,
+        icon_name,
+        COLOR_TEXT_PRIMARY,
+        icon_bytes,
+        rect,
+    );
 
     ui.painter().text(
         rect.left_center() + vec2(34.0, 0.0),
@@ -138,7 +149,7 @@ pub fn render_local_buttons(
         Align2::LEFT_CENTER,
         label,
         FontId::default(),
-        ui.visuals().text_color(),
+        COLOR_TEXT_SECONDARY,
     );
 }
 
@@ -260,6 +271,6 @@ pub fn render_drives_button(
         Align2::LEFT_CENTER,
         display_name,
         FontId::default(),
-        ui.visuals().text_color(),
+        COLOR_TEXT_SECONDARY,
     );
 }

@@ -16,3 +16,7 @@ pub const COLOR_FOLDER_PURPLE: Color32 = Color32::from_rgb(163, 97, 255);
 // Tonos de texto principales
 pub const COLOR_TEXT_PRIMARY: Color32 = Color32::from_rgb(255, 255, 255); // Blanco puro para textos principales
 pub const COLOR_TEXT_SECONDARY: Color32 = Color32::from_rgb(226, 213, 237); // Blanco violáceo para nombres de archivos y carpetas
+
+// Colores para la barrra de tools
+pub const COLOR_TOOLS_PRIMARY: Color32 = Color32::from_rgb(255, 255, 255);
+pub const COLOR_TOOLS_SECONDARY: Color32 = Color32::from_rgb(211, 161, 255);

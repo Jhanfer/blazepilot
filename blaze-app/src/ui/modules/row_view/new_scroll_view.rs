@@ -27,7 +27,8 @@ use crate::{
 };
 use egui::{
     pos2, scroll_area::ScrollSource, vec2, Button, Color32, ColorImage, CursorIcon, FontId, Id,
-    Key, Modifiers, PointerButton, Rect, RichText, ScrollArea, Sense, TextEdit, TextureOptions, Ui,
+    Key, Modifiers, PointerButton, Rect, RichText, ScrollArea, Sense, Stroke, StrokeKind, TextEdit,
+    TextureOptions, Ui,
 };
 use file_id::FileId;
 use std::{collections::HashMap, path::Path, sync::Arc};
@@ -509,6 +510,27 @@ pub fn new_render_scrollview(
                 );
             }
 
+            // Drop target highlight
+            if let Some(ref target) = state.row_view.drop_target.clone() {
+                if *file.full_path == **target {
+                    ui.painter().rect_stroke(
+                        rect,
+                        5.0,
+                        Stroke::new(2.0, Color32::from_rgb(150, 150, 255)),
+                        StrokeKind::Outside,
+                    );
+                }
+            } else if let Some(ref target_invalid) = state.row_view.drop_invalid_target.clone() {
+                if *file.full_path == **target_invalid {
+                    ui.painter().rect_stroke(
+                        rect,
+                        5.0,
+                        Stroke::new(2.0, Color32::from_rgb(255, 150, 150)),
+                        StrokeKind::Outside,
+                    );
+                }
+            }
+
             // --- Toda la lógica de interacción original ---
             handle_row_interactions(
                 ui,
@@ -577,11 +599,13 @@ pub fn new_render_scrollview(
             let icon_size = 16.0;
             let dot_size = 8.0;
             let icon_spacing = 4.0;
-            let name_start_x = rect.min.x + icon_size + dot_size + icon_spacing * 2.0;
+            let left_padding = 6.0;
+            let name_start_x =
+                rect.min.x + left_padding + icon_size + dot_size + icon_spacing * 2.0;
             let name_end_x = rect.min.x + name_w;
 
             let icon_rect = Rect::from_min_size(
-                pos2(rect.min.x, rect.center().y - icon_size / 2.0),
+                pos2(rect.min.x + left_padding, rect.center().y - icon_size / 2.0),
                 vec2(icon_size, icon_size),
             );
 
@@ -617,13 +641,21 @@ pub fn new_render_scrollview(
                 should_repaint = true;
             } else {
                 let (icon_name, icon_bytes, color) = resolve_icon(file, &color_snapshot);
-                let icon = ui_state
-                    .icon_cache
-                    .get_or_load(ui, &icon_name, icon_bytes, color);
+                let rounded_rect = Rect::from_min_max(
+                    pos2(icon_rect.min.x.round(), icon_rect.min.y.round()),
+                    pos2(icon_rect.max.x.round(), icon_rect.max.y.round()),
+                );
+                let icon = ui_state.icon_cache.get_or_load(
+                    ui,
+                    &icon_name,
+                    icon_bytes,
+                    color,
+                    vec2(icon_size, icon_size),
+                );
 
                 ui.painter().image(
                     icon.id(),
-                    icon_rect,
+                    rounded_rect,
                     Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
                     Color32::WHITE,
                 );
@@ -631,7 +663,7 @@ pub fn new_render_scrollview(
 
             // Dot git
             let dot_center = pos2(
-                rect.min.x + icon_size + icon_spacing + dot_size / 2.0,
+                rect.min.x + left_padding + icon_size + icon_spacing + dot_size / 2.0,
                 rect.center().y,
             );
             if let Some(dot) = dot_color {

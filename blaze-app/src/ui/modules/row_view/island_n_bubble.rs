@@ -110,13 +110,21 @@ pub fn render_island_bubble(
             let icon_size = egui::vec2(14.0, 14.0);
             let (icon_rect, _) = ui.allocate_exact_size(icon_size, Sense::hover());
             let (icon_name, icon_bytes) = ("file", icons::ICON_FILE);
-            let icon = ui_state
-                .icon_cache
-                .get_or_load(ui, icon_name, icon_bytes, Color32::GRAY);
+            let rounded_rect = Rect::from_min_max(
+                pos2(icon_rect.min.x.round(), icon_rect.min.y.round()),
+                pos2(icon_rect.max.x.round(), icon_rect.max.y.round()),
+            );
+            let icon = ui_state.icon_cache.get_or_load(
+                ui,
+                icon_name,
+                icon_bytes,
+                Color32::GRAY,
+                icon_size,
+            );
 
             ui.painter().image(
                 icon.id(),
-                icon_rect,
+                rounded_rect,
                 Rect::from_min_max(egui::pos2(0.0, 0.0), pos2(1.0, 1.0)),
                 Color32::WHITE,
             );
@@ -129,15 +137,22 @@ pub fn render_island_bubble(
             ui.add_space(5.0);
 
             let (icon_rect, _) = ui.allocate_exact_size(icon_size, Sense::hover());
-
+            let rounded_rect = Rect::from_min_max(
+                pos2(icon_rect.min.x.round(), icon_rect.min.y.round()),
+                pos2(icon_rect.max.x.round(), icon_rect.max.y.round()),
+            );
             let (icon_name, icon_bytes) = ("list", icons::ICON_LIST);
-            let icon = ui_state
-                .icon_cache
-                .get_or_load(ui, icon_name, icon_bytes, Color32::GRAY);
+            let icon = ui_state.icon_cache.get_or_load(
+                ui,
+                icon_name,
+                icon_bytes,
+                Color32::GRAY,
+                icon_size,
+            );
 
             ui.painter().image(
                 icon.id(),
-                icon_rect,
+                rounded_rect,
                 Rect::from_min_max(egui::pos2(0.0, 0.0), pos2(1.0, 1.0)),
                 Color32::WHITE,
             );
@@ -169,13 +184,21 @@ pub fn render_island_bubble(
 
             let (icon_rect, _) = ui.allocate_exact_size(icon_size, Sense::hover());
             let (icon_name, icon_bytes) = ("database", icons::ICON_DATABASE);
-            let icon = ui_state
-                .icon_cache
-                .get_or_load(ui, icon_name, icon_bytes, Color32::GRAY);
+            let rounded_rect = Rect::from_min_max(
+                pos2(icon_rect.min.x.round(), icon_rect.min.y.round()),
+                pos2(icon_rect.max.x.round(), icon_rect.max.y.round()),
+            );
+            let icon = ui_state.icon_cache.get_or_load(
+                ui,
+                icon_name,
+                icon_bytes,
+                Color32::GRAY,
+                icon_size,
+            );
 
             ui.painter().image(
                 icon.id(),
-                icon_rect,
+                rounded_rect,
                 Rect::from_min_max(egui::pos2(0.0, 0.0), pos2(1.0, 1.0)),
                 Color32::WHITE,
             );
@@ -347,11 +370,23 @@ pub fn render_island_bubble(
                                             icon_n,
                                             icon_b,
                                             Color32::GRAY,
+                                            vec2(icon_size, icon_size),
+                                        );
+
+                                        let rounded_rect = Rect::from_min_max(
+                                            pos2(
+                                                t_icon_rect.min.x.round(),
+                                                t_icon_rect.min.y.round(),
+                                            ),
+                                            pos2(
+                                                t_icon_rect.max.x.round(),
+                                                t_icon_rect.max.y.round(),
+                                            ),
                                         );
 
                                         ui.painter().image(
                                             icon.id(),
-                                            t_icon_rect,
+                                            rounded_rect,
                                             Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
                                             Color32::WHITE,
                                         );
@@ -409,11 +444,17 @@ pub fn render_island_bubble(
                                             icon_n,
                                             icon_b,
                                             Color32::GRAY,
+                                            vec2(icon_size, icon_size),
+                                        );
+
+                                        let rounded_rect = Rect::from_min_max(
+                                            pos2(x_rect.min.x.round(), x_rect.min.y.round()),
+                                            pos2(x_rect.max.x.round(), x_rect.max.y.round()),
                                         );
 
                                         ui.painter().image(
                                             icon.id(),
-                                            x_rect,
+                                            rounded_rect,
                                             Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
                                             Color32::WHITE,
                                         );
@@ -495,14 +536,22 @@ pub fn render_island_bubble(
 
                         let (icon_n, icon_b) = ("plus", icons::ICON_PLUS);
 
-                        let icon =
-                            ui_state
-                                .icon_cache
-                                .get_or_load(ui, icon_n, icon_b, Color32::GRAY);
+                        let rounded_rect = Rect::from_min_max(
+                            pos2(icon_rect.min.x.round(), icon_rect.min.y.round()),
+                            pos2(icon_rect.max.x.round(), icon_rect.max.y.round()),
+                        );
+
+                        let icon = ui_state.icon_cache.get_or_load(
+                            ui,
+                            icon_n,
+                            icon_b,
+                            Color32::GRAY,
+                            vec2(icon_size, icon_size),
+                        );
 
                         ui.painter().image(
                             icon.id(),
-                            icon_rect,
+                            rounded_rect,
                             Rect::from_min_max(egui::pos2(0.0, 0.0), pos2(1.0, 1.0)),
                             Color32::WHITE,
                         );
@@ -540,16 +589,24 @@ pub fn render_tags_island_bubble(
                 TagViewFilter::Tag { items_len, .. } => (1, items_len),
             };
 
-            let icon_size = egui::vec2(14.0, 14.0);
+            let icon_size = vec2(14.0, 14.0);
             let (icon_rect, _) = ui.allocate_exact_size(icon_size, Sense::hover());
             let (icon_name, icon_bytes) = ("tag", icons::ICON_TAG);
-            let icon = ui_state
-                .icon_cache
-                .get_or_load(ui, icon_name, icon_bytes, Color32::GRAY);
+            let rounded_rect = Rect::from_min_max(
+                pos2(icon_rect.min.x.round(), icon_rect.min.y.round()),
+                pos2(icon_rect.max.x.round(), icon_rect.max.y.round()),
+            );
+            let icon = ui_state.icon_cache.get_or_load(
+                ui,
+                icon_name,
+                icon_bytes,
+                Color32::GRAY,
+                icon_size,
+            );
 
             ui.painter().image(
                 icon.id(),
-                icon_rect,
+                rounded_rect,
                 Rect::from_min_max(egui::pos2(0.0, 0.0), pos2(1.0, 1.0)),
                 Color32::WHITE,
             );
@@ -563,13 +620,21 @@ pub fn render_tags_island_bubble(
             let (icon_rect, _) = ui.allocate_exact_size(icon_size, Sense::hover());
 
             let (icon_name, icon_bytes) = ("list", icons::ICON_LIST);
-            let icon = ui_state
-                .icon_cache
-                .get_or_load(ui, icon_name, icon_bytes, Color32::GRAY);
+            let rounded_rect = Rect::from_min_max(
+                pos2(icon_rect.min.x.round(), icon_rect.min.y.round()),
+                pos2(icon_rect.max.x.round(), icon_rect.max.y.round()),
+            );
+            let icon = ui_state.icon_cache.get_or_load(
+                ui,
+                icon_name,
+                icon_bytes,
+                Color32::GRAY,
+                icon_size,
+            );
 
             ui.painter().image(
                 icon.id(),
-                icon_rect,
+                rounded_rect,
                 Rect::from_min_max(egui::pos2(0.0, 0.0), pos2(1.0, 1.0)),
                 Color32::WHITE,
             );

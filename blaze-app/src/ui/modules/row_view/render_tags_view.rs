@@ -514,6 +514,7 @@ pub fn tag_views(
                                                         &thumb_snapshot,
                                                         ui_state,
                                                         icon_rect,
+                                                        icon_size,
                                                     );
 
                                                     ui.add_space(20.0);

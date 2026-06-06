@@ -14,7 +14,7 @@ use crate::{
 };
 use egui::{
     lerp, pos2, vec2, Align, Align2, Color32, ColorImage, CornerRadius, CursorIcon, Layout, Rect,
-    Sense, Stroke, StrokeKind, TextStyle, TextureOptions, Ui,
+    Sense, Stroke, StrokeKind, TextStyle, TextureOptions, Ui, Vec2,
 };
 use file_id::FileId;
 use std::{collections::HashMap, path::Path, sync::Arc};
@@ -167,6 +167,7 @@ pub fn render_quicklink_icon(
     thumb_snapshot: &HashMap<Arc<Path>, Thumbnail>,
     ui_state: &mut BlazeUiState,
     icon_rect: Rect,
+    icon_size: Vec2,
 ) {
     if let Some(thumb) = thumb_snapshot.get(&item.path) {
         let tex = ui_state
@@ -202,13 +203,17 @@ pub fn render_quicklink_icon(
     };
 
     let (icon_name, icon_bytes, color) = resolve_icon(&Arc::from(dummy_entry), &Default::default());
+    let rounded_rect = Rect::from_min_max(
+        pos2(icon_rect.min.x.round(), icon_rect.min.y.round()),
+        pos2(icon_rect.max.x.round(), icon_rect.max.y.round()),
+    );
     let icon = ui_state
         .icon_cache
-        .get_or_load(ui, &icon_name, icon_bytes, color);
+        .get_or_load(ui, &icon_name, icon_bytes, color, icon_size);
 
     ui.painter().image(
         icon.id(),
-        icon_rect,
+        rounded_rect,
         Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
         Color32::WHITE,
     );
@@ -413,7 +418,7 @@ pub fn render_op_buttons<F, C>(
 
             let icon_edit = ui_state
                 .icon_cache
-                .get_or_load(ui, "edit", ICON_EDIT, accent1);
+                .get_or_load(ui, "edit", ICON_EDIT, accent1, icon_size);
 
             ui.painter().image(
                 icon_edit.id(),
@@ -424,7 +429,7 @@ pub fn render_op_buttons<F, C>(
 
             let icon_trash = ui_state
                 .icon_cache
-                .get_or_load(ui, "trash", ICON_TRASH, accent2);
+                .get_or_load(ui, "trash", ICON_TRASH, accent2, icon_size);
 
             ui.painter().image(
                 icon_trash.id(),

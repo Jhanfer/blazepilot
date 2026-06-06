@@ -83,25 +83,30 @@ pub fn tools(
                     let (icon_plus_fol, icon_bytes_plus_fol) =
                         ("plus-folder", icons::ICON_PLUS_FOLDER);
 
-                    let icon_size = vec2(17.5, 17.5);
+                    let icon_size = vec2(18.0, 18.0);
                     let (icon_rect, new_fol) = ui.allocate_exact_size(icon_size, Sense::click());
+                    let rounded_rect = Rect::from_min_max(
+                        pos2(icon_rect.min.x.round(), icon_rect.min.y.round()),
+                        pos2(icon_rect.max.x.round(), icon_rect.max.y.round()),
+                    );
 
                     let icon = ui_state.icon_cache.get_or_load(
                         ui,
                         icon_plus_fol,
                         icon_bytes_plus_fol,
                         Color32::GRAY,
+                        icon_size,
                     );
 
                     let plus_color = if new_fol.hovered() {
-                        COLOR_TEXT_PRIMARY
+                        COLOR_TOOLS_PRIMARY
                     } else {
-                        COLOR_TEXT_SECONDARY
+                        COLOR_TOOLS_SECONDARY
                     };
 
                     ui.painter().image(
                         icon.id(),
-                        icon_rect,
+                        rounded_rect,
                         Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
                         plus_color,
                     );
@@ -114,25 +119,30 @@ pub fn tools(
                     let (icon_plus_file, icon_bytes_plus_file) =
                         ("plus-file", icons::ICON_PLUS_FILE);
 
-                    let icon_size = vec2(17.5, 17.5);
+                    let icon_size = vec2(18.0, 18.0);
                     let (icon_rect, new_file) = ui.allocate_exact_size(icon_size, Sense::click());
+                    let rounded_rect = Rect::from_min_max(
+                        pos2(icon_rect.min.x.round(), icon_rect.min.y.round()),
+                        pos2(icon_rect.max.x.round(), icon_rect.max.y.round()),
+                    );
 
                     let icon = ui_state.icon_cache.get_or_load(
                         ui,
                         icon_plus_file,
                         icon_bytes_plus_file,
                         Color32::GRAY,
+                        icon_size,
                     );
 
                     let plus_color = if new_file.hovered() {
-                        COLOR_TEXT_PRIMARY
+                        COLOR_TOOLS_PRIMARY
                     } else {
-                        COLOR_TEXT_SECONDARY
+                        COLOR_TOOLS_SECONDARY
                     };
 
                     ui.painter().image(
                         icon.id(),
-                        icon_rect,
+                        rounded_rect,
                         Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
                         plus_color,
                     );
@@ -165,23 +175,30 @@ pub fn tools(
                     ("scissors-disable", icons::ICON_SCISSORS_DISABLE)
                 };
 
-                let icon_size = vec2(17.5, 17.5);
+                let icon_size = vec2(18.0, 18.0);
                 let (icon_rect, cut_resp) = ui.allocate_exact_size(icon_size, Sense::click());
+                let rounded_rect = Rect::from_min_max(
+                    pos2(icon_rect.min.x.round(), icon_rect.min.y.round()),
+                    pos2(icon_rect.max.x.round(), icon_rect.max.y.round()),
+                );
 
-                let icon =
-                    ui_state
-                        .icon_cache
-                        .get_or_load(ui, icon_cut, icon_bytes_cut, Color32::GRAY);
+                let icon = ui_state.icon_cache.get_or_load(
+                    ui,
+                    icon_cut,
+                    icon_bytes_cut,
+                    Color32::GRAY,
+                    icon_size,
+                );
 
                 let sissors_color = if cut_resp.hovered() && has_selection {
-                    COLOR_TEXT_PRIMARY
+                    COLOR_TOOLS_PRIMARY
                 } else {
-                    COLOR_TEXT_SECONDARY
+                    COLOR_TOOLS_SECONDARY
                 };
 
                 ui.painter().image(
                     icon.id(),
-                    icon_rect,
+                    rounded_rect,
                     Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
                     sissors_color,
                 );
@@ -196,23 +213,30 @@ pub fn tools(
                     ("copy-disable", icons::ICON_COPY_DISABLE)
                 };
 
-                let icon_size = vec2(17.5, 17.5);
+                let icon_size = vec2(18.0, 18.0);
                 let (icon_rect, cop_resp) = ui.allocate_exact_size(icon_size, Sense::click());
+                let rounded_rect = Rect::from_min_max(
+                    pos2(icon_rect.min.x.round(), icon_rect.min.y.round()),
+                    pos2(icon_rect.max.x.round(), icon_rect.max.y.round()),
+                );
 
-                let icon =
-                    ui_state
-                        .icon_cache
-                        .get_or_load(ui, icon_copy, icon_bytes_copy, Color32::GRAY);
+                let icon = ui_state.icon_cache.get_or_load(
+                    ui,
+                    icon_copy,
+                    icon_bytes_copy,
+                    Color32::GRAY,
+                    icon_size,
+                );
 
                 let clip_color = if cop_resp.hovered() && has_selection {
-                    COLOR_TEXT_PRIMARY
+                    COLOR_TOOLS_PRIMARY
                 } else {
-                    COLOR_TEXT_SECONDARY
+                    COLOR_TOOLS_SECONDARY
                 };
 
                 ui.painter().image(
                     icon.id(),
-                    icon_rect,
+                    rounded_rect,
                     Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
                     clip_color,
                 );
@@ -227,25 +251,30 @@ pub fn tools(
                     ("clipboard-disable", icons::ICON_CLIPBOARD_DISABLE)
                 };
 
-                let icon_size = vec2(17.5, 17.5);
+                let icon_size = vec2(18.0, 18.0);
                 let (icon_rect, pas_resp) = ui.allocate_exact_size(icon_size, Sense::click());
+                let rounded_rect = Rect::from_min_max(
+                    pos2(icon_rect.min.x.round(), icon_rect.min.y.round()),
+                    pos2(icon_rect.max.x.round(), icon_rect.max.y.round()),
+                );
 
                 let icon = ui_state.icon_cache.get_or_load(
                     ui,
                     icon_paste,
                     icon_bytes_paste,
                     Color32::GRAY,
+                    icon_size,
                 );
 
                 let pas_color = if pas_resp.hovered() && has_clipboard {
-                    COLOR_TEXT_PRIMARY
+                    COLOR_TOOLS_PRIMARY
                 } else {
-                    COLOR_TEXT_SECONDARY
+                    COLOR_TOOLS_SECONDARY
                 };
 
                 ui.painter().image(
                     icon.id(),
-                    icon_rect,
+                    rounded_rect,
                     Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
                     pas_color,
                 );
@@ -261,25 +290,30 @@ pub fn tools(
                     ("trash-disable", icons::ICON_TRASH_DISABLED)
                 };
 
-                let icon_size = vec2(17.5, 17.5);
+                let icon_size = vec2(18.0, 18.0);
                 let (icon_rect, del_resp) = ui.allocate_exact_size(icon_size, Sense::click());
+                let rounded_rect = Rect::from_min_max(
+                    pos2(icon_rect.min.x.round(), icon_rect.min.y.round()),
+                    pos2(icon_rect.max.x.round(), icon_rect.max.y.round()),
+                );
 
                 let icon = ui_state.icon_cache.get_or_load(
                     ui,
                     icon_trash,
                     icon_bytes_trash,
                     Color32::GRAY,
+                    icon_size,
                 );
 
                 let del_color = if del_resp.hovered() && has_selection {
-                    COLOR_TEXT_PRIMARY
+                    COLOR_TOOLS_PRIMARY
                 } else {
-                    COLOR_TEXT_SECONDARY
+                    COLOR_TOOLS_SECONDARY
                 };
 
                 ui.painter().image(
                     icon.id(),
-                    icon_rect,
+                    rounded_rect,
                     Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
                     del_color,
                 );
@@ -319,23 +353,30 @@ pub fn tools(
                     ("select-all", icons::ICON_SELECTALL)
                 };
 
-                let icon_size = vec2(17.5, 17.5);
+                let icon_size = vec2(18.0, 18.0);
                 let (icon_rect, select_resp) = ui.allocate_exact_size(icon_size, Sense::click());
+                let rounded_rect = Rect::from_min_max(
+                    pos2(icon_rect.min.x.round(), icon_rect.min.y.round()),
+                    pos2(icon_rect.max.x.round(), icon_rect.max.y.round()),
+                );
 
-                let icon =
-                    ui_state
-                        .icon_cache
-                        .get_or_load(ui, icon_name, icon_bytes, Color32::GRAY);
+                let icon = ui_state.icon_cache.get_or_load(
+                    ui,
+                    icon_name,
+                    icon_bytes,
+                    Color32::GRAY,
+                    icon_size,
+                );
 
                 let sel_color = if select_resp.hovered() {
-                    COLOR_TEXT_PRIMARY
+                    COLOR_TOOLS_PRIMARY
                 } else {
-                    COLOR_TEXT_SECONDARY
+                    COLOR_TOOLS_SECONDARY
                 };
 
                 ui.painter().image(
                     icon.id(),
-                    icon_rect,
+                    rounded_rect,
                     Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
                     sel_color,
                 );
@@ -348,25 +389,30 @@ pub fn tools(
 
                 let (icon_refresh, icon_bytes_refresh) = ("refresh", icons::ICON_REFRESH);
 
-                let icon_size = vec2(17.5, 17.5);
+                let icon_size = vec2(18.0, 18.0);
                 let (icon_rect, refresh_resp) = ui.allocate_exact_size(icon_size, Sense::click());
+                let rounded_rect = Rect::from_min_max(
+                    pos2(icon_rect.min.x.round(), icon_rect.min.y.round()),
+                    pos2(icon_rect.max.x.round(), icon_rect.max.y.round()),
+                );
 
                 let icon = ui_state.icon_cache.get_or_load(
                     ui,
                     icon_refresh,
                     icon_bytes_refresh,
                     Color32::GRAY,
+                    icon_size,
                 );
 
                 let ref_color = if refresh_resp.hovered() {
-                    COLOR_TEXT_PRIMARY
+                    COLOR_TOOLS_PRIMARY
                 } else {
-                    COLOR_TEXT_SECONDARY
+                    COLOR_TOOLS_SECONDARY
                 };
 
                 ui.painter().image(
                     icon.id(),
-                    icon_rect,
+                    rounded_rect,
                     Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
                     ref_color,
                 );
@@ -392,25 +438,30 @@ pub fn tools(
                         ("eye-closed", icons::ICON_EYE_CLOSED)
                     };
 
-                    let icon_size = vec2(17.5, 17.5);
+                    let icon_size = vec2(18.0, 18.0);
                     let (icon_rect, hidd_resp) = ui.allocate_exact_size(icon_size, Sense::click());
+                    let rounded_rect = Rect::from_min_max(
+                        pos2(icon_rect.min.x.round(), icon_rect.min.y.round()),
+                        pos2(icon_rect.max.x.round(), icon_rect.max.y.round()),
+                    );
 
                     let icon = ui_state.icon_cache.get_or_load(
                         ui,
                         icon_refresh,
                         icon_bytes_refresh,
                         Color32::GRAY,
+                        icon_size,
                     );
 
                     let hidd_color = if hidd_resp.hovered() {
-                        COLOR_TEXT_PRIMARY
+                        COLOR_TOOLS_PRIMARY
                     } else {
-                        COLOR_TEXT_SECONDARY
+                        COLOR_TOOLS_SECONDARY
                     };
 
                     ui.painter().image(
                         icon.id(),
-                        icon_rect,
+                        rounded_rect,
                         Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
                         hidd_color,
                     );
