@@ -1,3 +1,21 @@
+## [0.12.0] - 2026-06-06
+
+### 🚀 Features
+- **(i18n)** Implementa internacionalización con 6 idiomas ([`2546bf8`](https://github.com/Jhanfer/blazepilot/commit/2546bf87161103edcc6a7f486a5813393269046a))
+- **(main)** Añade sistema de reintentos automático con backends X11/Wayland ([`0e1cd0d`](https://github.com/Jhanfer/blazepilot/commit/0e1cd0d4ce2b2644b7cc4863a5e396fe10317c48))
+
+### 🐛 Bug fixes
+- **(ui)** Reintentos y timeout en carga de terminales en configs_dialog ([`075a6af`](https://github.com/Jhanfer/blazepilot/commit/075a6af2c4aba83430b0f626143f9f81dc8f34e5))
+- Prevenir inserción accidental de 'rec:' y simplificar pre-commit ([`b9e2a6b`](https://github.com/Jhanfer/blazepilot/commit/b9e2a6b9022a0be6f6ff4d3bbc595e4045328278))
+
+### ⚡ Performance
+- **(ui)** Optimiza renderizado de iconos y mejora visual ([`cf7a91c`](https://github.com/Jhanfer/blazepilot/commit/cf7a91cda03e066254426f88de8ecf1c28320b9b))
+- **(watcher+git)** Debounce 500ms, caché Git con propagación y rutas absolutas ([`c47c23a`](https://github.com/Jhanfer/blazepilot/commit/c47c23adbcbac3044e163498f56195dfc541b752))
+- **(quick-access)** Optimiza watcher y evita cálculos redundantes ([`7824e55`](https://github.com/Jhanfer/blazepilot/commit/7824e55129b4e4b4c6341fa67de6b4bd542be3af))
+
+### ⚙️ Miscelánea
+- **(repo)** Añade pre-commit, CI y estandarización masiva de código ([`322b3f4`](https://github.com/Jhanfer/blazepilot/commit/322b3f4df852c5a602878d8b0aebb42fc345d817))
+
 ## [0.11.0] - 2026-05-29
  
 ### 🚀 Features

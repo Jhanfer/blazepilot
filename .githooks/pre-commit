@@ -7,4 +7,12 @@ if ! cargo fmt --all -- --check >/dev/null 2>&1; then
     exit 1
 fi
 
+commit_msg=$(git diff --cached --name-only | head -1)
+subject=$(git log --format="%s" -1 HEAD 2>/dev/null || true)
+
+if [ ${#subject} -gt 100 ]; then
+    echo "❌ Subject demasiado largo (${#subject} chars). Máximo 100."
+    exit 1
+fi
+
 echo "✓ Formato correcto"

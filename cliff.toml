@@ -5,7 +5,6 @@ body = """
 {% else %}\
 ## [unreleased]
 {% endif %}\
-{% set files = commits | map(attribute="id") | join(sep=",") %}\
 
 {% for group, commits in commits | group_by(attribute="group") %}
 ### {{ group | striptags | trim | upper_first }}
@@ -13,7 +12,7 @@ body = """
 - {% if commit.scope %}**({{ commit.scope }})** {% endif %}\
 {% if commit.breaking %}[**breaking**] {% endif %}\
 {{ commit.message | upper_first }}\
- ([`{{ commit.id | truncate(length=7, end="") }}`](https://github.com/Jhanfer/blazepilot/commit/{{ commit.id }}))\
+ ([`{{ commit.id | truncate(length=7, end="") }}`](https://github.com/Jhanfer/blazepilot/commit/{{ commit.id }}))
 {% endfor %}
 {% endfor %}\
 """
@@ -23,6 +22,7 @@ render_always = true
 [git]
 conventional_commits = true
 filter_unconventional = true
+use_body = false
 require_conventional = false
 split_commits = false
 protect_breaking_commits = true
