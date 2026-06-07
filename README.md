@@ -1,5 +1,5 @@
 # 🔥 BlazePilot
-🌐 **[English]** | 🇪🇸 **Español**
+🌐 **[English]** | 🇪🇸 **[Español](README.ES.md)**
 
 **Blazing-fast file explorer** built with **egui** in Rust ⚡
 A modern, lightweight, and highly customizable graphical file manager. Navigate your files smoothly with multi-language support, a tag system, thumbnails, Git integration, disk management, and much more.
