@@ -1,5 +1,5 @@
 # 🔥 BlazePilot
-🌐 **English** | 🇪🇸 **[Español]**
+🌐 **[English](README.md)** | 🇪🇸 **[Español]**
 
 **Explorador de archivos ultrarrápido** hecho con **egui** en Rust ⚡
 Un gestor de archivos gráfico moderno, ligero y altamente personalizable. Navega por tus archivos con fluidez, soporte multi-idioma, sistema de tags, thumbnails, integración Git, gestión de discos y mucho más.
