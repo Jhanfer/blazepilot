@@ -18,7 +18,7 @@ use crate::{
             sure_to_delete::SureToDeleteDialog, sure_to_move_to::SureToMoveToDialog,
             update_dialog::UpdateDialog, want_to_install::WantToInstallDialog,
         },
-        image_preview::image_preview::ImagePreviewState,
+        image_preview::image_preview_handler::ImagePreviewState,
     },
 };
 

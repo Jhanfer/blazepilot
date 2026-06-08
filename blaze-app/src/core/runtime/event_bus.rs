@@ -14,9 +14,9 @@
 
 use crate::core::files::blaze_motor::motor_structs::{FileLoadingMessage, RecursiveMessages};
 use crate::core::system::extended_info::extended_info_manager::ExtendedInfoMessages;
-use crate::core::system::sizer_manager::sizer_manager::SizerMessages;
+use crate::core::system::sizer_manager::manager::SizerMessages;
 use crate::ui::icons_cache::thumbnails::thumbnails_manager::ThumbnailMessages;
-use crate::ui::task_manager::task_manager::TaskMessage;
+use crate::ui::task_manager::tasks::TaskMessage;
 use crossbeam_channel::unbounded;
 use crossbeam_channel::{Receiver, SendError, Sender};
 use dashmap::DashMap;

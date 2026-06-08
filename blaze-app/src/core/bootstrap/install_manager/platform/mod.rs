@@ -8,7 +8,7 @@ pub mod macos;
 pub mod windows;
 
 #[cfg(target_os = "linux")]
-pub use crate::core::bootstrap::install_manager::platform::linux::linux::LinuxInstallation as PlatformInstallation;
+pub use crate::core::bootstrap::install_manager::platform::linux::backend::LinuxInstallation as PlatformInstallation;
 
 #[cfg(target_os = "macos")]
 use crate::core::bootstrap::configs::platform::macos::macos::MacosInstallation as PlatformInstallation;

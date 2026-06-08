@@ -160,7 +160,7 @@ pub fn render_drives_button(
     ui_state: &mut BlazeUiState,
 ) {
     let used = drive.used_percent / 100.0;
-    let is_mounted = !drive.mountpoint.is_none();
+    let is_mounted = drive.mountpoint.is_some();
     let used_percentage = format!("Usado {}%", drive.used_percent as i32);
     let is_removable = drive.is_removable;
     let is_system = drive.is_system;

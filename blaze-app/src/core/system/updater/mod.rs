@@ -1,1 +1,1 @@
-pub mod updater;
+pub mod updater_manager;

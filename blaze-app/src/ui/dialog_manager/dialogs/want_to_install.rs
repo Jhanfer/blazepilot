@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use crate::core::bootstrap::install_manager::installation_manager::InstallResult;
-use crate::ui::dialog_manager::dialog_manager::ModalDialog;
+use crate::ui::dialog_manager::manager::ModalDialog;
 use crate::{
     core::{
         bootstrap::{

@@ -20,13 +20,11 @@ use tracing::warn;
 pub static LINUX_TERMINAL_OPENER: Lazy<Arc<Mutex<LinuxTerminalOpener>>> =
     Lazy::new(|| Arc::new(Mutex::new(LinuxTerminalOpener::init())));
 
-pub struct LinuxTerminalOpener {
-    terminal: Option<String>,
-}
+pub struct LinuxTerminalOpener;
 
 impl LinuxTerminalOpener {
     fn init() -> Self {
-        Self { terminal: None }
+        Self {}
     }
 
     pub fn load_terminals(&self) -> Vec<String> {

@@ -3,9 +3,9 @@ use crate::{
         blaze_state::BlazeCoreState,
         bootstrap::configs::config_manager::with_configs,
         system::{
-            clipboard::clipboard::TOKIO_RUNTIME,
+            clipboard::global_clipboard::TOKIO_RUNTIME,
             knowndirs::knowndirs_manager::KnownDirsManager,
-            trash_manager::trash_manager::{get_backend, TrashDestination},
+            trash_manager::manager::{get_backend, TrashDestination},
         },
     },
     ui::{
@@ -77,7 +77,7 @@ pub fn sidebar_left_component(
                                 return;
                             };
 
-                            dirs.push(("trash", i18n.t("left_sidebar.trash").into(), &trash));
+                            dirs.push(("trash", i18n.t("left_sidebar.trash"), &trash));
 
                             for (key, label, path) in dirs {
                                 if path.exists() {

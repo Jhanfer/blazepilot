@@ -244,7 +244,7 @@ mod tests {
             file_extension::FileExtension,
         },
         system::{
-            clipboard::clipboard::TOKIO_RUNTIME, trash_manager::trash_manager::init_trash_backend,
+            clipboard::global_clipboard::TOKIO_RUNTIME, trash_manager::manager::init_trash_backend,
         },
     };
 

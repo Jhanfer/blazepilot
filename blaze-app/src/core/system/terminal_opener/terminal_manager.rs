@@ -17,7 +17,7 @@ use std::{path::Path, sync::Arc};
 use tokio::sync::Mutex;
 
 #[cfg(target_os = "linux")]
-use crate::core::system::terminal_opener::platform::linux::linux::LinuxTerminalOpener;
+use crate::core::system::terminal_opener::platform::linux::backend::LinuxTerminalOpener;
 
 #[derive(Clone)]
 enum PlatformTerminal {
@@ -40,7 +40,7 @@ impl TerminalManager {
                 {
                     use tracing::debug;
 
-                    use crate::core::system::terminal_opener::platform::linux::linux::LINUX_TERMINAL_OPENER;
+                    use crate::core::system::terminal_opener::platform::linux::backend::LINUX_TERMINAL_OPENER;
 
                     debug!("Usando terminal opener de linux");
 

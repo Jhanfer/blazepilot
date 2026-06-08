@@ -8,7 +8,7 @@ use crate::{
     ui::{
         blaze_ui_state::BlazeUiState,
         icons_cache::icons,
-        task_manager::task_manager::TaskStatus,
+        task_manager::tasks::TaskStatus,
         themes::colors::{COLOR_ACCENT_GLOW, COLOR_BG_PANEL},
     },
     utils::formating::format_size,

@@ -17,7 +17,7 @@ use crate::core::{
         bus_structs::FileOperation,
         event_bus::{with_event_bus, Dispatcher},
     },
-    system::{cache::cache_manager::CacheManager, clipboard::clipboard::TOKIO_RUNTIME},
+    system::{cache::cache_manager::CacheManager, clipboard::global_clipboard::TOKIO_RUNTIME},
 };
 use jwalk::{Parallelism, WalkDir};
 use parking_lot::Mutex;
@@ -41,13 +41,19 @@ pub struct CancelledError;
 
 pub enum SizerMessages {
     StartCal(Arc<Path>, Uuid),
-    CancelCal { path: Arc<Path>, request_id: Uuid },
+    #[allow(unused)]
+    CancelCal {
+        path: Arc<Path>,
+        request_id: Uuid,
+    },
     CancelAll,
 }
 
+type SizerTaskMap = HashMap<Uuid, (AbortHandle, Arc<AtomicBool>)>;
+
 pub struct SizerManager {
     pub cache_manager: &'static CacheManager,
-    active_tasks: Arc<Mutex<HashMap<Uuid, (AbortHandle, Arc<AtomicBool>)>>>,
+    active_tasks: Arc<Mutex<SizerTaskMap>>,
 }
 
 impl SizerManager {

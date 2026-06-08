@@ -28,11 +28,12 @@ use crate::{
             event_bus::with_event_bus,
         },
         system::{
-            cache::color_cache::color_cache::FolderColorManager, updater::updater::UpdateMessages,
+            cache::color_cache::color_cache_logic::FolderColorManager,
+            updater::updater_manager::UpdateMessages,
         },
     },
     ui::{
-        dialog_manager::dialog_manager::DialogManager,
+        dialog_manager::manager::DialogManager,
         icons_cache::{icon_cache::IconCache, thumbnails::thumbnails_manager::ThumbnailManager},
         modules::custom_context_menu::context_state::ContextMenuState,
     },
@@ -139,15 +140,8 @@ impl BlazeUiState {
                     info!("Error recibido");
                     self.dialog_manager.open_error_dialog(&message);
                 }
-                UiEvent::RefreshList => {
-                    info!("RECIBIDO!!");
-                }
                 UiEvent::SureTo(sureto) => match sureto {
-                    SureTo::SureToMove {
-                        files,
-                        dest,
-                        tab_id: _,
-                    } => {
+                    SureTo::SureToMove { files, dest } => {
                         debug!("Mover {:?} → {:?}", files, dest);
                         self.dialog_manager.open_sure_move_dialog(files, dest);
                     }
@@ -171,7 +165,6 @@ impl BlazeUiState {
                     UpdateMessages::UpToDate => {
                         info!("Estás en la última versión.");
                     }
-                    UpdateMessages::ProcedToUpdate => {}
                 },
 
                 UiEvent::FileConflict(file_conflict) => match file_conflict {
@@ -189,10 +182,7 @@ impl BlazeUiState {
                     self.dialog_manager.open_configs();
                 }
 
-                UiEvent::ThumbnailReady {
-                    full_path,
-                    tab_id: _,
-                } => {
+                UiEvent::ThumbnailReady { full_path } => {
                     self.calculating_thumbnails.remove(&full_path);
                     self.calculated_thumbnails.insert(full_path.clone());
                     self.newly_calculated_thumbnails.insert(full_path);

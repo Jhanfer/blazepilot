@@ -35,7 +35,7 @@ use crate::{
         },
         system::{
             knowndirs::knowndirs_manager::KnownDirsManager,
-            trash_manager::trash_manager::init_trash_backend,
+            trash_manager::manager::init_trash_backend,
         },
     },
     utils::initial_path_handler::parse_initial_path,
@@ -76,7 +76,7 @@ fn try_run_with_retries(initial_path: Option<Arc<Path>>) -> anyhow::Result<()> {
 
     let backend = with_configs(|c| c.get_display_backend());
 
-    let configs = vec![
+    let configs = [
         RunConfigs::wgpu_present(backend.clone(), eframe::wgpu::PresentMode::Immediate),
         RunConfigs::wgpu_present(backend, eframe::wgpu::PresentMode::Fifo),
         RunConfigs::wgpu_present(DisplayBackend::Auto, eframe::wgpu::PresentMode::Fifo),

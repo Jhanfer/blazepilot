@@ -21,9 +21,9 @@ use crate::{
             bus_structs::{FileOperation, UiEvent},
             event_bus::Dispatcher,
         },
-        system::clipboard::clipboard::TOKIO_RUNTIME,
+        system::clipboard::global_clipboard::TOKIO_RUNTIME,
     },
-    ui::task_manager::task_manager::TaskMessage,
+    ui::task_manager::tasks::TaskMessage,
 };
 
 #[derive(Debug, Clone)]

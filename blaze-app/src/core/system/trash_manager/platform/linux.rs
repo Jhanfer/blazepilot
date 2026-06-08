@@ -1,7 +1,7 @@
 use crate::core::system::knowndirs::knowndirs_manager::KnownDirsManager;
 use crate::core::system::trash_manager::{
     error::{TrashError, TrashResult},
-    trash_manager::{TrashBackend, TrashDestination},
+    manager::{TrashBackend, TrashDestination},
 };
 use chrono::{DateTime, Utc};
 use std::{

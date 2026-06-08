@@ -34,9 +34,9 @@ use crate::core::files::blaze_motor::utilities::build_entry;
 use crate::core::files::blaze_motor::watcher::FileWatcher;
 use crate::core::runtime::bus_structs::UiEvent;
 use crate::core::runtime::event_bus::{with_event_bus, Dispatcher};
-use crate::core::system::clipboard::clipboard::TOKIO_RUNTIME;
+use crate::core::system::clipboard::global_clipboard::TOKIO_RUNTIME;
 use crate::core::system::knowndirs::knowndirs_manager::KnownDirsManager;
-use crate::core::system::sizer_manager::sizer_manager::SizerManager;
+use crate::core::system::sizer_manager::manager::SizerManager;
 
 static NEXT_TASK: AtomicU64 = AtomicU64::new(1);
 pub fn new_task_id() -> u64 {

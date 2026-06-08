@@ -19,7 +19,7 @@ use crate::core::{
     },
     system::{
         cache::cache_manager::CacheManager,
-        clipboard::clipboard::TOKIO_RUNTIME,
+        clipboard::global_clipboard::TOKIO_RUNTIME,
         extended_info::error::{ExtendedInfoError, ExtendedInfoResult},
     },
 };
@@ -256,13 +256,7 @@ impl ExtendedInfoManager {
             .unwrap_or(0)
     }
 
-    fn requst_scan(
-        &self,
-        path_buf: Arc<Path>,
-        current_mtime: u64,
-        sender: &Dispatcher,
-        tab_id: Uuid,
-    ) {
+    fn requst_scan(&self, path_buf: Arc<Path>, current_mtime: u64, sender: &Dispatcher) {
         let info_map = self.info_map.clone();
         let repo_cache = self.repo_cache.clone();
         let path_to_task = path_buf.clone();
@@ -326,7 +320,6 @@ impl ExtendedInfoManager {
 
                     if let Err(e) = sender.send(FileOperation::ExtendedInfoReady {
                         full_path: path_buf,
-                        tab_id,
                     }) {
                         warn!("Error al enviar ExtendedInfo: {}", e);
                     }
@@ -355,7 +348,6 @@ impl ExtendedInfoManager {
                 ExtendedInfoMessages::StartScan(path_buf) => {
                     let key = path_buf.to_string_lossy();
                     let current_mtime = Self::get_real_mtime(&path_buf);
-                    let tab_id = sender.tab_id;
 
                     let is_dir = path_buf.is_dir();
 
@@ -389,20 +381,18 @@ impl ExtendedInfoManager {
                             sender
                                 .send(FileOperation::ExtendedInfoReady {
                                     full_path: path_buf,
-                                    tab_id,
                                 })
                                 .map_err(ExtendedInfoError::SendError)?;
                         }
                     } else {
-                        self.requst_scan(path_buf, current_mtime, &sender, tab_id);
+                        self.requst_scan(path_buf, current_mtime, &sender);
                     }
                 }
 
                 ExtendedInfoMessages::ForceScan(path_buf) => {
                     let current_mtime = Self::get_real_mtime(&path_buf);
-                    let tab_id = sender.tab_id;
 
-                    self.requst_scan(path_buf, current_mtime, &sender, tab_id);
+                    self.requst_scan(path_buf, current_mtime, &sender);
                 }
             }
         }

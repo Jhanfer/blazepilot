@@ -17,7 +17,7 @@ use crate::core::{
         bus_structs::UiEvent,
         event_bus::{with_event_bus, Dispatcher},
     },
-    system::{cache::cache_manager::CacheManager, clipboard::clipboard::TOKIO_RUNTIME},
+    system::{cache::cache_manager::CacheManager, clipboard::global_clipboard::TOKIO_RUNTIME},
 };
 use ffmpeg_sidecar::{download::auto_download, paths::ffmpeg_path};
 use lru::LruCache;
@@ -200,7 +200,6 @@ impl ThumbnailManager {
 
                     let thumb_map = self.thumb_map.clone();
                     let sender_clone = sender.clone();
-                    let tab_id = sender.tab_id;
                     let sem = self.semaphore.clone();
 
                     let current_mtime = Self::get_real_mtime(&path);
@@ -217,10 +216,7 @@ impl ThumbnailManager {
                             if let Ok(thumb) = Self::load_from_cache(&cache_path).await {
                                 thumb_map.write().await.put(path.clone(), thumb);
                                 sender_clone
-                                    .send(UiEvent::ThumbnailReady {
-                                        full_path: path,
-                                        tab_id,
-                                    })
+                                    .send(UiEvent::ThumbnailReady { full_path: path })
                                     .ok();
                             }
                         });
@@ -252,10 +248,7 @@ impl ThumbnailManager {
 
                                 thumb_map.write().await.put(path.clone(), thumb);
                                 sender_clone
-                                    .send(UiEvent::ThumbnailReady {
-                                        full_path: path,
-                                        tab_id,
-                                    })
+                                    .send(UiEvent::ThumbnailReady { full_path: path })
                                     .ok();
                             }
                         });

@@ -11,7 +11,7 @@ use crate::{
         },
         system::{
             extended_info::extended_info_manager::{ExtendedInfo, GitStatus},
-            trash_manager::trash_manager::get_backend,
+            trash_manager::manager::get_backend,
         },
     },
     ui::{
@@ -64,6 +64,7 @@ fn new_ff_logic(state: &mut BlazeCoreState, ui: &mut Ui) {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn handle_row_interactions(
     ui: &mut Ui,
     response: &egui::Response,
@@ -125,7 +126,6 @@ fn handle_row_interactions(
         if drop_in_file_area {
             let tab_id = state.active_id;
             let dispatcher = with_event_bus(|e| e.dispatcher(tab_id));
-            let tab_id = state.motor.borrow_mut().active_tab().id;
 
             if let Some(target) = state.row_view.drop_target.take() {
                 let sources = state.get_selected_paths(files);
@@ -134,7 +134,6 @@ fn handle_row_interactions(
                     .send(UiEvent::SureTo(SureTo::SureToMove {
                         files: sources,
                         dest: target,
-                        tab_id,
                     }))
                     .ok();
             } else {
@@ -149,7 +148,6 @@ fn handle_row_interactions(
                     .send(UiEvent::SureTo(SureTo::SureToMove {
                         files: sources,
                         dest: cwd,
-                        tab_id,
                     }))
                     .ok();
             }
@@ -240,7 +238,7 @@ fn render_rename_field(
 
 pub fn new_render_scrollview(
     ui: &mut Ui,
-    files: &Vec<Arc<FileEntry>>,
+    files: &[Arc<FileEntry>],
     state: &mut BlazeCoreState,
     ui_state: &mut BlazeUiState,
     row_height: f32,

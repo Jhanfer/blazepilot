@@ -10,8 +10,10 @@ pub struct KnownDirsManager {
     pub app_config: Arc<Path>,
     pub app_cache: Arc<Path>,
     pub app_data: Arc<Path>,
+    #[allow(unused)]
     pub sys_config: Arc<Path>,
     pub sys_cache: Arc<Path>,
+    #[allow(unused)]
     pub data_local: Arc<Path>,
 
     pub desktop: Option<Arc<Path>>,

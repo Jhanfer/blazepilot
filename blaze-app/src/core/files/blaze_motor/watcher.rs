@@ -15,7 +15,7 @@
 use crate::core::{
     files::blaze_motor::{error::MotorResult, motor_structs::FileLoadingMessage},
     runtime::event_bus::Dispatcher,
-    system::clipboard::clipboard::TOKIO_RUNTIME,
+    system::clipboard::global_clipboard::TOKIO_RUNTIME,
 };
 use notify::{Event, EventKind, RecursiveMode, Watcher};
 use std::sync::{

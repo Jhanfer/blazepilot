@@ -21,12 +21,12 @@ use crate::{
         },
         system::{
             extended_info::extended_info_manager::ExtendedInfoMessages,
-            sizer_manager::sizer_manager::SizerMessages,
+            sizer_manager::manager::SizerMessages,
         },
     },
     ui::{
         icons_cache::thumbnails::thumbnails_manager::ThumbnailMessages,
-        task_manager::task_manager::TaskMessage,
+        task_manager::tasks::TaskMessage,
     },
 };
 use crossbeam_channel::{Receiver, Sender};

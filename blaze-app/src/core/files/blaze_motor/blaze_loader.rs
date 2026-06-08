@@ -16,7 +16,7 @@ use crate::core::files::blaze_motor::error::{MotorError, MotorResult};
 use crate::core::files::blaze_motor::motor_structs::{FileEntry, FileLoadingMessage};
 use crate::core::files::blaze_motor::utilities::build_entry;
 use crate::core::runtime::event_bus::Dispatcher;
-use crate::core::system::clipboard::clipboard::TOKIO_RUNTIME;
+use crate::core::system::clipboard::global_clipboard::TOKIO_RUNTIME;
 use file_id::get_file_id;
 use std::collections::HashMap;
 use std::path::Path;
@@ -203,7 +203,6 @@ impl BlazeLoader {
         mut done_rx: tokio::sync::oneshot::Receiver<MotorResult<()>>,
     ) -> MotorResult<()> {
         let mut interval = tokio::time::interval(Duration::from_millis(50));
-        let mut scan_done = false;
 
         loop {
             tokio::select! {
@@ -214,8 +213,7 @@ impl BlazeLoader {
                     Self::flush_buffer(&buffer, &sender, generation).await?;
                 }
 
-                _ = &mut done_rx, if !scan_done => {
-                    scan_done = true;
+                _ = &mut done_rx => {
                     Self::flush_buffer(&buffer, &sender, generation).await?;
 
                     sender.send(FileLoadingMessage::Finished(generation))

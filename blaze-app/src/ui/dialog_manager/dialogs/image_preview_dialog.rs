@@ -12,8 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::ui::dialog_manager::dialog_manager::ModalDialog;
-use crate::ui::{image_preview::image_preview::ImagePreviewState, themes::colors::COLOR_BG_MAIN};
+use crate::ui::dialog_manager::manager::ModalDialog;
+use crate::ui::{
+    image_preview::image_preview_handler::ImagePreviewState, themes::colors::COLOR_BG_MAIN,
+};
 use egui::{
     pos2, vec2, Button, Color32, CornerRadius, Frame, Key, Margin, Order, Rect, ScrollArea, Sense,
     Ui, Vec2, Window,

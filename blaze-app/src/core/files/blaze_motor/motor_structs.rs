@@ -6,10 +6,13 @@ use std::{path::Path, sync::Arc};
 //------------------------------------------------
 #[derive(Debug, Clone)]
 pub enum TaskType {
+    #[allow(unused)]
     FileLoading,
     CopyPaste,
+    #[allow(unused)]
     CutPaste,
     MoveTrash,
+    #[allow(unused)]
     Delete,
     RestoreTrash,
 }
@@ -18,6 +21,8 @@ pub enum TaskType {
 pub enum FileLoadingMessage {
     Batch(u64, Vec<Arc<FileEntry>>),
     Finished(u64),
+
+    #[allow(unused)]
     ProgressUpdate {
         total: usize,
         done: usize,
@@ -38,6 +43,7 @@ pub enum FileLoadingMessage {
     RecursiveBatch {
         generation: u64,
         batch: Vec<Arc<FileEntry>>,
+        #[allow(unused)]
         source_dir: Arc<Path>,
     },
 
@@ -46,16 +52,16 @@ pub enum FileLoadingMessage {
 
 #[derive(Debug, Clone)]
 pub enum RecursiveMessages {
-    Started {
-        task_id: u64,
-        text: String,
-    },
+    #[allow(unused)]
+    Started { task_id: u64, text: String },
+    #[allow(unused)]
     Progress {
         task_id: u64,
         files_found: usize,
         current_dir: Arc<Path>,
         text: String,
     },
+    #[allow(unused)]
     Finished {
         task_id: u64,
         success: bool,
@@ -71,17 +77,22 @@ pub struct FileEntry {
     pub kind: FileKind,
     pub size: u64,
     pub modified: u64,
-    pub created: u64,
     pub is_hidden: bool,
     pub unique_id: Option<FileId>,
 
+    #[allow(unused)]
     pub accessed: u64,
+    #[allow(unused)]
     pub permissions: u32,
-
+    #[allow(unused)]
+    pub created: u64,
+    #[allow(unused)]
     #[cfg(unix)]
     pub inode: u64,
+    #[allow(unused)]
     #[cfg(unix)]
     pub nlink: u64,
+    #[allow(unused)]
     #[cfg(unix)]
     pub device: u64,
 

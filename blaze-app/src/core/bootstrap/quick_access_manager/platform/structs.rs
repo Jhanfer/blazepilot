@@ -13,7 +13,7 @@ use uuid::Uuid;
 
 use crate::core::{
     files::blaze_motor::motor_structs::FileKind,
-    system::{clipboard::clipboard::TOKIO_RUNTIME, sizer_manager::sizer_manager::SizerManager},
+    system::{clipboard::global_clipboard::TOKIO_RUNTIME, sizer_manager::manager::SizerManager},
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]

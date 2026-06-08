@@ -67,6 +67,7 @@ pub enum ArchiveType {
     Xz,
     Rar,
     SevenZ,
+    #[allow(unused)]
     Zst,
 }
 
@@ -274,10 +275,11 @@ impl FileExtension {
         matches!(self, FileExtension::Video(_))
     }
 
+    #[allow(unused)]
     pub fn is_code(&self) -> bool {
         matches!(self, FileExtension::Code(_))
     }
-
+    #[allow(unused)]
     pub fn archive_type(&self) -> Option<ArchiveType> {
         match self {
             FileExtension::Archive(t) => Some(t.clone()),

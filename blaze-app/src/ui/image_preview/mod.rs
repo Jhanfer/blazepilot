@@ -1,2 +1,2 @@
 mod error;
-pub mod image_preview;
+pub mod image_preview_handler;

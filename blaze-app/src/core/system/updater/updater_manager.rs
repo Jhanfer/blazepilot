@@ -34,8 +34,6 @@ pub enum UpdateMessages {
     },
 
     UpToDate,
-
-    ProcedToUpdate,
 }
 
 pub struct Updater {
@@ -156,6 +154,7 @@ impl Updater {
         });
     }
 
+    #[allow(unused)]
     fn is_updating(&self) -> bool {
         self.is_updating.load(Ordering::SeqCst)
     }

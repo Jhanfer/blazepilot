@@ -1,3 +1,5 @@
+#![allow(unused)]
+
 use egui::Color32;
 
 // Tonos principales de fondo y paneles

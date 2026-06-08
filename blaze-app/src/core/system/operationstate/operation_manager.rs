@@ -46,14 +46,15 @@ impl OperationHistoryManager {
         }
     }
 
+    #[allow(unused)]
     pub fn history(&self) -> &VecDeque<UndoRecord> {
         &self.history
     }
-
+    #[allow(unused)]
     pub fn is_empty(&self) -> bool {
         self.history.is_empty()
     }
-
+    #[allow(unused)]
     pub fn len(&self) -> usize {
         self.history.len()
     }
@@ -80,6 +81,7 @@ impl OperationHistoryManager {
         }
     }
 
+    #[allow(unused)]
     pub fn undo_at(&mut self, index: usize, sender: &Dispatcher) -> bool {
         if let Some(record) = self.history.remove(index) {
             record.execute_undo(sender);

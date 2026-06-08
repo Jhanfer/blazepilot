@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::ui::{dialog_manager::dialog_manager::ModalDialog, themes::colors::COLOR_BG_MAIN};
+use crate::ui::{dialog_manager::manager::ModalDialog, themes::colors::COLOR_BG_MAIN};
 use egui::{CornerRadius, Frame, Margin, Order, Ui, Window};
 use tracing::info;
 

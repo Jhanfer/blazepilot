@@ -2,8 +2,8 @@ use crate::core::bootstrap::quick_access_manager::platform::structs::QuickLinks;
 use crate::core::files::blaze_motor::motor_structs::FileEntry;
 use crate::core::system::fileopener_module::platform::linux::structs::AppsIconData;
 use crate::core::system::fileopener_module::AppAssociation;
-use crate::core::system::updater::updater::UpdateMessages;
-use crate::ui::image_preview::image_preview::ImagePreviewState;
+use crate::core::system::updater::updater_manager::UpdateMessages;
+use crate::ui::image_preview::image_preview_handler::ImagePreviewState;
 use egui::Color32;
 use file_id::FileId;
 use std::path::Path;
@@ -54,7 +54,6 @@ pub enum FileOperation {
     },
     ExtendedInfoReady {
         full_path: Arc<Path>,
-        tab_id: Uuid,
     },
 
     ExtractHere {
@@ -64,7 +63,6 @@ pub enum FileOperation {
 
     NavigateTo(Arc<Path>),
     OpenFileByPath(Arc<Path>),
-    OpenPathToNewTab(Arc<Path>),
 }
 
 #[derive(Debug)]
@@ -72,7 +70,6 @@ pub enum SureTo {
     SureToMove {
         files: Vec<Arc<Path>>,
         dest: Arc<Path>,
-        tab_id: Uuid,
     },
     SureToDelete {
         files: Vec<Arc<Path>>,
@@ -96,7 +93,6 @@ pub enum UiEvent {
 
     ThumbnailReady {
         full_path: Arc<Path>,
-        tab_id: Uuid,
     },
 
     ShowImagePvw {
@@ -123,8 +119,6 @@ pub enum UiEvent {
     ShowWantToInstall,
 
     OpenConfigs,
-
-    RefreshList,
 
     QuickTagEvent(QuickTagEvent),
 }

@@ -16,7 +16,7 @@ use std::sync::Arc;
 
 pub fn render_row_view(
     ui: &mut Ui,
-    files: &Vec<Arc<FileEntry>>,
+    files: &[Arc<FileEntry>],
     state: &mut BlazeCoreState,
     ui_state: &mut BlazeUiState,
 ) {

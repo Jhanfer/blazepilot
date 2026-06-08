@@ -1,3 +1,4 @@
+#![allow(unused)]
 //Extensiones de archivos e iconos del fileview
 pub const ICON_FOLDER: &[u8] = include_bytes!("../assets/icons/folder.svg");
 pub const ICON_FILE: &[u8] = include_bytes!("../assets/icons/file.svg");

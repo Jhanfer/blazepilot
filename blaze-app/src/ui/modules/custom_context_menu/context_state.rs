@@ -18,12 +18,12 @@ use crate::{
             bus_structs::{FileOperation, QuickTagEvent, SureTo, UiEvent},
             event_bus::{with_event_bus, Dispatcher},
         },
-        system::{clipboard::clipboard::TOKIO_RUNTIME, disk_reader::disk::Disk},
+        system::{clipboard::global_clipboard::TOKIO_RUNTIME, disk_reader::disk::Disk},
     },
     ui::{
         blaze_ui_state::BlazeUiState,
         icons_cache::icons,
-        image_preview::image_preview::ImagePreviewState,
+        image_preview::image_preview_handler::ImagePreviewState,
         themes::colors::{COLOR_ACCENT_GLOW, COLOR_BG_PANEL},
     },
 };
@@ -207,6 +207,7 @@ impl ContextMenuState {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn render_context_button<J, I>(
         ui: &mut Ui,
         ui_state: &mut BlazeUiState,

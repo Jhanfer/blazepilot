@@ -16,7 +16,7 @@ use crate::{
 
 pub fn connect_ui_components_callback(
     ui: &mut Ui,
-    files: &Vec<Arc<FileEntry>>,
+    files: &[Arc<FileEntry>],
     state: &mut BlazeCoreState,
     ui_state: &mut BlazeUiState,
 ) {

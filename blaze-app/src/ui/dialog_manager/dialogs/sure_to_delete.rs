@@ -14,7 +14,7 @@
 
 use std::{path::Path, sync::Arc};
 
-use crate::ui::dialog_manager::dialog_manager::ModalDialog;
+use crate::ui::dialog_manager::manager::ModalDialog;
 use crate::{
     core::runtime::{bus_structs::FileOperation, event_bus::Dispatcher},
     ui::themes::colors::COLOR_BG_MAIN,

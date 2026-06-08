@@ -28,18 +28,18 @@ use crate::{
         },
         system::{
             cache::cache_manager::CacheManager,
-            clipboard::clipboard::{GlobalClipboard, TOKIO_RUNTIME},
+            clipboard::global_clipboard::{GlobalClipboard, TOKIO_RUNTIME},
             extended_info::extended_info_manager::{ExtendedInfoManager, ExtendedInfoMessages},
             fileopener_module::{FileOpenerManager, GLOBAL_FILE_OPENER},
             operationstate::operation_manager::with_history,
-            sizer_manager::sizer_manager::{SizerManager, SizerMessages},
+            sizer_manager::manager::{SizerManager, SizerMessages},
             terminal_opener::terminal_manager::{TerminalManager, GLOBAL_TERMINAL_MANAGER},
-            trash_manager::trash_manager::{get_backend, TrashDestination},
-            updater::updater::Updater,
-            zip_manager::zip_manager::ZipManager,
+            trash_manager::manager::{get_backend, TrashDestination},
+            updater::updater_manager::Updater,
+            zip_manager::manager::ZipManager,
         },
     },
-    ui::task_manager::task_manager::TaskManager,
+    ui::task_manager::tasks::TaskManager,
 };
 use bitvec::vec::BitVec;
 use std::{
@@ -501,6 +501,7 @@ impl BlazeCoreState {
         result
     }
 
+    #[allow(unused)]
     pub fn clear_clipboard(&self) {
         match self.clipboard.clear() {
             Ok(_) => {}
@@ -965,12 +966,16 @@ impl BlazeCoreState {
         }
 
         for msg in recursive_messages {
-            match msg {
+            match &msg {
                 RecursiveMessages::Started { .. } => {
+                    debug!("Started: {:?}", msg);
                     self.is_loading = true;
                 }
-                RecursiveMessages::Progress { .. } => {}
+                RecursiveMessages::Progress { .. } => {
+                    debug!("Progress: {:?}", msg);
+                }
                 RecursiveMessages::Finished { .. } => {
+                    debug!("Finished: {:?}", msg);
                     self.is_loading = false;
                 }
             }
@@ -1061,10 +1066,7 @@ impl BlazeCoreState {
                     }
                 }
 
-                FileOperation::ExtendedInfoReady {
-                    full_path,
-                    tab_id: _,
-                } => {
+                FileOperation::ExtendedInfoReady { full_path } => {
                     self.calculating_extended_info.remove(&full_path);
                     self.calculated_extended_info.insert(full_path);
                 }
@@ -1076,10 +1078,6 @@ impl BlazeCoreState {
 
                 FileOperation::OpenFileByPath(path) => {
                     self.open_file_by_path(path);
-                }
-
-                FileOperation::OpenPathToNewTab(path) => {
-                    self.add_tab_from_file(&path);
                 }
             }
         }

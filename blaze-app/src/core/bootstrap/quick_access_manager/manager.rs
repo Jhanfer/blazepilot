@@ -149,7 +149,8 @@ impl QuickAccessManager {
         }
     }
 
-    #[must_use]
+    #[allow(unused)]
+    #[must_use = "el resultado de save() debe comprobarse por si falla"]
     pub fn save(&mut self) -> QuickAccResult<()> {
         self.platform.save()
     }

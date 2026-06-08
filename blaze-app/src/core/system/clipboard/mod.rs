@@ -1,2 +1,2 @@
-pub mod clipboard;
 mod error;
+pub mod global_clipboard;

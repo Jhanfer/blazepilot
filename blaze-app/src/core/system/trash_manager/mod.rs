@@ -1,3 +1,3 @@
 pub mod error;
+pub mod manager;
 pub mod platform;
-pub mod trash_manager;

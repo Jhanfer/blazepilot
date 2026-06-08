@@ -20,10 +20,8 @@ use crate::core::runtime::event_bus::Dispatcher;
 use crate::core::system::clipboard::error::{ClipBoardError, ClipBoardResult};
 use crate::core::system::operationstate::operation_manager::with_history;
 use crate::core::system::operationstate::undo_record::UndoRecord;
-use crate::core::system::trash_manager::trash_manager::{
-    get_backend, TrashBackend, TrashDestination,
-};
-use crate::ui::task_manager::task_manager::TaskMessage;
+use crate::core::system::trash_manager::manager::{get_backend, TrashBackend, TrashDestination};
+use crate::ui::task_manager::tasks::TaskMessage;
 use once_cell::sync::Lazy;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::OnceLock;
@@ -43,10 +41,13 @@ pub static TOKIO_RUNTIME: Lazy<Runtime> = Lazy::new(|| {
 });
 
 pub enum ConflictStrategy {
-    Ask,       // preguntar al usuario (por defecto)
+    Ask, // preguntar al usuario (por defecto)
+    #[allow(unused)]
     Overwrite, // sobreescribir siempre
-    Rename,    // renombrar automáticamente (copia 2, copia 3...)
-    Skip,      // saltar el archivo
+    #[allow(unused)]
+    Rename, // renombrar automáticamente (copia 2, copia 3...)
+    #[allow(unused)]
+    Skip, // saltar el archivo
 }
 
 #[derive(Clone, Debug)]

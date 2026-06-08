@@ -14,7 +14,7 @@
 
 use crate::{
     core::runtime::{bus_structs::FileOperation, event_bus::Dispatcher},
-    ui::{dialog_manager::dialog_manager::ModalDialog, themes::colors::COLOR_BG_MAIN},
+    ui::{dialog_manager::manager::ModalDialog, themes::colors::COLOR_BG_MAIN},
 };
 use egui::{CornerRadius, Frame, Margin, Order, RichText, Ui, Window};
 use std::{path::Path, sync::Arc};

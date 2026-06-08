@@ -17,7 +17,7 @@ use crate::{
         bootstrap::quick_access_manager::manager::with_quick_tags,
         runtime::bus_structs::QuickTagEvent,
     },
-    ui::{dialog_manager::dialog_manager::ModalDialog, themes::colors::COLOR_BG_MAIN},
+    ui::{dialog_manager::manager::ModalDialog, themes::colors::COLOR_BG_MAIN},
 };
 use egui::{Color32, CornerRadius, Frame, Margin, Modal, Order, TextEdit, Ui, Window};
 use tracing::info;

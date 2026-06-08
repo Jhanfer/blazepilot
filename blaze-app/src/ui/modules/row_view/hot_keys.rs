@@ -8,7 +8,7 @@ use crate::{
         },
         system::{
             cache::cache_manager::CacheManager, operationstate::operation_manager::with_history,
-            trash_manager::trash_manager::get_backend,
+            trash_manager::manager::get_backend,
         },
     },
     ui::blaze_ui_state::BlazeUiState,

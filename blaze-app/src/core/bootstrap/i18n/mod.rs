@@ -59,13 +59,14 @@ impl I18n {
         *self.current_locale.write() = locale.to_string();
     }
 
+    #[allow(unused)]
     pub fn current_locale(&self) -> String {
         self.current_locale.read().clone()
     }
 
     fn load_locale(locale: &str) -> HashMap<String, String> {
         let content = load_locale_str!(locale);
-        flatten_toml(&content)
+        flatten_toml(content)
     }
 }
 

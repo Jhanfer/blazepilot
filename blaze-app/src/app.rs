@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use crate::core::blaze_state::{BlazeCoreBuilder, BlazeCoreState};
-use crate::core::system::clipboard::clipboard::TOKIO_RUNTIME;
+use crate::core::system::clipboard::global_clipboard::TOKIO_RUNTIME;
 use crate::core::system::knowndirs::knowndirs_manager::KnownDirsManager;
 use crate::ui::blaze_ui_state::BlazeUiState;
 use crate::ui::modules::ui_callback::connect_ui_components_callback;

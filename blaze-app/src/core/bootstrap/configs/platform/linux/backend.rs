@@ -102,7 +102,7 @@ impl Default for LinuxConfigs {
         let lang = std::env::var("LANG").unwrap_or(String::from("en_US.UTF-8"));
         let locale = lang.split("_").next().unwrap_or("en");
 
-        let i18n = Arc::new(I18n::load(&locale));
+        let i18n = Arc::new(I18n::load(locale));
         info!("Llamando i18n en default");
 
         Self {

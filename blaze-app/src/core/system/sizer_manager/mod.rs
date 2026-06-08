@@ -1,1 +1,1 @@
-pub mod sizer_manager;
+pub mod manager;

@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::ui::dialog_manager::dialog_manager::ModalDialog;
+use crate::ui::dialog_manager::manager::ModalDialog;
 use crate::{
-    core::system::{cache::cache_manager, clipboard::clipboard::TOKIO_RUNTIME},
+    core::system::{cache::cache_manager, clipboard::global_clipboard::TOKIO_RUNTIME},
     ui::themes::colors::COLOR_BG_MAIN,
 };
 use egui::{Color32, CornerRadius, Frame, Margin, Order, Ui, Window};

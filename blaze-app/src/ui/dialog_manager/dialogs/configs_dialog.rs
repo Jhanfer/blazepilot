@@ -12,14 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::ui::dialog_manager::dialog_manager::ModalDialog;
+use crate::ui::dialog_manager::manager::ModalDialog;
 use crate::{
     core::{
         bootstrap::configs::{
             config_manager::with_configs, platform::linux::conf_structs::DisplayBackend,
         },
         system::{
-            clipboard::clipboard::TOKIO_RUNTIME,
+            clipboard::global_clipboard::TOKIO_RUNTIME,
             terminal_opener::terminal_manager::GLOBAL_TERMINAL_MANAGER,
         },
     },

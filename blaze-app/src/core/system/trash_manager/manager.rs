@@ -23,6 +23,7 @@ pub trait TrashBackend: Send + Sync + std::fmt::Debug {
     fn permanently_delete(&self, trash_path: &Path) -> TrashResult<()>;
 
     //limpiar papelera
+    #[allow(unused)]
     fn empty_trash(&self) -> TrashResult<()>;
 
     //ruta base de la papelera para este destino

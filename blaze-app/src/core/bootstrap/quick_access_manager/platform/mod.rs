@@ -13,7 +13,7 @@ pub mod macos;
 pub mod windows;
 
 #[cfg(target_os = "linux")]
-pub use crate::core::bootstrap::quick_access_manager::platform::linux::linux::QuickAccessLinux as PlatformQuickAccess;
+pub use crate::core::bootstrap::quick_access_manager::platform::linux::backend::QuickAccessLinux as PlatformQuickAccess;
 
 #[cfg(target_os = "macos")]
 pub use crate::core::bootstrap::quick_access_manager::platform::macos::macos::QuickAccessMacos as PlatformQuickAccess;

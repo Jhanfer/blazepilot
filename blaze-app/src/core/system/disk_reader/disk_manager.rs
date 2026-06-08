@@ -124,6 +124,7 @@ impl DiskManager {
 
     /// Verifica si hay discos USB removibles
     #[cfg(target_os = "linux")]
+    #[allow(unused)]
     pub fn has_removable_disks(&self) -> bool {
         match &self.disks {
             PlatformDisks::Linux(disks) => {
@@ -135,6 +136,7 @@ impl DiskManager {
 
     /// Obtiene solo discos removibles (USB)
     #[cfg(target_os = "linux")]
+    #[allow(unused)]
     pub async fn get_removable_disks(&self) -> Vec<Disk> {
         match &self.disks {
             PlatformDisks::Linux(disks) => {

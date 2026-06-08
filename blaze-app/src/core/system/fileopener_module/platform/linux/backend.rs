@@ -193,10 +193,12 @@ impl LinuxOpener {
         for line in content.lines() {
             let line = line.trim();
 
-            if line.starts_with("Name=") && !line.starts_with("Name[") {
-                name = Some(line[5..].trim().to_string());
-            } else if line.starts_with("Exec=") {
-                let e = line[5..].trim().to_string();
+            if let Some(value) = line.strip_prefix("Name=") {
+                name = Some(value.trim().to_string())
+            }
+
+            if let Some(value) = line.strip_prefix("Exec=") {
+                let e = value.trim().to_string();
                 is_private = {
                     let e_lower = e.to_lowercase();
                     e_lower.contains("--incognito")
@@ -204,14 +206,18 @@ impl LinuxOpener {
                         || e_lower.contains("-private")
                 };
                 exec = Some(e);
-            } else if line.starts_with("Icon=") {
-                icon = Some(line[5..].trim().to_string());
-            } else if line.starts_with("MimeType=") {
-                mimes = line[9..]
+            }
+
+            if let Some(value) = line.strip_prefix("Icon=") {
+                icon = Some(value.trim().to_string());
+            }
+
+            if let Some(value) = line.strip_prefix("MimeType=") {
+                mimes = value
                     .split(';')
                     .map(str::trim)
                     .filter(|s| !s.is_empty())
-                    .map(String::from)
+                    .map(|s| s.to_string())
                     .collect();
             }
         }

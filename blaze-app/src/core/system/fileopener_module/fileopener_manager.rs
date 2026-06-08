@@ -19,7 +19,7 @@ use tokio::sync::Mutex;
 use tracing::{debug, error};
 
 #[cfg(target_os = "linux")]
-use crate::core::system::fileopener_module::platform::linux::linux::LinuxOpener;
+use crate::core::system::fileopener_module::platform::linux::backend::LinuxOpener;
 
 #[cfg(target_os = "macos")]
 use crate::core::system::fileopener_module::platform::macos::{MacosOpener, MACOS_FILE_OPENER};
@@ -62,7 +62,7 @@ impl FileOpenerManager {
             opener: {
                 #[cfg(target_os = "linux")]
                 {
-                    use crate::core::system::fileopener_module::platform::linux::linux::LINUX_FILE_OPENER;
+                    use crate::core::system::fileopener_module::platform::linux::backend::LINUX_FILE_OPENER;
 
                     debug!("Usando FileOpener Linux");
                     PlatformOpener::Linux(LINUX_FILE_OPENER.clone())

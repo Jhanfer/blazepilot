@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use crate::{
-    core::system::clipboard::clipboard::TOKIO_RUNTIME,
+    core::system::clipboard::global_clipboard::TOKIO_RUNTIME,
     ui::image_preview::error::{ImagePreviewError, ImagePreviewResult},
 };
 use crossbeam_channel::{bounded, Receiver};

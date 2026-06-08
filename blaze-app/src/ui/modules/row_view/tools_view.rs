@@ -7,7 +7,7 @@ use crate::{
             bus_structs::{SureTo, UiEvent},
             event_bus::with_event_bus,
         },
-        system::trash_manager::trash_manager::get_backend,
+        system::trash_manager::manager::get_backend,
     },
     ui::{blaze_ui_state::BlazeUiState, icons_cache::icons, themes::colors::*},
 };

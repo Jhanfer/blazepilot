@@ -1,5 +1,5 @@
 pub mod appassociation;
-pub mod linux;
+pub mod backend;
 pub mod mimeapps;
 pub mod mimeappsfile;
 pub mod structs;

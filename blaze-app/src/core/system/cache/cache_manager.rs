@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use crate::core::system::{
-    cache::color_cache::color_cache::ColorCache,
+    cache::color_cache::color_cache_logic::ColorCache,
     extended_info::extended_info_manager::ExtendedInfoCache,
     knowndirs::knowndirs_manager::KnownDirsManager,
 };

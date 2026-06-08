@@ -5,7 +5,7 @@ use crate::{
         runtime::event_bus::with_event_bus,
         system::{
             extended_info::extended_info_manager::ExtendedInfoMessages,
-            sizer_manager::sizer_manager::SizerMessages, trash_manager::trash_manager::get_backend,
+            sizer_manager::manager::SizerMessages, trash_manager::manager::get_backend,
         },
     },
     ui::{
@@ -27,6 +27,7 @@ use std::sync::Arc;
 use tracing::warn;
 use uuid::Uuid;
 
+#[allow(clippy::too_many_arguments)]
 fn background_response_logic(
     state: &mut BlazeCoreState,
     ui_state: &mut BlazeUiState,
@@ -129,7 +130,7 @@ fn background_response_logic(
 
 pub fn row_panel_frame(
     ui: &mut Ui,
-    files: &Vec<Arc<FileEntry>>,
+    files: &[Arc<FileEntry>],
     state: &mut BlazeCoreState,
     ui_state: &mut BlazeUiState,
     bottom_padding: i8,

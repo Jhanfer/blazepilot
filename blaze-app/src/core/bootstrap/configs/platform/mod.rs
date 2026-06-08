@@ -9,7 +9,7 @@ pub mod macos;
 pub mod windows;
 
 #[cfg(target_os = "linux")]
-pub use crate::core::bootstrap::configs::platform::linux::linux::LinuxConfigs as PlatformConfigs;
+pub use crate::core::bootstrap::configs::platform::linux::backend::LinuxConfigs as PlatformConfigs;
 
 #[cfg(target_os = "macos")]
 use crate::core::bootstrap::configs::platform::macos::macos::MacosConfigs as PlatformConfigs;

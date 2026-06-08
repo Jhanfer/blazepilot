@@ -132,12 +132,13 @@ impl ConfigManager {
         self.platform.i18n.switch_locale(locale);
     }
 
-    #[must_use]
+    #[must_use = "el resultado de save() debe comprobarse por si falla"]
     pub fn save(&self) -> ConfigResult<()> {
         self.platform.save()
     }
 
-    #[must_use]
+    #[allow(unused)]
+    #[must_use = "el resultado de reload() debe comprobarse por si falla"]
     pub fn reload(&mut self) -> ConfigResult<()> {
         self.platform.load()
     }

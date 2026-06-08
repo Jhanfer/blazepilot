@@ -170,7 +170,7 @@ pub fn tag_views(
                                                 };
                                             }),
                                             Some(|ui: &mut Ui| {
-                                                if ui.button(&i18n.t("tags_quick.edit")).clicked() {
+                                                if ui.button(i18n.t("tags_quick.edit")).clicked() {
                                                     dispatcher
                                                         .send(UiEvent::QuickTagEvent(
                                                             QuickTagEvent::EditCurrentTag {
@@ -182,7 +182,7 @@ pub fn tag_views(
                                                         .ok();
                                                 }
 
-                                                if ui.button(&i18n.t("tags_quick.delete")).clicked()
+                                                if ui.button(i18n.t("tags_quick.delete")).clicked()
                                                 {
                                                     dispatcher
                                                         .send(UiEvent::QuickTagEvent(
@@ -390,7 +390,7 @@ pub fn tag_views(
                                         };
 
                                         response.context_menu(|ui| {
-                                            if ui.button(&i18n.t("tags_quick.edit")).clicked() {
+                                            if ui.button(i18n.t("tags_quick.edit")).clicked() {
                                                 dispatcher
                                                     .send(UiEvent::QuickTagEvent(
                                                         QuickTagEvent::EditCurrentQuickLink {
@@ -403,7 +403,7 @@ pub fn tag_views(
                                                     .ok();
                                             }
 
-                                            if ui.button(&i18n.t("tags_quick.delete")).clicked() {
+                                            if ui.button(i18n.t("tags_quick.delete")).clicked() {
                                                 dispatcher
                                                     .send(UiEvent::QuickTagEvent(
                                                         QuickTagEvent::DeleteQuickLink {

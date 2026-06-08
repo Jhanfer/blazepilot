@@ -21,12 +21,12 @@ use tracing::info;
 
 use crate::{
     core::system::{
-        clipboard::clipboard::TOKIO_RUNTIME,
+        clipboard::global_clipboard::TOKIO_RUNTIME,
         fileopener_module::{
             platform::linux::structs::AppsIconData, AppAssociation, GLOBAL_FILE_OPENER,
         },
     },
-    ui::{dialog_manager::dialog_manager::ModalDialog, themes::colors::COLOR_BG_MAIN},
+    ui::{dialog_manager::manager::ModalDialog, themes::colors::COLOR_BG_MAIN},
 };
 
 pub struct SelectorData {
