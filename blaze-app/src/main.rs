@@ -69,14 +69,7 @@ fn main() {
 }
 
 fn try_run_with_retries(initial_path: Option<Arc<Path>>) -> anyhow::Result<()> {
-    let mut last_error;
-
-    let max_tries = std::env::var("BLAZE_RETRIES")
-        .unwrap_or_else(|_| "3".to_string())
-        .parse()
-        .unwrap_or(3);
-
-    let retry_delay = std::env::var("BALAZE_RETRY_DELAY")
+    let retry_delay = std::env::var("BLAZE_RETRY_DELAY")
         .unwrap_or_else(|_| "500".to_string())
         .parse()
         .unwrap_or(500);
@@ -84,42 +77,42 @@ fn try_run_with_retries(initial_path: Option<Arc<Path>>) -> anyhow::Result<()> {
     let backend = with_configs(|c| c.get_display_backend());
 
     let configs = vec![
-        RunConfigs::default_with_backend(backend),
-        RunConfigs::default_with_backend(DisplayBackend::Wayland),
-        RunConfigs::default_with_backend(DisplayBackend::X11),
-        RunConfigs::fallback_config(),
+        RunConfigs::wgpu_present(backend.clone(), eframe::wgpu::PresentMode::Immediate),
+        RunConfigs::wgpu_present(backend, eframe::wgpu::PresentMode::Fifo),
+        RunConfigs::wgpu_present(DisplayBackend::Auto, eframe::wgpu::PresentMode::Fifo),
     ];
 
     for (attempt, config) in configs.iter().enumerate() {
         info!(
-            "Intento {}: iniciando con backend {:?}",
+            "Intento {}/{}: Backend={:?}, PresentMode={:?}, Power={:?}",
             attempt + 1,
-            config.backend
+            configs.len(),
+            config.backend,
+            config.present_mode,
+            config.power_preference,
         );
 
         match run_application(config.clone(), initial_path.clone()) {
             Ok(_) => return Ok(()),
             Err(e) => {
-                last_error = Some(e);
                 warn!(
                     "Intento {} ha fallado: {:?}: esperando antes de reintentar...",
                     attempt + 1,
-                    last_error
+                    e
                 );
 
-                if attempt < max_tries - 1 {
-                    std::thread::sleep(Duration::from_millis(retry_delay * (attempt + 1) as u64));
+                if attempt < configs.len() - 1 {
+                    let delay = retry_delay * (attempt as u64 + 1);
+                    info!("Esperando {}ms antes del siguiente intento...", delay);
+                    std::thread::sleep(Duration::from_millis(delay));
                 }
             }
         }
     }
 
-    warn!("Intentando configuración predeterminada...");
-    if let Err(e) = run_application(RunConfigs::default_config(), initial_path) {
-        Err(anyhow::anyhow!("Fallo catastrófico: {}", e))
-    } else {
-        Ok(())
-    }
+    Err(anyhow::anyhow!(
+        "Todos los intentos han fallado. Pruebe instalando drivers de Vulkan o ejecute con LIBGL_ALWAYS_SOFTWARE=1"
+    ))
 }
 
 fn run_application(config: RunConfigs, initial_path: Option<Arc<Path>>) -> anyhow::Result<()> {
@@ -149,54 +142,39 @@ fn run_application(config: RunConfigs, initial_path: Option<Arc<Path>>) -> anyho
     .map_err(|e| anyhow::anyhow!("Error al ejecutar: {}", e))
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 struct RunConfigs {
     backend: DisplayBackend,
     vsync: bool,
     multisampling: u16,
     power_preference: eframe::wgpu::PowerPreference,
+    present_mode: eframe::wgpu::PresentMode,
 }
 
 impl RunConfigs {
-    fn default_with_backend(backend: DisplayBackend) -> Self {
+    fn wgpu_present(backend: DisplayBackend, present_mode: eframe::wgpu::PresentMode) -> Self {
         Self {
             backend,
-            vsync: false,
+            present_mode,
+            vsync: matches!(present_mode, eframe::wgpu::PresentMode::Fifo),
             multisampling: 0,
             power_preference: eframe::wgpu::PowerPreference::LowPower,
-        }
-    }
-
-    fn fallback_config() -> Self {
-        Self {
-            backend: DisplayBackend::Auto,
-            vsync: true,
-            multisampling: 0,
-            power_preference: eframe::wgpu::PowerPreference::LowPower,
-        }
-    }
-
-    fn default_config() -> Self {
-        Self {
-            backend: DisplayBackend::Auto,
-            vsync: true,
-            multisampling: 0,
-            power_preference: eframe::wgpu::PowerPreference::None,
         }
     }
 }
 
 fn create_native_options(configs: &RunConfigs) -> NativeOptions {
+    let viewport = egui::ViewportBuilder::default()
+        .with_inner_size([1280.0, 720.0])
+        .with_min_inner_size([800.0, 500.0])
+        .with_title("BlazePilot")
+        .with_decorations(true)
+        .with_transparent(true)
+        .with_resizable(true)
+        .with_maximized(false)
+        .with_fullscreen(false);
     NativeOptions {
-        viewport: egui::ViewportBuilder::default()
-            .with_inner_size([1280.0, 720.0])
-            .with_min_inner_size([800.0, 500.0])
-            .with_title("BlazePilot")
-            .with_decorations(true)
-            .with_transparent(true)
-            .with_resizable(true)
-            .with_maximized(false)
-            .with_fullscreen(false),
+        viewport,
         renderer: eframe::Renderer::Wgpu,
         hardware_acceleration: HardwareAcceleration::Preferred,
         vsync: configs.vsync,
@@ -204,15 +182,9 @@ fn create_native_options(configs: &RunConfigs) -> NativeOptions {
         depth_buffer: 0,
         stencil_buffer: 0,
         dithering: false,
-
         wgpu_options: eframe::egui_wgpu::WgpuConfiguration {
-            present_mode: if configs.vsync {
-                eframe::wgpu::PresentMode::Fifo
-            } else {
-                eframe::wgpu::PresentMode::Immediate
-            },
+            present_mode: configs.present_mode,
             desired_maximum_frame_latency: Some(1),
-
             wgpu_setup: eframe::egui_wgpu::WgpuSetup::CreateNew(
                 eframe::egui_wgpu::WgpuSetupCreateNew {
                     power_preference: configs.power_preference,
@@ -224,14 +196,11 @@ fn create_native_options(configs: &RunConfigs) -> NativeOptions {
                         experimental_features: eframe::wgpu::ExperimentalFeatures::disabled(),
                         trace: eframe::wgpu::Trace::Off,
                     }),
-
                     ..eframe::egui_wgpu::WgpuSetupCreateNew::without_display_handle()
                 },
             ),
-
             ..Default::default()
         },
-
         ..Default::default()
     }
 }
