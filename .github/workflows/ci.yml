@@ -12,6 +12,7 @@ concurrency:
 
 jobs:
   check:
+    name: CI Check
     runs-on: ubuntu-latest
 
     steps:
