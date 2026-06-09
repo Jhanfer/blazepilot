@@ -13,8 +13,6 @@ pub const COLOR_ACCENT_PURPLE: Color32 = Color32::from_rgb(140, 75, 247); // El 
 pub const COLOR_ACCENT_GLOW: Color32 = Color32::from_rgb(186, 110, 255); // El tono neón más claro del resplandor superior
 pub const COLOR_TEXT_MUTED: Color32 = Color32::from_rgb(122, 106, 133); // Color de los iconos y texto secundario desvanecido
 
-pub const COLOR_FOLDER_PURPLE: Color32 = Color32::from_rgb(163, 97, 255);
-
 // Tonos de texto principales
 pub const COLOR_TEXT_PRIMARY: Color32 = Color32::from_rgb(255, 255, 255); // Blanco puro para textos principales
 pub const COLOR_TEXT_SECONDARY: Color32 = Color32::from_rgb(226, 213, 237); // Blanco violáceo para nombres de archivos y carpetas

@@ -58,61 +58,98 @@ fn main() {
         .with_thread_ids(true)
         .init();
 
-    let initial_path = parse_initial_path();
+    if std::env::var("BLAZE_IS_CHILD").is_ok() {
+        let present_mode = parse_present_mode_from_env();
+        let backend = parse_backend_from_env();
+        let initial_path = parse_initial_path();
+        let _ = init_dir_trash().map_err(|e| warn!("Error inicializando: {}", e));
+
+        let config = RunConfigs::wgpu_present(backend, present_mode);
+        if let Err(e) = run_application(config, initial_path) {
+            error!("Fallo al arrancar: {}", e);
+            std::process::exit(1);
+        }
+        return;
+    }
 
     let _ = init_dir_trash().map_err(|e| warn!("Ha ocurrido un error inicializando: {}", e));
 
-    if let Err(e) = try_run_with_retries(initial_path) {
+    if let Err(e) = try_run_with_retries() {
         error!("Todos los intentos han fallado: {}", e);
         std::process::exit(1);
     }
 }
 
-fn try_run_with_retries(initial_path: Option<Arc<Path>>) -> anyhow::Result<()> {
+fn try_run_with_retries() -> anyhow::Result<()> {
+    let exe = std::env::current_exe()?;
+    let args: Vec<String> = std::env::args().skip(1).collect();
+
     let retry_delay = std::env::var("BLAZE_RETRY_DELAY")
         .unwrap_or_else(|_| "500".to_string())
         .parse()
-        .unwrap_or(500);
+        .unwrap_or(500u64);
 
     let backend = with_configs(|c| c.get_display_backend());
 
     let configs = [
-        RunConfigs::wgpu_present(backend.clone(), eframe::wgpu::PresentMode::Immediate),
-        RunConfigs::wgpu_present(backend, eframe::wgpu::PresentMode::Fifo),
-        RunConfigs::wgpu_present(DisplayBackend::Auto, eframe::wgpu::PresentMode::Fifo),
+        (backend.clone(), "Immediate"),
+        (backend, "Fifo"),
+        (DisplayBackend::Auto, "Fifo"),
     ];
 
-    for (attempt, config) in configs.iter().enumerate() {
+    for (attempt, (backend, present_mode)) in configs.iter().enumerate() {
         info!(
-            "Intento {}/{}: Backend={:?}, PresentMode={:?}, Power={:?}",
+            "Intento {}/{}: Backend={:?}, PresentMode={}",
             attempt + 1,
             configs.len(),
-            config.backend,
-            config.present_mode,
-            config.power_preference,
+            backend,
+            present_mode
         );
 
-        match run_application(config.clone(), initial_path.clone()) {
-            Ok(_) => return Ok(()),
-            Err(e) => {
-                warn!(
-                    "Intento {} ha fallado: {:?}: esperando antes de reintentar...",
-                    attempt + 1,
-                    e
-                );
+        let mut cmd = std::process::Command::new(&exe);
+        cmd.args(&args)
+            .env("BLAZE_PRESENT_MODE", present_mode)
+            .env("BLAZE_BACKEND", format!("{:?}", backend))
+            .env("BLAZE_IS_CHILD", "1");
 
-                if attempt < configs.len() - 1 {
-                    let delay = retry_delay * (attempt as u64 + 1);
-                    info!("Esperando {}ms antes del siguiente intento...", delay);
-                    std::thread::sleep(Duration::from_millis(delay));
-                }
-            }
+        let status = cmd.status()?;
+
+        if status.success() {
+            info!("Intento {} completado correctamente.", attempt + 1);
+            return Ok(());
+        }
+
+        warn!(
+            "Intento {} terminó con código: {:?}",
+            attempt + 1,
+            status.code()
+        );
+
+        if attempt < configs.len() - 1 {
+            let delay = retry_delay * (attempt as u64 + 1);
+            info!("Esperando {}ms antes del siguiente intento...", delay);
+            std::thread::sleep(Duration::from_millis(delay));
         }
     }
 
     Err(anyhow::anyhow!(
-        "Todos los intentos han fallado. Pruebe instalando drivers de Vulkan o ejecute con LIBGL_ALWAYS_SOFTWARE=1"
+        "Todos los intentos fallaron. Instala drivers Vulkan o ejecuta con LIBGL_ALWAYS_SOFTWARE=1"
     ))
+}
+
+fn parse_present_mode_from_env() -> eframe::wgpu::PresentMode {
+    match std::env::var("BLAZE_PRESENT_MODE").as_deref() {
+        Ok("Immediate") => eframe::wgpu::PresentMode::Immediate,
+        _ => eframe::wgpu::PresentMode::Fifo,
+    }
+}
+
+fn parse_backend_from_env() -> DisplayBackend {
+    match std::env::var("BLAZE_BACKEND").as_deref() {
+        Ok("X11") => DisplayBackend::X11,
+        Ok("Wayland") => DisplayBackend::Wayland,
+        _ => DisplayBackend::Auto,
+    }
 }
 
 fn run_application(config: RunConfigs, initial_path: Option<Arc<Path>>) -> anyhow::Result<()> {
@@ -188,13 +225,16 @@ fn create_native_options(configs: &RunConfigs) -> NativeOptions {
             wgpu_setup: eframe::egui_wgpu::WgpuSetup::CreateNew(
                 eframe::egui_wgpu::WgpuSetupCreateNew {
                     power_preference: configs.power_preference,
-                    device_descriptor: Arc::new(|adapter| eframe::wgpu::DeviceDescriptor {
-                        label: Some("BlazePilot Device"),
-                        required_limits: adapter.limits(),
-                        required_features: eframe::wgpu::Features::empty(),
-                        memory_hints: eframe::wgpu::MemoryHints::MemoryUsage,
-                        experimental_features: eframe::wgpu::ExperimentalFeatures::disabled(),
-                        trace: eframe::wgpu::Trace::Off,
+                    device_descriptor: Arc::new(|adapter| {
+                        let limits = adapter.limits();
+                        eframe::wgpu::DeviceDescriptor {
+                            label: Some("BlazePilot Device"),
+                            required_limits: limits,
+                            required_features: eframe::wgpu::Features::empty(),
+                            memory_hints: eframe::wgpu::MemoryHints::MemoryUsage,
+                            experimental_features: eframe::wgpu::ExperimentalFeatures::disabled(),
+                            trace: eframe::wgpu::Trace::Off,
+                        }
                     }),
                     ..eframe::egui_wgpu::WgpuSetupCreateNew::without_display_handle()
                 },
