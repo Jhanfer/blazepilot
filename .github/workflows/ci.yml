@@ -6,9 +6,12 @@ on:
   pull_request:
     branches: [main, master]
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   check:
-    name: Check & Test
     runs-on: ubuntu-latest
 
     steps:
@@ -19,23 +22,14 @@ jobs:
         with:
           components: rustfmt, clippy
 
-      - name: Registro de Cache Cargo
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
 
       - name: cargo fmt --check
         run: cargo fmt --all -- --check
 
       - name: cargo clippy
-        run: cargo clippy --all-targets --all-features -- -D warnings
-
-      - name: cargo build
-        run: cargo build --release
+        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
 
       - name: cargo test
-        run: cargo test --all
+        run: cargo test --workspace

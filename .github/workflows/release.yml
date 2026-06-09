@@ -11,6 +11,7 @@ permissions:
 jobs:
   build-linux:
     runs-on: ubuntu-22.04
+
     steps:
       - name: Checkout código
         uses: actions/checkout@v4
@@ -20,6 +21,9 @@ jobs:
         with:
           targets: x86_64-unknown-linux-gnu
 
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+
       - name: Instalar dependencias del sistema
         run: |
           sudo apt-get update
@@ -27,10 +31,26 @@ jobs:
             libssl-dev pkg-config \
             libx11-dev \
             libxkbcommon-dev \
-            libwayland-dev
+            libxkbcommon-x11-dev \
+            libwayland-dev \
+            libwayland-client0 \
+            libgl1-mesa-dev \
+            libegl1-mesa-dev \
+            libgles2-mesa-dev \
+            libvulkan-dev \
+            libdbus-1-dev
 
       - name: Compilar en modo Release
         run: cargo build --release --target x86_64-unknown-linux-gnu
+
+      - name: Verificar binario
+        run: |
+          BIN="target/x86_64-unknown-linux-gnu/release/blazepilot"
+          if [ ! -f "$BIN" ]; then
+            echo "❌ Binario no encontrado: $BIN"
+            exit 1
+          fi
+          echo "✅ $(du -sh $BIN | cut -f1) — $BIN"
 
       - name: Renombrar binario
         id: rename
@@ -40,21 +60,49 @@ jobs:
           cp target/x86_64-unknown-linux-gnu/release/blazepilot "./$FILE"
           echo "file=$FILE" >> "$GITHUB_OUTPUT"
 
-      - name: Extraer changelog de esta versión
+      - name: Generar Release Notes
         id: changelog
         run: |
           VERSION=${GITHUB_REF_NAME#v}
-          BODY=$(awk "/^## \[${VERSION}\]/{found=1; next} found && /^## \[/{exit} found{print}" CHANGELOG.md)
-          echo "body<<EOF" >> "$GITHUB_OUTPUT"
-          echo "$BODY" >> "$GITHUB_OUTPUT"
-          echo "EOF" >> "$GITHUB_OUTPUT"
+
+          if [ ! -f CHANGELOG.md ]; then
+            echo "❌ CHANGELOG.md no encontrado"
+            exit 1
+          fi
+
+          CHANGELOG=$(awk "/^## \[${VERSION//./\\.}\]/{found=1; next} found && /^## \[/{exit} found{print}" CHANGELOG.md)
+
+          if [ -z "$CHANGELOG" ]; then
+            echo "❌ No se encontró changelog para ${VERSION}"
+            exit 1
+          fi
+
+          {
+            echo "body<<EOF"
+
+            echo "# 🚀 BlazePilot ${VERSION}"
+            echo
+            echo "$CHANGELOG"
+            echo
+            echo "---"
+            echo
+            echo "## 📦 Descargas"
+            echo
+            echo "- Linux x86_64 GNU"
+            echo
+            echo "---"
+            echo
+            echo "❤️ Gracias por usar BlazePilot"
+
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Subir binario al Release
         uses: softprops/action-gh-release@v2
         with:
           files: ${{ steps.rename.outputs.file }}
           tag_name: ${{ github.ref_name }}
-          name: Release ${{ github.ref_name }}
+          name: BlazePilot ${{ github.ref_name }}
           body: ${{ steps.changelog.outputs.body }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

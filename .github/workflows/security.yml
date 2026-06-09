@@ -1,0 +1,27 @@
+name: Security Audit
+
+on:
+  schedule:
+    - cron: '0 0 * * 1'
+
+  workflow_dispatch:
+
+jobs:
+  audit:
+    timeout-minutes: 10
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instalar Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+
+      - name: Instalar cargo-audit
+        run: cargo install cargo-audit
+
+      - name: Ejecutar auditoría
+        run: cargo audit --deny warnings
