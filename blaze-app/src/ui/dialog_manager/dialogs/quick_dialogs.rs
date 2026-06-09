@@ -37,8 +37,8 @@ impl ModalDialog for QuickAccDialog {
     fn close(&mut self) {
         self.close()
     }
-    fn render(&mut self, ui: &mut Ui) {
-        self.process_events(ui);
+    fn render(&mut self, ui: &mut Ui) -> bool {
+        self.process_events(ui)
     }
 }
 
@@ -71,9 +71,9 @@ impl QuickAccDialog {
         });
     }
 
-    fn process_events(&mut self, ui: &mut Ui) {
+    fn process_events(&mut self, ui: &mut Ui) -> bool {
         let Some(event) = self.event.take() else {
-            return;
+            return false;
         };
 
         match event {
@@ -155,6 +155,8 @@ impl QuickAccDialog {
                 } else if self.show_modal {
                     self.event = Some(QuickTagEvent::AddQuickLinkToTag { quicks });
                 }
+
+                self.show_modal
             }
 
             QuickTagEvent::CreateNewTag {
@@ -239,6 +241,8 @@ impl QuickAccDialog {
                 } else if self.show_modal {
                     self.event = Some(QuickTagEvent::CreateNewTag { title, temp_color });
                 }
+
+                self.show_modal
             }
 
             QuickTagEvent::EditCurrentTag {
@@ -327,6 +331,8 @@ impl QuickAccDialog {
                         temp_color,
                     });
                 }
+
+                self.show_modal
             }
 
             QuickTagEvent::DeleteCurrentTag { id, title } => {
@@ -363,6 +369,8 @@ impl QuickAccDialog {
                 if !accepted && self.show_modal {
                     self.event = Some(QuickTagEvent::DeleteCurrentTag { id, title });
                 }
+
+                self.show_modal
             }
 
             QuickTagEvent::DeleteQuickLink {
@@ -407,6 +415,8 @@ impl QuickAccDialog {
                         quick_id,
                     });
                 }
+
+                self.show_modal
             }
 
             QuickTagEvent::EditCurrentQuickLink {
@@ -497,6 +507,8 @@ impl QuickAccDialog {
                         temp_color,
                     });
                 }
+
+                self.show_modal
             }
         }
     }

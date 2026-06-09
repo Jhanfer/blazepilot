@@ -32,8 +32,8 @@ impl ModalDialog for SureToMoveToDialog {
     fn close(&mut self) {
         self.close()
     }
-    fn render(&mut self, ui: &mut Ui) {
-        self.render_dialog(ui);
+    fn render(&mut self, ui: &mut Ui) -> bool {
+        self.render_dialog(ui)
     }
 }
 
@@ -56,11 +56,11 @@ impl SureToMoveToDialog {
         self.show_modal = true;
     }
 
-    pub fn render_dialog(&mut self, ui: &mut Ui) {
+    pub fn render_dialog(&mut self, ui: &mut Ui) -> bool {
         let mut should_close = false;
 
         let (Some(sources), Some(dest)) = (self.sources.as_ref(), self.dest.as_ref()) else {
-            return;
+            return false;
         };
 
         let custom_frame = Frame::NONE
@@ -143,8 +143,6 @@ impl SureToMoveToDialog {
                 });
             });
 
-        if should_close {
-            self.close();
-        }
+        should_close
     }
 }

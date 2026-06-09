@@ -504,7 +504,9 @@ impl BlazeCoreState {
     #[allow(unused)]
     pub fn clear_clipboard(&self) {
         match self.clipboard.clear() {
-            Ok(_) => {}
+            Ok(_) => {
+                info!("Se limpia el clipboard");
+            }
             Err(e) => warn!("Eror en clipboard: {e}"),
         }
     }
@@ -513,7 +515,9 @@ impl BlazeCoreState {
         let cwd = self.motor.borrow_mut().active_tab().cwd.clone();
         let items = self.selected_as_entries(files);
         match self.clipboard.copy_items(items, cwd) {
-            Ok(_) => {}
+            Ok(_) => {
+                info!("Se copia");
+            }
             Err(e) => warn!("Eror en clipboard: {e}"),
         }
     }
@@ -524,7 +528,9 @@ impl BlazeCoreState {
             .clone();
         let items = self.selected_as_entries(files);
         match self.clipboard.cut_items(items, cwd) {
-            Ok(_) => {}
+            Ok(_) => {
+                info!("Se corta");
+            }
             Err(e) => warn!("Eror en clipboard: {e}"),
         }
     }

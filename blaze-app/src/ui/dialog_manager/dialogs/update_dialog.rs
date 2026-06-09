@@ -33,8 +33,8 @@ impl ModalDialog for UpdateDialog {
     fn close(&mut self) {
         self.close()
     }
-    fn render(&mut self, ui: &mut Ui) {
-        self.render_dialog(ui);
+    fn render(&mut self, ui: &mut Ui) -> bool {
+        self.render_dialog(ui)
     }
 }
 
@@ -59,7 +59,7 @@ impl UpdateDialog {
         self.show_modal = true;
     }
 
-    pub fn render_dialog(&mut self, ui: &mut Ui) {
+    pub fn render_dialog(&mut self, ui: &mut Ui) -> bool {
         let mut should_close = false;
 
         let (Some(current_ver), Some(new_ver), Some(_)) = (
@@ -67,7 +67,7 @@ impl UpdateDialog {
             self.new_version.as_ref(),
             self.tab_id.as_ref(),
         ) else {
-            return;
+            return false;
         };
 
         let custom_frame = Frame::NONE
@@ -117,8 +117,6 @@ impl UpdateDialog {
                 });
             });
 
-        if should_close {
-            self.close();
-        }
+        should_close
     }
 }

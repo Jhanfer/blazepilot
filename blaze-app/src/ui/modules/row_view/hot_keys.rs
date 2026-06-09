@@ -191,16 +191,19 @@ pub fn hot_keys_logic(
 
     //copiar
     if do_copy && disable_keys {
+        tracing::info!("Se manda comando copia");
         state.copy(files);
     }
 
     //cortar
     if do_cut && disable_keys {
+        tracing::info!("Se manda comando corta");
         state.cut(files);
     }
 
     //pegar
     if do_paste && disable_keys && has_clipboard {
+        tracing::info!("Se manda comando pega");
         let cwd = state.cwd.clone();
         state.paste(cwd);
     }

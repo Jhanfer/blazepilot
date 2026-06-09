@@ -167,8 +167,8 @@ impl ModalDialog for ConfigDialog {
     fn close(&mut self) {
         self.close()
     }
-    fn render(&mut self, ui: &mut Ui) {
-        self.render_dialog(ui);
+    fn render(&mut self, ui: &mut Ui) -> bool {
+        self.render_dialog(ui)
     }
 }
 
@@ -539,11 +539,11 @@ impl ConfigDialog {
         });
     }
 
-    pub fn render_dialog(&mut self, ui: &mut Ui) {
+    pub fn render_dialog(&mut self, ui: &mut Ui) -> bool {
         let i18n = with_configs(|c| c.get_i18n());
         let mut config_open = self.show_modal;
         if !self.show_modal {
-            return;
+            return false;
         }
 
         let custom_frame = Frame::NONE
@@ -631,5 +631,7 @@ impl ConfigDialog {
         if input.key_pressed(Key::Escape) || close_requested {
             self.close();
         }
+
+        self.show_modal
     }
 }

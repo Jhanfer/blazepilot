@@ -33,8 +33,8 @@ impl ModalDialog for FolderColorSelector {
     fn close(&mut self) {
         self.close()
     }
-    fn render(&mut self, ui: &mut Ui) {
-        self.render_dialog(ui);
+    fn render(&mut self, ui: &mut Ui) -> bool {
+        self.render_dialog(ui)
     }
 }
 
@@ -60,14 +60,14 @@ impl FolderColorSelector {
         self.show_modal = true;
     }
 
-    pub fn render_dialog(&mut self, ui: &mut Ui) {
+    pub fn render_dialog(&mut self, ui: &mut Ui) -> bool {
         let mut should_close = false;
 
         let Some(folder_id) = self.folder_id.as_ref() else {
-            return;
+            return false;
         };
         let Some(temp_color) = &mut self.temp_color else {
-            return;
+            return false;
         };
 
         let custom_frame = Frame::NONE
@@ -132,8 +132,6 @@ impl FolderColorSelector {
                 });
             });
 
-        if should_close {
-            self.close();
-        }
+        should_close
     }
 }

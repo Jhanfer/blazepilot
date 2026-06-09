@@ -34,8 +34,8 @@ impl ModalDialog for ImagePreviewDialog {
     fn close(&mut self) {
         self.close()
     }
-    fn render(&mut self, ui: &mut Ui) {
-        self.render_dialog(ui);
+    fn render(&mut self, ui: &mut Ui) -> bool {
+        self.render_dialog(ui)
     }
 }
 
@@ -211,10 +211,10 @@ impl ImagePreviewDialog {
         }
     }
 
-    pub fn render_dialog(&mut self, ui: &mut Ui) {
+    pub fn render_dialog(&mut self, ui: &mut Ui) -> bool {
         let mut should_close = false;
         let Some(pvw) = self.preview.as_mut() else {
-            return;
+            return false;
         };
 
         let is_portrait = pvw.current_texture.as_ref().is_some_and(|tex| {
@@ -321,7 +321,8 @@ impl ImagePreviewDialog {
 
         if should_close {
             pvw.cleanup();
-            self.close();
         }
+
+        should_close
     }
 }

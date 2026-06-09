@@ -50,8 +50,8 @@ impl ModalDialog for AppSelectorDialog {
     fn close(&mut self) {
         self.close()
     }
-    fn render(&mut self, ui: &mut Ui) {
-        self.render_app_selector(ui);
+    fn render(&mut self, ui: &mut Ui) -> bool {
+        self.render_app_selector(ui)
     }
 }
 
@@ -180,9 +180,9 @@ impl AppSelectorDialog {
         should_close
     }
 
-    pub fn render_app_selector(&mut self, ui: &mut Ui) {
+    pub fn render_app_selector(&mut self, ui: &mut Ui) -> bool {
         if self.selector_data.is_none() {
-            return;
+            return false;
         }
 
         let mut should_close = self.show_modal;
@@ -190,7 +190,7 @@ impl AppSelectorDialog {
         self.load_textures(ui);
 
         let Some(data) = &mut self.selector_data else {
-            return;
+            return false;
         };
 
         let custom_frame = Frame::NONE
@@ -260,10 +260,7 @@ impl AppSelectorDialog {
                 });
             });
 
-        if close_requested {
-            self.close();
-        }
-
         self.show_modal = should_close;
+        close_requested
     }
 }

@@ -35,8 +35,8 @@ impl ModalDialog for SureToDeleteDialog {
     fn close(&mut self) {
         self.close()
     }
-    fn render(&mut self, ui: &mut Ui) {
-        self.render_dialog(ui);
+    fn render(&mut self, ui: &mut Ui) -> bool {
+        self.render_dialog(ui)
     }
 }
 
@@ -59,11 +59,11 @@ impl SureToDeleteDialog {
         self.show_modal = true;
     }
 
-    pub fn render_dialog(&mut self, ui: &mut Ui) {
+    pub fn render_dialog(&mut self, ui: &mut Ui) -> bool {
         let mut should_close = false;
 
         let (Some(sources), Some(_)) = (self.sources.as_ref(), self.tab_id.as_ref()) else {
-            return;
+            return false;
         };
 
         let custom_frame = Frame::NONE
@@ -129,8 +129,6 @@ impl SureToDeleteDialog {
                 });
             });
 
-        if should_close {
-            self.close();
-        }
+        should_close
     }
 }

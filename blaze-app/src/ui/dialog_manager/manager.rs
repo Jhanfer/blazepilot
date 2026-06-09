@@ -25,7 +25,7 @@ use crate::{
 pub trait ModalDialog {
     fn is_open(&self) -> bool;
     fn close(&mut self);
-    fn render(&mut self, ui: &mut Ui);
+    fn render(&mut self, ui: &mut Ui) -> bool;
 }
 
 pub struct DialogManager {
@@ -135,34 +135,31 @@ impl DialogManager {
         let open_dialog = dialogs.into_iter().find(|d| d.is_open());
 
         if let Some(dialog) = open_dialog {
-            let mut should_close = false;
+            let backdrop_clicked = {
+                let screen_rect = ui.content_rect();
+                let resp = Area::new("blocker".into())
+                    .fixed_pos(egui::pos2(0.0, 0.0))
+                    .order(Order::Middle)
+                    .sense(Sense::click())
+                    .interactable(true)
+                    .show(ui, |ui| {
+                        ui.painter().rect_filled(
+                            screen_rect,
+                            0.0,
+                            egui::Color32::from_rgba_unmultiplied(0, 0, 0, 180),
+                        );
+                        ui.allocate_rect(screen_rect, egui::Sense::click())
+                            .clicked()
+                    });
 
-            Area::new("blocker".into())
-                .fixed_pos(egui::pos2(0.0, 0.0))
-                .order(Order::Middle)
-                .sense(Sense::click())
-                .interactable(true)
-                .show(ui, |ui| {
-                    let screen_rect = ui.ctx().content_rect();
-                    ui.painter().rect_filled(
-                        screen_rect,
-                        0.0,
-                        egui::Color32::from_rgba_unmultiplied(0, 0, 0, 180),
-                    );
+                resp.inner
+            };
 
-                    if ui
-                        .allocate_rect(screen_rect, egui::Sense::click_and_drag())
-                        .clicked()
-                    {
-                        should_close = true;
-                    }
-                });
+            let dialog_requested_close = dialog.render(ui);
 
-            if should_close {
+            if backdrop_clicked || dialog_requested_close {
                 dialog.close();
             }
-
-            dialog.render(ui);
         }
     }
 }

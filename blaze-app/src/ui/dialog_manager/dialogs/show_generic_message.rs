@@ -14,7 +14,6 @@
 
 use crate::ui::{dialog_manager::manager::ModalDialog, themes::colors::COLOR_BG_MAIN};
 use egui::{CornerRadius, Frame, Margin, Order, Ui, Window};
-use tracing::info;
 
 pub struct ShowGenericDialog {
     pub title: Option<Box<str>>,
@@ -29,8 +28,8 @@ impl ModalDialog for ShowGenericDialog {
     fn close(&mut self) {
         self.close()
     }
-    fn render(&mut self, ui: &mut Ui) {
-        self.render_dialog(ui);
+    fn render(&mut self, ui: &mut Ui) -> bool {
+        self.render_dialog(ui)
     }
 }
 
@@ -53,11 +52,11 @@ impl ShowGenericDialog {
         self.show_modal = true;
     }
 
-    pub fn render_dialog(&mut self, ui: &mut Ui) {
+    pub fn render_dialog(&mut self, ui: &mut Ui) -> bool {
         let mut should_close = false;
 
         let (Some(title), Some(message)) = (self.title.as_ref(), self.message.as_ref()) else {
-            return;
+            return false;
         };
 
         let custom_frame = Frame::NONE
@@ -95,9 +94,6 @@ impl ShowGenericDialog {
                 });
             });
 
-        if should_close {
-            info!("Se cierra");
-            self.close();
-        }
+        should_close
     }
 }
