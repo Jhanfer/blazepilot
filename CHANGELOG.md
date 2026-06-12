@@ -1,3 +1,28 @@
+## [0.13.0] - 2026-06-12
+
+### 🐛 Bug fixes
+- **(startup)** Reintentos en proceso hijo y panic=unwind([`bda7e59`](https://github.com/Jhanfer/blazepilot/commit/bda7e5955113d922f41d2cf66d5718b858c64cb2))
+
+
+### 🚜 Refactor
+- **(app)** Reemplaza reintentos por env por lista fija de configs([`7935c4c`](https://github.com/Jhanfer/blazepilot/commit/7935c4c56bb2ba3aaa9b1473820d9929bbd2db5f))
+- **(core)** Reestructuración modular Linux y endurece CI a -D warnings([`4c73ea5`](https://github.com/Jhanfer/blazepilot/commit/4c73ea5a2304b0088dd48011f2387672b86bd60f))
+- **(ui)** ModalDialog.render devuelve bool para control de cierre([`d55b670`](https://github.com/Jhanfer/blazepilot/commit/d55b670419ad9b205c83b46c30f303f34abd94b0))
+- **(linux)** Simplifica fileopener, elimina async y channel_pool([`5057977`](https://github.com/Jhanfer/blazepilot/commit/505797743f3c95daeafda6588f8c8a3cdf106780))
+
+
+### 📚 Docs
+- **(readme)** Añade dos screenshots y actualiza README([`7005296`](https://github.com/Jhanfer/blazepilot/commit/7005296f4f991ee9951a93e79f4d5038e69aeafa))
+
+
+### ⚙️ Miscelánea
+- **(release)** Genera changelog automático en el cuerpo del release([`cf676ab`](https://github.com/Jhanfer/blazepilot/commit/cf676ab058962a80efc71fb30691c5e558e13dd7))
+- **(github)** Añade FUNDING.yml para GitHub Sponsors([`10da90d`](https://github.com/Jhanfer/blazepilot/commit/10da90d716d3fdd9a30945581964f5c34234e0a7))
+- Fuerza clippy a denegar warnings (-D warnings)([`eb5ed83`](https://github.com/Jhanfer/blazepilot/commit/eb5ed83e48118779b2ea7d6deade5d478de17c35))
+- Mejora workflows con cache, concurrencia y release notes automáticas([`77926fa`](https://github.com/Jhanfer/blazepilot/commit/77926fa8fc0bac3105df25b5ea1a427c834e9b79))
+- **(ci)** Añade nombre al job del CI([`1fa361c`](https://github.com/Jhanfer/blazepilot/commit/1fa361c4bdb71f57989cded81aea05d7ddd38da6))
+- **(version)** V0.13.0([`ab0ed63`](https://github.com/Jhanfer/blazepilot/commit/ab0ed6363ecc82f81446bce2dbe7ebe100b0cef7))
+
 ## [0.12.0] - 2026-06-06
 
 ### 🚀 Features
