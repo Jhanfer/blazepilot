@@ -54,7 +54,7 @@ impl ConfigManager {
         manager
     }
 
-    #[must_use]
+    #[allow(unused)]
     pub fn config_dir(&self) -> &Path {
         self.platform.config_dir()
     }

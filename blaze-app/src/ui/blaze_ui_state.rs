@@ -121,20 +121,8 @@ impl BlazeUiState {
 
         for envent in events {
             match envent {
-                UiEvent::OpenWithSelector {
-                    path,
-                    mime,
-                    apps,
-                    icon_data,
-                    show_all_apps,
-                } => {
-                    self.dialog_manager.open_selector_dialog(
-                        path,
-                        mime,
-                        apps,
-                        icon_data,
-                        show_all_apps,
-                    );
+                UiEvent::OpenWithSelector { path } => {
+                    self.dialog_manager.open_selector_dialog(path);
                 }
                 UiEvent::ShowError(message) => {
                     info!("Error recibido");

@@ -3,45 +3,36 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum OpenerError {
-    #[error("No se ha podido leer el archivo: {path} - {source}")]
+    #[error("{msg}: {path} - {source}")]
     Io {
         path: Arc<Path>,
+        msg: Box<str>,
         #[source]
         source: std::io::Error,
     },
 
-    #[error("Error de Serde {0}")]
-    SerdeError(#[from] serde_json::Error),
+    #[error("{msg}: {path} - {source}")]
+    TomlError {
+        path: Arc<Path>,
+        msg: Box<str>,
+        #[source]
+        source: toml::ser::Error,
+    },
 
     #[error("Ejecutable bloqueado por política de seguridad: '{name}'")]
-    BlockedExecutable { name: String },
+    BlockedExecutable { name: Box<str> },
 
-    #[error("Ejecutable no encontrado o sin permisos: '{name}'")]
-    ExecutableNotFound { name: String },
+    #[error("Error parseando argumentos de Exec: {error}")]
+    ExecParseFailed { error: shell_words::ParseError },
 
-    #[error("Exec vacío o inválido en desktop file: {desktop_id}")]
-    InvalidExec { desktop_id: String },
+    #[error("Exec vacío")]
+    ArgsEmpty,
 
-    #[error("No se pudo parsear el archivo de escritorio: {path}")]
-    DesktopParsedFaild { path: Arc<Path> },
+    #[error("No se han encontrado la aplicación")]
+    NoAppFound,
 
-    #[error("Error parseando argumentos de Exec: {raw}")]
-    ExecParseFailed { raw: String },
-
-    #[error("Error en el task de tokio: {0}")]
-    ThreadError(#[from] tokio::task::JoinError),
-
-    #[error("Formato no soportado")]
-    UnsuportedFormat,
-
-    #[error("Error leyendo imagen: {0}")]
-    ImageError(#[from] image::error::ImageError),
-
-    #[error("Error leyendo imagen: {0}")]
-    SvgError(#[from] resvg::usvg::Error),
-
-    #[error("No hay dimensiones disponibles")]
-    TargetDimensionError,
+    #[error("xdg-mime ha retornado error")]
+    XDGMimeError,
 }
 
 pub type OpenerResult<T> = Result<T, OpenerError>;

@@ -1,7 +1,5 @@
 use crate::core::bootstrap::quick_access_manager::platform::structs::QuickLinks;
 use crate::core::files::blaze_motor::motor_structs::FileEntry;
-use crate::core::system::fileopener_module::platform::linux::structs::AppsIconData;
-use crate::core::system::fileopener_module::AppAssociation;
 use crate::core::system::updater::updater_manager::UpdateMessages;
 use crate::ui::image_preview::image_preview_handler::ImagePreviewState;
 use egui::Color32;
@@ -83,21 +81,11 @@ pub enum FileConflict {
 }
 
 pub enum UiEvent {
-    OpenWithSelector {
-        path: Arc<Path>,
-        mime: String,
-        apps: Vec<AppAssociation>,
-        icon_data: Vec<AppsIconData>,
-        show_all_apps: bool,
-    },
+    OpenWithSelector { path: Arc<Path> },
 
-    ThumbnailReady {
-        full_path: Arc<Path>,
-    },
+    ThumbnailReady { full_path: Arc<Path> },
 
-    ShowImagePvw {
-        pvw: Option<ImagePreviewState>,
-    },
+    ShowImagePvw { pvw: Option<ImagePreviewState> },
 
     SureTo(SureTo),
 
@@ -107,14 +95,9 @@ pub enum UiEvent {
 
     ShowError(Box<str>),
 
-    ShowGeneric {
-        title: Box<str>,
-        message: Box<str>,
-    },
+    ShowGeneric { title: Box<str>, message: Box<str> },
 
-    ShowFolderColorSelector {
-        folder_id: FileId,
-    },
+    ShowFolderColorSelector { folder_id: FileId },
 
     ShowWantToInstall,
 

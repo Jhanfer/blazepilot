@@ -13,34 +13,44 @@
 // limitations under the License.
 
 use egui::{
-    scroll_area::ScrollSource, ColorImage, Frame, Margin, Order, RichText, ScrollArea,
-    TextureOptions, Ui, Window,
+    ColorImage, Frame, Image, Margin, Order, RichText, ScrollArea, TextureHandle, TextureOptions,
+    Ui, Window,
 };
+use parking_lot::Mutex;
 use std::{path::Path, sync::Arc};
-use tracing::info;
+use tracing::warn;
 
 use crate::{
     core::system::{
         clipboard::global_clipboard::TOKIO_RUNTIME,
         fileopener_module::{
-            platform::linux::structs::AppsIconData, AppAssociation, GLOBAL_FILE_OPENER,
+            platform::{
+                linux::backend::DesktopApp,
+                opener_trait::{AppIconSource, AppInfo},
+            },
+            GLOBAL_FILE_OPENER,
         },
     },
     ui::{dialog_manager::manager::ModalDialog, themes::colors::COLOR_BG_MAIN},
 };
 
-pub struct SelectorData {
-    pub path: Arc<Path>,
-    pub mime: String,
-    pub apps: Vec<AppAssociation>,
-    pub icon_data: Vec<AppsIconData>,
-    pub textures: Vec<Option<egui::TextureHandle>>,
-    pub show_all_apps: bool,
+pub enum SelectorState {
+    Loading,
+    Ready(SelectorData),
 }
 
+pub struct SelectorData {
+    pub path: Arc<Path>,
+    pub apps: Vec<AppInfo>,
+    pub textures: Vec<Option<egui::TextureHandle>>,
+}
+
+type PendingApps = (Arc<Path>, Arc<Mutex<Option<Vec<AppInfo>>>>);
+
 pub struct AppSelectorDialog {
-    pub selector_data: Option<SelectorData>,
     pub show_modal: bool,
+    pub state: Option<SelectorState>,
+    pending_apps: Option<PendingApps>,
 }
 
 impl ModalDialog for AppSelectorDialog {
@@ -58,70 +68,135 @@ impl ModalDialog for AppSelectorDialog {
 impl AppSelectorDialog {
     pub fn new() -> Self {
         Self {
-            selector_data: None,
             show_modal: false,
+            state: None,
+            pending_apps: None,
         }
     }
 
     pub fn close(&mut self) {
         self.show_modal = false;
-        self.selector_data = None;
+        self.state = None;
+        self.pending_apps = None;
     }
 
-    pub fn open(
-        &mut self,
-        path: Arc<Path>,
-        mime: String,
-        apps: Vec<AppAssociation>,
-        icon_data: Vec<AppsIconData>,
-        show_all_apps: bool,
-    ) {
-        let textures = vec![None; apps.len()];
-        self.selector_data = Some(SelectorData {
-            path,
-            mime,
-            apps,
-            icon_data,
-            textures,
-            show_all_apps,
-        });
-
+    pub fn open(&mut self, path: Arc<Path>) {
         self.show_modal = true;
+        self.state = Some(SelectorState::Loading);
+
+        let slot: Arc<Mutex<Option<Vec<AppInfo>>>> = Arc::new(Mutex::new(None));
+        let opener = GLOBAL_FILE_OPENER.clone();
+        let path_clone = path.clone();
+        let slot_clone = slot.clone();
+
+        let manager = opener.lock();
+        match manager.get_all_apps(path_clone) {
+            Ok(apps) => {
+                let mut guard = slot_clone.lock();
+                *guard = Some(apps);
+            }
+            Err(e) => warn!("Error obteniendo apps en segundo plano: {}", e),
+        }
+        self.pending_apps = Some((path, slot));
     }
 
-    fn load_textures(&mut self, ui: &mut Ui) {
-        let Some(app_icon_data) = &mut self.selector_data else {
+    fn poll_pending_apps(&mut self) {
+        let Some((path, slot)) = self.pending_apps.take() else {
             return;
         };
 
-        for (i, icon) in app_icon_data.icon_data.iter().enumerate() {
-            if app_icon_data.textures[i].is_some() {
+        let slot_clone = slot.clone();
+
+        if let Some(mut guard) = slot_clone.try_lock() {
+            if let Some(apps) = guard.take() {
+                let count = apps.len();
+
+                self.state = Some(SelectorState::Ready(SelectorData {
+                    path,
+                    apps,
+                    textures: vec![None; count],
+                }));
+                self.pending_apps = None;
+            }
+        } else {
+            self.pending_apps = Some((path, slot))
+        };
+    }
+
+    fn load_svg_as_texture(ctx: &mut Ui, path: &Path, size: u32) -> Option<TextureHandle> {
+        let svg_data = std::fs::read(path).ok()?;
+
+        let opt = resvg::usvg::Options::default();
+        let tree = resvg::usvg::Tree::from_data(&svg_data, &opt).ok()?;
+
+        let mut pixmap = resvg::tiny_skia::Pixmap::new(size, size)?;
+
+        resvg::render(
+            &tree,
+            resvg::tiny_skia::Transform::from_scale(
+                size as f32 / tree.size().width(),
+                size as f32 / tree.size().height(),
+            ),
+            &mut pixmap.as_mut(),
+        );
+
+        let image =
+            ColorImage::from_rgba_unmultiplied([size as usize, size as usize], pixmap.data());
+
+        Some(ctx.load_texture(path.to_string_lossy(), image, TextureOptions::LINEAR))
+    }
+
+    fn load_textures(&mut self, ui: &mut Ui) {
+        let Some(SelectorState::Ready(data)) = &mut self.state else {
+            return;
+        };
+        let mut needs_repaint = false;
+        for app in data.apps.iter_mut() {
+            if let AppIconSource::Unresolved(name) = &app.icon {
+                app.icon = DesktopApp::resolve_icon_path(&name.clone());
+                needs_repaint = true;
+                break;
+            }
+        }
+
+        for (i, app) in data.apps.iter_mut().enumerate() {
+            if data.textures[i].is_some() {
                 continue;
             }
 
-            if let AppsIconData::Rgba {
-                data,
-                width,
-                height,
-            } = icon
-            {
-                let color_image =
-                    ColorImage::from_rgba_unmultiplied([*width as usize, *height as usize], data);
+            let AppIconSource::Path(icon_path) = &app.icon else {
+                continue;
+            };
 
-                let texture = ui.load_texture(
-                    format!("icon_{}", app_icon_data.apps[i].id),
-                    color_image,
-                    TextureOptions::NEAREST,
-                );
+            let texture = match icon_path.extension().and_then(|e| e.to_str()) {
+                Some("png") | Some("jpg") => image::open(icon_path).ok().map(|img| {
+                    let img = img.resize_exact(64, 64, image::imageops::FilterType::Lanczos3);
+                    let img = img.to_rgba8();
+                    let (w, h) = img.dimensions();
+                    ui.ctx().load_texture(
+                        format!("icon_{}", app.id),
+                        ColorImage::from_rgba_unmultiplied([w as usize, h as usize], img.as_raw()),
+                        TextureOptions::LINEAR,
+                    )
+                }),
+                Some("svg") => Self::load_svg_as_texture(ui, icon_path, 64),
+                _ => None,
+            };
 
-                app_icon_data.textures[i] = Some(texture);
+            if texture.is_some() {
+                data.textures[i] = texture;
+                needs_repaint = true;
             }
+        }
+
+        if needs_repaint {
+            ui.request_repaint();
         }
     }
 
     fn render_selector_button(
         ui: &mut egui::Ui,
-        app: &AppAssociation,
+        app: &AppInfo,
         data: &SelectorData,
         index: usize,
     ) -> bool {
@@ -130,111 +205,109 @@ impl AppSelectorDialog {
 
         ui.horizontal(|ui| {
             if let Some(texture) = &data.textures[index] {
-                ui.image(texture);
+                ui.add(Image::new(texture).fit_to_exact_size(egui::vec2(20.0, 20.0)));
             } else {
                 ui.label("🖼");
             }
 
             let br = ui.button(&app.name);
+
             if br.clicked() {
-                let app_owned = app.clone();
+                let app_id = app.id.clone();
                 let path_owned = data.path.clone();
                 let opener_clone = opener.clone();
 
-                TOKIO_RUNTIME.spawn(async move {
-                    let mut opener = opener_clone.lock().await;
-                    opener.request_launch(&app_owned, path_owned).await;
+                TOKIO_RUNTIME.spawn_blocking(move || {
+                    let opener = opener_clone.lock();
+                    if let Err(e) = opener.open_with(&app_id, path_owned) {
+                        warn!("Error abriendo: {}", e);
+                    }
                 });
 
                 should_close = true;
-                info!("Abrir con {}", app.name);
             }
 
             br.context_menu(|ui| {
-                if ui.button("Seleccionar default").clicked() {
-                    let app_name_owned = app.name.clone();
-                    let app_owned = app.clone();
-                    let mime_owned = data.mime.clone();
-                    let opener_clone = opener.clone();
-
-                    TOKIO_RUNTIME.spawn(async move {
-                        let mut opener = opener_clone.lock().await;
-                        opener.set_pending_default_app_name(app_name_owned).await;
-                        opener.set_association(&mime_owned, app_owned).await;
-                    });
-
-                    info!("Seleccionado como default {}", app.name);
-
+                if ui.button("Seleccionar como predeterminado").clicked() {
+                    let app_id = app.id.clone();
                     let path_owned = data.path.clone();
-                    let app_owned = app.clone();
                     let opener_clone = opener.clone();
-                    TOKIO_RUNTIME.spawn(async move {
-                        let mut opener = opener_clone.lock().await;
-                        opener.request_launch(&app_owned, path_owned).await;
+
+                    TOKIO_RUNTIME.spawn_blocking(move || {
+                        let opener = opener_clone.lock();
+                        // save_to_system = false: solo guarda en BlazePilot,
+                        // no toca mimeapps.list del sistema
+                        if let Err(e) = opener.set_default_app(path_owned.clone(), &app_id, false) {
+                            warn!("Error estableciendo default: {}", e);
+                            return; // no intentar abrir si falló el set
+                        }
+                        if let Err(e) = opener.open_with(&app_id, path_owned) {
+                            warn!("Error abriendo: {}", e);
+                        }
                     });
 
                     should_close = true;
                 }
             });
         });
+
         should_close
     }
 
     pub fn render_app_selector(&mut self, ui: &mut Ui) -> bool {
-        if self.selector_data.is_none() {
-            return false;
+        self.poll_pending_apps();
+
+        if let Some(SelectorState::Ready(_)) = &self.state {
+            self.load_textures(ui);
         }
 
         let mut should_close = self.show_modal;
 
-        self.load_textures(ui);
+        match &self.state {
+            None => false,
+            Some(SelectorState::Loading) => {
+                ui.spinner();
+                ui.label("Buscando aplicaciones...");
+                false
+            }
+            Some(SelectorState::Ready(data)) => {
+                let custom_frame = Frame::NONE
+                    .fill(COLOR_BG_MAIN)
+                    .inner_margin(Margin::same(20));
+                let file_name = data
+                    .path
+                    .file_name()
+                    .map(|f| f.to_string_lossy().into_owned())
+                    .unwrap_or_else(|| "".to_string());
 
-        let Some(data) = &mut self.selector_data else {
-            return false;
-        };
+                let mut close_requested = false;
 
-        let custom_frame = Frame::NONE
-            .fill(COLOR_BG_MAIN)
-            .inner_margin(Margin::same(20));
-
-        let file_name = data
-            .path
-            .file_name()
-            .map(|f| f.to_string_lossy().into_owned())
-            .unwrap_or_else(|| data.mime.clone());
-
-        let mut close_requested = false;
-
-        Window::new(format!("Abrir «{}» con...", file_name))
-            .frame(custom_frame)
-            .order(Order::Foreground)
-            .collapsible(false)
-            .resizable(false)
-            .default_size([480.0, 520.0])
-            .min_size([400.0, 300.0])
-            .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
-            .open(&mut should_close)
-            .show(ui, |ui| {
-                ui.heading("Seleccionar aplicación");
-                ui.separator();
-
-                let height = if data.show_all_apps { 320.0 } else { 50.0 };
-
-                ScrollArea::vertical()
-                    .scroll_source(ScrollSource::MOUSE_WHEEL | ScrollSource::SCROLL_BAR)
-                    .auto_shrink([false, false])
-                    .max_height(height)
+                Window::new(format!("Abrir «{}» con...", file_name))
+                    .frame(custom_frame)
+                    .order(Order::Foreground)
+                    .collapsible(false)
+                    .resizable(false)
+                    .default_size([480.0, 520.0])
+                    .min_size([400.0, 300.0])
+                    .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
+                    .open(&mut should_close)
                     .show(ui, |ui| {
-                        ui.label(RichText::new("Recomendadas").strong());
-                        ui.add_space(6.0);
+                        ui.heading("Seleccionar aplicación");
+                        ui.separator();
 
-                        for (i, app) in data.apps.iter().enumerate() {
-                            if app.is_recommended {
-                                close_requested |= Self::render_selector_button(ui, app, data, i);
+                        let height = 320.0;
+
+                        ScrollArea::vertical().max_height(height).show(ui, |ui| {
+                            ui.label(RichText::new("Recomendadas").strong());
+                            ui.add_space(6.0);
+
+                            for (i, app) in data.apps.iter().enumerate() {
+                                if app.is_recommended {
+                                    close_requested |=
+                                        Self::render_selector_button(ui, app, data, i);
+                                }
                             }
-                        }
 
-                        if data.show_all_apps {
                             ui.add_space(12.0);
                             ui.separator();
                             ui.add_space(12.0);
@@ -248,19 +321,19 @@ impl AppSelectorDialog {
                                         Self::render_selector_button(ui, app, data, i);
                                 }
                             }
-                        }
+                        });
+
+                        ui.separator();
+                        ui.horizontal(|ui| {
+                            if ui.button("Cerrar").clicked() {
+                                close_requested = true;
+                            }
+                        });
                     });
 
-                ui.separator();
-
-                ui.horizontal(|ui| {
-                    if ui.button("Cerrar").clicked() {
-                        close_requested = true;
-                    }
-                });
-            });
-
-        self.show_modal = should_close;
-        close_requested
+                self.show_modal = should_close;
+                close_requested
+            }
+        }
     }
 }

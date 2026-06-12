@@ -5,10 +5,7 @@ use file_id::FileId;
 use uuid::Uuid;
 
 use crate::{
-    core::{
-        runtime::bus_structs::QuickTagEvent,
-        system::fileopener_module::{platform::linux::structs::AppsIconData, AppAssociation},
-    },
+    core::runtime::bus_structs::QuickTagEvent,
     ui::{
         dialog_manager::dialogs::{
             configs_dialog::ConfigDialog, error_dialog::ErrorDialog,
@@ -59,16 +56,8 @@ impl DialogManager {
         }
     }
 
-    pub fn open_selector_dialog(
-        &mut self,
-        path: Arc<Path>,
-        mime: String,
-        apps: Vec<AppAssociation>,
-        icon_data: Vec<AppsIconData>,
-        show_all_apps: bool,
-    ) {
-        self.selector_dialog
-            .open(path, mime, apps, icon_data, show_all_apps);
+    pub fn open_selector_dialog(&mut self, path: Arc<Path>) {
+        self.selector_dialog.open(path);
     }
 
     pub fn open_sure_move_dialog(&mut self, sources: Vec<Arc<Path>>, dest: Arc<Path>) {

@@ -42,6 +42,7 @@ use crate::{
     ui::task_manager::tasks::TaskManager,
 };
 use bitvec::vec::BitVec;
+use parking_lot::Mutex;
 use std::{
     cell::{RefCell, RefMut},
     collections::HashSet,
@@ -251,7 +252,7 @@ pub struct BlazeCoreState {
     pub selection: BitVec,
     pub active_tasks: usize,
     pub motor: Rc<RefCell<BlazeMotor>>,
-    pub file_opener_manager: Arc<TokioMutex<FileOpenerManager>>,
+    pub file_opener_manager: Arc<Mutex<FileOpenerManager>>,
     pub pending_scroll_to: Option<usize>,
     pub scroll_offset: f32,
     pub rubber_band: RubberBand,
@@ -638,40 +639,35 @@ impl BlazeCoreState {
 
     pub fn open_file_by_path(&mut self, path: Arc<Path>) {
         let manager_arc = self.file_opener_manager.clone();
-
-        let dispatcher = with_event_bus(|e| e.dispatcher(self.active_id));
-
-        TOKIO_RUNTIME.spawn(async move {
-            info!("intentando abrir");
-            let mut manager = manager_arc.lock().await;
-            manager.request_open_file(path, dispatcher).await;
-        });
+        info!("intentando abrir");
+        let mut manager = manager_arc.lock();
+        match manager.open_file(path) {
+            Ok(_) => {}
+            Err(e) => {
+                warn!("Ha fallado la apertura del archivo: {}", e);
+            }
+        }
     }
 
     pub fn open_file(&mut self, file: &Arc<FileEntry>) {
         let path = file.full_path.to_owned();
         let manager_arc = self.file_opener_manager.clone();
-
-        let dispatcher = with_event_bus(|e| e.dispatcher(self.active_id));
-
-        TOKIO_RUNTIME.spawn(async move {
-            info!("intentando abrir");
-            let mut manager = manager_arc.lock().await;
-            manager.request_open_file(path, dispatcher).await;
-        });
+        info!("intentando abrir");
+        let mut manager = manager_arc.lock();
+        match manager.open_file(path) {
+            Ok(_) => {}
+            Err(e) => {
+                warn!("Ha fallado la apertura del archivo: {}", e);
+            }
+        }
     }
 
     pub fn open_file_with(&mut self, file: &Arc<FileEntry>) {
         let path = file.full_path.to_owned();
-        let manager_arc = self.file_opener_manager.clone();
+        info!("intentando abrir");
 
         let dispatcher = with_event_bus(|e| e.dispatcher(self.active_id));
-        TOKIO_RUNTIME.spawn(async move {
-            info!("intentando abrir");
-            let mut manager = manager_arc.lock().await;
-
-            manager.request_open_file_with(path, dispatcher).await;
-        });
+        dispatcher.send(UiEvent::OpenWithSelector { path }).ok();
     }
 
     pub fn open_terminal_here(&self) {
