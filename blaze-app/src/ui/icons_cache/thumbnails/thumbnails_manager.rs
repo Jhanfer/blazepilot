@@ -12,19 +12,23 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::core::{
-    runtime::{
-        bus_structs::UiEvent,
-        event_bus::{with_event_bus, Dispatcher},
+use crate::{
+    core::{
+        runtime::{
+            bus_structs::UiEvent,
+            event_bus::{with_event_bus, Dispatcher},
+        },
+        system::{cache::cache_manager::CacheManager, clipboard::global_clipboard::TOKIO_RUNTIME},
     },
-    system::{cache::cache_manager::CacheManager, clipboard::global_clipboard::TOKIO_RUNTIME},
+    ui::icons_cache::thumbnails::utils::resolve_tiff_data,
 };
+use fast_image_resize as fr;
 use ffmpeg_sidecar::{download::auto_download, paths::ffmpeg_path};
 use lru::LruCache;
 use sha2::{Digest, Sha256};
 use std::num::NonZeroUsize;
 use std::{
-    io::{BufReader, Read},
+    io::Read,
     path::{Path, PathBuf},
     sync::Arc,
     time::UNIX_EPOCH,
@@ -62,7 +66,7 @@ pub enum ThumbError {
     #[error("Directorio de caché de miniaturas no existe")]
     ThumbsDirDoesNotExist,
 }
-
+#[derive(Debug)]
 pub enum ThumbnailMessages {
     RequestThumb(Arc<Path>),
 }
@@ -136,7 +140,22 @@ impl ThumbnailManager {
                 .and_then(|e| e.to_str())
                 .map(|e| e.to_lowercase())
                 .as_deref(),
-            Some("png" | "jpg" | "jpeg" | "webp" | "gif")
+            Some(
+                "png"
+                    | "jpg"
+                    | "jpeg"
+                    | "webp"
+                    | "gif"
+                    | "pbm"
+                    | "pgm"
+                    | "ppm"
+                    | "pnm"
+                    | "bmp"
+                    | "tif"
+                    | "tiff"
+                    | "ico"
+                    | "avif"
+            )
         )
     }
 
@@ -325,26 +344,106 @@ impl ThumbnailManager {
         tokio::task::spawn_blocking(move || -> Result<Thumbnail, ThumbError> {
             let mut file = std::fs::File::open(path.clone()).map_err(ThumbError::Io)?;
 
-            let mut header = [0u8; 16];
+            let mut header = [0u8; 54];
 
             let n = file.read(&mut header).map_err(ThumbError::Io)?;
 
-            let real_format =
-                image::guess_format(&header[..n]).map_err(|_| ThumbError::UnsuportedFormat)?;
+            let img_type =
+                imagesize::image_type(&header[..n]).map_err(|_| ThumbError::UnsuportedFormat)?;
 
-            let file = std::fs::File::open(path.clone()).map_err(ThumbError::Io)?;
+            let mut buffer = Vec::new();
+            let mut full_file = std::fs::File::open(path.clone()).map_err(ThumbError::Io)?;
+            full_file.read_to_end(&mut buffer).map_err(ThumbError::Io)?;
 
-            let dynamic_image = image::ImageReader::with_format(BufReader::new(file), real_format)
-                .decode()
-                .map_err(|_| ThumbError::ImageError)?;
-            let resized = dynamic_image.thumbnail(64, 64);
-            let rgba = resized.to_rgba8();
-            let (w, h) = rgba.dimensions();
+            let is_avif = path
+                .extension()
+                .and_then(|ext| ext.to_str())
+                .map(|ext| ext.eq_ignore_ascii_case("avif"))
+                .unwrap_or(false);
+
+            let (src_pixels, src_w, src_h) = if is_avif {
+                let dynamic_image =
+                    libavif_image::read(&buffer).map_err(|_| ThumbError::ImageError)?;
+
+                let w = dynamic_image.width();
+                let h = dynamic_image.height();
+
+                let rgba_buf = dynamic_image.to_rgba8().into_raw();
+                (rgba_buf, w, h)
+            } else {
+                match img_type {
+                    imagesize::ImageType::Webp => {
+                        let cursor = std::io::Cursor::new(&buffer);
+
+                        let mut decoder = image_webp::WebPDecoder::new(cursor)
+                            .map_err(|_| ThumbError::ImageError)?;
+
+                        let (w, h) = decoder.dimensions();
+
+                        let has_alpha = decoder.has_alpha();
+                        let bytes_per_pixel = if has_alpha { 4 } else { 3 };
+                        let mut raw_buf = vec![0u8; (w * h * bytes_per_pixel) as usize];
+
+                        decoder
+                            .read_image(&mut raw_buf)
+                            .map_err(|_| ThumbError::ImageError)?;
+
+                        let rgba_buf = if !has_alpha {
+                            let mut converted = Vec::with_capacity((w * h * 4) as usize);
+
+                            for chunk in raw_buf.chunks_exact(3) {
+                                converted.extend_from_slice(&[chunk[0], chunk[1], chunk[2], 255]);
+                            }
+                            converted
+                        } else {
+                            raw_buf
+                        };
+
+                        (rgba_buf, w, h)
+                    }
+
+                    imagesize::ImageType::Tiff => {
+                        let cursor = std::io::Cursor::new(&buffer);
+
+                        let mut decoder = tiff::decoder::Decoder::new(cursor)
+                            .map_err(|_| ThumbError::ImageError)?;
+
+                        let (w, h) = decoder.dimensions().map_err(|_| ThumbError::ImageError)?;
+
+                        let rgba_buf = decoder.read_image().map_err(|_| ThumbError::ImageError)?;
+
+                        let rgb_data = resolve_tiff_data(rgba_buf, w, h)?;
+
+                        (rgb_data, w, h)
+                    }
+
+                    _ => match stb_image::image::load_from_memory_with_depth(&buffer, 4, false) {
+                        stb_image::image::LoadResult::ImageU8(image) => {
+                            (image.data, image.width as u32, image.height as u32)
+                        }
+                        _ => return Err(ThumbError::ImageError),
+                    },
+                }
+            };
+
+            let src_image =
+                fr::images::Image::from_vec_u8(src_w, src_h, src_pixels, fr::PixelType::U8x4)
+                    .map_err(|_| ThumbError::ImageError)?;
+
+            let mut dst_image = fr::images::Image::new(64, 64, fr::PixelType::U8x4);
+
+            let mut resizer = fr::Resizer::new();
+
+            resizer
+                .resize(&src_image, &mut dst_image, &fr::ResizeOptions::new())
+                .unwrap();
+
+            let rgba_scaled = dst_image.into_vec();
 
             Ok(Thumbnail {
-                pixels: Arc::new(rgba.into_raw()),
-                width: w,
-                height: h,
+                pixels: Arc::new(rgba_scaled),
+                width: 64,
+                height: 64,
             })
         })
         .await
@@ -433,13 +532,15 @@ impl ThumbnailManager {
             }
         };
 
-        let img = image::load_from_memory(&output).map_err(|_| ThumbError::VideoError)?;
-        let resized = img.thumbnail(64, 64);
-        let rgba = resized.to_rgba8();
-        let (w, h) = rgba.dimensions();
+        let (raw, w, h) = match stb_image::image::load_from_memory_with_depth(&output, 4, false) {
+            stb_image::image::LoadResult::ImageU8(image) => {
+                (image.data, image.width as u32, image.height as u32)
+            }
+            _ => return Err(ThumbError::ImageError),
+        };
 
         Ok(Thumbnail {
-            pixels: Arc::new(rgba.into_raw()),
+            pixels: Arc::new(raw),
             width: w,
             height: h,
         })

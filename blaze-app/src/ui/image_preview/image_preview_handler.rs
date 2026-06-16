@@ -14,12 +14,15 @@
 
 use crate::{
     core::system::clipboard::global_clipboard::TOKIO_RUNTIME,
-    ui::image_preview::error::{ImagePreviewError, ImagePreviewResult},
+    ui::{
+        icons_cache::thumbnails::utils::resolve_tiff_data,
+        image_preview::error::{ImagePreviewError, ImagePreviewResult},
+    },
 };
 use crossbeam_channel::{bounded, Receiver};
 use egui::{ColorImage, TextureHandle, TextureOptions, Ui, Vec2};
 use std::{
-    io::{BufReader, Read},
+    io::Read,
     path::{Path, PathBuf},
 };
 use tracing::warn;
@@ -179,31 +182,27 @@ impl ImagePreviewState {
     }
 
     fn img_handler(path: &Path) -> ImagePreviewResult<ColorImage> {
-        let mut file = std::fs::File::open(path).map_err(ImagePreviewError::Io)?;
+        let mut buffer = Vec::new();
+        let mut full_file = std::fs::File::open(path).map_err(ImagePreviewError::Io)?;
+        full_file
+            .read_to_end(&mut buffer)
+            .map_err(ImagePreviewError::Io)?;
 
-        let mut header = [0u8; 16];
+        let (raw, w, h) = match stb_image::image::load_from_memory_with_depth(&buffer, 4, false) {
+            stb_image::image::LoadResult::ImageU8(image) => {
+                (image.data, image.width as u32, image.height as u32)
+            }
+            _ => return Err(ImagePreviewError::ImageError),
+        };
 
-        let n = file.read(&mut header).map_err(ImagePreviewError::Io)?;
-
-        let real_format =
-            image::guess_format(&header[..n]).map_err(|_| ImagePreviewError::UnsuportedFormat)?;
-
-        let file = std::fs::File::open(path).map_err(ImagePreviewError::Io)?;
-
-        let dynamic_image = image::ImageReader::with_format(BufReader::new(file), real_format)
-            .decode()
-            .map_err(ImagePreviewError::ImageError)?;
-
-        let rgba = dynamic_image.to_rgba8();
-        let (w, h) = rgba.dimensions();
         Ok(ColorImage::from_rgba_unmultiplied(
             [w as usize, h as usize],
-            &rgba.into_raw(),
+            &raw,
         ))
     }
 
-    fn svg_handler(path: PathBuf) -> ImagePreviewResult<ColorImage> {
-        let data = std::fs::read(&path)?;
+    fn svg_handler(path: &Path) -> ImagePreviewResult<ColorImage> {
+        let data = std::fs::read(path)?;
         let opt = resvg::usvg::Options::default();
         let tree = resvg::usvg::Tree::from_data(&data, &opt)?;
         let size = tree.size();
@@ -216,7 +215,7 @@ impl ImagePreviewState {
         let target_height = (size.height() * scale).ceil() as u32;
 
         let mut pixmap = resvg::tiny_skia::Pixmap::new(target_width, target_height)
-            .ok_or_else(|| ImagePreviewError::DimensionError)?;
+            .ok_or(ImagePreviewError::DimensionError)?;
 
         let transform = resvg::tiny_skia::Transform::from_scale(scale, scale);
 
@@ -227,6 +226,98 @@ impl ImagePreviewState {
         Ok(ColorImage::from_rgba_unmultiplied(
             [target_width as usize, target_height as usize],
             &image_data,
+        ))
+    }
+
+    fn tiff_handler(path: &Path) -> ImagePreviewResult<ColorImage> {
+        let mut buffer = Vec::new();
+        let mut full_file = std::fs::File::open(path).map_err(ImagePreviewError::Io)?;
+
+        full_file
+            .read_to_end(&mut buffer)
+            .map_err(ImagePreviewError::Io)?;
+        let cursor = std::io::Cursor::new(&buffer);
+
+        let mut decoder =
+            tiff::decoder::Decoder::new(cursor).map_err(|_| ImagePreviewError::ImageError)?;
+
+        let (w, h) = decoder
+            .dimensions()
+            .map_err(|_| ImagePreviewError::ImageError)?;
+
+        let rgba_buf = decoder
+            .read_image()
+            .map_err(|_| ImagePreviewError::ImageError)?;
+
+        let rgb_data = match resolve_tiff_data(rgba_buf, w, h) {
+            Ok(raw) => raw,
+            Err(_) => return Err(ImagePreviewError::ImageError),
+        };
+
+        Ok(ColorImage::from_rgba_unmultiplied(
+            [w as usize, h as usize],
+            &rgb_data,
+        ))
+    }
+
+    fn webp_handler(path: &Path) -> ImagePreviewResult<ColorImage> {
+        let mut buffer = Vec::new();
+        let mut full_file = std::fs::File::open(path).map_err(ImagePreviewError::Io)?;
+
+        full_file
+            .read_to_end(&mut buffer)
+            .map_err(ImagePreviewError::Io)?;
+        let cursor = std::io::Cursor::new(&buffer);
+
+        let mut decoder =
+            image_webp::WebPDecoder::new(cursor).map_err(|_| ImagePreviewError::ImageError)?;
+
+        let (w, h) = decoder.dimensions();
+
+        let has_alpha = decoder.has_alpha();
+        let bytes_per_pixel = if has_alpha { 4 } else { 3 };
+        let mut raw_buf = vec![0u8; (w * h * bytes_per_pixel) as usize];
+
+        decoder
+            .read_image(&mut raw_buf)
+            .map_err(|_| ImagePreviewError::ImageError)?;
+
+        let rgba_buf = if !has_alpha {
+            let mut converted = Vec::with_capacity((w * h * 4) as usize);
+
+            for chunk in raw_buf.chunks_exact(3) {
+                converted.extend_from_slice(&[chunk[0], chunk[1], chunk[2], 255]);
+            }
+            converted
+        } else {
+            raw_buf
+        };
+
+        Ok(ColorImage::from_rgba_unmultiplied(
+            [w as usize, h as usize],
+            &rgba_buf,
+        ))
+    }
+
+    fn avif_handler(path: &Path) -> ImagePreviewResult<ColorImage> {
+        let mut buffer = Vec::new();
+        let mut full_file = std::fs::File::open(path).map_err(ImagePreviewError::Io)?;
+
+        full_file
+            .read_to_end(&mut buffer)
+            .map_err(ImagePreviewError::Io)?;
+
+        let dynamic_image =
+            libavif_image::read(&buffer).map_err(|_| ImagePreviewError::ImageError)?;
+
+        let w = dynamic_image.width();
+        let h = dynamic_image.height();
+
+        let rgba_buf = dynamic_image.to_rgba8().into_raw();
+
+        Ok(ColorImage::from_rgba_unmultiplied(
+            [w as usize, h as usize],
+            &rgba_buf,
         ))
     }
 
@@ -243,13 +334,27 @@ impl ImagePreviewState {
         TOKIO_RUNTIME.spawn(async move {
             let image = tokio::task::spawn_blocking(move || {
                 if ext.as_str() == "svg" {
-                    return Self::svg_handler(path);
+                    return Self::svg_handler(&path);
                 }
+
+                if ext.as_str() == "webp" {
+                    return Self::webp_handler(&path);
+                }
+
+                if ext.as_str() == "avif" {
+                    return Self::avif_handler(&path);
+                }
+
+                let is_tiff = matches!(ext.as_str(), "tif" | "tiff",);
 
                 let is_image_ext = matches!(
                     ext.as_str(),
-                    "png" | "jpg" | "jpeg" | "webp" | "gif" | "bmp" | "tiff"
+                    "png" | "jpg" | "jpeg" | "pbm" | "pgm" | "ppm" | "pnm" | "bmp" | "ico"
                 );
+
+                if is_tiff {
+                    return Self::tiff_handler(&path);
+                }
 
                 if is_image_ext {
                     Self::img_handler(&path)

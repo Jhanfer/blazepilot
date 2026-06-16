@@ -16,6 +16,7 @@ use egui::{
     ColorImage, Frame, Image, Margin, Order, RichText, ScrollArea, TextureHandle, TextureOptions,
     Ui, Window,
 };
+use fast_image_resize as fr;
 use parking_lot::Mutex;
 use std::{path::Path, sync::Arc};
 use tracing::warn;
@@ -169,16 +170,56 @@ impl AppSelectorDialog {
             };
 
             let texture = match icon_path.extension().and_then(|e| e.to_str()) {
-                Some("png") | Some("jpg") => image::open(icon_path).ok().map(|img| {
-                    let img = img.resize_exact(64, 64, image::imageops::FilterType::Lanczos3);
-                    let img = img.to_rgba8();
-                    let (w, h) = img.dimensions();
-                    ui.ctx().load_texture(
-                        format!("icon_{}", app.id),
-                        ColorImage::from_rgba_unmultiplied([w as usize, h as usize], img.as_raw()),
-                        TextureOptions::LINEAR,
-                    )
-                }),
+                Some("png") | Some("jpg") | Some("jpeg") => {
+                    if let Ok(mut file) = std::fs::File::open(icon_path) {
+                        let mut buffer = Vec::new();
+                        use std::io::Read;
+
+                        if file.read_to_end(&mut buffer).is_ok() {
+                            match stb_image::image::load_from_memory_with_depth(&buffer, 4, false) {
+                                stb_image::image::LoadResult::ImageU8(image) => {
+                                    let (w, h) = (image.width as u32, image.height as u32);
+                                    let raw_rgba = if w == 64 && h == 64 {
+                                        image.data
+                                    } else {
+                                        let src_image =
+                                            fr::images::Image::new(64, 64, fr::PixelType::U8x4);
+
+                                        let mut dst_image =
+                                            fr::images::Image::new(64, 64, fr::PixelType::U8x4);
+
+                                        let mut resizer = fr::Resizer::new();
+
+                                        resizer
+                                            .resize(
+                                                &src_image,
+                                                &mut dst_image,
+                                                &fr::ResizeOptions::new(),
+                                            )
+                                            .unwrap();
+
+                                        dst_image.into_vec()
+                                    };
+
+                                    Some(ui.ctx().load_texture(
+                                        format!("icon_{}", app.id),
+                                        egui::ColorImage::from_rgba_unmultiplied(
+                                            [64, 64],
+                                            &raw_rgba,
+                                        ),
+                                        egui::TextureOptions::LINEAR,
+                                    ))
+                                }
+
+                                _ => None,
+                            }
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                }
                 Some("svg") => Self::load_svg_as_texture(ui, icon_path, 64),
                 _ => None,
             };

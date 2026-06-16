@@ -40,8 +40,8 @@ use std::{
 };
 use tokio::sync::Semaphore;
 use tracing::{error, warn};
-use users::{get_group_by_gid, get_user_by_uid};
 use uuid::Uuid;
+use uzers::{get_group_by_gid, get_user_by_uid};
 
 pub enum ExtendedInfoMessages {
     StartScan(Arc<Path>),
@@ -141,8 +141,11 @@ impl RepoStatusCache {
             }
 
             let rel: PathBuf = match entry.path() {
-                Some(p) => PathBuf::from(p),
-                None => continue,
+                Ok(p) => PathBuf::from(p),
+                Err(e) => {
+                    warn!("Ha ocurrido un error: {e}");
+                    continue;
+                }
             };
 
             let git_status = Self::classify(status);
@@ -471,15 +474,10 @@ impl ExtendedInfoManager {
             if is_image {
                 let path_clone = path.clone();
                 let file = std::fs::File::open(&path_clone)?;
-                let reader = image::ImageReader::new(BufReader::new(file))
-                    .with_guessed_format()
+                let dims = imagesize::reader_size(BufReader::new(file))
                     .map_err(|_| ExtendedInfoError::DimensionError)?;
 
-                let dims = reader
-                    .into_dimensions()
-                    .map_err(|_| ExtendedInfoError::DimensionError)?;
-
-                Some(dims)
+                Some((dims.width as u32, dims.height as u32))
             } else {
                 None
             }

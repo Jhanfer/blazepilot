@@ -38,7 +38,9 @@ jobs:
             libegl1-mesa-dev \
             libgles2-mesa-dev \
             libvulkan-dev \
-            libdbus-1-dev
+            libdbus-1-dev \
+            meson ninja-build libdav1d-dev \
+            nasm
 
       - name: Compilar en modo Release
         run: cargo build --release --target x86_64-unknown-linux-gnu

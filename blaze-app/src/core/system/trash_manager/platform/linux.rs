@@ -10,7 +10,7 @@ use std::{
     path::{Path, PathBuf},
     sync::Arc,
 };
-use users::get_current_uid;
+use uzers::get_current_uid;
 
 #[derive(Debug, Clone)]
 pub struct LinuxTrashBackend {

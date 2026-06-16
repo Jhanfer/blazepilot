@@ -8,8 +8,8 @@ name = "blazepilot"
 path = "blaze-app/src/main.rs"
 
 [dependencies]
-egui = { version = "0.34.2", features = ["serde"] }
-egui_extras = "0.34.2"
+egui = { version = "0.34.3", features = ["serde"] }
+egui_extras = "0.34.3"
 openssl = { version = "0.10.79", features = ["vendored"] }
 once_cell = "1.19"
 tokio = { version = "1.52.3", features = ["full"] }
@@ -24,8 +24,6 @@ chrono = "0.4.44"
 crossbeam-channel = "0.5.15"
 cfg-if = "1.0.4"
 shell-words = "1.1.1"
-resvg = "0.47.0"
-image = "0.25.10"
 mime_guess = "2.0.5"
 fuzzy-matcher = "0.3.7"
 tracing = "0.1.44"
@@ -35,7 +33,7 @@ anyhow = "1.0.102"
 zbus = "5.15.0"
 udisks2 = "0.3.1"
 libc = "0.2.186"
-users = "0.11.0"
+uzers = "0.12.2"
 which = "8.0.2"
 self_update = "0.44.0"
 jwalk = "0.8.1"
@@ -43,7 +41,7 @@ sysinfo = "0.39.1"
 postcard = { version = "1.1.3", features = ["use-std"] }
 bitvec = "1.0.1"
 file-id = { version = "0.2.3", features = ["serde"] }
-git2 = "0.20.4"
+git2 = "0.21.0"
 zip = "8.6.0"
 tar = "0.4"
 flate2 = "1.0"
@@ -56,14 +54,25 @@ dashmap = "6.1.0"
 urlencoding = "2.1.3"
 parking_lot = "0.12.5"
 toml = "1.1.2"
+resvg = "0.47.0"
+imagesize = "0.14.0"
+stb_image = "0.3"
+image-webp = "0.2"
+libavif-image = "0.14.0"
+fast_image_resize = "6.0.0"
+tiff = { version = "0.11.3", default-features = false, features = ["deflate", "fax", "lzw"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
-eframe = { version = "0.34.2", default-features = false, features = ["wgpu", "x11", "wayland", "wgpu_no_default_features"] }
+eframe = { version = "0.34.3", default-features = false, features = ["wgpu", "x11", "wayland", "wgpu_no_default_features"] }
 winit = { version = "0.30", default-features = false, features = ["x11", "wayland",] }
 linicon = "2.3.0"
 
 [target.'cfg(not(target_os = "linux"))'.dependencies]
-eframe = { version = "0.34.1", features = ["wgpu"] }
+eframe = { version = "0.34.3", features = ["wgpu"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+eframe = { version = "0.34.3", features = ["wgpu"] }
+
 
 
 [profile.dev]

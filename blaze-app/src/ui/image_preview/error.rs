@@ -5,8 +5,8 @@ pub enum ImagePreviewError {
     #[error("I/O error: {0}")]
     Io(#[from] std::io::Error),
 
-    #[error("Error leyendo imagen: {0}")]
-    ImageError(#[from] image::error::ImageError),
+    #[error("Error leyendo imagen")]
+    ImageError,
 
     #[error("Error leyendo imagen: {0}")]
     SvgImageError(#[from] resvg::usvg::Error),

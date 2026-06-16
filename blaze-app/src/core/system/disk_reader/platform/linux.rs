@@ -22,7 +22,7 @@ use tokio::sync::Mutex as TokioMutex;
 use tokio_stream::StreamExt;
 use tracing::{info, warn};
 use udisks2::{block::BlockProxy, filesystem::FilesystemProxy, Client};
-use users::{get_current_gid, get_current_uid};
+use uzers::{get_current_gid, get_current_uid};
 use zbus::zvariant::{ObjectPath, Value};
 use zbus::{Connection, MatchRule, MessageStream};
 
