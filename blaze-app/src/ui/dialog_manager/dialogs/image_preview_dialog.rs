@@ -13,12 +13,11 @@
 // limitations under the License.
 
 use crate::ui::dialog_manager::manager::ModalDialog;
-use crate::ui::{
-    image_preview::image_preview_handler::ImagePreviewState, themes::colors::COLOR_BG_MAIN,
-};
+use crate::ui::image_preview::image_preview_handler::ImagePreviewState;
+use crate::ui::themes::colors::COLOR_ACCENT_GLOW;
 use egui::{
-    pos2, vec2, Button, Color32, CornerRadius, Frame, Key, Margin, Order, Rect, ScrollArea, Sense,
-    Ui, Vec2, Window,
+    pos2, vec2, Button, Color32, CornerRadius, Frame, Key, Margin, Order, Rect, Sense, Stroke, Ui,
+    Vec2, Window,
 };
 
 pub struct ImagePreviewDialog {
@@ -93,34 +92,30 @@ impl ImagePreviewDialog {
             return;
         }
 
-        let fit_zoom = (available.x / tex_size.x).min(available.y / tex_size.y);
-        let min_zoom = fit_zoom.min(1.0);
-        let max_zoom = 12.0;
-
-        preview.zoom = preview.zoom.clamp(min_zoom, max_zoom);
-
-        let displayed_size = tex_size * preview.zoom;
-
         let image_area = Rect::from_min_size(ui.cursor().min, available);
 
         let img_resp = ui.allocate_rect(image_area, Sense::click_and_drag());
 
-        let max_offset_x = (displayed_size.x - available.x).max(0.0) / displayed_size.x;
-        let max_offset_y = (displayed_size.y - available.y).max(0.0) / displayed_size.y;
+        let fit_zoom = (available.x / tex_size.x).min(available.y / tex_size.y);
 
-        preview.offset.x = preview.offset.x.clamp(0.0, max_offset_x);
-        preview.offset.y = preview.offset.y.clamp(0.0, max_offset_y);
+        let min_zoom = fit_zoom * 0.5;
+        let max_zoom = 20.0;
 
-        let uv_rect = Rect::from_min_max(
-            pos2(preview.offset.x, preview.offset.y),
-            pos2(
-                (preview.offset.x + available.x / displayed_size.x).min(1.0),
-                (preview.offset.y + available.y / displayed_size.y).min(1.0),
-            ),
-        );
+        if preview.zoom <= 0.0 {
+            preview.zoom = fit_zoom;
+        } else {
+            preview.zoom = preview.zoom.clamp(min_zoom, max_zoom);
+        }
 
-        ui.painter()
-            .image(texture.id(), image_area, uv_rect, egui::Color32::WHITE);
+        let dest_size = tex_size * preview.zoom;
+
+        let max_pan_x = (dest_size.x - available.x).max(0.0) / 2.0;
+        let max_pan_y = (dest_size.y - available.y).max(0.0) / 2.0;
+
+        preview.offset.x = preview.offset.x.clamp(-max_pan_x, max_pan_x);
+        preview.offset.y = preview.offset.y.clamp(-max_pan_y, max_pan_y);
+
+        let dest_rect = Rect::from_center_size(image_area.center() + preview.offset, dest_size);
 
         if img_resp.hovered() {
             let scroll = ui.input(|i| i.smooth_scroll_delta.y);
@@ -131,21 +126,16 @@ impl ImagePreviewDialog {
 
                 if (new_zoom - preview.zoom).abs() > 0.001 {
                     if let Some(cursor_pos) = img_resp.hover_pos() {
-                        let cursor_ratio_x = (cursor_pos.x - image_area.min.x) / available.x;
-                        let cursor_ratio_y = (cursor_pos.y - image_area.min.y) / available.y;
+                        let current_center = image_area.center() + preview.offset;
+                        let relative_cursor = cursor_pos - current_center;
 
-                        let old_world_x =
-                            (preview.offset.x + cursor_ratio_x) * tex_size.x * preview.zoom;
-                        let old_world_y =
-                            (preview.offset.y + cursor_ratio_y) * tex_size.y * preview.zoom;
+                        let zoom_ratio = new_zoom / preview.zoom;
+                        let new_relative_cursor = relative_cursor * zoom_ratio;
+
+                        preview.offset.x += relative_cursor.x - new_relative_cursor.x;
+                        preview.offset.y += relative_cursor.y - new_relative_cursor.y;
 
                         preview.zoom = new_zoom;
-
-                        let new_uv_x = old_world_x / (tex_size.x * preview.zoom) - cursor_ratio_x;
-                        let new_uv_y = old_world_y / (tex_size.y * preview.zoom) - cursor_ratio_y;
-
-                        preview.offset.x = new_uv_x.clamp(0.0, max_offset_x);
-                        preview.offset.y = new_uv_y.clamp(0.0, max_offset_y);
                     } else {
                         preview.zoom = new_zoom;
                     }
@@ -155,25 +145,27 @@ impl ImagePreviewDialog {
             if img_resp.dragged() {
                 ui.set_cursor_icon(egui::CursorIcon::Grabbing);
                 let drag = img_resp.drag_delta();
-                preview.offset.x -= drag.x / displayed_size.x;
-                preview.offset.y -= drag.y / displayed_size.y;
+                preview.offset.x += drag.x;
+                preview.offset.y += drag.y;
             }
+
+            preview.offset.x = preview.offset.x.clamp(-max_pan_x, max_pan_x);
+            preview.offset.y = preview.offset.y.clamp(-max_pan_y, max_pan_y);
         }
 
         if img_resp.double_clicked() {
-            preview.zoom = min_zoom;
+            preview.zoom = fit_zoom;
             preview.offset = Vec2::ZERO;
-
-            let image_displayed = tex_size * preview.zoom;
-
-            if image_displayed.x > available.x {
-                preview.offset.x = (image_displayed.x - available.x) / (2.0 * image_displayed.x);
-            }
-
-            if image_displayed.y > available.y {
-                preview.offset.y = (image_displayed.y - available.y) / (2.0 * image_displayed.y);
-            }
         }
+
+        let uv_rect = Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0));
+
+        ui.painter().with_clip_rect(image_area).image(
+            texture.id(),
+            dest_rect,
+            uv_rect,
+            Color32::WHITE,
+        );
 
         ui.add_space(8.0);
         ui.horizontal_centered(|ui| {
@@ -190,19 +182,19 @@ impl ImagePreviewDialog {
             }
 
             if ui.button("Reset").clicked() {
-                preview.zoom = min_zoom;
+                preview.zoom = fit_zoom;
                 preview.offset = Vec2::ZERO;
             }
         });
 
         let input = ui.input(|i| i.clone());
         if input.key_pressed(Key::ArrowRight) {
-            preview.zoom = min_zoom;
+            preview.zoom = 0.0;
             preview.offset = Vec2::ZERO;
             preview.next(ui);
         }
         if input.key_pressed(Key::ArrowLeft) {
-            preview.zoom = min_zoom;
+            preview.zoom = 0.0;
             preview.offset = Vec2::ZERO;
             preview.prev(ui);
         }
@@ -217,106 +209,80 @@ impl ImagePreviewDialog {
             return false;
         };
 
-        let is_portrait = pvw.current_texture.as_ref().is_some_and(|tex| {
-            let size = tex.size_vec2();
-            size.y > size.x * 1.5
-        });
-
-        let is_landscape = pvw.current_texture.as_ref().is_some_and(|tex| {
-            let size = tex.size_vec2();
-            size.x > size.y * 1.5
-        });
-
         let custom_frame = Frame::NONE
-            .fill(COLOR_BG_MAIN)
+            .fill(Color32::TRANSPARENT)
             .corner_radius(CornerRadius::same(10))
             .inner_margin(Margin::same(10));
 
-        let mut window = Window::new(pvw.current_name())
+        let screen_size = ui.content_rect().size();
+        let max_window_size = vec2(screen_size.x * 0.9, screen_size.y * 0.9);
+
+        let window = Window::new(pvw.current_name())
             .frame(custom_frame)
             .order(Order::Foreground)
             .collapsible(false)
             .resizable(true)
             .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
-            .open(&mut self.show_modal);
-
-        if is_portrait {
-            window = window.default_size([400.0, 700.0]);
-        } else if is_landscape {
-            window = window.default_size([900.0, 500.0]);
-        } else {
-            window = window.default_size([600.0, 600.0]);
-        }
+            .open(&mut self.show_modal)
+            .default_size(max_window_size)
+            .resizable(false)
+            .max_size(max_window_size);
 
         window.show(ui, |ui| {
             let available_width = ui.available_width();
             let available_height = ui.available_height();
-            ui.set_min_width(300.0);
-            ui.set_min_height(300.0);
-
             let preview_height = (available_height * 0.7).max(200.0);
 
-            ScrollArea::vertical()
-                .max_height(available_height)
+            Frame::NONE
+                .fill(pvw.background_color.linear_multiply(0.8))
+                .stroke(Stroke::new(0.5, COLOR_ACCENT_GLOW))
+                .corner_radius(8.0)
+                .inner_margin(10.0)
                 .show(ui, |ui| {
-                    Frame::NONE
-                        .fill(Color32::from_rgb(10, 15, 19))
-                        .corner_radius(8.0)
-                        .inner_margin(10.0)
-                        .show(ui, |ui| {
-                            ui.set_height(preview_height);
-                            ui.set_width(available_width - 20.0);
+                    ui.set_height(preview_height);
+                    ui.set_width(available_width - 20.0);
 
-                            ui.centered_and_justified(|ui| {
-                                Self::render_preview(
-                                    ui,
-                                    pvw,
-                                    &mut self.needs_initial_load,
-                                    &mut should_close,
-                                );
-                            });
+                    ui.allocate_ui(vec2(ui.available_width(), preview_height), |ui| {
+                        ui.centered_and_justified(|ui| {
+                            Self::render_preview(
+                                ui,
+                                pvw,
+                                &mut self.needs_initial_load,
+                                &mut should_close,
+                            );
                         });
+                    });
+
+                    ui.horizontal(|ui| {
+                        let button_width = 50.0;
+                        let button_spacing = 20.0;
+
+                        ui.spacing_mut().item_spacing.x = button_spacing;
+
+                        let total_width = button_width * 2.0 + button_spacing;
+                        let spacing = (ui.available_width() - total_width) / 2.0;
+
+                        ui.add_space(spacing.max(0.0));
+
+                        if ui
+                            .add(Button::new("◀").min_size(vec2(button_width, 30.0)))
+                            .clicked()
+                        {
+                            pvw.zoom = 0.0;
+                            pvw.offset = Vec2::ZERO;
+                            pvw.prev(ui);
+                        }
+
+                        if ui
+                            .add(Button::new("▶").min_size(vec2(button_width, 30.0)))
+                            .clicked()
+                        {
+                            pvw.zoom = 0.0;
+                            pvw.offset = Vec2::ZERO;
+                            pvw.next(ui);
+                        }
+                    });
                 });
-
-            ui.add_space(10.0);
-
-            ui.horizontal_centered(|ui| {
-                ui.spacing_mut().item_spacing.x = 20.0;
-
-                if ui
-                    .add(Button::new("◀").min_size(vec2(120.0, 42.0)))
-                    .clicked()
-                {
-                    pvw.zoom = 1.0;
-                    pvw.offset = Vec2::ZERO;
-                    pvw.prev(ui);
-                }
-
-                if ui
-                    .add(Button::new("▶").min_size(vec2(120.0, 42.0)))
-                    .clicked()
-                {
-                    pvw.zoom = 1.0;
-                    pvw.offset = Vec2::ZERO;
-                    pvw.next(ui);
-                }
-            });
-
-            ui.horizontal(|ui| {
-                let width = ui.available_width();
-                let button_width = 120.0;
-                let spacing = (width - button_width) / 2.0;
-
-                ui.add_space(spacing);
-                if ui
-                    .add(Button::new("Cerrar").min_size(vec2(button_width, 42.0)))
-                    .clicked()
-                {
-                    should_close = true;
-                }
-            });
-
-            ui.add_space(20.0);
         });
 
         if should_close {

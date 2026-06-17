@@ -20,7 +20,7 @@ use crate::{
     },
 };
 use crossbeam_channel::{bounded, Receiver};
-use egui::{ColorImage, TextureHandle, TextureOptions, Ui, Vec2};
+use egui::{Color32, ColorImage, TextureHandle, TextureOptions, Ui, Vec2};
 use std::{
     io::Read,
     path::{Path, PathBuf},
@@ -39,6 +39,10 @@ pub struct ImagePreviewState {
     pub loading: bool,
     pub zoom: f32,
     pub offset: Vec2,
+    pub background_color: Color32,
+    pub current_bg_color: Color32,
+    pub prev_bg_color: Color32,
+    pub next_bg_color: Color32,
 }
 
 impl ImagePreviewState {
@@ -60,6 +64,10 @@ impl ImagePreviewState {
             loading: true,
             zoom: 1.0,
             offset: Vec2::ZERO,
+            background_color: Color32::TRANSPARENT,
+            current_bg_color: Color32::TRANSPARENT,
+            prev_bg_color: Color32::TRANSPARENT,
+            next_bg_color: Color32::TRANSPARENT,
         }
     }
 
@@ -101,6 +109,11 @@ impl ImagePreviewState {
         self.current_texture = self.next_texture.take();
         self.current_index = self.next_index();
 
+        //rotar colores
+        self.prev_bg_color = self.current_bg_color;
+        self.current_bg_color = self.next_bg_color;
+        self.background_color = self.current_bg_color;
+
         self.prev_rx = None;
         self.current_rx = self.next_rx.take();
 
@@ -119,6 +132,11 @@ impl ImagePreviewState {
         self.current_texture = self.prev_texture.take();
         self.current_index = self.prev_index();
 
+        //rotar colores al revés
+        self.next_bg_color = self.current_bg_color;
+        self.current_bg_color = self.prev_bg_color;
+        self.background_color = self.current_bg_color;
+
         self.next_rx = None;
         self.current_rx = self.prev_rx.take();
 
@@ -128,27 +146,34 @@ impl ImagePreviewState {
     }
 
     pub fn poll_loading(&mut self, ui: &mut Ui) {
-        Self::poll_rx(
+        if let Some(bg_color) = Self::poll_rx(
             &mut self.current_rx,
             &mut self.current_texture,
             &mut self.loading,
             "preview_current",
             ui,
-        );
+        ) {
+            self.current_bg_color = bg_color;
+            self.background_color = bg_color;
+        }
 
-        Self::poll_rx_silent(
+        if let Some(bg_color) = Self::poll_rx_silent(
             &mut self.prev_rx,
             &mut self.prev_texture,
             "preview_prev",
             ui,
-        );
+        ) {
+            self.prev_bg_color = bg_color
+        }
 
-        Self::poll_rx_silent(
+        if let Some(bg_color) = Self::poll_rx_silent(
             &mut self.next_rx,
             &mut self.next_texture,
             "preview_next",
             ui,
-        );
+        ) {
+            self.next_bg_color = bg_color;
+        }
     }
 
     fn poll_rx(
@@ -157,14 +182,19 @@ impl ImagePreviewState {
         loading: &mut bool,
         name: &str,
         ui: &mut Ui,
-    ) {
+    ) -> Option<Color32> {
         if let Some(r) = rx {
             if let Ok(Some(img)) = r.try_recv() {
+                let bg_color = Self::extract_dominant_color(&img);
+
                 *texture = Some(ui.load_texture(name, img, TextureOptions::LINEAR));
                 *loading = false;
                 *rx = None;
+
+                return Some(bg_color);
             }
         }
+        None
     }
 
     fn poll_rx_silent(
@@ -172,12 +202,64 @@ impl ImagePreviewState {
         texture: &mut Option<TextureHandle>,
         name: &str,
         ui: &mut Ui,
-    ) {
+    ) -> Option<Color32> {
         if let Some(r) = rx {
             if let Ok(Some(img)) = r.try_recv() {
+                let bg_color = Self::extract_dominant_color(&img);
+
                 *texture = Some(ui.load_texture(name, img, TextureOptions::LINEAR));
                 *rx = None;
+
+                return Some(bg_color);
             }
+        }
+        None
+    }
+
+    pub fn extract_dominant_color(image: &ColorImage) -> Color32 {
+        if image.pixels.is_empty() {
+            return Color32::from_rgb(10, 15, 19);
+        }
+
+        let step = 10;
+        let mut total_r = 0u64;
+        let mut total_g = 0u64;
+        let mut total_b = 0u64;
+        let mut count = 0u64;
+
+        for y in (0..image.height()).step_by(step) {
+            for x in (0..image.width()).step_by(step) {
+                let pixel = image.pixels[y * image.width() + x];
+                total_r += pixel.r() as u64;
+                total_g += pixel.g() as u64;
+                total_b += pixel.b() as u64;
+                count += 1;
+            }
+        }
+
+        if count == 0 {
+            return Color32::from_rgb(10, 15, 19);
+        }
+
+        let avg_r = (total_r / count) as u8;
+        let avg_g = (total_g / count) as u8;
+        let avg_b = (total_b / count) as u8;
+
+        let luminance =
+            (0.299 * avg_r as f32 + 0.587 * avg_g as f32 + 0.114 * avg_b as f32) / 255.0;
+
+        if luminance > 0.5 {
+            Color32::from_rgb(
+                (avg_r as f32 * 0.2) as u8,
+                (avg_g as f32 * 0.2) as u8,
+                (avg_b as f32 * 0.2) as u8,
+            )
+        } else {
+            Color32::from_rgb(
+                (avg_r as f32 * 0.3 + 40.0).min(255.0) as u8,
+                (avg_g as f32 * 0.3 + 40.0).min(255.0) as u8,
+                (avg_b as f32 * 0.3 + 40.0).min(255.0) as u8,
+            )
         }
     }
 
