@@ -1,3 +1,18 @@
+## [0.14.0] - 2026-06-19
+
+### 🚀 Features
+- **(preview)** Rediseño de vista previa con zoom por píxeles y fondo dinámico([`cf5fc54`](https://github.com/Jhanfer/blazepilot/commit/cf5fc54592853a6d48023b8232a839351a70117e))
+- **(blaze)** Añade vista Grid, reorganiza módulos y config con debounce([`3add657`](https://github.com/Jhanfer/blazepilot/commit/3add6570e92640a1de51fa452d50feff670e6df1))
+
+
+### ⚡ Performance
+- **(images)** Reemplaza crate image por decodificadores ligeros([`e6ca639`](https://github.com/Jhanfer/blazepilot/commit/e6ca6390f6a44a831819cd8ae9317de927c6fa2a))
+
+
+### ⚙️ Miscelánea
+- Instala dependencias del sistema en workflow([`3e24fce`](https://github.com/Jhanfer/blazepilot/commit/3e24fcedf4a7a27d7c9b1e786b15e834ca0240f0))
+- **(version)** Versiona a 0.14.0([`e74c6b7`](https://github.com/Jhanfer/blazepilot/commit/e74c6b76d8da78cacd59ef290d1aa50e33befc69))
+
 ## [0.13.0] - 2026-06-12
 
 ### 🐛 Bug fixes
