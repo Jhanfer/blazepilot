@@ -27,8 +27,8 @@ use crate::{
 };
 use core::f32;
 use egui::{
-    pos2, Area, CentralPanel, Color32, ComboBox, CornerRadius, Frame, Key, Margin, OpenUrl, Order,
-    Panel, RichText, TextEdit, Ui, Window,
+    CentralPanel, Color32, ComboBox, CornerRadius, Frame, Key, Margin, OpenUrl, Order, Panel,
+    RichText, TextEdit, Ui, Window,
 };
 use std::time::Duration;
 use tracing::warn;
@@ -541,13 +541,17 @@ impl ConfigDialog {
 
     pub fn render_dialog(&mut self, ui: &mut Ui) -> bool {
         let i18n = with_configs(|c| c.get_i18n());
-        let mut config_open = self.show_modal;
+
+        let mut should_close = false;
+
+        let mut is_open = self.show_modal;
+
         if !self.show_modal {
             return false;
         }
 
-        let custom_frame = Frame::NONE
-            .fill(Color32::from_rgba_unmultiplied(16, 21, 25, 0))
+        let custom_frame = Frame::window(ui.style())
+            .fill(Color32::from_rgba_unmultiplied(16, 21, 25, 122))
             .corner_radius(CornerRadius::same(10))
             .inner_margin(Margin::same(10));
 
@@ -560,9 +564,8 @@ impl ConfigDialog {
             .fill(COLOR_BG_MAIN)
             .outer_margin(Margin::same(5));
 
-        let mut close_requested = false;
-
         Window::new(i18n.t("configs.title"))
+            .id(egui::Id::new("config_modal_window"))
             .frame(custom_frame)
             .order(Order::Foreground)
             .default_size([desired_width, desired_height])
@@ -571,12 +574,12 @@ impl ConfigDialog {
             .collapsible(false)
             .resizable(false)
             .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
-            .open(&mut config_open)
+            .open(&mut is_open)
             .show(ui, |ui| {
                 ui.set_width(ui.available_width());
                 ui.set_height(ui.available_height());
 
-                let side = Panel::left("config_left_panel")
+                Panel::left("config_left_panel")
                     .show_separator_line(false)
                     .resizable(false)
                     .frame(frame)
@@ -587,7 +590,7 @@ impl ConfigDialog {
                         self.render_config_sidebar(ui);
                     });
 
-                let central = CentralPanel::default().frame(frame).show_inside(ui, |ui| {
+                CentralPanel::default().frame(frame).show_inside(ui, |ui| {
                     ui.set_width(ui.available_width());
                     ui.set_height(ui.available_height());
 
@@ -611,27 +614,20 @@ impl ConfigDialog {
                         }
                     }
                 });
-
-                let all_rect = side.response.rect.union(central.response.rect);
-
-                Area::new("close".into())
-                    .order(Order::Middle)
-                    .fixed_pos(pos2(all_rect.center().x, all_rect.bottom() + 8.0))
-                    .show(ui, |ui| {
-                        if ui.button(i18n.t("general_dialog.close")).clicked() {
-                            close_requested = true;
-                        }
-                    });
             });
 
-        self.show_modal = config_open;
-
-        let input = ui.input(|i| i.clone());
-
-        if input.key_pressed(Key::Escape) || close_requested {
-            self.close();
+        if !is_open {
+            should_close = true;
         }
 
-        self.show_modal
+        if ui.input(|i| i.key_pressed(Key::Escape)) {
+            should_close = true;
+        }
+
+        if should_close {
+            self.show_modal = false;
+        }
+
+        should_close
     }
 }

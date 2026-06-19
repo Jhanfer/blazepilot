@@ -1,6 +1,14 @@
 pub mod custom_context_menu;
+pub mod drag_drop_logic;
+pub mod file_view_callback;
+pub mod grid_view;
+pub mod hot_keys;
+pub mod island_n_bubble;
+pub mod render_tags_view;
 pub mod row_view;
 pub mod sidebar_left_component;
 pub mod sidebar_right;
 pub mod toolbar;
+pub mod tools_view;
 pub mod ui_callback;
+pub mod utilities;

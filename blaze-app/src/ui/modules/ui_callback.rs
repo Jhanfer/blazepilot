@@ -7,7 +7,7 @@ use crate::{
     ui::{
         blaze_ui_state::BlazeUiState,
         modules::{
-            row_view::row_view_callback::render_row_view,
+            file_view_callback::render_views,
             sidebar_left_component::sidebar_callback::sidebar_left_component,
             sidebar_right::sidebar_right_component, toolbar::toolbar_component,
         },
@@ -38,5 +38,5 @@ pub fn connect_ui_components_callback(
     // -------------------------------
     //  file view
     // -------------------------------
-    render_row_view(ui, files, state, ui_state);
+    render_views(ui, files, state, ui_state);
 }

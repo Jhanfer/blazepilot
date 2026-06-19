@@ -22,15 +22,18 @@ use directories::ProjectDirs;
 use serde::{Deserialize, Serialize};
 use tracing::info;
 
-use crate::core::bootstrap::{
-    configs::{
-        error::{ConfigError, ConfigResult},
-        platform::{
-            linux::conf_structs::{DisplayBackend, OrderingMode},
-            PlatformConfigTrait,
+use crate::core::{
+    blaze_state::{LayoutMode, ViewMode},
+    bootstrap::{
+        configs::{
+            error::{ConfigError, ConfigResult},
+            platform::{
+                linux::conf_structs::{DisplayBackend, OrderingMode},
+                PlatformConfigTrait,
+            },
         },
+        i18n::I18n,
     },
-    i18n::I18n,
 };
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -76,6 +79,12 @@ pub struct LinuxConfigs {
 
     #[serde(skip)]
     pub i18n: Arc<I18n>,
+
+    pub view_mode: ViewMode,
+
+    pub row_icon_size: f32,
+
+    pub grid_icon_size: f32,
 }
 
 impl LinuxConfigs {
@@ -120,6 +129,9 @@ impl Default for LinuxConfigs {
             last_time_asked_installation: None,
             locale: locale.into(),
             i18n,
+            view_mode: ViewMode::Normal(LayoutMode::Row),
+            row_icon_size: 20.0,
+            grid_icon_size: 56.0,
         }
     }
 }

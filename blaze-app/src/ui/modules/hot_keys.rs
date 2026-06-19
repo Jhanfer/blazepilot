@@ -1,6 +1,7 @@
 use crate::{
     core::{
-        blaze_state::{BlazeCoreState, NewItemType, ViewMode},
+        blaze_state::{BlazeCoreState, LayoutMode, NewItemType, ViewMode},
+        bootstrap::configs::config_manager::with_configs,
         files::blaze_motor::motor_structs::FileEntry,
         runtime::{
             bus_structs::{QuickTagEvent, SureTo, UiEvent},
@@ -238,9 +239,25 @@ pub fn hot_keys_logic(
 
     //Tags
     if input.modifiers.ctrl && input.key_pressed(Key::T) && !input.modifiers.shift {
-        state.view_mode = match state.view_mode {
-            ViewMode::Normal => ViewMode::Tags,
-            ViewMode::Tags => ViewMode::Normal,
+        state.view_mode = match &state.view_mode {
+            ViewMode::Normal(layout) => ViewMode::Tags(layout.to_owned()),
+            ViewMode::Tags(layout) => ViewMode::Normal(layout.to_owned()),
+        };
+    }
+
+    if input.modifiers.ctrl && input.key_pressed(Key::L) && !input.modifiers.shift {
+        state.view_mode = match &state.view_mode {
+            ViewMode::Normal(LayoutMode::Row) => {
+                state.grid_view.icon_size = 56.0;
+                with_configs(|c| c.set_grid_icon_size(56.0));
+                ViewMode::Normal(LayoutMode::Grid)
+            }
+            ViewMode::Normal(LayoutMode::Grid) => {
+                state.row_view.icon_size = 20.0;
+                with_configs(|c| c.set_row_icon_size(20.0));
+                ViewMode::Normal(LayoutMode::Row)
+            }
+            actual_state => actual_state.to_owned(),
         };
     }
 

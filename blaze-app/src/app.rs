@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use crate::core::blaze_state::{BlazeCoreBuilder, BlazeCoreState};
+use crate::core::bootstrap::configs::config_manager::with_configs;
 use crate::core::system::clipboard::global_clipboard::TOKIO_RUNTIME;
 use crate::core::system::knowndirs::knowndirs_manager::KnownDirsManager;
 use crate::ui::blaze_ui_state::BlazeUiState;
@@ -21,7 +22,7 @@ use eframe::Frame;
 use egui::{FontData, FontDefinitions, FontFamily, Ui};
 use std::path::Path;
 use std::sync::Arc;
-use tracing::debug;
+use tracing::{debug, error};
 
 #[must_use = "llama .build() para construir la aap"]
 pub struct BlazeAppBuilder {
@@ -93,6 +94,11 @@ impl eframe::App for BlazeApp {
     fn ui(&mut self, ui: &mut Ui, _frame: &mut Frame) {
         self.set_up_custom_font(ui);
 
+        with_configs(|c| match c.tick() {
+            Ok(_) => {}
+            Err(e) => error!("Ha ocurrido un error de guardado: {e}."),
+        });
+
         ui.options_mut(|opt| {
             opt.reduce_texture_memory = true;
         });
@@ -133,6 +139,10 @@ impl eframe::App for BlazeApp {
     }
 
     fn on_exit(&mut self) {
+        with_configs(|c| match c.force_save() {
+            Ok(_) => {}
+            Err(e) => error!("Ha ocurrido un error de guardado: {e}."),
+        });
         self.state.save_caches(true);
     }
 }

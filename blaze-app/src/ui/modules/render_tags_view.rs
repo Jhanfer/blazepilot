@@ -12,7 +12,7 @@ use crate::{
     ui::{
         blaze_ui_state::BlazeUiState,
         icons_cache::thumbnails::thumbnails_manager::Thumbnail,
-        modules::row_view::{
+        modules::{
             island_n_bubble::render_tags_island_bubble,
             utilities::{
                 ensure_min_lightness, render_button, render_op_buttons, render_quicklink_icon,
@@ -553,9 +553,9 @@ pub fn tag_views(
 
     //Tags
     if ui.input(|i| i.modifiers.ctrl) && ui.input(|i| i.key_pressed(egui::Key::T)) {
-        state.view_mode = match state.view_mode {
-            ViewMode::Normal => ViewMode::Tags,
-            ViewMode::Tags => ViewMode::Normal,
+        state.view_mode = match &state.view_mode {
+            ViewMode::Normal(layout) => ViewMode::Tags(layout.to_owned()),
+            ViewMode::Tags(layout) => ViewMode::Normal(layout.to_owned()),
         };
     }
 }

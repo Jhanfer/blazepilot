@@ -14,11 +14,11 @@ use crate::{
         modules::{
             custom_context_menu::context_state::ContextMenuKind,
             drag_drop_logic::drag_files,
+            grid_view::{
+                grid_scroll_view::render_grid_scrollview, rubber_band_logic::render_grid_rubberband,
+            },
             hot_keys::hot_keys_logic,
             island_n_bubble::render_island_bubble,
-            row_view::{
-                new_scroll_view::new_render_scrollview, rubber_band_logic::render_row_rubberband,
-            },
         },
         themes::colors::*,
     },
@@ -129,7 +129,7 @@ fn background_response_logic(
     }
 }
 
-pub fn row_panel_frame(
+pub fn grid_panel_frame(
     ui: &mut Ui,
     files: &[Arc<FileEntry>],
     state: &mut BlazeCoreState,
@@ -164,25 +164,25 @@ pub fn row_panel_frame(
             let panel_top = content_rect.min.y;
             let clipped_painter = &ui.painter_at(content_rect);
 
-            let icon_size = state.row_view.icon_size;
-
-            let row_height = (icon_size + 8.0).clamp(28.0, 64.0);
             let total_rows = files.len();
 
+            let row_height = state.grid_view.row_height;
+
             //Drag
-            if state.row_view.is_dragging_files {
+            if state.grid_view.is_dragging_files {
                 drag_files(ui, state, files, clipped_painter, content_rect, row_height);
             }
 
             //Rubberband
             if state.rubber_band.is_rubber_banding {
-                render_row_rubberband(
+                render_grid_rubberband(
                     state,
                     files,
                     clipped_painter,
-                    panel_top,
                     content_rect,
                     row_height,
+                    state.grid_view.cell_size,
+                    state.grid_view.cols,
                 );
             }
 
@@ -208,8 +208,8 @@ pub fn row_panel_frame(
             //Disparador de sizer
             for file in files
                 .iter()
-                .take(state.row_view.last_visible.min(files.len()))
-                .skip(state.row_view.first_visible)
+                .take(state.grid_view.last_visible.min(files.len()))
+                .skip(state.grid_view.first_visible)
             {
                 if file.is_dir()
                     && !state.calculating_dir_sizes.contains(&file.full_path)
@@ -228,8 +228,8 @@ pub fn row_panel_frame(
             //Disparador de Info extendida
             for file in files
                 .iter()
-                .take(state.row_view.last_visible.min(files.len()))
-                .skip(state.row_view.first_visible)
+                .take(state.grid_view.last_visible.min(files.len()))
+                .skip(state.grid_view.first_visible)
             {
                 if !state.calculating_extended_info.contains(&file.full_path)
                     && !state.calculated_extended_info.contains(&file.full_path)
@@ -248,8 +248,8 @@ pub fn row_panel_frame(
             //disparador de thumbnails
             for file in files
                 .iter()
-                .take(state.row_view.last_visible.min(files.len()))
-                .skip(state.row_view.first_visible)
+                .take(state.grid_view.last_visible.min(files.len()))
+                .skip(state.grid_view.first_visible)
             {
                 let img_vid = file.extension.is_image() || file.extension.is_video();
 
@@ -269,21 +269,13 @@ pub fn row_panel_frame(
             }
 
             //Scrollview
-            new_render_scrollview(
-                ui,
-                files,
-                state,
-                ui_state,
-                row_height,
-                total_rows,
-                content_rect,
-            );
+            render_grid_scrollview(ui, files, state, ui_state, content_rect);
 
-            if state.row_view.is_dragging_files && !ui.input(|i| i.pointer.any_down()) {
-                state.row_view.is_dragging_files = false;
-                state.row_view.drag_ghost_pos = None;
-                state.row_view.drop_target = None;
-                state.row_view.drop_invalid_target = None;
+            if state.grid_view.is_dragging_files && !ui.input(|i| i.pointer.any_down()) {
+                state.grid_view.is_dragging_files = false;
+                state.grid_view.drag_ghost_pos = None;
+                state.grid_view.drop_target = None;
+                state.grid_view.drop_invalid_target = None;
             }
 
             //Isla y burbuja y las tabs

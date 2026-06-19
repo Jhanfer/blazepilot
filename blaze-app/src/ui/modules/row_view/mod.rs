@@ -1,10 +1,3 @@
-pub mod drag_drop_logic;
-pub mod hot_keys;
-pub mod island_n_bubble;
 pub mod new_scroll_view;
 pub mod render_row_panel_view;
-pub mod render_tags_view;
-pub mod row_view_callback;
 pub mod rubber_band_logic;
-pub mod tools_view;
-pub mod utilities;

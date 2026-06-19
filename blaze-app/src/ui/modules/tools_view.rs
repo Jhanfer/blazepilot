@@ -1,6 +1,6 @@
 use crate::{
     core::{
-        blaze_state::{BlazeCoreState, NewItemType, ViewMode},
+        blaze_state::{BlazeCoreState, LayoutMode, NewItemType, ViewMode},
         bootstrap::configs::config_manager::with_configs,
         files::blaze_motor::motor_structs::FileEntry,
         runtime::{
@@ -22,13 +22,17 @@ fn render_tag_button(ui: &mut Ui, state: &mut BlazeCoreState) {
     let (rect_toggle, resp_toggle) = ui.allocate_exact_size(vec2(45.0, 25.0), Sense::click());
 
     if resp_toggle.clicked() {
-        state.view_mode = match state.view_mode {
-            ViewMode::Normal => ViewMode::Tags,
-            ViewMode::Tags => ViewMode::Normal,
+        state.view_mode = match &state.view_mode {
+            ViewMode::Normal(layout) => ViewMode::Tags(layout.to_owned()),
+            ViewMode::Tags(layout) => ViewMode::Normal(layout.to_owned()),
         };
     }
 
-    let anim = ui.animate_bool("view_mode_toggle".into(), state.view_mode == ViewMode::Tags);
+    let anim = ui.animate_bool(
+        "view_mode_toggle".into(),
+        state.view_mode == ViewMode::Tags(LayoutMode::Row)
+            || state.view_mode == ViewMode::Tags(LayoutMode::Grid),
+    );
 
     let bg_color = COLOR_ACCENT_PURPLE;
 

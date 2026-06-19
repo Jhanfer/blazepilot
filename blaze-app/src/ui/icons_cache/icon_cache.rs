@@ -36,10 +36,11 @@ impl IconCache {
         icon_size: egui::Vec2,
     ) -> &TextureHandle {
         let tint_key = format!("{:02X}{:02X}{:02X}", tint.r(), tint.g(), tint.b());
-        let full_key = format!("{}-{}", name, tint_key);
         let pixels_per_point = ui.pixels_per_point();
         let w = (icon_size.x * pixels_per_point).round() as u32;
         let h = (icon_size.y * pixels_per_point).round() as u32;
+        let scale_key = (pixels_per_point * 10.0).round() as u32;
+        let full_key = format!("{}-{}-{}x{}-{}ppp", name, tint_key, w, h, scale_key);
 
         self.cache.entry(full_key).or_insert_with(|| {
             let image = rasterize_svg(svg_bytes, w, h, tint);

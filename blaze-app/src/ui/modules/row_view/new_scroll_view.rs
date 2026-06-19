@@ -19,7 +19,7 @@ use crate::{
         icons_cache::thumbnails::thumbnails_manager::Thumbnail,
         modules::{
             custom_context_menu::context_state::ContextMenuKind,
-            row_view::utilities::{git_dot_color, resolve_icon, text_color_for_git},
+            utilities::{git_dot_color, resolve_icon, text_color_for_git},
         },
         themes::colors::COLOR_MAIN_BUTTONS,
     },
@@ -245,6 +245,8 @@ pub fn new_render_scrollview(
     total_rows: usize,
     content_rect: Rect,
 ) {
+    let icon_size = state.row_view.icon_size;
+
     let i18n = with_configs(|c| c.get_i18n());
 
     ui_state.evict_thumbnail_cache_if_dir_changed(&state.cwd);
@@ -594,10 +596,11 @@ pub fn new_render_scrollview(
             let dot_color = git_dot_color(git);
 
             // Columna Filename
-            let icon_size = 16.0;
-            let dot_size = 8.0;
-            let icon_spacing = 4.0;
-            let left_padding = 6.0;
+
+            let dot_size = icon_size / 8.0;
+
+            let icon_spacing = icon_size / 4.0;
+            let left_padding = icon_size / 6.0;
             let name_start_x =
                 rect.min.x + left_padding + icon_size + dot_size + icon_spacing * 2.0;
             let name_end_x = rect.min.x + name_w;
@@ -683,6 +686,7 @@ pub fn new_render_scrollview(
             }
 
             // Nombre
+            let name_font_size = (icon_size / 2.0 * 1.2).clamp(13.0, 25.0);
             let motor = state.motor.borrow_mut();
             let display_name = if motor.active_tab().is_recursive_active {
                 file.full_path
@@ -698,7 +702,11 @@ pub fn new_render_scrollview(
             let name_rect =
                 Rect::from_min_max(pos2(name_start_x, rect.min.y), pos2(name_end_x, rect.max.y));
             let name_galley = ui.fonts_mut(|f| {
-                f.layout_no_wrap(display_name, FontId::proportional(13.0), name_color)
+                f.layout_no_wrap(
+                    display_name,
+                    FontId::proportional(name_font_size),
+                    name_color,
+                )
             });
             let name_painter = ui.painter().with_clip_rect(name_rect);
             name_painter.galley(
@@ -708,6 +716,7 @@ pub fn new_render_scrollview(
             );
 
             // Columna Modified
+            let date_font_size = (icon_size / 2.0 * 1.2).clamp(12.0, 25.0);
             let date_rect = Rect::from_min_max(
                 pos2(rect.min.x + name_w, rect.min.y),
                 pos2(rect.min.x + name_w + date_w, rect.max.y),
@@ -715,7 +724,7 @@ pub fn new_render_scrollview(
             let date_galley = ui.fonts_mut(|f| {
                 f.layout_no_wrap(
                     format_date(file.modified).to_string(),
-                    FontId::proportional(12.0),
+                    FontId::proportional(date_font_size),
                     Color32::from_rgb(109, 108, 111),
                 )
             });
@@ -729,6 +738,7 @@ pub fn new_render_scrollview(
             );
 
             // Columna Size
+            let size_font_size = (icon_size / 2.0 * 1.2).clamp(12.0, 25.0);
             let size_rect = Rect::from_min_max(
                 pos2(rect.min.x + name_w + date_w, rect.min.y),
                 pos2(rect.max.x, rect.max.y),
@@ -755,7 +765,7 @@ pub fn new_render_scrollview(
             let size_galley = ui.fonts_mut(|f| {
                 f.layout_no_wrap(
                     size_text,
-                    FontId::proportional(12.0),
+                    FontId::proportional(size_font_size),
                     Color32::from_rgb(109, 108, 111),
                 )
             });

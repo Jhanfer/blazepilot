@@ -12,21 +12,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::core::bootstrap::{
-    configs::{
-        error::ConfigResult,
-        platform::{
-            linux::conf_structs::{DisplayBackend, OrderingMode},
-            PlatformConfigTrait, PlatformConfigs,
+use crate::core::{
+    blaze_state::ViewMode,
+    bootstrap::{
+        configs::{
+            error::ConfigResult,
+            platform::{
+                linux::conf_structs::{DisplayBackend, OrderingMode},
+                PlatformConfigTrait, PlatformConfigs,
+            },
         },
+        i18n::I18n,
     },
-    i18n::I18n,
 };
 use parking_lot::Mutex;
 use std::{
     path::Path,
     sync::{Arc, LazyLock},
-    time::SystemTime,
+    time::{Duration, Instant, SystemTime},
 };
 use tracing::warn;
 
@@ -39,12 +42,18 @@ pub fn with_configs<R>(f: impl FnOnce(&mut ConfigManager) -> R) -> R {
 
 pub struct ConfigManager {
     platform: PlatformConfigs,
+    last_change: Option<Instant>,
+    is_dirty: bool,
+    debounce: Duration,
 }
 
 impl ConfigManager {
     fn new() -> Self {
         let mut manager = Self {
             platform: PlatformConfigs::default(),
+            last_change: None,
+            is_dirty: false,
+            debounce: Duration::from_millis(1000),
         };
 
         if let Err(e) = manager.platform.load() {
@@ -93,37 +102,64 @@ impl ConfigManager {
         self.platform.i18n.clone()
     }
 
+    pub fn get_row_icon_size(&self) -> f32 {
+        self.platform.row_icon_size
+    }
+
+    pub fn get_grid_icon_size(&self) -> f32 {
+        self.platform.grid_icon_size
+    }
+
+    pub fn get_view_mode(&self) -> ViewMode {
+        self.platform.view_mode.to_owned()
+    }
+
     //--__--__--__--__ Setters  __--__--__--__--__--__--__
 
     pub fn set_ordering_mode(&mut self, mode: OrderingMode) {
         self.platform.app_ordering_mode = mode;
-        self.save().ok();
+        self.save();
     }
 
     pub fn set_show_hidden_files(&mut self, show: bool) {
         self.platform.show_hidden_files = show;
-        self.save().ok();
+        self.save();
     }
 
     pub fn set_display_backend(&mut self, backend: DisplayBackend) {
         self.platform.display_backend = backend;
-        self.save().ok();
+        self.save();
     }
 
     pub fn set_default_terminal(&mut self, terminal: String) {
         self.platform.default_terminal = terminal;
-        self.save().ok();
+        self.save();
     }
 
     pub fn set_should_ask_install(&mut self, ask: bool) {
         self.platform.should_ask_to_install = ask;
-        self.save().ok();
+        self.save();
     }
 
     pub fn set_locale(&mut self, locale: &str) {
         self.platform.locale = locale.into();
         self.switch_i18n(locale);
-        self.save().ok();
+        self.save();
+    }
+
+    pub fn set_row_icon_size(&mut self, size: f32) {
+        self.platform.row_icon_size = size;
+        self.save();
+    }
+
+    pub fn set_grid_icon_size(&mut self, size: f32) {
+        self.platform.grid_icon_size = size;
+        self.save();
+    }
+
+    pub fn set_view_mode(&mut self, view_mode: ViewMode) {
+        self.platform.view_mode = view_mode;
+        self.save();
     }
 
     //--__--__--__--__ Recarga y Guardado  __--__--__--__--__--__--__
@@ -132,8 +168,13 @@ impl ConfigManager {
         self.platform.i18n.switch_locale(locale);
     }
 
+    pub fn save(&mut self) {
+        self.is_dirty = true;
+        self.last_change = Some(Instant::now());
+    }
+
     #[must_use = "el resultado de save() debe comprobarse por si falla"]
-    pub fn save(&self) -> ConfigResult<()> {
+    pub fn force_save(&mut self) -> ConfigResult<()> {
         self.platform.save()
     }
 
@@ -141,5 +182,25 @@ impl ConfigManager {
     #[must_use = "el resultado de reload() debe comprobarse por si falla"]
     pub fn reload(&mut self) -> ConfigResult<()> {
         self.platform.load()
+    }
+
+    #[must_use = "el resultado de save() debe comprobarse por si falla"]
+    pub fn tick(&mut self) -> ConfigResult<()> {
+        if !self.is_dirty {
+            return Ok(());
+        }
+
+        let Some(last_change) = self.last_change else {
+            return Ok(());
+        };
+
+        if last_change.elapsed() >= self.debounce {
+            tracing::info!("Guardando...");
+            self.platform.save()?;
+            self.is_dirty = false;
+            self.last_change = None;
+        }
+
+        Ok(())
     }
 }

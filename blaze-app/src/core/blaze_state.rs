@@ -42,7 +42,9 @@ use crate::{
     ui::task_manager::tasks::TaskManager,
 };
 use bitvec::vec::BitVec;
+use egui::{pos2, Pos2};
 use parking_lot::Mutex;
+use serde::{Deserialize, Serialize};
 use std::{
     cell::{RefCell, RefMut},
     collections::HashSet,
@@ -61,11 +63,16 @@ use uuid::Uuid;
 // Para el guardado en caché
 static LAST_SAVE_REQUEST: AtomicU64 = AtomicU64::new(0);
 
-#[derive(PartialEq, Clone, Default)]
+#[derive(PartialEq, Clone, Serialize, Deserialize, Debug)]
+pub enum LayoutMode {
+    Row,
+    Grid,
+}
+
+#[derive(PartialEq, Clone, Serialize, Deserialize, Debug)]
 pub enum ViewMode {
-    #[default]
-    Normal,
-    Tags,
+    Normal(LayoutMode),
+    Tags(LayoutMode),
 }
 
 pub enum TagViewFilter {
@@ -89,6 +96,23 @@ pub struct RowView {
     pub first_visible: usize,
     pub last_visible: usize,
     pub viewport_height: f32,
+    pub icon_size: f32,
+}
+
+pub struct GridView {
+    pub is_dragging_files: bool,
+    pub drag_ghost_pos: Option<egui::Pos2>,
+    pub drop_target: Option<Arc<Path>>,
+    pub drop_invalid_target: Option<Arc<Path>>,
+    pub scroll_area_origin_y: f32,
+    pub first_visible: usize,
+    pub last_visible: usize,
+    pub viewport_height: f32,
+    pub cols: usize,
+    pub cell_size: f32,
+    pub actual_origin: Pos2,
+    pub row_height: f32,
+    pub icon_size: f32,
 }
 
 #[derive(Clone, PartialEq)]
@@ -136,6 +160,15 @@ impl BlazeCoreBuilder {
             rubber_band_start_content_y: 0.0,
         };
 
+        // Traer los tamaños desde las configs
+        let (row_icon_size, grid_icon_size, view_mode) = with_configs(|c| {
+            (
+                c.get_row_icon_size(),
+                c.get_grid_icon_size(),
+                c.get_view_mode(),
+            )
+        });
+
         let row_view = RowView {
             is_dragging_files: false,
             drag_ghost_pos: None,
@@ -145,6 +178,23 @@ impl BlazeCoreBuilder {
             first_visible: 0,
             last_visible: 0,
             viewport_height: 0.0,
+            icon_size: row_icon_size,
+        };
+
+        let grid_view = GridView {
+            is_dragging_files: false,
+            drag_ghost_pos: None,
+            drop_target: None,
+            drop_invalid_target: None,
+            scroll_area_origin_y: 0.0,
+            first_visible: 0,
+            last_visible: 0,
+            viewport_height: 0.0,
+            cols: 0,
+            cell_size: 0.0,
+            actual_origin: pos2(0.0, 0.0),
+            row_height: 0.0,
+            icon_size: grid_icon_size,
         };
 
         let file_opener_manager = GLOBAL_FILE_OPENER.clone();
@@ -170,6 +220,7 @@ impl BlazeCoreBuilder {
             scroll_offset: 0.0,
             rubber_band,
             row_view,
+            grid_view,
             renaming_file: None,
             rename_buffer: String::new(),
             creating_new: None,
@@ -192,7 +243,7 @@ impl BlazeCoreBuilder {
             cwd: PathBuf::new().into(),
             last_navigation_time: None,
             navigation_cooldown: Duration::from_millis(100),
-            view_mode: ViewMode::Normal,
+            view_mode,
             tag_filter: TagViewFilter::All { all_items_len: 0 },
         };
 
@@ -257,6 +308,7 @@ pub struct BlazeCoreState {
     pub scroll_offset: f32,
     pub rubber_band: RubberBand,
     pub row_view: RowView,
+    pub grid_view: GridView,
     pub renaming_file: Option<PathBuf>,
     pub rename_buffer: String,
     pub creating_new: Option<NewItemType>,
@@ -1074,7 +1126,12 @@ impl BlazeCoreState {
                 }
 
                 FileOperation::NavigateTo(path) => {
-                    self.view_mode = ViewMode::Normal;
+                    let current_layout = match &self.view_mode {
+                        ViewMode::Normal(layout) => layout,
+                        ViewMode::Tags(layout) => layout,
+                    };
+
+                    self.view_mode = ViewMode::Normal(current_layout.to_owned());
                     self.navigate_to(path);
                 }
 
