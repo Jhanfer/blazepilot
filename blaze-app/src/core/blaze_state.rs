@@ -492,6 +492,10 @@ impl BlazeCoreState {
         self.save_caches(false);
     }
 
+    pub fn can_go_up(&self) -> bool {
+        self.motor.borrow().active_tab().can_go_up()
+    }
+
     pub fn back(&mut self) {
         let dispatcher = with_event_bus(|e| e.dispatcher(self.active_id));
         let prev_dir = self.cwd.clone();
@@ -502,6 +506,10 @@ impl BlazeCoreState {
         self.save_caches(false);
     }
 
+    pub fn can_go_back(&self) -> bool {
+        self.motor.borrow().active_tab().can_go_back()
+    }
+
     pub fn forward(&mut self) {
         let dispatcher = with_event_bus(|e| e.dispatcher(self.active_id));
         let prev_dir = self.cwd.clone();
@@ -510,6 +518,10 @@ impl BlazeCoreState {
         dispatcher.send(SizerMessages::CancelAll).ok();
         self.refresh();
         self.save_caches(false);
+    }
+
+    pub fn can_go_forward(&self) -> bool {
+        self.motor.borrow().active_tab().can_go_forward()
     }
 
     pub fn refresh(&mut self) {

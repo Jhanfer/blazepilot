@@ -115,7 +115,7 @@ impl Default for LinuxConfigs {
         info!("Llamando i18n en default");
 
         Self {
-            app_ordering_mode: OrderingMode::Az,
+            app_ordering_mode: OrderingMode::default(),
             config_file_path: path,
             show_hidden_files: false,
             item_file_list_size: 10,

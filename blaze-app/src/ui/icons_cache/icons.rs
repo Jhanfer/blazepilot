@@ -31,6 +31,8 @@ pub const ICON_EXTERNAL_LINK: &[u8] = include_bytes!("../assets/icons/external-l
 pub const ICON_EDIT: &[u8] = include_bytes!("../assets/icons/edit.svg");
 pub const ICON_EDIT_DISABLE: &[u8] = include_bytes!("../assets/icons/edit-off.svg");
 pub const ICON_BELL: &[u8] = include_bytes!("../assets/icons/bell.svg");
+pub const ICON_LAYOUT_GRID: &[u8] = include_bytes!("../assets/icons/layout-grid.svg");
+pub const ICON_LAYOUT_LIST: &[u8] = include_bytes!("../assets/icons/layout-list.svg");
 
 //Iconos varios
 pub const ICON_HOME: &[u8] = include_bytes!("../assets/icons/home.svg");
@@ -65,3 +67,12 @@ pub const ICON_DATABASE: &[u8] = include_bytes!("../assets/icons/database.svg");
 pub const ICON_MUSIC: &[u8] = include_bytes!("../assets/icons/music.svg");
 pub const ICON_PUBLIC: &[u8] = include_bytes!("../assets/icons/users.svg");
 pub const ICON_TAG: &[u8] = include_bytes!("../assets/icons/tag.svg");
+pub const ICON_SEARCH: &[u8] = include_bytes!("../assets/icons/search.svg");
+pub const ICON_CALENDAR_UP: &[u8] = include_bytes!("../assets/icons/calendar-up.svg");
+pub const ICON_CALENDAR_DOWN: &[u8] = include_bytes!("../assets/icons/calendar-down.svg");
+pub const ICON_SORT_LETTERS_UP: &[u8] =
+    include_bytes!("../assets/icons/sort-ascending-letters.svg");
+pub const ICON_SORT_LETTERS_DOWN: &[u8] =
+    include_bytes!("../assets/icons/sort-descending-letters.svg");
+pub const ICON_SORT_SHAPES_UP: &[u8] = include_bytes!("../assets/icons/sort-ascending-2.svg");
+pub const ICON_SORT_SHAPES_DOWN: &[u8] = include_bytes!("../assets/icons/sort-descending-2.svg");

@@ -20,7 +20,8 @@ use crate::{
     ui::{
         blaze_ui_state::BlazeUiState,
         icons_cache::icons::{self},
-        themes::colors::{COLOR_BG_MAIN, COLOR_BG_PANEL},
+        modules::utilities::ensure_min_lightness,
+        themes::colors::*,
     },
 };
 use egui::{
@@ -34,13 +35,15 @@ fn render_bar_button<F>(
     label: &'static str,
     bytes: &[u8],
     ui_state: &mut BlazeUiState,
+    active: bool,
     mut callback: F,
 ) where
     F: FnMut(),
 {
     let ball_size = 35.0;
     Frame::new()
-        .fill(Color32::from_rgb(80, 40, 140))
+        .fill(COLOR_BG_PANEL)
+        .stroke(Stroke::new(0.5, COLOR_ACCENT_GLOW))
         .corner_radius(CornerRadius::same((ball_size / 1.5) as u8))
         .show(ui, |ui| {
             ui.set_width(ball_size);
@@ -57,22 +60,30 @@ fn render_bar_button<F>(
                 pos2(icon_rect.max.x.round(), icon_rect.max.y.round()),
             );
 
+            let color = if resp.hovered() && active {
+                ensure_min_lightness(COLOR_ACCENT_GLOW, 0.90)
+            } else if !active {
+                COLOR_TEXT_MUTED
+            } else {
+                Color32::WHITE
+            };
+
             let icon = ui_state
                 .icon_cache
-                .get_or_load(ui, label, bytes, Color32::WHITE, icon_size);
+                .get_or_load(ui, label, bytes, color, icon_size);
 
             ui.painter().image(
                 icon.id(),
                 rounded_rect,
                 Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
-                Color32::WHITE,
+                color,
             );
 
-            if resp.clicked() {
+            if resp.clicked() && active {
                 callback();
             }
 
-            if resp.hovered() {
+            if resp.hovered() && active {
                 ui.set_cursor_icon(egui::CursorIcon::PointingHand);
             }
         });
@@ -100,14 +111,19 @@ pub fn toolbar_component(ui: &mut Ui, state: &mut BlazeCoreState, ui_state: &mut
                         ui.set_height(total_height);
                         ui.set_width(ui.available_width());
 
+                        let back_active = state.can_go_back();
+
                         render_bar_button(
                             ui,
                             total_height,
                             "<",
                             icons::ICON_ARROW_LEFT,
                             ui_state,
+                            back_active,
                             || state.back(),
                         );
+
+                        let forward_active = state.can_go_forward();
 
                         render_bar_button(
                             ui,
@@ -115,8 +131,11 @@ pub fn toolbar_component(ui: &mut Ui, state: &mut BlazeCoreState, ui_state: &mut
                             ">",
                             icons::ICON_ARROW_RIGHT,
                             ui_state,
+                            forward_active,
                             || state.forward(),
                         );
+
+                        let up_active = state.can_go_up();
 
                         render_bar_button(
                             ui,
@@ -124,6 +143,7 @@ pub fn toolbar_component(ui: &mut Ui, state: &mut BlazeCoreState, ui_state: &mut
                             "UP",
                             icons::ICON_ARROW_UP,
                             ui_state,
+                            up_active,
                             || state.up(),
                         );
 
@@ -133,6 +153,7 @@ pub fn toolbar_component(ui: &mut Ui, state: &mut BlazeCoreState, ui_state: &mut
                             "⚙️",
                             icons::ICON_SETTINGS,
                             ui_state,
+                            true,
                             || {
                                 let tab_id = state.active_id;
                                 let dispatcher = with_event_bus(|e| e.dispatcher(tab_id));
@@ -141,7 +162,8 @@ pub fn toolbar_component(ui: &mut Ui, state: &mut BlazeCoreState, ui_state: &mut
                         );
 
                         Frame::new()
-                            .fill(Color32::from_rgb(80, 40, 140))
+                            .fill(COLOR_BG_PANEL)
+                            .stroke(Stroke::new(0.5, COLOR_ACCENT_GLOW))
                             .corner_radius(CornerRadius::same(20))
                             .show(ui, |ui| {
                                 ui.set_width(ui.available_width());

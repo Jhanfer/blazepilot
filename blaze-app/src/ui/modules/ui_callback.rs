@@ -33,7 +33,7 @@ pub fn connect_ui_components_callback(
     // -------------------------------
     //  sidebar right
     // -------------------------------
-    sidebar_right_component(ui, state, files);
+    sidebar_right_component(ui, state, ui_state, files);
 
     // -------------------------------
     //  file view

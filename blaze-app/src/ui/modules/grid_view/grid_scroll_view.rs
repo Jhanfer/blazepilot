@@ -17,7 +17,7 @@ use crate::{
         icons_cache::thumbnails::thumbnails_manager::Thumbnail,
         modules::{
             custom_context_menu::context_state::ContextMenuKind,
-            utilities::{git_dot_color, resolve_icon, text_color_for_git},
+            utilities::{ensure_min_lightness, git_dot_color, resolve_icon, text_color_for_git},
         },
         themes::colors::COLOR_MAIN_BUTTONS,
     },
@@ -610,11 +610,13 @@ pub fn render_grid_scrollview(
                         pos2(icon_rect.max.x.round(), icon_rect.max.y.round()),
                     );
 
+                    let normalized_color = ensure_min_lightness(color, 0.70);
+
                     let icon = ui_state.icon_cache.get_or_load(
                         ui,
                         &icon_name,
                         icon_bytes,
-                        color,
+                        normalized_color,
                         vec2(icon_size, icon_size),
                     );
                     ui.painter().image(
@@ -678,7 +680,7 @@ pub fn render_grid_scrollview(
 
                     let max_height = name_rect.height();
 
-                    if name_galley.size().y > max_height && !name_galley.is_empty() {
+                    if name_galley.size().y > max_height && !name_galley.rows.is_empty() {
                         let line_height = name_galley.size().y / name_galley.rows.len() as f32;
                         let max_lines = (max_height / line_height).floor() as usize;
                         let max_lines = max_lines.max(1);
@@ -686,19 +688,10 @@ pub fn render_grid_scrollview(
                         if name_galley.rows.len() > max_lines {
                             let last_row_idx = max_lines - 1;
 
-                            let mut byte_idx = 0;
-                            if let Some(glyph) = name_galley.rows[last_row_idx].glyphs.last() {
-                                byte_idx = glyph.chr.len_utf8();
-                            }
-
                             let mut absolute_byte_idx = 0;
                             for row_idx in 0..=last_row_idx {
-                                if row_idx < last_row_idx {
-                                    for glyph in &name_galley.rows[row_idx].glyphs {
-                                        absolute_byte_idx += glyph.chr.len_utf8();
-                                    }
-                                } else {
-                                    absolute_byte_idx += byte_idx;
+                                for glyph in &name_galley.rows[row_idx].glyphs {
+                                    absolute_byte_idx += glyph.chr.len_utf8();
                                 }
                             }
 
@@ -707,22 +700,31 @@ pub fn render_grid_scrollview(
                                 truncated.truncate(absolute_byte_idx);
                             }
 
-                            for _ in 0..3 {
-                                match truncated.pop() {
-                                    Some(_) => continue,
-                                    None => break,
-                                }
-                            }
                             truncated.push_str("...");
 
-                            name_galley = ui.fonts_mut(|f| {
-                                f.layout(
-                                    truncated,
-                                    FontId::proportional(name_font_size),
-                                    name_color,
-                                    name_rect.width(),
-                                )
-                            });
+                            let mut iterations = 0;
+                            while iterations < 10 {
+                                name_galley = ui.fonts_mut(|f| {
+                                    f.layout(
+                                        truncated.clone(),
+                                        FontId::proportional(name_font_size),
+                                        name_color,
+                                        name_rect.width(),
+                                    )
+                                });
+
+                                if name_galley.size().y <= max_height || truncated.len() <= 3 {
+                                    break;
+                                }
+
+                                truncated.pop();
+                                truncated.pop();
+                                truncated.pop();
+                                truncated.pop();
+                                truncated.push_str("...");
+
+                                iterations += 1;
+                            }
                         }
                     }
 
@@ -732,7 +734,7 @@ pub fn render_grid_scrollview(
                     ui.painter().with_clip_rect(name_rect).galley(
                         pos2(text_x, text_y),
                         name_galley,
-                        name_color,
+                        ensure_min_lightness(name_color, 0.90),
                     );
                 }
 

@@ -98,7 +98,7 @@ pub fn render_local_buttons(
     ui_state: &mut BlazeUiState,
 ) {
     let (rect, response) = ui.allocate_exact_size(
-        egui::vec2(ui.available_width(), 30.0),
+        egui::vec2(ui.available_width(), 35.0),
         Sense::click_and_drag(),
     );
 
@@ -165,7 +165,7 @@ pub fn render_drives_button(
     let is_removable = drive.is_removable;
     let is_system = drive.is_system;
 
-    let btn_h = if is_mounted { 50.0 } else { 30.0 };
+    let btn_h = if is_mounted { 50.0 } else { 35.0 };
 
     let (rect, response) =
         ui.allocate_exact_size(vec2(ui.available_width(), btn_h), Sense::click_and_drag());

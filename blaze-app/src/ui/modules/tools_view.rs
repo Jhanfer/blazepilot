@@ -9,7 +9,12 @@ use crate::{
         },
         system::trash_manager::manager::get_backend,
     },
-    ui::{blaze_ui_state::BlazeUiState, icons_cache::icons, themes::colors::*},
+    ui::{
+        blaze_ui_state::BlazeUiState,
+        icons_cache::icons::{self, ICON_LAYOUT_GRID, ICON_LAYOUT_LIST, ICON_TAG},
+        modules::utilities::ensure_min_lightness,
+        themes::colors::*,
+    },
 };
 use egui::{
     containers::Frame, pos2, vec2, Align, Color32, CornerRadius, CursorIcon, Layout, Margin, Rect,
@@ -18,8 +23,8 @@ use egui::{
 use std::sync::Arc;
 use tracing::warn;
 
-fn render_tag_button(ui: &mut Ui, state: &mut BlazeCoreState) {
-    let (rect_toggle, resp_toggle) = ui.allocate_exact_size(vec2(45.0, 25.0), Sense::click());
+fn render_tag_button(ui: &mut Ui, state: &mut BlazeCoreState, ui_state: &mut BlazeUiState) {
+    let (container_rect, resp_toggle) = ui.allocate_exact_size(vec2(50.0, 25.0), Sense::click());
 
     if resp_toggle.clicked() {
         state.view_mode = match &state.view_mode {
@@ -28,25 +33,93 @@ fn render_tag_button(ui: &mut Ui, state: &mut BlazeCoreState) {
         };
     }
 
-    let anim = ui.animate_bool(
-        "view_mode_toggle".into(),
-        state.view_mode == ViewMode::Tags(LayoutMode::Row)
-            || state.view_mode == ViewMode::Tags(LayoutMode::Grid),
-    );
-
-    let bg_color = COLOR_ACCENT_PURPLE;
-
-    ui.painter().rect_filled(rect_toggle, 20.0, bg_color);
-
-    let padding = 3.0;
-    let radius = (rect_toggle.height() / 2.0) - padding;
-    let x_left = rect_toggle.min.x + padding + radius;
-    let x_right = rect_toggle.max.x - padding - radius;
-    let cx = x_left + (x_right - x_left) * anim;
-    let cy = rect_toggle.center().y;
+    if resp_toggle.hovered() {
+        ui.set_cursor_icon(CursorIcon::PointingHand);
+    }
 
     ui.painter()
-        .circle_filled(pos2(cx, cy), radius, Color32::WHITE);
+        .rect_filled(container_rect, 20.0, COLOR_BG_CONTAINER);
+
+    let is_tags = matches!(
+        state.view_mode,
+        ViewMode::Tags(LayoutMode::Row) | ViewMode::Tags(LayoutMode::Grid)
+    );
+
+    let anim = ui.animate_bool_with_time("view_mode_toggle".into(), is_tags, 0.2);
+
+    let padding = 3.0;
+    let radius = (container_rect.height() / 2.0) - padding;
+
+    let x_left = container_rect.min.x + padding + radius;
+    let x_right = container_rect.max.x - padding - radius;
+    let cx = x_left + (x_right - x_left) * anim;
+
+    let stretch = anim * (1.0 - anim) * 4.0;
+    let capsule_width = radius * 2.0 * (1.0 + stretch * 0.8);
+    let capsule_height = radius * 2.0;
+
+    let capsule_rect = Rect::from_center_size(
+        pos2(cx, container_rect.center().y),
+        vec2(capsule_width, capsule_height),
+    );
+
+    ui.painter().rect_stroke(
+        capsule_rect,
+        radius,
+        Stroke::new(1.0, COLOR_ACCENT_GLOW),
+        egui::StrokeKind::Outside,
+    );
+
+    let icon_size = vec2(16.0, 16.0);
+
+    let icon1_rect = Rect::from_min_size(
+        pos2(
+            x_left - 7.5,
+            container_rect.center().y - (icon_size.y / 2.0),
+        ),
+        icon_size,
+    );
+
+    let icon2_rect = Rect::from_min_size(
+        pos2(
+            x_right - 6.5,
+            container_rect.center().y - (icon_size.y / 2.0),
+        ),
+        icon_size,
+    );
+
+    let icon1_name = match (&state.view_mode, is_tags) {
+        (ViewMode::Normal(LayoutMode::Row), _) => ("layout-list", ICON_LAYOUT_LIST),
+        (ViewMode::Normal(LayoutMode::Grid), _) => ("layout-grid", ICON_LAYOUT_GRID),
+        (ViewMode::Tags(LayoutMode::Row), _) => ("layout-row", ICON_LAYOUT_LIST),
+        (ViewMode::Tags(LayoutMode::Grid), _) => ("layout-grid", ICON_LAYOUT_GRID),
+    };
+
+    let icons = [
+        (icon1_name.0, icon1_name.1, icon1_rect, anim == 0.0),
+        ("tag", ICON_TAG, icon2_rect, anim == 1.0),
+    ];
+
+    for (name, bytes, rect, is_active) in icons {
+        let base_color = if is_active {
+            COLOR_ACCENT_GLOW
+        } else {
+            COLOR_TEXT_MUTED
+        };
+
+        let color = ensure_min_lightness(base_color, 0.70);
+
+        let icon = ui_state
+            .icon_cache
+            .get_or_load(ui, name, bytes, color, icon_size);
+
+        ui.painter().image(
+            icon.id(),
+            rect,
+            Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
+            Color32::WHITE,
+        );
+    }
 }
 
 pub fn tools(
@@ -98,7 +171,7 @@ pub fn tools(
                         ui,
                         icon_plus_fol,
                         icon_bytes_plus_fol,
-                        Color32::GRAY,
+                        ensure_min_lightness(Color32::GRAY, 0.70),
                         icon_size,
                     );
 
@@ -134,7 +207,7 @@ pub fn tools(
                         ui,
                         icon_plus_file,
                         icon_bytes_plus_file,
-                        Color32::GRAY,
+                        ensure_min_lightness(Color32::GRAY, 0.70),
                         icon_size,
                     );
 
@@ -190,7 +263,7 @@ pub fn tools(
                     ui,
                     icon_cut,
                     icon_bytes_cut,
-                    Color32::GRAY,
+                    ensure_min_lightness(Color32::GRAY, 0.70),
                     icon_size,
                 );
 
@@ -228,7 +301,7 @@ pub fn tools(
                     ui,
                     icon_copy,
                     icon_bytes_copy,
-                    Color32::GRAY,
+                    ensure_min_lightness(Color32::GRAY, 0.70),
                     icon_size,
                 );
 
@@ -266,7 +339,7 @@ pub fn tools(
                     ui,
                     icon_paste,
                     icon_bytes_paste,
-                    Color32::GRAY,
+                    ensure_min_lightness(Color32::GRAY, 0.70),
                     icon_size,
                 );
 
@@ -305,7 +378,7 @@ pub fn tools(
                     ui,
                     icon_trash,
                     icon_bytes_trash,
-                    Color32::GRAY,
+                    ensure_min_lightness(Color32::GRAY, 0.70),
                     icon_size,
                 );
 
@@ -368,7 +441,7 @@ pub fn tools(
                     ui,
                     icon_name,
                     icon_bytes,
-                    Color32::GRAY,
+                    ensure_min_lightness(Color32::GRAY, 0.70),
                     icon_size,
                 );
 
@@ -404,7 +477,7 @@ pub fn tools(
                     ui,
                     icon_refresh,
                     icon_bytes_refresh,
-                    Color32::GRAY,
+                    ensure_min_lightness(Color32::GRAY, 0.70),
                     icon_size,
                 );
 
@@ -427,7 +500,9 @@ pub fn tools(
 
                 ui.separator();
 
-                render_tag_button(ui, state);
+                ui.vertical(|ui| {
+                    render_tag_button(ui, state, ui_state);
+                });
 
                 ui.separator();
 
@@ -453,7 +528,7 @@ pub fn tools(
                         ui,
                         icon_refresh,
                         icon_bytes_refresh,
-                        Color32::GRAY,
+                        ensure_min_lightness(Color32::GRAY, 0.70),
                         icon_size,
                     );
 

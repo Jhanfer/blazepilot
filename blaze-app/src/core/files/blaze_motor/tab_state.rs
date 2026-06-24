@@ -22,8 +22,9 @@ use std::sync::{Arc, RwLock};
 use tracing::{debug, warn};
 use uuid::Uuid;
 
-use crate::core::bootstrap::configs::{
-    config_manager::with_configs, platform::linux::conf_structs::OrderingMode,
+use crate::core::bootstrap::configs::config_manager::with_configs;
+use crate::core::bootstrap::configs::platform::linux::conf_structs::{
+    OrderingDirection, OrderingKind,
 };
 use crate::core::files::blaze_motor::blaze_loader::BlazeLoader;
 use crate::core::files::blaze_motor::error::{MotorError, MotorResult};
@@ -187,7 +188,6 @@ impl BlazeTabState {
         let mode = with_configs(|c| c.get_ordering_mode());
 
         let file_guard = self.files.write().map_err(|_| MotorError::PoisonedLock)?;
-
         let mut indices_guard = self
             .sorted_indices
             .write()
@@ -196,43 +196,36 @@ impl BlazeTabState {
         let mut indices: Vec<usize> = (0..file_guard.len()).collect();
 
         indices.sort_by(|&a, &b| {
-            let entry_a = &file_guard[a];
-            let entry_b = &file_guard[b];
+            let (ea, eb) = (&file_guard[a], &file_guard[b]);
 
-            match (entry_a.is_dir(), entry_b.is_dir()) {
+            // Carpetas primero
+            match (ea.is_dir(), eb.is_dir()) {
                 (true, false) => return std::cmp::Ordering::Less,
                 (false, true) => return std::cmp::Ordering::Greater,
                 _ => {}
             }
 
-            if matches!(mode, OrderingMode::SizeAsc | OrderingMode::SizeDesc) {
-                let size_a = self.get_effective_size(entry_a, sizer_manager);
-                let size_b = self.get_effective_size(entry_b, sizer_manager);
+            let ord = match mode.kind {
+                OrderingKind::Size => {
+                    let (sa, sb) = (
+                        self.get_effective_size(ea, sizer_manager),
+                        self.get_effective_size(eb, sizer_manager),
+                    );
+                    sa.cmp(&sb)
+                }
+                OrderingKind::Name => ea.name.to_lowercase().cmp(&eb.name.to_lowercase()),
+                OrderingKind::Date => ea.modified.cmp(&eb.modified),
+            };
 
-                if matches!(mode, OrderingMode::SizeAsc) {
-                    size_a.cmp(&size_b)
-                } else {
-                    size_b.cmp(&size_a)
-                }
+            // Invertir si es descendente
+            if mode.direction == OrderingDirection::Desc {
+                ord.reverse()
             } else {
-                match mode {
-                    OrderingMode::Az => entry_a
-                        .name
-                        .to_lowercase()
-                        .cmp(&entry_b.name.to_lowercase()),
-                    OrderingMode::Za => entry_b
-                        .name
-                        .to_lowercase()
-                        .cmp(&entry_a.name.to_lowercase()),
-                    OrderingMode::DateAsc => entry_a.modified.cmp(&entry_b.modified),
-                    OrderingMode::DateDesc => entry_b.modified.cmp(&entry_a.modified),
-                    _ => std::cmp::Ordering::Equal,
-                }
+                ord
             }
         });
 
         *indices_guard = indices;
-
         Ok(())
     }
 
@@ -561,6 +554,21 @@ impl BlazeTabState {
         if let Some(next) = self.future.pop() {
             self.history.push(self.cwd.clone());
             self.cwd = next;
+        }
+    }
+
+    pub fn can_go_back(&self) -> bool {
+        !self.history.is_empty()
+    }
+
+    pub fn can_go_forward(&self) -> bool {
+        !self.future.is_empty()
+    }
+
+    pub fn can_go_up(&self) -> bool {
+        match self.cwd.parent() {
+            Some(parent) => parent != self.cwd.iter().as_path(),
+            None => false,
         }
     }
 }

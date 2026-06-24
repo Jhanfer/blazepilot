@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use egui::TextureHandle;
+use egui::{Color32, TextureHandle};
+use file_id::FileId;
 use std::{
     collections::{HashMap, HashSet},
     path::Path,
@@ -51,6 +52,7 @@ pub struct BlazeUiState {
     pub needs_repaint: bool,
     pub newly_calculated_thumbnails: HashSet<Arc<Path>>,
     last_thumb_cache_dir: Option<Arc<Path>>,
+    pub color_snapshot: HashMap<FileId, Color32>,
 }
 
 impl Default for BlazeUiState {
@@ -74,6 +76,7 @@ impl BlazeUiState {
             needs_repaint: false,
             newly_calculated_thumbnails: HashSet::new(),
             last_thumb_cache_dir: None,
+            color_snapshot: HashMap::new(),
         }
     }
 

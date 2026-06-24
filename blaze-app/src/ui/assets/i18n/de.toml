@@ -18,13 +18,13 @@ disks = "Laufwerke"
 
 [right_sidebar]
 info = "Informationen"
-ext = "Erweiterung: {query}"
-type = "Typ: {query}"
-size = "Größe: {query}"
-owner = "Besitzer: {query}"
-group_name = "Gruppenname: {query}"
-dimensions = "Abmessungen: {w} x {h}"
-git_status = "Git-Status: {query}"
+ext = "Erweiterung:"
+type = "Typ:"
+size = "Größe:"
+owner = "Besitzer:"
+group_name = "Gruppenname:"
+dimensions = "Abmessungen:"
+git_status = "Git-Status:"
 
 [search]
 placeholder = "Dateien suchen..."

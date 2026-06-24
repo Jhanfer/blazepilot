@@ -1,15 +1,26 @@
 use serde::{Deserialize, Serialize};
 
 //--__--__--__--__ Modo de ordenado __--__--__--__--__--__--__
-#[derive(Serialize, Deserialize, Debug, Default, Clone, PartialEq)]
-pub enum OrderingMode {
+
+#[derive(Serialize, Deserialize, Debug, Default, Clone, PartialEq, Copy)]
+pub enum OrderingKind {
     #[default]
-    Az,
-    Za,
-    SizeAsc,
-    SizeDesc,
-    DateAsc,
-    DateDesc,
+    Name,
+    Size,
+    Date,
+}
+
+#[derive(Serialize, Deserialize, Debug, Default, Clone, PartialEq, Copy)]
+pub enum OrderingDirection {
+    #[default]
+    Asc,
+    Desc,
+}
+
+#[derive(Serialize, Deserialize, Debug, Default, Clone, PartialEq, Copy)]
+pub struct OrderingMode {
+    pub kind: OrderingKind,
+    pub direction: OrderingDirection,
 }
 
 //--__--__--__--__ Backends  __--__--__--__--__--__--__

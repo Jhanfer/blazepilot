@@ -89,6 +89,7 @@ pub fn sidebar_left_component(
                                         ui,
                                         ui_state,
                                     );
+                                    ui.add_space(2.0);
                                 }
                             }
 
@@ -113,6 +114,7 @@ pub fn sidebar_left_component(
                             ui.vertical(|ui| {
                                 for drive in drives {
                                     render_drives_button(ui, state, drive, ui_state);
+                                    ui.add_space(2.0);
                                 }
                             });
 

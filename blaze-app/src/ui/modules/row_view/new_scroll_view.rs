@@ -2,7 +2,8 @@ use crate::{
     core::{
         blaze_state::BlazeCoreState,
         bootstrap::configs::{
-            config_manager::with_configs, platform::linux::conf_structs::OrderingMode,
+            config_manager::with_configs,
+            platform::linux::conf_structs::{OrderingDirection, OrderingKind, OrderingMode},
         },
         files::blaze_motor::motor_structs::FileEntry,
         runtime::{
@@ -19,7 +20,7 @@ use crate::{
         icons_cache::thumbnails::thumbnails_manager::Thumbnail,
         modules::{
             custom_context_menu::context_state::ContextMenuKind,
-            utilities::{git_dot_color, resolve_icon, text_color_for_git},
+            utilities::{ensure_min_lightness, git_dot_color, resolve_icon, text_color_for_git},
         },
         themes::colors::COLOR_MAIN_BUTTONS,
     },
@@ -30,7 +31,6 @@ use egui::{
     Key, Modifiers, PointerButton, Rect, RichText, ScrollArea, Sense, Stroke, StrokeKind, TextEdit,
     TextureOptions, Ui,
 };
-use file_id::FileId;
 use std::{collections::HashMap, path::Path, sync::Arc};
 use tracing::info;
 
@@ -280,11 +280,13 @@ pub fn new_render_scrollview(
 
     // Botón Nombre
     let name_btn_rect = Rect::from_min_size(header_rect.min, vec2(name_w, header_height));
-    let name_label = match current_order {
-        OrderingMode::Az => format!("{} ↑", i18n.t("tools.name")),
-        OrderingMode::Za => format!("{} ↓", i18n.t("tools.name")),
+
+    let name_label = match (current_order.kind, current_order.direction) {
+        (OrderingKind::Name, OrderingDirection::Asc) => format!("{} ↑", i18n.t("tools.name")),
+        (OrderingKind::Name, OrderingDirection::Desc) => format!("{} ↓", i18n.t("tools.name")),
         _ => i18n.t("tools.name").to_string(),
     };
+
     if ui
         .put(
             name_btn_rect,
@@ -298,9 +300,15 @@ pub fn new_render_scrollview(
         .clicked()
     {
         with_configs(|c| {
-            c.set_ordering_mode(match current_order {
-                OrderingMode::Az => OrderingMode::Za,
-                _ => OrderingMode::Az,
+            c.set_ordering_mode(match (current_order.kind, current_order.direction) {
+                (OrderingKind::Name, OrderingDirection::Asc) => OrderingMode {
+                    kind: OrderingKind::Name,
+                    direction: OrderingDirection::Desc,
+                },
+                _ => OrderingMode {
+                    kind: OrderingKind::Name,
+                    direction: OrderingDirection::Asc,
+                },
             });
         });
         state.refresh();
@@ -310,11 +318,13 @@ pub fn new_render_scrollview(
     let date_x = header_rect.min.x + name_w;
     let date_btn_rect =
         Rect::from_min_size(pos2(date_x, header_rect.min.y), vec2(date_w, header_height));
-    let date_label = match current_order {
-        OrderingMode::DateAsc => format!("{} ↑", i18n.t("tools.modified")),
-        OrderingMode::DateDesc => format!("{} ↓", i18n.t("tools.modified")),
+
+    let date_label = match (current_order.kind, current_order.direction) {
+        (OrderingKind::Date, OrderingDirection::Asc) => format!("{} ↑", i18n.t("tools.modified")),
+        (OrderingKind::Date, OrderingDirection::Desc) => format!("{} ↓", i18n.t("tools.modified")),
         _ => i18n.t("tools.modified").to_string(),
     };
+
     if ui
         .put(
             date_btn_rect,
@@ -328,9 +338,15 @@ pub fn new_render_scrollview(
         .clicked()
     {
         with_configs(|c| {
-            c.set_ordering_mode(match current_order {
-                OrderingMode::DateAsc => OrderingMode::DateDesc,
-                _ => OrderingMode::DateAsc,
+            c.set_ordering_mode(match (current_order.kind, current_order.direction) {
+                (OrderingKind::Date, OrderingDirection::Asc) => OrderingMode {
+                    kind: OrderingKind::Date,
+                    direction: OrderingDirection::Desc,
+                },
+                _ => OrderingMode {
+                    kind: OrderingKind::Date,
+                    direction: OrderingDirection::Asc,
+                },
             });
         });
         state.refresh();
@@ -340,11 +356,13 @@ pub fn new_render_scrollview(
     let size_x = date_x + date_w;
     let size_btn_rect =
         Rect::from_min_size(pos2(size_x, header_rect.min.y), vec2(size_w, header_height));
-    let size_label = match current_order {
-        OrderingMode::SizeAsc => format!("{} ↑", i18n.t("tools.size")),
-        OrderingMode::SizeDesc => format!("{} ↓", i18n.t("tools.size")),
+
+    let size_label = match (current_order.kind, current_order.direction) {
+        (OrderingKind::Size, OrderingDirection::Asc) => format!("{} ↑", i18n.t("tools.size")),
+        (OrderingKind::Size, OrderingDirection::Desc) => format!("{} ↓", i18n.t("tools.size")),
         _ => i18n.t("tools.size").to_string(),
     };
+
     if ui
         .put(
             size_btn_rect,
@@ -358,9 +376,15 @@ pub fn new_render_scrollview(
         .clicked()
     {
         with_configs(|c| {
-            c.set_ordering_mode(match current_order {
-                OrderingMode::SizeAsc => OrderingMode::SizeDesc,
-                _ => OrderingMode::SizeAsc,
+            c.set_ordering_mode(match (current_order.kind, current_order.direction) {
+                (OrderingKind::Size, OrderingDirection::Asc) => OrderingMode {
+                    kind: OrderingKind::Size,
+                    direction: OrderingDirection::Desc,
+                },
+                _ => OrderingMode {
+                    kind: OrderingKind::Size,
+                    direction: OrderingDirection::Asc,
+                },
             });
         });
         state.refresh();
@@ -435,7 +459,7 @@ pub fn new_render_scrollview(
             }
         };
 
-        let color_snapshot: HashMap<FileId, Color32> = {
+        ui_state.color_snapshot = {
             match ui_state
                 .folder_color_manager
                 .cache_manager
@@ -641,16 +665,19 @@ pub fn new_render_scrollview(
             {
                 should_repaint = true;
             } else {
-                let (icon_name, icon_bytes, color) = resolve_icon(file, &color_snapshot);
+                let (icon_name, icon_bytes, color) = resolve_icon(file, &ui_state.color_snapshot);
                 let rounded_rect = Rect::from_min_max(
                     pos2(icon_rect.min.x.round(), icon_rect.min.y.round()),
                     pos2(icon_rect.max.x.round(), icon_rect.max.y.round()),
                 );
+
+                let normalized_color = ensure_min_lightness(color, 0.70);
+
                 let icon = ui_state.icon_cache.get_or_load(
                     ui,
                     &icon_name,
                     icon_bytes,
-                    color,
+                    normalized_color,
                     vec2(icon_size, icon_size),
                 );
 
@@ -712,7 +739,7 @@ pub fn new_render_scrollview(
             name_painter.galley(
                 pos2(name_start_x, rect.center().y - name_galley.size().y / 2.0),
                 name_galley,
-                name_color,
+                ensure_min_lightness(name_color, 0.90),
             );
 
             // Columna Modified
@@ -791,7 +818,7 @@ pub fn new_render_scrollview(
         ui_state.context_menu_state = ctx_menu;
 
         if ui_state.needs_repaint || should_repaint {
-            ui.ctx().request_repaint();
+            ui.request_repaint();
             ui_state.needs_repaint = false;
         }
 

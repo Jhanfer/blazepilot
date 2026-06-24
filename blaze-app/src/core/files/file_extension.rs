@@ -155,12 +155,24 @@ impl FileExtension {
             return Self::Archive(ArchiveType::TarBz2);
         }
 
-        match path
-            .extension()
-            .and_then(|e| e.to_str())
-            .map(|e| e.to_ascii_lowercase())
-            .as_deref()
-        {
+        let file_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+
+        let ext = if file_name.starts_with('.') {
+            file_name.find('.').and_then(|i| {
+                let after = &file_name[i + 1..];
+                if after.is_empty() {
+                    None
+                } else {
+                    Some(after)
+                }
+            })
+        } else {
+            path.extension().and_then(|e| e.to_str())
+        };
+
+        let ext = ext.map(|e| e.to_ascii_lowercase());
+
+        match ext.as_deref() {
             Some("pdf") => Self::Document(DocType::Pdf),
             Some("doc") => Self::Document(DocType::Doc),
             Some("docx") => Self::Document(DocType::Docx),
