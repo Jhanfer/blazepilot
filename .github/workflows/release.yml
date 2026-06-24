@@ -4,6 +4,14 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_call:
+    outputs:
+      sha256:
+        value: ${{ jobs.build-linux.outputs.sha256 }}
+      file:
+        value: ${{ jobs.build-linux.outputs.file }}
+      version:
+        value: ${{ jobs.build-linux.outputs.version }}
 
 permissions:
   contents: write
@@ -11,6 +19,10 @@ permissions:
 jobs:
   build-linux:
     runs-on: ubuntu-22.04
+    outputs:
+      file: ${{ steps.rename.outputs.file }}
+      sha256: ${{ steps.checksum.outputs.sha256 }}
+      version: ${{ steps.rename.outputs.version }}
 
     steps:
       - name: Checkout código
@@ -62,6 +74,15 @@ jobs:
           cp target/x86_64-unknown-linux-gnu/release/blazepilot "./$FILE"
           echo "file=$FILE" >> "$GITHUB_OUTPUT"
 
+      - name: Generar checksum SHA-256
+              id: checksum
+              run: |
+                FILE="${{ steps.rename.outputs.file }}"
+                sha256sum "$FILE" > "${FILE}.sha256"
+                HASH=$(cut -d' ' -f1 "${FILE}.sha256")
+                echo "sha256=$HASH" >> "$GITHUB_OUTPUT"
+                echo "✅ SHA-256: $HASH"
+
       - name: Generar Release Notes
         id: changelog
         run: |
@@ -102,7 +123,9 @@ jobs:
       - name: Subir binario al Release
         uses: softprops/action-gh-release@v2
         with:
-          files: ${{ steps.rename.outputs.file }}
+          files: | 
+            ${{ steps.rename.outputs.file }}
+            ${{ steps.rename.outputs.file }}.sha256
           tag_name: ${{ github.ref_name }}
           name: BlazePilot ${{ github.ref_name }}
           body: ${{ steps.changelog.outputs.body }}
