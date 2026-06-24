@@ -19,14 +19,16 @@ use crate::core::system::{
 };
 use egui::Color32;
 use file_id::FileId;
+
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{
     collections::{HashMap, HashSet},
     hash::Hash,
     path::Path,
-    sync::{Arc, OnceLock, RwLock},
+    sync::{Arc, OnceLock},
 };
-use tokio::sync::RwLock as AsyncRwLock;
+
+use parking_lot::RwLock;
 use tracing::error;
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
@@ -38,11 +40,10 @@ pub struct SizeCache {
 static CACHE_MANAGER: OnceLock<CacheManager> = OnceLock::new();
 pub struct CacheManager {
     pub cache_dir: Arc<Path>,
-    pub size_cache: AsyncRwLock<HashMap<String, SizeCache>>,
+    pub size_cache: RwLock<HashMap<String, SizeCache>>,
     pub invalidated: RwLock<HashSet<String>>,
-
-    pub extended_info_cache: AsyncRwLock<HashMap<String, ExtendedInfoCache>>,
-    pub color_cache: AsyncRwLock<HashMap<FileId, ColorCache>>,
+    pub extended_info_cache: RwLock<HashMap<String, ExtendedInfoCache>>,
+    pub color_cache: RwLock<HashMap<FileId, ColorCache>>,
 }
 
 impl CacheManager {
@@ -53,25 +54,25 @@ impl CacheManager {
         CACHE_MANAGER.get_or_init(|| Self {
             cache_dir,
             invalidated: RwLock::new(HashSet::new()),
-            size_cache: AsyncRwLock::new(HashMap::new()),
-            color_cache: AsyncRwLock::new(HashMap::new()),
-            extended_info_cache: AsyncRwLock::new(HashMap::new()),
+            size_cache: RwLock::new(HashMap::new()),
+            color_cache: RwLock::new(HashMap::new()),
+            extended_info_cache: RwLock::new(HashMap::new()),
         })
     }
 
     pub fn invalidate(&self, path: &Path) {
         let key = path.to_string_lossy().into_owned();
-        self.invalidated.write().unwrap().insert(key);
+        self.invalidated.write().insert(key);
     }
 
     pub fn is_invalidated(&self, path: &Path) -> bool {
         let key = path.to_string_lossy();
-        self.invalidated.read().unwrap().contains(key.as_ref())
+        self.invalidated.read().contains(key.as_ref())
     }
 
     pub fn clear_invalidated(&self, path: &Path) {
         let key = path.to_string_lossy().into_owned();
-        self.invalidated.write().unwrap().remove(&key);
+        self.invalidated.write().remove(&key);
     }
 
     async fn load_cache<K, T>(&self, filename: &str) -> Option<HashMap<K, T>>
@@ -131,30 +132,25 @@ impl CacheManager {
             .load_cache::<String, SizeCache>("cache_sizes.bin")
             .await
         {
-            let mut guard = self.size_cache.write().await;
+            let mut guard = self.size_cache.write();
             *guard = cache;
         }
     }
 
     pub async fn save_size_cache(&self) {
-        let data_to_save = self.size_cache.read().await.clone();
+        let data_to_save = self.size_cache.read().clone();
         self.save_cache("cache_sizes.bin", &data_to_save).await;
     }
 
-    pub async fn update_cache_size(&self, path: String, size: u64, modified: u64) {
+    pub fn update_cache_size(&self, path: String, size: u64, modified: u64) {
         self.size_cache
             .write()
-            .await
             .insert(path, SizeCache { size, modified });
     }
 
     pub fn get_cached_size(&self, path: &Path) -> Option<u64> {
         let key = path.to_string_lossy();
-        self.size_cache
-            .try_read()
-            .ok()?
-            .get(key.as_ref())
-            .map(|c| c.size)
+        self.size_cache.read().get(key.as_ref()).map(|c| c.size)
     }
 
     ///------ Colores ----    
@@ -163,14 +159,14 @@ impl CacheManager {
             .load_cache::<FileId, ColorCache>("color_cache.bin")
             .await
         {
-            let mut guard = self.color_cache.write().await;
+            let mut guard = self.color_cache.write();
             *guard = cache;
         }
     }
 
     pub async fn save_color_cache(&self) {
         let data_to_save = {
-            let guard = self.color_cache.read().await;
+            let guard = self.color_cache.read();
             guard.clone()
         };
         self.save_cache("color_cache.bin", &data_to_save).await;
@@ -179,15 +175,14 @@ impl CacheManager {
     pub async fn update_color_cache(&self, file_id: FileId, new_color: Color32) {
         self.color_cache
             .write()
-            .await
             .insert(file_id, ColorCache { color: new_color });
     }
 
     pub fn get_cached_color(&self, file_id: &FileId) -> Color32 {
-        self.color_cache
-            .try_read()
-            .ok()
-            .and_then(|guard| guard.get(file_id).map(|c| c.color))
+        let guard = self.color_cache.read();
+        guard
+            .get(file_id)
+            .map(|c| c.color)
             .unwrap_or(Color32::YELLOW)
     }
 
@@ -197,14 +192,14 @@ impl CacheManager {
             .load_cache::<String, ExtendedInfoCache>("cache_extended_info.bin")
             .await
         {
-            let mut guard = self.extended_info_cache.write().await;
+            let mut guard = self.extended_info_cache.write();
             *guard = cache;
         }
     }
 
     pub async fn save_extended_info_cache(&self) {
         let data_to_save = {
-            let guard = self.extended_info_cache.read().await;
+            let guard = self.extended_info_cache.read();
             guard.clone()
         };
         self.save_cache("cache_extended_info.bin", &data_to_save)
@@ -212,15 +207,11 @@ impl CacheManager {
     }
 
     pub async fn update_extended_info_cache(&self, path: String, info: ExtendedInfoCache) {
-        self.extended_info_cache.write().await.insert(path, info);
+        self.extended_info_cache.write().insert(path, info);
     }
 
     pub fn get_cached_extended_info(&self, path: &Path) -> Option<ExtendedInfoCache> {
         let key = path.to_string_lossy();
-        self.extended_info_cache
-            .try_read()
-            .ok()?
-            .get(key.as_ref())
-            .cloned()
+        self.extended_info_cache.read().get(key.as_ref()).cloned()
     }
 }

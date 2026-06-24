@@ -379,23 +379,21 @@ pub fn render_grid_scrollview(
         };
 
         let color_snapshot: HashMap<FileId, Color32> = {
-            match ui_state
+            let guard = ui_state
                 .folder_color_manager
                 .cache_manager
                 .color_cache
-                .try_read()
-            {
-                Ok(guard) => file_indices
-                    .iter()
-                    .filter_map(|&i| {
-                        files[i]
-                            .unique_id
-                            .as_ref()
-                            .and_then(|id| guard.get(id).map(|c| (*id, c.color)))
-                    })
-                    .collect(),
-                Err(_) => HashMap::new(),
-            }
+                .read();
+
+            file_indices
+                .iter()
+                .filter_map(|&i| {
+                    files[i]
+                        .unique_id
+                        .as_ref()
+                        .and_then(|id| guard.get(id).map(|c| (*id, c.color)))
+                })
+                .collect()
         };
 
         let thumbnail_snapshot: HashMap<Arc<Path>, Thumbnail> = {

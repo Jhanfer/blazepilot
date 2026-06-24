@@ -527,6 +527,8 @@ impl BlazeCoreState {
     pub fn refresh(&mut self) {
         self.clean_search();
         let dispatcher = with_event_bus(|e| e.dispatcher(self.active_id));
+        dispatcher.send(SizerMessages::CancelAll).ok();
+
         let new_cwd = {
             let mut motor = self.motor.borrow_mut();
             let tab = motor.active_tab_mut();
@@ -535,6 +537,7 @@ impl BlazeCoreState {
             }
             tab.cwd.clone()
         };
+
         self.calculating_dir_sizes.clear();
         self.calculated_dir_sizes.clear();
         self.calculating_extended_info.clear();

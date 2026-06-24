@@ -117,10 +117,10 @@ impl SizerManager {
                     let cache_valid = if force {
                         false
                     } else {
-                        cm.size_cache
-                            .try_read()
-                            .ok()
-                            .and_then(|g| g.get(key.as_ref()).map(|c| c.modified == current_mtime))
+                        let guard = cm.size_cache.read();
+                        guard
+                            .get(key.as_ref())
+                            .map(|c| c.modified == current_mtime)
                             .unwrap_or(false)
                     };
 
@@ -162,13 +162,11 @@ impl SizerManager {
 
                                 match result {
                                     Ok(Ok(size)) => {
-                                        CacheManager::global()
-                                            .update_cache_size(
-                                                path_to_task.to_string_lossy().into_owned(),
-                                                size,
-                                                mtime_to_task,
-                                            )
-                                            .await;
+                                        CacheManager::global().update_cache_size(
+                                            path_to_task.to_string_lossy().into_owned(),
+                                            size,
+                                            mtime_to_task,
+                                        );
 
                                         sender_clone
                                             .send(FileOperation::UpdateDirSize {

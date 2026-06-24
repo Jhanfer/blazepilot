@@ -357,16 +357,11 @@ impl ExtendedInfoManager {
                     let cache_valid = if is_dir {
                         false
                     } else {
-                        match cm.extended_info_cache.try_read() {
-                            Ok(g) => g
-                                .get(key.as_ref())
-                                .map(|c| c.modified == current_mtime)
-                                .unwrap_or(false),
-                            Err(e) => {
-                                warn!("No se ha podido validar la caché de 'ExtendedInfo': {}", e);
-                                false
-                            }
-                        }
+                        let guard = cm.extended_info_cache.read();
+                        guard
+                            .get(key.as_ref())
+                            .map(|c| c.modified == current_mtime)
+                            .unwrap_or(false)
                     };
 
                     if cache_valid {

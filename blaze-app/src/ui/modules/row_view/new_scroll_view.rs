@@ -460,23 +460,21 @@ pub fn new_render_scrollview(
         };
 
         ui_state.color_snapshot = {
-            match ui_state
+            let guard = ui_state
                 .folder_color_manager
                 .cache_manager
                 .color_cache
-                .try_read()
-            {
-                Ok(guard) => row_range
-                    .clone()
-                    .filter_map(|i| {
-                        files[i]
-                            .unique_id
-                            .as_ref()
-                            .and_then(|id| guard.get(id).map(|c| (*id, c.color)))
-                    })
-                    .collect(),
-                Err(_) => HashMap::new(),
-            }
+                .read();
+
+            row_range
+                .clone()
+                .filter_map(|i| {
+                    files[i]
+                        .unique_id
+                        .as_ref()
+                        .and_then(|id| guard.get(id).map(|c| (*id, c.color)))
+                })
+                .collect()
         };
 
         let thumbnail_snapshot: HashMap<Arc<Path>, Thumbnail> = {
@@ -771,9 +769,7 @@ pub fn new_render_scrollview(
                 pos2(rect.max.x, rect.max.y),
             );
             let display_size = if file.is_dir() {
-                if state.calculating_dir_sizes.contains(&file.full_path) {
-                    None
-                } else if state.calculated_dir_sizes.contains(&file.full_path) {
+                if state.calculated_dir_sizes.contains(&file.full_path) {
                     Some(file.size)
                 } else {
                     state
