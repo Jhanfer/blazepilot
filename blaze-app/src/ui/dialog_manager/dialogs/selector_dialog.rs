@@ -32,7 +32,10 @@ use crate::{
             GLOBAL_FILE_OPENER,
         },
     },
-    ui::{dialog_manager::manager::ModalDialog, themes::colors::COLOR_BG_MAIN},
+    ui::{
+        dialog_manager::manager::ModalDialog,
+        themes::{platform::structs::ToColor, theme_manager::with_theme},
+    },
 };
 
 pub enum SelectorState {
@@ -312,8 +315,10 @@ impl AppSelectorDialog {
                 false
             }
             Some(SelectorState::Ready(data)) => {
+                let current_theme = with_theme(|t| t.current());
+
                 let custom_frame = Frame::NONE
-                    .fill(COLOR_BG_MAIN)
+                    .fill(current_theme.bg_main.to_color())
                     .inner_margin(Margin::same(20));
                 let file_name = data
                     .path
@@ -339,7 +344,11 @@ impl AppSelectorDialog {
                         let height = 320.0;
 
                         ScrollArea::vertical().max_height(height).show(ui, |ui| {
-                            ui.label(RichText::new("Recomendadas").strong());
+                            ui.label(
+                                RichText::new("Recomendadas")
+                                    .color(current_theme.text_primary.to_color())
+                                    .strong(),
+                            );
                             ui.add_space(6.0);
 
                             for (i, app) in data.apps.iter().enumerate() {
@@ -353,7 +362,11 @@ impl AppSelectorDialog {
                             ui.separator();
                             ui.add_space(12.0);
 
-                            ui.label(egui::RichText::new("Todas las apps").strong());
+                            ui.label(
+                                RichText::new("Todas las apps")
+                                    .color(current_theme.text_primary.to_color())
+                                    .strong(),
+                            );
                             ui.add_space(6.0);
 
                             for (i, app) in data.apps.iter().enumerate() {

@@ -13,17 +13,16 @@
 // limitations under the License.
 
 use crate::core::bootstrap::install_manager::installation_manager::InstallResult;
-use crate::ui::dialog_manager::manager::ModalDialog;
-use crate::{
-    core::{
-        bootstrap::{
-            configs::config_manager::with_configs,
-            install_manager::installation_manager::with_installation_manager,
-        },
-        runtime::{bus_structs::UiEvent, event_bus::Dispatcher},
+use crate::core::{
+    bootstrap::{
+        configs::config_manager::with_configs,
+        install_manager::installation_manager::with_installation_manager,
     },
-    ui::themes::colors::COLOR_BG_MAIN,
+    runtime::{bus_structs::UiEvent, event_bus::Dispatcher},
 };
+use crate::ui::dialog_manager::manager::ModalDialog;
+use crate::ui::themes::platform::structs::ToColor;
+use crate::ui::themes::theme_manager::with_theme;
 use egui::{CornerRadius, Frame, Margin, Order, Ui, Window};
 
 pub struct WantToInstallDialog {
@@ -56,9 +55,11 @@ impl WantToInstallDialog {
     }
 
     pub fn render_dialog(&mut self, ui: &mut Ui) -> bool {
+        let current_theme = with_theme(|t| t.current());
+
         let mut should_close = false;
         let custom_frame = Frame::NONE
-            .fill(COLOR_BG_MAIN)
+            .fill(current_theme.bg_main.to_color())
             .corner_radius(CornerRadius::same(10))
             .inner_margin(Margin::same(10));
 

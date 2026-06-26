@@ -14,7 +14,10 @@
 
 use crate::{
     core::runtime::{bus_structs::FileOperation, event_bus::Dispatcher},
-    ui::{dialog_manager::manager::ModalDialog, themes::colors::COLOR_BG_MAIN},
+    ui::{
+        dialog_manager::manager::ModalDialog,
+        themes::{platform::structs::ToColor, theme_manager::with_theme},
+    },
 };
 use egui::{CornerRadius, Frame, Margin, Order, RichText, Ui, Window};
 use std::{path::Path, sync::Arc};
@@ -57,6 +60,8 @@ impl SureToMoveToDialog {
     }
 
     pub fn render_dialog(&mut self, ui: &mut Ui) -> bool {
+        let current_theme = with_theme(|t| t.current());
+
         let mut should_close = false;
 
         let (Some(sources), Some(dest)) = (self.sources.as_ref(), self.dest.as_ref()) else {
@@ -64,7 +69,7 @@ impl SureToMoveToDialog {
         };
 
         let custom_frame = Frame::NONE
-            .fill(COLOR_BG_MAIN)
+            .fill(current_theme.bg_main.to_color())
             .corner_radius(CornerRadius::same(10))
             .inner_margin(Margin::same(10));
 
@@ -104,6 +109,7 @@ impl SureToMoveToDialog {
                     }
                     ui.label(
                         RichText::new(format!("...y {} archivos más", total - MAX_SHOWN))
+                            .color(current_theme.text_primary.to_color())
                             .weak()
                             .italics(),
                     );

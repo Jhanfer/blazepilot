@@ -12,7 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::ui::{dialog_manager::manager::ModalDialog, themes::colors::COLOR_BG_MAIN};
+use crate::ui::{
+    dialog_manager::manager::ModalDialog,
+    themes::{platform::structs::ToColor, theme_manager::with_theme},
+};
 use egui::{CornerRadius, Frame, Margin, Order, Ui, Window};
 
 pub struct ErrorDialog {
@@ -50,6 +53,7 @@ impl ErrorDialog {
     }
 
     pub fn render_dialog(&mut self, ui: &mut Ui) -> bool {
+        let current_theme = with_theme(|t| t.current());
         let mut should_close = false;
 
         let Some(message) = self.message.as_ref() else {
@@ -57,7 +61,7 @@ impl ErrorDialog {
         };
 
         let custom_frame = Frame::NONE
-            .fill(COLOR_BG_MAIN)
+            .fill(current_theme.bg_main.to_color())
             .corner_radius(CornerRadius::same(10))
             .inner_margin(Margin::same(10));
 

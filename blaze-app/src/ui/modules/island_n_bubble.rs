@@ -9,7 +9,7 @@ use crate::{
         blaze_ui_state::BlazeUiState,
         icons_cache::icons,
         task_manager::tasks::TaskStatus,
-        themes::colors::{COLOR_ACCENT_GLOW, COLOR_BG_PANEL},
+        themes::{platform::structs::ToColor, theme_manager::with_theme},
     },
     utils::formating::format_size,
 };
@@ -58,6 +58,8 @@ pub fn generic_island<F>(
 where
     F: FnMut(&mut Ui, &mut BlazeUiState, &mut BlazeCoreState),
 {
+    let current_theme = with_theme(|t| t.current());
+
     const ISLAND_GAP: f32 = 30.0;
 
     Area::new("blaze_island".into())
@@ -72,8 +74,8 @@ where
         .show(ui, |ui| {
             Frame::NONE
                 .inner_margin(egui::Margin::same(10))
-                .fill(COLOR_BG_PANEL)
-                .stroke(Stroke::new(0.8, COLOR_ACCENT_GLOW))
+                .fill(current_theme.bg_panel.to_color())
+                .stroke(Stroke::new(0.8, current_theme.accent_glow.to_color()))
                 .corner_radius(CornerRadius::same(20))
                 .show(ui, |ui| {
                     ui.set_width(width);
@@ -99,6 +101,8 @@ pub fn render_island_bubble(
     bottom_padding: i8,
     tabs_height: i8,
 ) {
+    let current_theme = with_theme(|t| t.current());
+
     let island_rect = generic_island(
         ui,
         state,
@@ -231,8 +235,8 @@ pub fn render_island_bubble(
         .show(ui, |ui| {
             Frame::NONE
                 .inner_margin(egui::Margin::same(10))
-                .fill(COLOR_BG_PANEL)
-                .stroke(Stroke::new(0.8, COLOR_ACCENT_GLOW))
+                .fill(current_theme.bg_panel.to_color())
+                .stroke(Stroke::new(0.8, current_theme.accent_glow.to_color()))
                 .corner_radius(CornerRadius::same(20))
                 .show(ui, |ui| {
                     let inner_w = (current_w - 20.0).max(0.1);
@@ -304,8 +308,8 @@ pub fn render_island_bubble(
             .show(ui, |ui| {
                 Frame::new()
                     .inner_margin(Margin::symmetric(10, 4))
-                    .fill(COLOR_BG_PANEL)
-                    .stroke(Stroke::new(0.8, COLOR_ACCENT_GLOW))
+                    .fill(current_theme.bg_panel.to_color())
+                    .stroke(Stroke::new(0.8, current_theme.accent_glow.to_color()))
                     .corner_radius(CornerRadius::same(20))
                     .show(ui, |ui| {
                         ui.set_width(tabs_width);
@@ -409,7 +413,7 @@ pub fn render_island_bubble(
                                             label,
                                             TextFormat {
                                                 font_id: FontId::default(),
-                                                color: Color32::WHITE,
+                                                color: current_theme.text_primary.to_color(),
                                                 ..Default::default()
                                             },
                                         );
@@ -497,8 +501,8 @@ pub fn render_island_bubble(
             .show(ui, |ui| {
                 Frame::new()
                     .inner_margin(Margin::symmetric(10, 4))
-                    .fill(COLOR_BG_PANEL)
-                    .stroke(Stroke::new(0.8, COLOR_ACCENT_GLOW))
+                    .fill(current_theme.bg_panel.to_color())
+                    .stroke(Stroke::new(0.8, current_theme.accent_glow.to_color()))
                     .corner_radius(CornerRadius {
                         nw: 10,
                         ne: 10,
@@ -509,6 +513,7 @@ pub fn render_island_bubble(
                         ui.horizontal_centered(|ui| {
                             ui.label(
                                 RichText::new("Ctrl + 1-5, Ctrl + <-/->, Tab, Shift + Tab")
+                                    .color(current_theme.text_secondary.to_color())
                                     .size(10.0),
                             );
                         });

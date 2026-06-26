@@ -1,4 +1,7 @@
-use crate::core::{blaze_state::BlazeCoreState, files::blaze_motor::motor_structs::FileEntry};
+use crate::{
+    core::{blaze_state::BlazeCoreState, files::blaze_motor::motor_structs::FileEntry},
+    ui::themes::{platform::structs::ToColor, theme_manager::with_theme},
+};
 use egui::{vec2, Color32, Painter, Rect, Ui};
 use std::sync::Arc;
 
@@ -10,6 +13,8 @@ pub fn drag_files(
     content_rect: Rect,
     row_height: f32,
 ) {
+    let current_theme = with_theme(|t| t.current());
+
     if let Some(pos) = state.row_view.drag_ghost_pos {
         let count = state.selected_count(files.len());
 
@@ -44,7 +49,7 @@ pub fn drag_files(
                 first_name.to_string()
             },
             egui::FontId::default(),
-            Color32::WHITE,
+            current_theme.text_primary.to_color(),
         );
     }
 

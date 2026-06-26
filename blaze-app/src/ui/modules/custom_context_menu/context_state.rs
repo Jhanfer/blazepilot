@@ -24,7 +24,7 @@ use crate::{
         blaze_ui_state::BlazeUiState,
         icons_cache::icons,
         image_preview::image_preview_handler::ImagePreviewState,
-        themes::colors::{COLOR_ACCENT_GLOW, COLOR_BG_PANEL},
+        themes::{platform::structs::ToColor, theme_manager::with_theme},
     },
 };
 
@@ -124,6 +124,8 @@ impl ContextMenuState {
     where
         F: FnMut(&mut Ui),
     {
+        let current_theme = with_theme(|t| t.current());
+
         let screen = ui.content_rect();
         let pos = self.position;
 
@@ -135,9 +137,9 @@ impl ContextMenuState {
             .constrain_to(screen)
             .show(ui.ctx(), |ui| {
                 Frame::new()
-                    .fill(COLOR_BG_PANEL)
+                    .fill(current_theme.bg_panel.to_color())
                     .corner_radius(12.0)
-                    .stroke(Stroke::new(0.8, COLOR_ACCENT_GLOW))
+                    .stroke(Stroke::new(0.8, current_theme.accent_glow.to_color()))
                     .inner_margin(8.0)
                     .show(ui, |ui| {
                         ui.set_min_width(190.0);
@@ -221,6 +223,8 @@ impl ContextMenuState {
         J: FnMut(),
         I: FnMut(&mut Ui, &mut BlazeUiState),
     {
+        let current_theme = with_theme(|t| t.current());
+
         let (rect, response) = ui.allocate_exact_size(
             vec2(ui.available_width() - 2.0, 30.0),
             Sense::click_and_drag(),
@@ -230,9 +234,9 @@ impl ContextMenuState {
         let paint_rect = rect.shrink2(vec2(h_padding, 0.0));
 
         let text_color = if enabled {
-            ui.visuals().text_color()
+            current_theme.text_primary.to_color()
         } else {
-            ui.visuals().weak_text_color()
+            current_theme.text_secondary.to_color()
         };
 
         let popup_id = response.id.with("popup");
@@ -284,7 +288,7 @@ impl ContextMenuState {
         let hint_galley = ui.painter().layout_no_wrap(
             hint.to_string(),
             FontId::proportional(10.0),
-            ui.visuals().weak_text_color(),
+            current_theme.text_primary.to_color(),
         );
 
         let hint_width = hint_galley.size().x;
@@ -295,7 +299,7 @@ impl ContextMenuState {
         );
 
         ui.painter()
-            .galley(hint_pos, hint_galley, ui.visuals().weak_text_color());
+            .galley(hint_pos, hint_galley, current_theme.text_primary.to_color());
 
         if enabled {
             if response.clicked() {

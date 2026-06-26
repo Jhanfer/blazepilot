@@ -131,8 +131,64 @@ X11: Maggiore compatibilità con le app più vecchie. Consente il drag & drop da
 """
 disclaimer = "Queste modifiche richiedono il riavvio dell'app."
 
+
 [configs_appearance]
-title = "WIP :D"
+title = "Cambia aspetto"
+reload_theme = "Ricarica tema"
+selection = "Seleziona un tema"
+message = "Puoi modificare ogni tema in ~/.config/blazepilotapp/themes"
+
+color_editor = "Editor colori"
+
+states = "Stati"
+error = "Errore"
+success = "Successo"
+warn = "Avvertenza"
+
+background = "Sfondi"
+main_bg = "Sfondo principale"
+panel_bg = "Sfondo del pannello"
+container_bg = "Sfondo del contenitore"
+hover_bg = "Sfondo al passaggio del mouse"
+
+border-buttons = "Bordi e pulsanti"
+border_panel = "Bordo del pannello"
+main_buttons = "Pulsanti principali"
+
+accent = "Accenti"
+accent_glow = "Luminosità dell'accento"
+rubberband = "Banda di selezione"
+selected_item = "Elemento selezionato"
+
+texts = "Testi"
+primary_text = "Testo principale"
+secondary_text = "Testo secondario"
+muted_text = "Testo attenuato"
+
+tools = "Strumenti"
+primary-tool-color = "Colore principale dello strumento"
+secondary-tool-color = "Colore secondario dello strumento"
+tool-btn-active = "Pulsante strumento attivo"
+tool-btn-inactive = "Pulsante strumento inattivo"
+tool-btn-hovered = "Pulsante strumento al passaggio del mouse"
+
+files = "File"
+folder = "Cartella"
+image = "Immagine"
+pdf = "PDF"
+doc = "Documento"
+video = "Video"
+audio = "Audio"
+archive = "Archivio compresso"
+code = "Codice"
+font = "Carattere"
+exe = "Eseguibile"
+fallback = "Predefinito"
+
+theme-name = "Nome del tema"
+save-as-custom = "Salva come tema personalizzato"
+reset-defaults = "Ripristina valori predefiniti"
+
 
 [configs_behavior]
 title = "WIP :D"

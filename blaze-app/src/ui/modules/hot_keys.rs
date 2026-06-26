@@ -294,7 +294,8 @@ pub fn hot_keys_logic(
         || get_focus(ui, "search_ctx_menu")
         || get_focus(ui, "creating_new")
         || get_focus(ui, "rename_space")
-        || get_focus(ui, "quick_tag_name");
+        || get_focus(ui, "quick_tag_name")
+        || get_focus(ui, "save_theme_placeholder");
 
     if !text_edit_focused {
         for event in &input.events {

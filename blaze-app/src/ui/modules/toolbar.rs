@@ -21,11 +21,12 @@ use crate::{
         blaze_ui_state::BlazeUiState,
         icons_cache::icons::{self},
         modules::utilities::ensure_min_lightness,
-        themes::colors::*,
+        themes::{platform::structs::ToColor, theme_manager::with_theme},
     },
 };
 use egui::{
-    pos2, vec2, Color32, CornerRadius, Frame, Margin, Panel, Rect, RichText, Sense, Stroke, Ui,
+    pos2, vec2, Button, Color32, CornerRadius, Frame, Margin, Panel, Rect, RichText, Sense, Stroke,
+    Ui,
 };
 use std::path::PathBuf;
 
@@ -40,10 +41,12 @@ fn render_bar_button<F>(
 ) where
     F: FnMut(),
 {
+    let current_theme = with_theme(|t| t.current());
+
     let ball_size = 35.0;
     Frame::new()
-        .fill(COLOR_BG_PANEL)
-        .stroke(Stroke::new(0.5, COLOR_ACCENT_GLOW))
+        .fill(current_theme.bg_panel.to_color())
+        .stroke(Stroke::new(0.5, current_theme.accent_glow.to_color()))
         .corner_radius(CornerRadius::same((ball_size / 1.5) as u8))
         .show(ui, |ui| {
             ui.set_width(ball_size);
@@ -61,11 +64,11 @@ fn render_bar_button<F>(
             );
 
             let color = if resp.hovered() && active {
-                ensure_min_lightness(COLOR_ACCENT_GLOW, 0.90)
+                ensure_min_lightness(current_theme.tool_btn_hovered.to_color())
             } else if !active {
-                COLOR_TEXT_MUTED
+                current_theme.tool_btn_inactive.to_color()
             } else {
-                Color32::WHITE
+                current_theme.tool_btn_active.to_color()
             };
 
             let icon = ui_state
@@ -90,8 +93,14 @@ fn render_bar_button<F>(
 }
 
 pub fn toolbar_component(ui: &mut Ui, state: &mut BlazeCoreState, ui_state: &mut BlazeUiState) {
+    let current_theme = with_theme(|t| t.current());
+
     Panel::top("toolbar")
-        .frame(Frame::new().fill(COLOR_BG_MAIN).inner_margin(10))
+        .frame(
+            Frame::new()
+                .fill(current_theme.bg_main.to_color())
+                .inner_margin(10),
+        )
         .exact_size(80.0)
         .show_separator_line(false)
         .show_inside(ui, |ui| {
@@ -106,7 +115,7 @@ pub fn toolbar_component(ui: &mut Ui, state: &mut BlazeCoreState, ui_state: &mut
                 Frame::new()
                     .corner_radius(20)
                     .inner_margin(Margin::same(10))
-                    .fill(COLOR_BG_PANEL)
+                    .fill(current_theme.bg_panel.to_color())
                     .show(ui, |ui| {
                         ui.set_height(total_height);
                         ui.set_width(ui.available_width());
@@ -162,8 +171,8 @@ pub fn toolbar_component(ui: &mut Ui, state: &mut BlazeCoreState, ui_state: &mut
                         );
 
                         Frame::new()
-                            .fill(COLOR_BG_PANEL)
-                            .stroke(Stroke::new(0.5, COLOR_ACCENT_GLOW))
+                            .fill(current_theme.bg_panel.to_color())
+                            .stroke(Stroke::new(0.5, current_theme.accent_glow.to_color()))
                             .corner_radius(CornerRadius::same(20))
                             .show(ui, |ui| {
                                 ui.set_width(ui.available_width());
@@ -187,18 +196,18 @@ pub fn toolbar_component(ui: &mut Ui, state: &mut BlazeCoreState, ui_state: &mut
 
                                         let is_last = i == components.len() - 1;
 
-                                        let button = egui::Button::new(
+                                        let button = Button::new(
                                             RichText::new(name)
                                                 .color(if is_last {
-                                                    Color32::WHITE
+                                                    current_theme.text_primary.to_color()
                                                 } else {
-                                                    Color32::LIGHT_GRAY
+                                                    current_theme.text_secondary.to_color()
                                                 })
                                                 .strong(),
                                         )
                                         .frame(true)
                                         .fill(if is_last {
-                                            Color32::from_rgb(120, 80, 200)
+                                            current_theme.accent_glow.to_color()
                                         } else {
                                             Color32::TRANSPARENT
                                         })
@@ -215,7 +224,9 @@ pub fn toolbar_component(ui: &mut Ui, state: &mut BlazeCoreState, ui_state: &mut
                                         // Separador ">"
                                         if !is_last {
                                             ui.label(
-                                                RichText::new("›").color(Color32::GRAY).size(16.0),
+                                                RichText::new("›")
+                                                    .color(current_theme.text_secondary.to_color())
+                                                    .size(16.0),
                                             );
                                         }
                                     }

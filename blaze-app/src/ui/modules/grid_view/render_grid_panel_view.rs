@@ -20,7 +20,7 @@ use crate::{
             hot_keys::hot_keys_logic,
             island_n_bubble::render_island_bubble,
         },
-        themes::colors::*,
+        themes::{platform::structs::ToColor, theme_manager::with_theme},
     },
 };
 use egui::{CornerRadius, Frame, Margin, Rect, Stroke, Ui};
@@ -137,6 +137,8 @@ pub fn grid_panel_frame(
     bottom_padding: i8,
     tabs_height: i8,
 ) {
+    let current_theme = with_theme(|t| t.current());
+
     Frame::NONE
         .inner_margin(Margin {
             left: 10,
@@ -144,7 +146,7 @@ pub fn grid_panel_frame(
             top: 0,
             bottom: 10,
         })
-        .fill(COLOR_BG_PANEL)
+        .fill(current_theme.bg_panel.to_color())
         .corner_radius(CornerRadius {
             nw: 0,
             ne: 0,
@@ -153,7 +155,7 @@ pub fn grid_panel_frame(
         })
         .stroke(Stroke {
             width: 0.5,
-            color: COLOR_ACCENT_GLOW,
+            color: current_theme.accent_glow.to_color(),
         })
         .show(ui, |ui| {
             let original_clip = ui.clip_rect();

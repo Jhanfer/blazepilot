@@ -14,7 +14,10 @@
 
 use crate::{
     core::runtime::{bus_structs::FileOperation, event_bus::Dispatcher},
-    ui::{dialog_manager::manager::ModalDialog, themes::colors::COLOR_BG_MAIN},
+    ui::{
+        dialog_manager::manager::ModalDialog,
+        themes::{platform::structs::ToColor, theme_manager::with_theme},
+    },
 };
 use egui::{CornerRadius, Frame, Margin, Order, Ui, Window};
 use uuid::Uuid;
@@ -60,6 +63,8 @@ impl UpdateDialog {
     }
 
     pub fn render_dialog(&mut self, ui: &mut Ui) -> bool {
+        let current_theme = with_theme(|t| t.current());
+
         let mut should_close = false;
 
         let (Some(current_ver), Some(new_ver), Some(_)) = (
@@ -71,7 +76,7 @@ impl UpdateDialog {
         };
 
         let custom_frame = Frame::NONE
-            .fill(COLOR_BG_MAIN)
+            .fill(current_theme.bg_main.to_color())
             .corner_radius(CornerRadius::same(10))
             .inner_margin(Margin::same(10));
 

@@ -12,11 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::core::system::{cache::cache_manager, clipboard::global_clipboard::TOKIO_RUNTIME};
 use crate::ui::dialog_manager::manager::ModalDialog;
-use crate::{
-    core::system::{cache::cache_manager, clipboard::global_clipboard::TOKIO_RUNTIME},
-    ui::themes::colors::COLOR_BG_MAIN,
-};
+use crate::ui::themes::platform::structs::ToColor;
+use crate::ui::themes::theme_manager::with_theme;
 use egui::{Color32, CornerRadius, Frame, Margin, Order, Ui, Window};
 use file_id::FileId;
 
@@ -61,6 +60,8 @@ impl FolderColorSelector {
     }
 
     pub fn render_dialog(&mut self, ui: &mut Ui) -> bool {
+        let current_theme = with_theme(|t| t.current());
+
         let mut should_close = false;
 
         let Some(folder_id) = self.folder_id.as_ref() else {
@@ -71,7 +72,7 @@ impl FolderColorSelector {
         };
 
         let custom_frame = Frame::NONE
-            .fill(COLOR_BG_MAIN)
+            .fill(current_theme.bg_main.to_color())
             .corner_radius(CornerRadius::same(10))
             .inner_margin(Margin::same(10));
 

@@ -16,7 +16,7 @@ use crate::{
                 render_drives_button, render_header_text, render_local_buttons,
             },
         },
-        themes::colors::*,
+        themes::{platform::structs::ToColor, theme_manager::with_theme},
     },
 };
 use egui::{
@@ -28,14 +28,18 @@ pub fn sidebar_left_component(
     state: &mut BlazeCoreState,
     ui_state: &mut BlazeUiState,
 ) {
+    let current_theme = with_theme(|t| t.current());
+
     let i18n = with_configs(|c| c.get_i18n());
 
-    let custom_frame = Frame::NONE.fill(COLOR_BG_MAIN).inner_margin(Margin {
-        left: 15,
-        right: 0,
-        top: 0,
-        bottom: 10,
-    });
+    let custom_frame = Frame::NONE
+        .fill(current_theme.bg_main.to_color())
+        .inner_margin(Margin {
+            left: 15,
+            right: 0,
+            top: 0,
+            bottom: 10,
+        });
 
     Panel::left("LeftSidePanel")
         .show_separator_line(false)
@@ -46,11 +50,11 @@ pub fn sidebar_left_component(
 
             Frame::NONE
                 .inner_margin(egui::Margin::same(10))
-                .fill(COLOR_BG_PANEL)
+                .fill(current_theme.bg_panel.to_color())
                 .corner_radius(CornerRadius::same(20))
                 .stroke(Stroke {
                     width: 0.5,
-                    color: COLOR_ACCENT_GLOW,
+                    color: current_theme.accent_glow.to_color(),
                 })
                 .show(ui, |ui| {
                     ui.set_width(200.0);

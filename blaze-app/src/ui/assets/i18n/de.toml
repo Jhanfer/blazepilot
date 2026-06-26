@@ -131,8 +131,64 @@ X11: Größere Kompatibilität mit älteren Apps. Ermöglicht Drag & Drop aus an
 """
 disclaimer = "Diese Änderungen erfordern einen Neustart der App."
 
+
 [configs_appearance]
-title = "In Arbeit :D"
+title = "Aussehen ändern"
+reload_theme = "Design neu laden"
+selection = "Wähle ein Design"
+message = "Du kannst jedes Design in ~/.config/blazepilotapp/themes anpassen"
+
+color_editor = "Farbeditor"
+
+states = "Zustände"
+error = "Fehler"
+success = "Erfolg"
+warn = "Warnung"
+
+background = "Hintergründe"
+main_bg = "Haupthintergrund"
+panel_bg = "Panel-Hintergrund"
+container_bg = "Container-Hintergrund"
+hover_bg = "Hover-Hintergrund"
+
+border-buttons = "Rahmen und Schaltflächen"
+border_panel = "Panel-Rahmen"
+main_buttons = "Hauptschaltflächen"
+
+accent = "Akzente"
+accent_glow = "Akzent-Leuchten"
+rubberband = "Auswahlrahmen"
+selected_item = "Ausgewähltes Element"
+
+texts = "Texte"
+primary_text = "Haupttext"
+secondary_text = "Nebentext"
+muted_text = "Blasser Text"
+
+tools = "Werkzeuge"
+primary-tool-color = "Primäre Werkzeugfarbe"
+secondary-tool-color = "Sekundäre Werkzeugfarbe"
+tool-btn-active = "Aktiver Werkzeugknopf"
+tool-btn-inactive = "Inaktiver Werkzeugknopf"
+tool-btn-hovered = "Werkzeugknopf beim Hover"
+
+files = "Dateien"
+folder = "Ordner"
+image = "Bild"
+pdf = "PDF"
+doc = "Dokument"
+video = "Video"
+audio = "Audio"
+archive = "Komprimiertes Archiv"
+code = "Code"
+font = "Schriftart"
+exe = "Ausführbare Datei"
+fallback = "Standard"
+
+theme-name = "Designname"
+save-as-custom = "Als benutzerdefiniertes Design speichern"
+reset-defaults = "Auf Standardwerte zurücksetzen"
+
 
 [configs_behavior]
 title = "In Arbeit :D"

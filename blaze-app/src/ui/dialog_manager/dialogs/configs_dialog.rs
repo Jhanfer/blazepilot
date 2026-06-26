@@ -12,26 +12,25 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::ui::dialog_manager::manager::ModalDialog;
-use crate::{
-    core::{
-        bootstrap::configs::{
-            config_manager::with_configs, platform::linux::conf_structs::DisplayBackend,
-        },
-        system::{
-            clipboard::global_clipboard::TOKIO_RUNTIME,
-            terminal_opener::terminal_manager::GLOBAL_TERMINAL_MANAGER,
-        },
+use crate::core::{
+    bootstrap::configs::{
+        config_manager::with_configs, platform::linux::conf_structs::DisplayBackend,
     },
-    ui::themes::colors::COLOR_BG_MAIN,
+    system::{
+        clipboard::global_clipboard::TOKIO_RUNTIME,
+        terminal_opener::terminal_manager::GLOBAL_TERMINAL_MANAGER,
+    },
 };
+use crate::ui::dialog_manager::manager::ModalDialog;
+use crate::ui::themes::platform::structs::ToColor;
+use crate::ui::themes::theme_manager::with_theme;
 use core::f32;
 use egui::{
-    CentralPanel, Color32, ComboBox, CornerRadius, Frame, Key, Margin, OpenUrl, Order, Panel,
-    RichText, TextEdit, Ui, Window,
+    CentralPanel, Color32, ComboBox, CornerRadius, Frame, Id, Key, Label, Margin, OpenUrl, Order,
+    Panel, RichText, ScrollArea, TextEdit, Ui, Window,
 };
 use std::time::Duration;
-use tracing::warn;
+use tracing::{info, warn};
 
 #[derive(PartialEq, Clone, Copy)]
 enum CurrentConfigTab {
@@ -158,6 +157,7 @@ pub struct ConfigDialog {
     no_terminals_error: bool,
     retry_count: u8,
     max_retries: u8,
+    custom_theme_name: String,
 }
 
 impl ModalDialog for ConfigDialog {
@@ -186,6 +186,7 @@ impl ConfigDialog {
             no_terminals_error: false,
             retry_count: 0,
             max_retries: 3,
+            custom_theme_name: String::new(),
         }
     }
 
@@ -198,6 +199,8 @@ impl ConfigDialog {
     }
 
     fn render_config_sidebar(&mut self, ui: &mut Ui) {
+        let current_theme = with_theme(|t| t.current());
+
         let frame = Frame::new().inner_margin(20.0);
         frame.show(ui, |ui| {
             ui.add_space(6.0);
@@ -252,7 +255,9 @@ impl ConfigDialog {
             for tab in &filtered {
                 let is_selected = self.current_config_tab == *tab;
 
-                if ui.selectable_label(is_selected, tab.name()).clicked() {
+                let label = RichText::new(tab.name()).color(current_theme.text_primary.to_color());
+
+                if ui.selectable_label(is_selected, label).clicked() {
                     self.current_config_tab = *tab;
                 }
             }
@@ -260,13 +265,19 @@ impl ConfigDialog {
             if filtered.is_empty() && !query.is_empty() {
                 ui.vertical_centered(|ui| {
                     ui.add_space(20.0);
-                    ui.label(egui::RichText::new("No se encontraron resultados").weak());
+                    ui.label(
+                        RichText::new("No se encontraron resultados")
+                            .weak()
+                            .color(current_theme.text_primary.to_color()),
+                    );
                 });
             }
         });
     }
 
     fn render_general_settings(&self, ui: &mut Ui, _query: &str, frame: Frame) {
+        let current_theme = with_theme(|t| t.current());
+
         let i18n = with_configs(|c| c.get_i18n());
 
         ui.add_space(10.0);
@@ -274,17 +285,43 @@ impl ConfigDialog {
             ui.vertical(|ui| {
                 ui.add_space(20.0);
 
-                ui.heading("BlazePilot");
+                ui.add(
+                    Label::new(
+                        RichText::new("BlazePilot")
+                            .strong()
+                            .color(current_theme.text_primary.to_color()),
+                    )
+                    .selectable(false),
+                );
                 ui.add_space(4.0);
 
-                ui.label(RichText::new(format!("v{}", env!("CARGO_PKG_VERSION"))).weak());
+                ui.add(
+                    Label::new(
+                        RichText::new(format!("v{}", env!("CARGO_PKG_VERSION")))
+                            .color(current_theme.text_muted.to_color()),
+                    )
+                    .selectable(false),
+                );
 
                 ui.add_space(20.0);
                 ui.separator();
                 ui.add_space(20.0);
 
-                ui.label(i18n.t("configs_general.gratitude"));
-                ui.label(i18n.t("configs_general.made_for"));
+                ui.add(
+                    Label::new(
+                        RichText::new(i18n.t("configs_general.gratitude"))
+                            .color(current_theme.text_primary.to_color()),
+                    )
+                    .selectable(false),
+                );
+
+                ui.add(
+                    Label::new(
+                        RichText::new(i18n.t("configs_general.made_for"))
+                            .color(current_theme.text_primary.to_color()),
+                    )
+                    .selectable(false),
+                );
 
                 ui.add_space(20.0);
 
@@ -292,7 +329,14 @@ impl ConfigDialog {
                     if ui.link("GitHub").clicked() {
                         ui.open_url(OpenUrl::new_tab("https://github.com/Jhanfer/blazepilot"));
                     }
-                    ui.label("•");
+
+                    ui.add(
+                        Label::new(
+                            RichText::new("•").color(current_theme.text_secondary.to_color()),
+                        )
+                        .selectable(false),
+                    );
+
                     if ui.link(i18n.t("configs_general.report")).clicked() {
                         ui.open_url(OpenUrl::new_tab(
                             "https://github.com/Jhanfer/blazepilot/issues",
@@ -304,14 +348,25 @@ impl ConfigDialog {
                 ui.separator();
                 ui.add_space(12.0);
 
-                ui.collapsing(i18n.t("configs_general.sys_info"), |ui| {
-                    ui.monospace(format!("OS: {}", std::env::consts::OS));
-                    ui.monospace(format!("Arch: {}", std::env::consts::ARCH));
-                });
+                ui.collapsing(
+                    RichText::new(format!("OS: {}", std::env::consts::OS))
+                        .color(current_theme.text_secondary.to_color()),
+                    |ui| {
+                        ui.monospace(
+                            RichText::new(format!("OS: {}", std::env::consts::OS))
+                                .color(current_theme.text_secondary.to_color()),
+                        );
+                        ui.monospace(
+                            RichText::new(format!("Arch: {}", std::env::consts::ARCH))
+                                .color(current_theme.text_secondary.to_color()),
+                        );
+                    },
+                );
 
                 ui.add_space(20.0);
                 ui.label(
                     RichText::new(i18n.t("configs_general.disclaimer"))
+                        .color(current_theme.text_muted.to_color())
                         .italics()
                         .weak(),
                 );
@@ -342,6 +397,7 @@ impl ConfigDialog {
     }
 
     fn render_terminal_settings(&mut self, ui: &mut Ui, _query: &str, frame: Frame) {
+        let current_theme = with_theme(|t| t.current());
         let i18n = with_configs(|c| c.get_i18n());
 
         ui.add_space(10.0);
@@ -397,19 +453,34 @@ impl ConfigDialog {
 
         frame.show(ui, |ui| {
             ui.vertical(|ui| {
-                ui.heading(i18n.t("configs_terminal.title"));
+                ui.add(
+                    Label::new(
+                        RichText::new(i18n.t("configs_terminal.title"))
+                            .strong()
+                            .color(current_theme.text_primary.to_color()),
+                    )
+                    .selectable(false),
+                );
+
                 ui.add_space(8.0);
 
                 if self.loading_terminals {
                     ui.horizontal(|ui| {
                         ui.spinner();
-                        ui.label(i18n.t_args(
-                            "configs_terminal.loading_message",
-                            &[
-                                ("query", &self.retry_count.to_string()),
-                                ("query", &self.max_retries.to_string()),
-                            ],
-                        ));
+
+                        ui.add(
+                            Label::new(
+                                RichText::new(i18n.t_args(
+                                    "configs_terminal.loading_message",
+                                    &[
+                                        ("query", &self.retry_count.to_string()),
+                                        ("query", &self.max_retries.to_string()),
+                                    ],
+                                ))
+                                .color(current_theme.text_primary.to_color()),
+                            )
+                            .selectable(false),
+                        );
                     });
                     return;
                 }
@@ -419,7 +490,7 @@ impl ConfigDialog {
 
                     if self.no_terminals_error {
                         ui.colored_label(
-                            Color32::RED,
+                            current_theme.error.to_color(),
                             i18n.t("configs_terminal.no_terminals_error"),
                         );
 
@@ -431,19 +502,34 @@ impl ConfigDialog {
                             }
                         } else {
                             ui.colored_label(
-                                Color32::from_rgb(255, 165, 0),
+                                current_theme.warn.to_color(),
                                 i18n.t("configs_terminal.max_retries_error"),
                             );
-                            ui.label(i18n.t("configs_terminal.verify_terminals_message"));
+
+                            ui.add(
+                                Label::new(
+                                    RichText::new(
+                                        i18n.t("configs_terminal.verify_terminals_message"),
+                                    )
+                                    .color(current_theme.text_secondary.to_color()),
+                                )
+                                .selectable(false),
+                            );
                         }
                     } else {
-                        ui.label(i18n.t("configs_terminal.no_terminals_error"));
+                        ui.add(
+                            Label::new(
+                                RichText::new(i18n.t("configs_terminal.no_terminals_error"))
+                                    .color(current_theme.text_secondary.to_color()),
+                            )
+                            .selectable(false),
+                        );
                     }
 
                     if show_retry {
                         ui.add_space(8.0);
                         ui.colored_label(
-                            egui::Color32::from_rgb(255, 165, 0),
+                            current_theme.warn.to_color(),
                             i18n.t("configs_terminal.suggestion_message"),
                         );
                     }
@@ -451,70 +537,119 @@ impl ConfigDialog {
                     return;
                 }
 
-                egui::ComboBox::from_label(i18n.t("configs_terminal.combo_box_label"))
-                    .selected_text(
-                        self.get_selected_terminal_text(&i18n.t("configs_terminal.selection")),
-                    )
-                    .show_ui(ui, |ui| {
-                        for term in &self.available_terminals {
-                            let is_selected = self.is_terminal_selected(term);
+                ComboBox::from_label(
+                    RichText::new(i18n.t("configs_terminal.combo_box_label"))
+                        .color(current_theme.text_primary.to_color()),
+                )
+                .selected_text(
+                    self.get_selected_terminal_text(&i18n.t("configs_terminal.selection")),
+                )
+                .show_ui(ui, |ui| {
+                    for term in &self.available_terminals {
+                        let is_selected = self.is_terminal_selected(term);
 
-                            if ui.selectable_label(is_selected, term).clicked() {
-                                with_configs(|c| {
-                                    c.set_default_terminal(term.to_string());
-                                });
-                            }
+                        let label =
+                            RichText::new(term).color(current_theme.text_primary.to_color());
+
+                        if ui.selectable_label(is_selected, label).clicked() {
+                            with_configs(|c| {
+                                c.set_default_terminal(term.to_string());
+                            });
                         }
-                    });
+                    }
+                });
 
                 ui.add_space(12.0);
-                ui.label(i18n.t("configs_terminal.message"));
+                ui.add(
+                    Label::new(
+                        RichText::new(i18n.t("configs_terminal.message"))
+                            .color(current_theme.text_primary.to_color()),
+                    )
+                    .selectable(false),
+                );
             });
         });
     }
 
     fn render_backend_settings(&mut self, ui: &mut Ui, _query: &str, frame: Frame) {
+        let current_theme = with_theme(|t| t.current());
+
         let i18n = with_configs(|c| c.get_i18n());
 
         ui.add_space(10.0);
         frame.show(ui, |ui| {
             ui.vertical(|ui| {
-                ui.heading(i18n.t("configs_backend.title"));
+                ui.add(
+                    Label::new(
+                        RichText::new(i18n.t("configs_backend.title"))
+                            .strong()
+                            .color(current_theme.text_primary.to_color()),
+                    )
+                    .selectable(false),
+                );
 
                 ui.add_space(8.0);
 
                 let current = with_configs(|c| c.get_display_backend());
 
-                ComboBox::from_label(i18n.t("configs_backend.selection"))
-                    .selected_text(current.name())
-                    .show_ui(ui, |ui| {
-                        for (name, backend) in [
-                            ("Auto", DisplayBackend::Auto),
-                            ("Wayland", DisplayBackend::Wayland),
-                            ("X11", DisplayBackend::X11),
-                        ] {
-                            if ui.selectable_label(current == backend, name).clicked() {
-                                with_configs(|c| {
-                                    c.set_display_backend(backend);
-                                });
-                            }
+                ComboBox::from_label(
+                    RichText::new(i18n.t("configs_backend.selection"))
+                        .color(current_theme.text_primary.to_color()),
+                )
+                .selected_text(current.name())
+                .show_ui(ui, |ui| {
+                    for (name, backend) in [
+                        ("Auto", DisplayBackend::Auto),
+                        ("Wayland", DisplayBackend::Wayland),
+                        ("X11", DisplayBackend::X11),
+                    ] {
+                        let label =
+                            RichText::new(name).color(current_theme.text_primary.to_color());
+
+                        if ui.selectable_label(current == backend, label).clicked() {
+                            with_configs(|c| {
+                                c.set_display_backend(backend);
+                            });
                         }
-                    });
+                    }
+                });
             });
 
             ui.add_space(12.0);
-            ui.label(egui::RichText::new(i18n.t("configs_backend.hint")).strong());
-            ui.label(i18n.t("configs_backend.message"));
+
+            ui.add(
+                Label::new(
+                    RichText::new(i18n.t("configs_backend.hint"))
+                        .color(current_theme.text_primary.to_color()),
+                )
+                .selectable(false),
+            );
+
+            ui.add(
+                Label::new(
+                    RichText::new(i18n.t("configs_backend.message"))
+                        .color(current_theme.text_secondary.to_color()),
+                )
+                .selectable(false),
+            );
         });
     }
 
     fn render_language_settings(&mut self, ui: &mut Ui, _query: &str, frame: Frame) {
+        let current_theme = with_theme(|t| t.current());
         let i18n = with_configs(|c| c.get_i18n());
 
         ui.add_space(10.0);
         frame.show(ui, |ui| {
             ui.vertical(|ui| {
-                ui.heading(i18n.t("configs_language.title"));
+                ui.add(
+                    Label::new(
+                        RichText::new(i18n.t("configs_language.title"))
+                            .strong()
+                            .color(current_theme.text_primary.to_color()),
+                    )
+                    .selectable(false),
+                );
 
                 ui.add_space(8.0);
 
@@ -522,24 +657,304 @@ impl ConfigDialog {
 
                 let languages = ["en", "es", "it", "ru", "fr", "de"];
 
-                ComboBox::from_label(i18n.t("configs_language.selection"))
-                    .selected_text(&current)
-                    .show_ui(ui, |ui| {
-                        for lang in languages {
-                            if ui.selectable_label(current == lang.into(), lang).clicked() {
-                                with_configs(|c| {
-                                    c.set_locale(lang);
-                                });
-                            }
+                ComboBox::from_label(
+                    RichText::new(i18n.t("configs_language.selection"))
+                        .color(current_theme.text_primary.to_color()),
+                )
+                .selected_text(&current)
+                .show_ui(ui, |ui| {
+                    for lang in languages {
+                        let label =
+                            RichText::new(lang).color(current_theme.text_primary.to_color());
+
+                        if ui.selectable_label(current == lang.into(), label).clicked() {
+                            with_configs(|c| {
+                                c.set_locale(lang);
+                            });
                         }
-                    });
+                    }
+                });
             });
 
-            ui.label(i18n.t("configs_language.message"))
+            ui.add(
+                Label::new(
+                    RichText::new(i18n.t("configs_language.message"))
+                        .color(current_theme.text_secondary.to_color()),
+                )
+                .selectable(false),
+            );
+        });
+    }
+
+    fn render_appearance_settings(&mut self, ui: &mut Ui, _query: &str, frame: Frame) {
+        let i18n = with_configs(|c| c.get_i18n());
+        let (available_themes, current_theme) =
+            with_theme(|t| (t.get_available_themes_names(), t.current().clone()));
+
+        ui.add_space(10.0);
+
+        frame.show(ui, |ui| {
+            ui.vertical(|ui| {
+                // Titulo
+                ui.add(
+                    Label::new(
+                        RichText::new(i18n.t("configs_appearance.title"))
+                            .strong()
+                            .color(current_theme.text_primary.to_color()),
+                    )
+                    .selectable(false),
+                );
+                ui.add_space(8.0);
+
+                // Recargar
+                if ui
+                    .button(
+                        RichText::new(i18n.t("configs_appearance.reload_theme"))
+                            .color(current_theme.text_primary.to_color()),
+                    )
+                    .clicked()
+                {
+                    with_theme(|t| match t.reload() {
+                        Ok(_) => info!("Tema recargado con éxito."),
+                        Err(e) => warn!("Error al recargar el tema: {e}."),
+                    });
+                }
+
+                // Selector de temas
+                ComboBox::from_label(
+                    RichText::new(i18n.t("configs_appearance.selection"))
+                        .color(current_theme.text_primary.to_color()),
+                )
+                .selected_text(&*current_theme.name)
+                .show_ui(ui, |ui| {
+                    for theme in available_themes {
+                        let label =
+                            RichText::new(&*theme).color(current_theme.text_primary.to_color());
+                        if ui
+                            .selectable_label(current_theme.name == theme, label)
+                            .clicked()
+                        {
+                            with_configs(|c| c.set_current_theme_name(&theme));
+                            with_theme(|t| t.set_theme(&theme));
+                        }
+                    }
+                });
+
+                ui.add_space(12.0);
+                ui.separator();
+                ui.add_space(8.0);
+
+                // Editor
+                ui.label(
+                    RichText::new(i18n.t("configs_appearance.color_editor"))
+                        .strong()
+                        .color(current_theme.text_primary.to_color()),
+                );
+                ui.add_space(6.0);
+
+                ScrollArea::vertical().max_height(420.0).show(ui, |ui| {
+                    macro_rules! color_field {
+                        ($label:expr, $($path:tt)*) => {{
+                            ui.horizontal(|ui| {
+                                let current_hex = &current_theme.$($path)*;
+                                let mut color = Color32::from_hex(current_hex)
+                                    .unwrap_or(Color32::DEBUG_COLOR);
+
+                                ui.label(
+                                    RichText::new($label)
+                                        .color(current_theme.text_primary.to_color()),
+                                );
+
+                                if ui.color_edit_button_srgba(&mut color).changed() {
+                                    with_theme(|t| {
+                                        t.update_theme(
+                                            |theme, c| {
+                                                theme.$($path)* = format!(
+                                                    "#{:02X}{:02X}{:02X}{:02X}",
+                                                    c.r(), c.g(), c.b(), c.a()
+                                                );
+                                            },
+                                            color,
+                                        );
+                                    });
+
+                                }
+                            });
+                        }};
+                    }
+
+                    // --- Estados ---
+                    ui.label(
+                        RichText::new(i18n.t("configs_appearance.states"))
+                            .strong()
+                            .color(current_theme.text_secondary.to_color()),
+                    );
+                    color_field!(i18n.t("configs_appearance.error"), error);
+                    color_field!(i18n.t("configs_appearance.success"), success);
+                    color_field!(i18n.t("configs_appearance.warn"), warn);
+                    ui.add_space(8.0);
+
+                    // --- Fondos ---
+                    ui.label(
+                        RichText::new(i18n.t("configs_appearance.background"))
+                            .strong()
+                            .color(current_theme.text_secondary.to_color()),
+                    );
+                    color_field!(i18n.t("configs_appearance.main_bg"), bg_main);
+                    color_field!(i18n.t("configs_appearance.panel_bg"), bg_panel);
+                    color_field!(i18n.t("configs_appearance.container_bg"), bg_container);
+                    color_field!(i18n.t("configs_appearance.hover_bg"), bg_hover);
+                    ui.add_space(8.0);
+
+                    // --- Bordes y botones ---
+                    ui.label(
+                        RichText::new(i18n.t("configs_appearance.border-buttons"))
+                            .strong()
+                            .color(current_theme.text_secondary.to_color()),
+                    );
+                    color_field!(i18n.t("configs_appearance.border_panel"), border_panel);
+                    color_field!(i18n.t("configs_appearance.main_buttons"), main_buttons);
+                    ui.add_space(8.0);
+
+                    // --- Acentos ---
+                    ui.label(
+                        RichText::new(i18n.t("configs_appearance.accent"))
+                            .strong()
+                            .color(current_theme.text_secondary.to_color()),
+                    );
+                    color_field!(i18n.t("configs_appearance.accent"), accent);
+                    color_field!(i18n.t("configs_appearance.accent_glow"), accent_glow);
+                    color_field!(i18n.t("configs_appearance.rubberband"), rubberband);
+                    color_field!(i18n.t("configs_appearance.selected_item"), item_selected);
+                    ui.add_space(8.0);
+
+                    // --- Textos ---
+                    ui.label(
+                        RichText::new(i18n.t("configs_appearance.texts"))
+                            .strong()
+                            .color(current_theme.text_secondary.to_color()),
+                    );
+                    color_field!(i18n.t("configs_appearance.primary_text"), text_primary);
+                    color_field!(i18n.t("configs_appearance.secondary_text"), text_secondary);
+                    color_field!(i18n.t("configs_appearance.muted_text"), text_muted);
+                    ui.add_space(8.0);
+
+                    // --- Herramientas ---
+                    ui.label(
+                        RichText::new(i18n.t("configs_appearance.tools"))
+                            .strong()
+                            .color(current_theme.text_secondary.to_color()),
+                    );
+                    color_field!(
+                        i18n.t("configs_appearance.primary-tool-color"),
+                        tools_primary
+                    );
+                    color_field!(
+                        i18n.t("configs_appearance.secondary-tool-color"),
+                        tools_secondary
+                    );
+                    color_field!(
+                        i18n.t("configs_appearance.tool-btn-active"),
+                        tool_btn_active
+                    );
+                    color_field!(
+                        i18n.t("configs_appearance.tool-btn-inactive"),
+                        tool_btn_inactive
+                    );
+                    color_field!(
+                        i18n.t("configs_appearance.tool-btn-hovered"),
+                        tool_btn_hovered
+                    );
+                    ui.add_space(8.0);
+
+                    // --- Iconos de archivo ---
+                    ui.label(
+                        RichText::new(i18n.t("configs_appearance.files"))
+                            .strong()
+                            .color(current_theme.text_secondary.to_color()),
+                    );
+                    color_field!(
+                        i18n.t("configs_appearance.folder"),
+                        file_theme.folder_default
+                    );
+                    color_field!(i18n.t("configs_appearance.image"), file_theme.image);
+                    color_field!(i18n.t("configs_appearance.pdf"), file_theme.pdf);
+                    color_field!(i18n.t("configs_appearance.doc"), file_theme.document);
+                    color_field!(i18n.t("configs_appearance.video"), file_theme.video);
+                    color_field!(i18n.t("configs_appearance.audio"), file_theme.audio);
+                    color_field!(i18n.t("configs_appearance.archive"), file_theme.archive);
+                    color_field!(i18n.t("configs_appearance.code"), file_theme.code);
+                    color_field!(i18n.t("configs_appearance.font"), file_theme.font);
+                    color_field!(i18n.t("configs_appearance.exe"), file_theme.executable);
+                    color_field!(i18n.t("configs_appearance.fallback"), file_theme.fallback);
+                });
+
+                ui.add_space(12.0);
+                ui.separator();
+                ui.add_space(8.0);
+
+                // Input para nombre de tema personalizado
+                ui.horizontal(|ui| {
+                    ui.label(
+                        RichText::new(i18n.t("configs_appearance.theme-name"))
+                            .color(current_theme.text_primary.to_color()),
+                    );
+
+                    let text_edit = TextEdit::singleline(&mut self.custom_theme_name)
+                        .id("save_theme_placeholder".into());
+
+                    ui.add(text_edit);
+
+                    if ui
+                        .button(
+                            RichText::new(i18n.t("configs_appearance.save-as-custom"))
+                                .color(current_theme.text_primary.to_color()),
+                        )
+                        .clicked()
+                    {
+                        if !self.custom_theme_name.trim().is_empty() {
+                            with_theme(|t| {
+                                match t.save_as_custom_theme(self.custom_theme_name.trim()) {
+                                    Ok(_) => info!("Tema personalizado guardado"),
+                                    Err(e) => warn!("Error al guardar tema: {e}"),
+                                }
+                            });
+                        } else {
+                            warn!("El nombre del tema no puede estar vacío");
+                        }
+                    }
+                });
+
+                ui.add_space(8.0);
+
+                // Botone de reset
+                ui.horizontal(|ui| {
+                    if ui
+                        .button(
+                            RichText::new(i18n.t("configs_appearance.reset-defaults"))
+                                .color(current_theme.error.to_color()),
+                        )
+                        .clicked()
+                    {
+                        with_theme(|t| match t.reset_to_default() {
+                            Ok(_) => info!("Tema reseteado a valores por defecto"),
+                            Err(e) => warn!("Error al resetear tema: {e}"),
+                        });
+                    }
+                });
+
+                ui.add_space(8.0);
+                ui.label(
+                    RichText::new(i18n.t("configs_appearance.message"))
+                        .color(current_theme.text_secondary.to_color()),
+                );
+            });
         });
     }
 
     pub fn render_dialog(&mut self, ui: &mut Ui) -> bool {
+        let current_theme = with_theme(|t| t.current());
+
         let i18n = with_configs(|c| c.get_i18n());
 
         let mut should_close = false;
@@ -551,7 +966,12 @@ impl ConfigDialog {
         }
 
         let custom_frame = Frame::window(ui.style())
-            .fill(Color32::from_rgba_unmultiplied(16, 21, 25, 122))
+            .fill(Color32::from_rgba_unmultiplied(
+                current_theme.bg_main.to_color().r(),
+                current_theme.bg_main.to_color().g(),
+                current_theme.bg_main.to_color().b(),
+                122,
+            ))
             .corner_radius(CornerRadius::same(10))
             .inner_margin(Margin::same(10));
 
@@ -561,60 +981,56 @@ impl ConfigDialog {
 
         let frame = Frame::new()
             .corner_radius(CornerRadius::same(10))
-            .fill(COLOR_BG_MAIN)
+            .fill(current_theme.bg_main.to_color())
             .outer_margin(Margin::same(5));
 
-        Window::new(i18n.t("configs.title"))
-            .id(egui::Id::new("config_modal_window"))
-            .frame(custom_frame)
-            .order(Order::Foreground)
-            .default_size([desired_width, desired_height])
-            .min_size([300.0, 200.0])
-            .max_size([screen_rect.width() * 0.9, screen_rect.height() * 0.9])
-            .collapsible(false)
-            .resizable(false)
-            .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
-            .open(&mut is_open)
-            .show(ui, |ui| {
-                ui.set_width(ui.available_width());
-                ui.set_height(ui.available_height());
+        Window::new(
+            RichText::new(i18n.t("configs.title")).color(current_theme.text_primary.to_color()),
+        )
+        .id(Id::new("config_modal_window"))
+        .frame(custom_frame)
+        .order(Order::Foreground)
+        .default_size([desired_width, desired_height])
+        .min_size([300.0, 200.0])
+        .max_size([screen_rect.width() * 0.9, screen_rect.height() * 0.9])
+        .collapsible(false)
+        .resizable(false)
+        .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
+        .open(&mut is_open)
+        .show(ui, |ui| {
+            ui.set_width(ui.available_width());
+            ui.set_height(ui.available_height());
 
-                Panel::left("config_left_panel")
-                    .show_separator_line(false)
-                    .resizable(false)
-                    .frame(frame)
-                    .show_inside(ui, |ui| {
-                        ui.set_width(160.0);
-                        ui.add_space(8.0);
+            Panel::left("config_left_panel")
+                .show_separator_line(false)
+                .resizable(false)
+                .frame(frame)
+                .show_inside(ui, |ui| {
+                    ui.set_width(160.0);
+                    ui.add_space(8.0);
 
-                        self.render_config_sidebar(ui);
-                    });
-
-                CentralPanel::default().frame(frame).show_inside(ui, |ui| {
-                    ui.set_width(ui.available_width());
-                    ui.set_height(ui.available_height());
-
-                    let query = self.config_search.trim().to_lowercase();
-                    let frame = Frame::new().inner_margin(20.0);
-
-                    match self.current_config_tab {
-                        CurrentConfigTab::General => {
-                            self.render_general_settings(ui, &query, frame)
-                        }
-                        CurrentConfigTab::Terminal => {
-                            self.render_terminal_settings(ui, &query, frame)
-                        }
-                        CurrentConfigTab::Backend => {
-                            self.render_backend_settings(ui, &query, frame)
-                        }
-                        CurrentConfigTab::Appearance => {}
-                        CurrentConfigTab::Behavior => {}
-                        CurrentConfigTab::Language => {
-                            self.render_language_settings(ui, &query, frame)
-                        }
-                    }
+                    self.render_config_sidebar(ui);
                 });
+
+            CentralPanel::default().frame(frame).show_inside(ui, |ui| {
+                ui.set_max_width(ui.available_width());
+                ui.set_max_height(ui.available_height());
+
+                let query = self.config_search.trim().to_lowercase();
+                let frame = Frame::new().inner_margin(20.0);
+
+                match self.current_config_tab {
+                    CurrentConfigTab::General => self.render_general_settings(ui, &query, frame),
+                    CurrentConfigTab::Terminal => self.render_terminal_settings(ui, &query, frame),
+                    CurrentConfigTab::Backend => self.render_backend_settings(ui, &query, frame),
+                    CurrentConfigTab::Appearance => {
+                        self.render_appearance_settings(ui, &query, frame)
+                    }
+                    CurrentConfigTab::Behavior => {}
+                    CurrentConfigTab::Language => self.render_language_settings(ui, &query, frame),
+                }
             });
+        });
 
         if !is_open {
             should_close = true;

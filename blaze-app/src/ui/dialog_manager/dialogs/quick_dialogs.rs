@@ -17,7 +17,10 @@ use crate::{
         bootstrap::quick_access_manager::manager::with_quick_tags,
         runtime::bus_structs::QuickTagEvent,
     },
-    ui::{dialog_manager::manager::ModalDialog, themes::colors::COLOR_BG_MAIN},
+    ui::{
+        dialog_manager::manager::ModalDialog,
+        themes::{platform::structs::ToColor, theme_manager::with_theme},
+    },
 };
 use egui::{Color32, CornerRadius, Frame, Margin, Modal, Order, TextEdit, Ui, Window};
 use tracing::info;
@@ -520,10 +523,12 @@ impl QuickAccDialog {
     where
         F: FnMut(&mut Ui, bool) -> bool,
     {
+        let current_theme = with_theme(|t| t.current());
+
         let mut should_close = false;
 
         let custom_frame = Frame::NONE
-            .fill(COLOR_BG_MAIN)
+            .fill(current_theme.bg_main.to_color())
             .corner_radius(CornerRadius::same(10))
             .inner_margin(Margin::same(10));
 

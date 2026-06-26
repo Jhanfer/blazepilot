@@ -131,8 +131,73 @@ X11: Greater compatibility with older apps. Allows drag & drop from other applic
 """
 disclaimer = "These changes require restarting the app."
 
+
 [configs_appearance]
-title = "WIP :D"
+title = "Change appearance"
+reload_theme = "Reload theme"
+selection = "Select a theme"
+message = "You can modify each theme in ~/.config/blazepilotapp/themes"
+
+# Color editor
+color_editor = "Color editor"
+
+# States
+states = "States"
+error = "Error"
+success = "Success"
+warn = "Warning"
+
+# Backgrounds
+background = "Backgrounds"
+main_bg = "Main background"
+panel_bg = "Panel background"
+container_bg = "Container background"
+hover_bg = "Hover background"
+
+# Borders and buttons
+border-buttons = "Borders and buttons"
+border_panel = "Panel border"
+main_buttons = "Main buttons"
+
+# Accents
+accent = "Accents"
+accent_glow = "Accent glow"
+rubberband = "Selection band"
+selected_item = "Selected item"
+
+# Texts
+texts = "Texts"
+primary_text = "Primary text"
+secondary_text = "Secondary text"
+muted_text = "Muted text"
+
+# Tools
+tools = "Tools"
+primary-tool-color = "Primary tool color"
+secondary-tool-color = "Secondary tool color"
+tool-btn-active = "Active tool button"
+tool-btn-inactive = "Inactive tool button"
+tool-btn-hovered = "Tool button hovered"
+
+# File icons
+files = "Files"
+folder = "Folder"
+image = "Image"
+pdf = "PDF"
+doc = "Document"
+video = "Video"
+audio = "Audio"
+archive = "Compressed archive"
+code = "Code"
+font = "Font"
+exe = "Executable"
+fallback = "Default"
+
+# Theme actions
+theme-name = "Theme name"
+save-as-custom = "Save as custom theme"
+reset-defaults = "Reset to defaults"
+
 
 [configs_behavior]
 title = "WIP :D"

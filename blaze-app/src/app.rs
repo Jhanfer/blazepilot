@@ -18,6 +18,8 @@ use crate::core::system::clipboard::global_clipboard::TOKIO_RUNTIME;
 use crate::core::system::knowndirs::knowndirs_manager::KnownDirsManager;
 use crate::ui::blaze_ui_state::BlazeUiState;
 use crate::ui::modules::ui_callback::connect_ui_components_callback;
+use crate::ui::themes::platform::structs::ToColor;
+use crate::ui::themes::theme_manager::with_theme;
 use eframe::Frame;
 use egui::{FontData, FontDefinitions, FontFamily, Ui};
 use std::path::Path;
@@ -88,10 +90,69 @@ impl BlazeApp {
 
         ui.set_fonts(fonts);
     }
+
+    pub fn set_custom_visuals(&self, ui: &mut Ui) {
+        let current_theme = with_theme(|t| t.current());
+        ui.global_style_mut(|style| {
+            let vmut = &mut style.visuals;
+
+            let text_p = current_theme.text_primary.to_color();
+            let text_s = current_theme.text_secondary.to_color();
+            let border = current_theme.border_panel.to_color();
+
+            // Inactive
+            vmut.widgets.inactive.bg_fill = current_theme.main_buttons.to_color();
+            vmut.widgets.inactive.bg_stroke = egui::Stroke::new(1.0, border);
+            vmut.widgets.inactive.fg_stroke = egui::Stroke::new(1.0, text_p);
+            vmut.widgets.inactive.weak_bg_fill = current_theme.bg_container.to_color();
+
+            // Hover
+            vmut.widgets.hovered.bg_fill = current_theme.bg_hover.to_color();
+            vmut.widgets.hovered.bg_stroke =
+                egui::Stroke::new(1.0, current_theme.accent_glow.to_color());
+            vmut.widgets.hovered.fg_stroke =
+                egui::Stroke::new(1.0, current_theme.text_primary.to_color());
+            vmut.widgets.hovered.weak_bg_fill = current_theme.bg_hover.to_color();
+
+            // Selected
+            vmut.widgets.active.bg_fill = current_theme.item_selected.to_color();
+            vmut.widgets.active.bg_stroke = egui::Stroke::new(1.0, current_theme.accent.to_color());
+            vmut.widgets.active.fg_stroke =
+                egui::Stroke::new(1.0, current_theme.text_primary.to_color());
+            vmut.widgets.active.weak_bg_fill = current_theme.item_selected.to_color();
+
+            // ComboBox opened
+            vmut.widgets.open.bg_fill = current_theme.bg_container.to_color();
+            vmut.widgets.open.bg_stroke = egui::Stroke::new(1.0, border);
+            vmut.widgets.open.fg_stroke = egui::Stroke::new(1.0, text_s);
+            vmut.widgets.open.weak_bg_fill = current_theme.bg_container.to_color();
+
+            vmut.selection.bg_fill = current_theme.rubberband.to_color();
+            vmut.selection.stroke = egui::Stroke::new(1.0, current_theme.accent.to_color());
+
+            vmut.extreme_bg_color = current_theme.bg_container.to_color();
+
+            vmut.window_fill = current_theme.bg_panel.to_color();
+            vmut.window_stroke = egui::Stroke::new(1.0, border);
+
+            vmut.widgets.noninteractive.bg_stroke = egui::Stroke::new(1.0, border);
+
+            vmut.widgets.noninteractive.fg_stroke =
+                egui::Stroke::new(1.0, current_theme.text_muted.to_color());
+
+            vmut.widgets.noninteractive.weak_bg_fill = current_theme.bg_main.to_color();
+
+            vmut.panel_fill = current_theme.bg_main.to_color();
+            vmut.faint_bg_color = current_theme.bg_container.to_color();
+            vmut.override_text_color = Some(current_theme.text_primary.to_color());
+        });
+    }
 }
 
 impl eframe::App for BlazeApp {
     fn ui(&mut self, ui: &mut Ui, _frame: &mut Frame) {
+        self.set_custom_visuals(ui);
+
         self.set_up_custom_font(ui);
 
         with_configs(|c| match c.tick() {

@@ -1,8 +1,10 @@
 use crate::{
     core::{blaze_state::BlazeCoreState, system::disk_reader::disk::Disk},
     ui::{
-        blaze_ui_state::BlazeUiState, icons_cache::icons::*,
-        modules::custom_context_menu::context_state::ContextMenuKind, themes::colors::*,
+        blaze_ui_state::BlazeUiState,
+        icons_cache::icons::*,
+        modules::custom_context_menu::context_state::ContextMenuKind,
+        themes::{platform::structs::ToColor, theme_manager::with_theme},
     },
 };
 use egui::{
@@ -67,6 +69,8 @@ pub fn render_icon(
 }
 
 pub fn render_header_text(icon_key: &str, label: &str, ui: &mut Ui, ui_state: &mut BlazeUiState) {
+    let current_theme = with_theme(|t| t.current());
+
     let (rect, _resp) = ui.allocate_exact_size(vec2(ui.available_width(), 24.0), Sense::hover());
 
     let (icon_name, icon_bytes) = get_header_icon(icon_key);
@@ -75,7 +79,7 @@ pub fn render_header_text(icon_key: &str, label: &str, ui: &mut Ui, ui_state: &m
         ui,
         ui_state,
         icon_name,
-        COLOR_TEXT_PRIMARY,
+        current_theme.text_primary.to_color(),
         icon_bytes,
         rect,
     );
@@ -85,7 +89,7 @@ pub fn render_header_text(icon_key: &str, label: &str, ui: &mut Ui, ui_state: &m
         Align2::LEFT_CENTER,
         label,
         FontId::proportional(20.0),
-        Color32::from_rgb(255, 255, 255),
+        current_theme.text_primary.to_color(),
     );
 }
 
@@ -97,6 +101,10 @@ pub fn render_local_buttons(
     ui: &mut Ui,
     ui_state: &mut BlazeUiState,
 ) {
+    let current_theme = with_theme(|t| t.current());
+
+    let is_dark_theme = current_theme.text_primary.to_color().r() > 128;
+
     let (rect, response) = ui.allocate_exact_size(
         egui::vec2(ui.available_width(), 35.0),
         Sense::click_and_drag(),
@@ -104,12 +112,28 @@ pub fn render_local_buttons(
 
     let (bg_color, icon_color) = if response.hovered() {
         ui.set_cursor_icon(egui::CursorIcon::PointingHand);
-        (
-            Color32::from_rgba_unmultiplied(100, 100, 255, 60),
-            COLOR_ACCENT_GLOW,
-        )
+        let hover_bg = if is_dark_theme {
+            Color32::from_rgba_unmultiplied(
+                current_theme.accent_glow.to_color().r(),
+                current_theme.accent_glow.to_color().g(),
+                current_theme.accent_glow.to_color().b(),
+                80,
+            )
+        } else {
+            Color32::from_rgba_unmultiplied(
+                current_theme.accent_glow.to_color().r(),
+                current_theme.accent_glow.to_color().g(),
+                current_theme.accent_glow.to_color().b(),
+                10,
+            )
+        };
+
+        (hover_bg, current_theme.accent.to_color())
     } else {
-        (COLOR_MAIN_BUTTONS, Color32::WHITE)
+        (
+            current_theme.bg_hover.to_color(),
+            current_theme.tools_secondary.to_color(),
+        )
     };
 
     ui.painter().rect(
@@ -149,7 +173,7 @@ pub fn render_local_buttons(
         Align2::LEFT_CENTER,
         label,
         FontId::default(),
-        COLOR_TEXT_SECONDARY,
+        current_theme.text_secondary.to_color(),
     );
 }
 
@@ -159,6 +183,8 @@ pub fn render_drives_button(
     drive: Disk,
     ui_state: &mut BlazeUiState,
 ) {
+    let current_theme = with_theme(|t| t.current());
+
     let used = drive.used_percent / 100.0;
     let is_mounted = drive.mountpoint.is_some();
     let used_percentage = format!("Usado {}%", drive.used_percent as i32);
@@ -188,14 +214,32 @@ pub fn render_drives_button(
         ui_state.context_menu_state.target_drive = Some(drive);
     }
 
+    let is_dark_theme = current_theme.text_primary.to_color().r() > 128;
+
     let (bg_color, icon_color) = if response.hovered() {
-        ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
-        (
-            Color32::from_rgba_unmultiplied(100, 100, 255, 60),
-            COLOR_ACCENT_GLOW,
-        )
+        ui.set_cursor_icon(egui::CursorIcon::PointingHand);
+        let hover_bg = if is_dark_theme {
+            Color32::from_rgba_unmultiplied(
+                current_theme.accent_glow.to_color().r(),
+                current_theme.accent_glow.to_color().g(),
+                current_theme.accent_glow.to_color().b(),
+                80,
+            )
+        } else {
+            Color32::from_rgba_unmultiplied(
+                current_theme.accent_glow.to_color().r(),
+                current_theme.accent_glow.to_color().g(),
+                current_theme.accent_glow.to_color().b(),
+                10,
+            )
+        };
+
+        (hover_bg, current_theme.accent.to_color())
     } else {
-        (COLOR_MAIN_BUTTONS, Color32::WHITE)
+        (
+            current_theme.bg_hover.to_color(),
+            current_theme.tools_secondary.to_color(),
+        )
     };
 
     ui.painter().rect(
@@ -271,6 +315,6 @@ pub fn render_drives_button(
         Align2::LEFT_CENTER,
         display_name,
         FontId::default(),
-        COLOR_TEXT_SECONDARY,
+        current_theme.text_secondary.to_color(),
     );
 }

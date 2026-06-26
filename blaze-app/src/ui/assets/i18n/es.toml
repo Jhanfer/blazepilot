@@ -131,8 +131,73 @@ X11: Mayor compatibilidad con apps antiguas. Permite el drag & drop desde otras 
 """
 disclaimer = "Estos cambios requieren reiniciar la app."
 
+
 [configs_appearance]
-title = "WIP :D"
+title = "Cambia la apariencia"
+reload_theme = "Recargar tema"
+selection = "Selecciona un tema"
+message = "Puedes modificar cada tema en ~/.config/blazepilotapp/themes"
+
+# Editor de colores
+color_editor = "Editor de colores"
+
+# Estados
+states = "Estados"
+error = "Error"
+success = "Éxito"
+warn = "Advertencia"
+
+# Fondos
+background = "Fondos"
+main_bg = "Fondo principal"
+panel_bg = "Fondo del panel"
+container_bg = "Fondo del contenedor"
+hover_bg = "Fondo al pasar el cursor"
+
+# Bordes y botones
+border-buttons = "Bordes y botones"
+border_panel = "Borde del panel"
+main_buttons = "Botones principales"
+
+# Acentos
+accent = "Acentos"
+accent_glow = "Brillo del acento"
+rubberband = "Banda de selección"
+selected_item = "Elemento seleccionado"
+
+# Textos
+texts = "Textos"
+primary_text = "Texto principal"
+secondary_text = "Texto secundario"
+muted_text = "Texto atenuado"
+
+# Herramientas
+tools = "Herramientas"
+primary-tool-color = "Color principal de herramienta"
+secondary-tool-color = "Color secundario de herramienta"
+tool-btn-active = "Botón de herramienta activo"
+tool-btn-inactive = "Botón de herramienta inactivo"
+tool-btn-hovered = "Botón de herramienta al pasar el cursor"
+
+# Iconos de archivo
+files = "Archivos"
+folder = "Carpeta"
+image = "Imagen"
+pdf = "PDF"
+doc = "Documento"
+video = "Video"
+audio = "Audio"
+archive = "Archivo comprimido"
+code = "Código"
+font = "Fuente"
+exe = "Ejecutable"
+fallback = "Por defecto"
+
+# Acciones del tema
+theme-name = "Nombre del tema"
+save-as-custom = "Guardar como tema personalizado"
+reset-defaults = "Restablecer valores por defecto"
+
 
 [configs_behavior]
 title = "WIP :D"

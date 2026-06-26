@@ -19,7 +19,7 @@ use crate::{
             custom_context_menu::context_state::ContextMenuKind,
             utilities::{ensure_min_lightness, git_dot_color, resolve_icon, text_color_for_git},
         },
-        themes::colors::COLOR_MAIN_BUTTONS,
+        themes::{platform::structs::ToColor, theme_manager::with_theme},
     },
     utils::formating::{format_date, format_size},
 };
@@ -297,6 +297,8 @@ pub fn render_grid_scrollview(
     ui_state: &mut BlazeUiState,
     content_rect: Rect,
 ) {
+    let current_theme = with_theme(|t| t.current());
+
     let i18n = with_configs(|c| c.get_i18n());
 
     ui_state.evict_thumbnail_cache_if_dir_changed(&state.cwd);
@@ -460,8 +462,11 @@ pub fn render_grid_scrollview(
                         pos2(rect.max.x - margin, rect.max.y - margin),
                     );
 
-                    ui.painter()
-                        .rect_filled(selection_rect, 8.0, COLOR_MAIN_BUTTONS);
+                    ui.painter().rect_filled(
+                        selection_rect,
+                        8.0,
+                        current_theme.bg_hover.to_color(),
+                    );
                 }
 
                 if state.is_selected(i) {
@@ -474,7 +479,12 @@ pub fn render_grid_scrollview(
                     ui.painter().rect_filled(
                         selection_rect,
                         8.0,
-                        Color32::from_rgba_unmultiplied(100, 100, 255, 60),
+                        Color32::from_rgba_unmultiplied(
+                            current_theme.item_selected.to_color().r(),
+                            current_theme.item_selected.to_color().g(),
+                            current_theme.item_selected.to_color().b(),
+                            60,
+                        ),
                     );
                 }
 
@@ -608,7 +618,7 @@ pub fn render_grid_scrollview(
                         pos2(icon_rect.max.x.round(), icon_rect.max.y.round()),
                     );
 
-                    let normalized_color = ensure_min_lightness(color, 0.70);
+                    let normalized_color = ensure_min_lightness(color);
 
                     let icon = ui_state.icon_cache.get_or_load(
                         ui,
@@ -732,7 +742,7 @@ pub fn render_grid_scrollview(
                     ui.painter().with_clip_rect(name_rect).galley(
                         pos2(text_x, text_y),
                         name_galley,
-                        ensure_min_lightness(name_color, 0.90),
+                        ensure_min_lightness(name_color),
                     );
                 }
 

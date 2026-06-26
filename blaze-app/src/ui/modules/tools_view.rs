@@ -13,7 +13,7 @@ use crate::{
         blaze_ui_state::BlazeUiState,
         icons_cache::icons::{self, ICON_LAYOUT_GRID, ICON_LAYOUT_LIST, ICON_TAG},
         modules::utilities::ensure_min_lightness,
-        themes::colors::*,
+        themes::{platform::structs::ToColor, theme_manager::with_theme},
     },
 };
 use egui::{
@@ -24,6 +24,8 @@ use std::sync::Arc;
 use tracing::warn;
 
 fn render_tag_button(ui: &mut Ui, state: &mut BlazeCoreState, ui_state: &mut BlazeUiState) {
+    let current_theme = with_theme(|t| t.current());
+
     let (container_rect, resp_toggle) = ui.allocate_exact_size(vec2(50.0, 25.0), Sense::click());
 
     if resp_toggle.clicked() {
@@ -38,7 +40,7 @@ fn render_tag_button(ui: &mut Ui, state: &mut BlazeCoreState, ui_state: &mut Bla
     }
 
     ui.painter()
-        .rect_filled(container_rect, 20.0, COLOR_BG_CONTAINER);
+        .rect_filled(container_rect, 20.0, current_theme.border_panel.to_color());
 
     let is_tags = matches!(
         state.view_mode,
@@ -66,7 +68,7 @@ fn render_tag_button(ui: &mut Ui, state: &mut BlazeCoreState, ui_state: &mut Bla
     ui.painter().rect_stroke(
         capsule_rect,
         radius,
-        Stroke::new(1.0, COLOR_ACCENT_GLOW),
+        Stroke::new(1.0, current_theme.accent_glow.to_color()),
         egui::StrokeKind::Outside,
     );
 
@@ -102,12 +104,12 @@ fn render_tag_button(ui: &mut Ui, state: &mut BlazeCoreState, ui_state: &mut Bla
 
     for (name, bytes, rect, is_active) in icons {
         let base_color = if is_active {
-            COLOR_ACCENT_GLOW
+            current_theme.accent.to_color()
         } else {
-            COLOR_TEXT_MUTED
+            current_theme.tools_secondary.to_color()
         };
 
-        let color = ensure_min_lightness(base_color, 0.70);
+        let color = ensure_min_lightness(base_color);
 
         let icon = ui_state
             .icon_cache
@@ -128,8 +130,10 @@ pub fn tools(
     files: &[Arc<FileEntry>],
     ui: &mut Ui,
 ) {
+    let current_theme = with_theme(|t| t.current());
+
     Frame::new()
-        .fill(COLOR_BG_CONTAINER)
+        .fill(current_theme.border_panel.to_color())
         .inner_margin(Margin {
             left: 15,
             right: 15,
@@ -144,7 +148,7 @@ pub fn tools(
         })
         .stroke(Stroke {
             width: 0.5,
-            color: COLOR_ACCENT_GLOW,
+            color: current_theme.accent_glow.to_color(),
         })
         .show(ui, |ui| {
             let toolbar_height = 25.0;
@@ -171,14 +175,14 @@ pub fn tools(
                         ui,
                         icon_plus_fol,
                         icon_bytes_plus_fol,
-                        ensure_min_lightness(Color32::GRAY, 0.70),
+                        ensure_min_lightness(Color32::GRAY),
                         icon_size,
                     );
 
                     let plus_color = if new_fol.hovered() {
-                        COLOR_TOOLS_PRIMARY
+                        current_theme.tools_primary.to_color()
                     } else {
-                        COLOR_TOOLS_SECONDARY
+                        current_theme.tools_secondary.to_color()
                     };
 
                     ui.painter().image(
@@ -207,14 +211,14 @@ pub fn tools(
                         ui,
                         icon_plus_file,
                         icon_bytes_plus_file,
-                        ensure_min_lightness(Color32::GRAY, 0.70),
+                        ensure_min_lightness(Color32::GRAY),
                         icon_size,
                     );
 
                     let plus_color = if new_file.hovered() {
-                        COLOR_TOOLS_PRIMARY
+                        current_theme.tools_primary.to_color()
                     } else {
-                        COLOR_TOOLS_SECONDARY
+                        current_theme.tools_secondary.to_color()
                     };
 
                     ui.painter().image(
@@ -263,14 +267,14 @@ pub fn tools(
                     ui,
                     icon_cut,
                     icon_bytes_cut,
-                    ensure_min_lightness(Color32::GRAY, 0.70),
+                    ensure_min_lightness(Color32::GRAY),
                     icon_size,
                 );
 
                 let sissors_color = if cut_resp.hovered() && has_selection {
-                    COLOR_TOOLS_PRIMARY
+                    current_theme.tools_primary.to_color()
                 } else {
-                    COLOR_TOOLS_SECONDARY
+                    current_theme.tools_secondary.to_color()
                 };
 
                 ui.painter().image(
@@ -301,14 +305,14 @@ pub fn tools(
                     ui,
                     icon_copy,
                     icon_bytes_copy,
-                    ensure_min_lightness(Color32::GRAY, 0.70),
+                    ensure_min_lightness(Color32::GRAY),
                     icon_size,
                 );
 
                 let clip_color = if cop_resp.hovered() && has_selection {
-                    COLOR_TOOLS_PRIMARY
+                    current_theme.tools_primary.to_color()
                 } else {
-                    COLOR_TOOLS_SECONDARY
+                    current_theme.tools_secondary.to_color()
                 };
 
                 ui.painter().image(
@@ -339,14 +343,14 @@ pub fn tools(
                     ui,
                     icon_paste,
                     icon_bytes_paste,
-                    ensure_min_lightness(Color32::GRAY, 0.70),
+                    ensure_min_lightness(Color32::GRAY),
                     icon_size,
                 );
 
                 let pas_color = if pas_resp.hovered() && has_clipboard {
-                    COLOR_TOOLS_PRIMARY
+                    current_theme.tools_primary.to_color()
                 } else {
-                    COLOR_TOOLS_SECONDARY
+                    current_theme.tools_secondary.to_color()
                 };
 
                 ui.painter().image(
@@ -378,14 +382,14 @@ pub fn tools(
                     ui,
                     icon_trash,
                     icon_bytes_trash,
-                    ensure_min_lightness(Color32::GRAY, 0.70),
+                    ensure_min_lightness(Color32::GRAY),
                     icon_size,
                 );
 
                 let del_color = if del_resp.hovered() && has_selection {
-                    COLOR_TOOLS_PRIMARY
+                    current_theme.tools_primary.to_color()
                 } else {
-                    COLOR_TOOLS_SECONDARY
+                    current_theme.tools_secondary.to_color()
                 };
 
                 ui.painter().image(
@@ -441,14 +445,14 @@ pub fn tools(
                     ui,
                     icon_name,
                     icon_bytes,
-                    ensure_min_lightness(Color32::GRAY, 0.70),
+                    ensure_min_lightness(Color32::GRAY),
                     icon_size,
                 );
 
                 let sel_color = if select_resp.hovered() {
-                    COLOR_TOOLS_PRIMARY
+                    current_theme.tools_primary.to_color()
                 } else {
-                    COLOR_TOOLS_SECONDARY
+                    current_theme.tools_secondary.to_color()
                 };
 
                 ui.painter().image(
@@ -477,14 +481,14 @@ pub fn tools(
                     ui,
                     icon_refresh,
                     icon_bytes_refresh,
-                    ensure_min_lightness(Color32::GRAY, 0.70),
+                    ensure_min_lightness(Color32::GRAY),
                     icon_size,
                 );
 
                 let ref_color = if refresh_resp.hovered() {
-                    COLOR_TOOLS_PRIMARY
+                    current_theme.tools_primary.to_color()
                 } else {
-                    COLOR_TOOLS_SECONDARY
+                    current_theme.tools_secondary.to_color()
                 };
 
                 ui.painter().image(
@@ -528,14 +532,14 @@ pub fn tools(
                         ui,
                         icon_refresh,
                         icon_bytes_refresh,
-                        ensure_min_lightness(Color32::GRAY, 0.70),
+                        ensure_min_lightness(Color32::GRAY),
                         icon_size,
                     );
 
                     let hidd_color = if hidd_resp.hovered() {
-                        COLOR_TOOLS_PRIMARY
+                        current_theme.tools_primary.to_color()
                     } else {
-                        COLOR_TOOLS_SECONDARY
+                        current_theme.tools_secondary.to_color()
                     };
 
                     ui.painter().image(

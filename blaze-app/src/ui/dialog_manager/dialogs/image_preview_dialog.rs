@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::ui::dialog_manager::manager::ModalDialog;
 use crate::ui::image_preview::image_preview_handler::ImagePreviewState;
-use crate::ui::themes::colors::COLOR_ACCENT_GLOW;
+use crate::ui::themes::platform::structs::ToColor;
+use crate::ui::{dialog_manager::manager::ModalDialog, themes::theme_manager::with_theme};
 use egui::{
     pos2, vec2, Button, Color32, CornerRadius, Frame, Key, Margin, Order, Rect, Sense, Stroke, Ui,
     Vec2, Window,
@@ -204,6 +204,8 @@ impl ImagePreviewDialog {
     }
 
     pub fn render_dialog(&mut self, ui: &mut Ui) -> bool {
+        let current_theme = with_theme(|t| t.current());
+
         let mut should_close = false;
         let Some(pvw) = self.preview.as_mut() else {
             return false;
@@ -235,7 +237,7 @@ impl ImagePreviewDialog {
 
             Frame::NONE
                 .fill(pvw.background_color.linear_multiply(0.8))
-                .stroke(Stroke::new(0.5, COLOR_ACCENT_GLOW))
+                .stroke(Stroke::new(0.5, current_theme.accent_glow.to_color()))
                 .corner_radius(8.0)
                 .inner_margin(10.0)
                 .show(ui, |ui| {

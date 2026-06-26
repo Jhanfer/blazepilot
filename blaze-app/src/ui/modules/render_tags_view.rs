@@ -18,7 +18,7 @@ use crate::{
                 ensure_min_lightness, render_button, render_op_buttons, render_quicklink_icon,
             },
         },
-        themes::colors::*,
+        themes::{platform::structs::ToColor, theme_manager::with_theme},
     },
     utils::formating::{format_date, format_size},
 };
@@ -42,6 +42,8 @@ pub fn tag_views(
     bottom_padding: i8,
     tabs_height: i8,
 ) {
+    let current_theme = with_theme(|t| t.current());
+
     let mut tag_len: usize = 0;
 
     let i18n = with_configs(|c| c.get_i18n());
@@ -53,7 +55,7 @@ pub fn tag_views(
             top: 0,
             bottom: 10,
         })
-        .fill(COLOR_BG_PANEL)
+        .fill(current_theme.bg_panel.to_color())
         .corner_radius(CornerRadius {
             nw: 0,
             ne: 0,
@@ -62,9 +64,11 @@ pub fn tag_views(
         })
         .stroke(Stroke {
             width: 0.5,
-            color: COLOR_ACCENT_GLOW,
+            color: current_theme.accent_glow.to_color(),
         })
         .show(ui, |ui| {
+            let current_theme = with_theme(|t| t.current());
+
             ScrollArea::vertical().id_salt("all_tags").show(ui, |ui| {
                 if !ui.memory(|m| m.focused().is_some()) {
                     ui.memory_mut(|m| m.request_focus(ui.id()));
@@ -105,8 +109,8 @@ pub fn tag_views(
                         render_button(
                             ui,
                             &i18n.t("tags_quick.new"),
-                            COLOR_BG_MAIN,
-                            COLOR_ACCENT_GLOW,
+                            current_theme.bg_main.to_color(),
+                            current_theme.accent_glow.to_color(),
                             Some(|| {
                                 dispatcher
                                     .send(UiEvent::QuickTagEvent(QuickTagEvent::CreateNewTag {
@@ -121,8 +125,8 @@ pub fn tag_views(
                         render_button(
                             ui,
                             &i18n.t("tags_quick.all"),
-                            COLOR_BG_MAIN,
-                            COLOR_ACCENT_GLOW,
+                            current_theme.bg_main.to_color(),
+                            current_theme.accent_glow.to_color(),
                             Some(|| {
                                 state.tag_filter = TagViewFilter::All {
                                     all_items_len: total_items,
@@ -147,7 +151,7 @@ pub fn tag_views(
                                                 .zip(tags_items_len.iter()),
                                         )
                                     {
-                                        let vivid_color = ensure_min_lightness(*tag_color, 0.45);
+                                        let vivid_color = ensure_min_lightness(*tag_color);
 
                                         let color = Color32::from_rgba_unmultiplied(
                                             vivid_color.r(),
@@ -156,7 +160,7 @@ pub fn tag_views(
                                             60,
                                         );
 
-                                        let text_color = ensure_min_lightness(color, 0.70);
+                                        let text_color = ensure_min_lightness(color);
 
                                         render_button::<_, _>(
                                             ui,
@@ -208,7 +212,7 @@ pub fn tag_views(
                         |ui| {
                             ui.label(
                                 egui::RichText::new(&*i18n.t("tags_quick.empty"))
-                                    .color(COLOR_TEXT_SECONDARY)
+                                    .color(current_theme.text_secondary.to_color())
                                     .size(14.0)
                                     .strong(),
                             );
@@ -223,7 +227,7 @@ pub fn tag_views(
                         TagViewFilter::All { .. } => true,
                         TagViewFilter::Tag { name, .. } => *t.title == *name,
                     }) {
-                        let vivid_color = ensure_min_lightness(tag.color, 0.45);
+                        let vivid_color = ensure_min_lightness(tag.color);
 
                         let color = Color32::from_rgba_unmultiplied(
                             vivid_color.r(),
@@ -232,7 +236,7 @@ pub fn tag_views(
                             60,
                         );
 
-                        let text_color = ensure_min_lightness(color, 0.70);
+                        let text_color = ensure_min_lightness(color);
 
                         Frame::NONE
                             .corner_radius(CornerRadius::same(20))
@@ -260,7 +264,7 @@ pub fn tag_views(
                                                 "tags_quick.count",
                                                 &[("query", &tag.items.len().to_string())],
                                             ))
-                                            .color(COLOR_TEXT_SECONDARY)
+                                            .color(current_theme.text_secondary.to_color())
                                             .size(11.0),
                                         )
                                         .selectable(false),
@@ -327,7 +331,7 @@ pub fn tag_views(
                                                     RichText::new(
                                                         &*i18n.t("tags_quick.add_something"),
                                                     )
-                                                    .color(COLOR_TEXT_SECONDARY)
+                                                    .color(current_theme.text_secondary.to_color())
                                                     .size(14.0)
                                                     .strong(),
                                                 );
@@ -477,7 +481,7 @@ pub fn tag_views(
                                                     );
 
                                                     let item_vivid =
-                                                        ensure_min_lightness(item.color, 0.45);
+                                                        ensure_min_lightness(item.color);
 
                                                     let color = Color32::from_rgba_unmultiplied(
                                                         item_vivid.r(),
@@ -487,7 +491,7 @@ pub fn tag_views(
                                                     );
 
                                                     let fixed_item_color =
-                                                        ensure_min_lightness(color, 0.70);
+                                                        ensure_min_lightness(color);
 
                                                     let glow = egui::epaint::Shadow {
                                                         offset: [1, 1],

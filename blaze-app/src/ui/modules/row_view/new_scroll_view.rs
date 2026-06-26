@@ -22,7 +22,7 @@ use crate::{
             custom_context_menu::context_state::ContextMenuKind,
             utilities::{ensure_min_lightness, git_dot_color, resolve_icon, text_color_for_git},
         },
-        themes::colors::COLOR_MAIN_BUTTONS,
+        themes::{platform::structs::ToColor, theme_manager::with_theme},
     },
     utils::formating::{format_date, format_size},
 };
@@ -245,6 +245,8 @@ pub fn new_render_scrollview(
     total_rows: usize,
     content_rect: Rect,
 ) {
+    let current_theme = with_theme(|t| t.current());
+
     let icon_size = state.row_view.icon_size;
 
     let i18n = with_configs(|c| c.get_i18n());
@@ -276,7 +278,7 @@ pub fn new_render_scrollview(
     let (header_rect, _) = ui.allocate_exact_size(vec2(available, header_height), Sense::hover());
 
     let painter = ui.painter_at(header_rect);
-    painter.rect_filled(header_rect, 0.0, Color32::from_rgb(20, 24, 28));
+    painter.rect_filled(header_rect, 0.0, Color32::TRANSPARENT);
 
     // Botón Nombre
     let name_btn_rect = Rect::from_min_size(header_rect.min, vec2(name_w, header_height));
@@ -293,9 +295,11 @@ pub fn new_render_scrollview(
             Button::new(
                 RichText::new(name_label)
                     .size(11.0)
-                    .color(Color32::from_rgb(140, 140, 160)),
+                    .color(current_theme.text_secondary.to_color()),
             )
-            .frame(false),
+            .fill(current_theme.bg_container.to_color())
+            .stroke(Stroke::NONE)
+            .frame(true),
         )
         .clicked()
     {
@@ -331,9 +335,11 @@ pub fn new_render_scrollview(
             Button::new(
                 RichText::new(date_label)
                     .size(11.0)
-                    .color(Color32::from_rgb(140, 140, 160)),
+                    .color(current_theme.text_secondary.to_color()),
             )
-            .frame(false),
+            .fill(current_theme.bg_container.to_color())
+            .stroke(Stroke::NONE)
+            .frame(true),
         )
         .clicked()
     {
@@ -369,9 +375,11 @@ pub fn new_render_scrollview(
             Button::new(
                 RichText::new(size_label)
                     .size(11.0)
-                    .color(Color32::from_rgb(140, 140, 160)),
+                    .color(current_theme.text_secondary.to_color()),
             )
-            .frame(false),
+            .fill(current_theme.bg_container.to_color())
+            .stroke(Stroke::NONE)
+            .frame(true),
         )
         .clicked()
     {
@@ -402,9 +410,9 @@ pub fn new_render_scrollview(
 
         if handle_response.hovered() || handle_response.dragged() {
             ui.set_cursor_icon(CursorIcon::ResizeColumn);
-            painter.rect_filled(handle_rect, 0.0, Color32::from_rgb(100, 100, 140));
+            painter.rect_filled(handle_rect, 0.0, current_theme.accent.to_color());
         } else {
-            painter.rect_filled(handle_rect, 0.0, Color32::from_rgb(50, 50, 60));
+            painter.rect_filled(handle_rect, 0.0, current_theme.text_muted.to_color());
         }
 
         if handle_response.dragged() {
@@ -521,14 +529,20 @@ pub fn new_render_scrollview(
             // --- Selección y hover ---
             if response.hovered() {
                 ui.set_cursor_icon(CursorIcon::PointingHand);
-                ui.painter().rect_filled(rect, 5.0, COLOR_MAIN_BUTTONS);
+                ui.painter()
+                    .rect_filled(rect, 5.0, current_theme.bg_hover.to_color());
             }
 
             if state.is_selected(i) {
                 ui.painter().rect_filled(
                     rect,
                     5.0,
-                    Color32::from_rgba_unmultiplied(100, 100, 255, 60),
+                    Color32::from_rgba_unmultiplied(
+                        current_theme.item_selected.to_color().r(),
+                        current_theme.item_selected.to_color().g(),
+                        current_theme.item_selected.to_color().b(),
+                        60,
+                    ),
                 );
             }
 
@@ -669,7 +683,7 @@ pub fn new_render_scrollview(
                     pos2(icon_rect.max.x.round(), icon_rect.max.y.round()),
                 );
 
-                let normalized_color = ensure_min_lightness(color, 0.70);
+                let normalized_color = ensure_min_lightness(color);
 
                 let icon = ui_state.icon_cache.get_or_load(
                     ui,
@@ -737,7 +751,7 @@ pub fn new_render_scrollview(
             name_painter.galley(
                 pos2(name_start_x, rect.center().y - name_galley.size().y / 2.0),
                 name_galley,
-                ensure_min_lightness(name_color, 0.90),
+                ensure_min_lightness(name_color),
             );
 
             // Columna Modified
@@ -750,7 +764,7 @@ pub fn new_render_scrollview(
                 f.layout_no_wrap(
                     format_date(file.modified).to_string(),
                     FontId::proportional(date_font_size),
-                    Color32::from_rgb(109, 108, 111),
+                    current_theme.text_secondary.to_color(),
                 )
             });
             ui.painter().with_clip_rect(date_rect).galley(
@@ -789,7 +803,7 @@ pub fn new_render_scrollview(
                 f.layout_no_wrap(
                     size_text,
                     FontId::proportional(size_font_size),
-                    Color32::from_rgb(109, 108, 111),
+                    current_theme.text_secondary.to_color(),
                 )
             });
             ui.painter().with_clip_rect(size_rect).galley(

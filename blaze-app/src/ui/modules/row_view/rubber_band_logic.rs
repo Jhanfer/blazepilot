@@ -1,6 +1,6 @@
 use crate::{
     core::{blaze_state::BlazeCoreState, files::blaze_motor::motor_structs::FileEntry},
-    ui::themes::colors::COLOR_ACCENT_GLOW,
+    ui::themes::{platform::structs::ToColor, theme_manager::with_theme},
 };
 use egui::{pos2, vec2, Color32, Painter, Rect, Stroke};
 use std::sync::Arc;
@@ -13,6 +13,8 @@ pub fn render_row_rubberband(
     content_rect: Rect,
     row_height: f32,
 ) {
+    let current_theme = with_theme(|t| t.current());
+
     if let (Some(start), Some(current)) = (
         state.rubber_band.rubber_band_start,
         state.rubber_band.rubber_band_current,
@@ -26,9 +28,9 @@ pub fn render_row_rubberband(
             rect,
             10.0,
             Color32::from_rgba_unmultiplied(
-                COLOR_ACCENT_GLOW.r(),
-                COLOR_ACCENT_GLOW.g(),
-                COLOR_ACCENT_GLOW.b(),
+                current_theme.accent_glow.to_color().r(),
+                current_theme.accent_glow.to_color().g(),
+                current_theme.accent_glow.to_color().b(),
                 40,
             ),
         );
@@ -38,9 +40,9 @@ pub fn render_row_rubberband(
         let stroke = Stroke::new(
             3.0,
             Color32::from_rgba_unmultiplied(
-                COLOR_ACCENT_GLOW.r(),
-                COLOR_ACCENT_GLOW.g(),
-                COLOR_ACCENT_GLOW.b(),
+                current_theme.accent_glow.to_color().r(),
+                current_theme.accent_glow.to_color().g(),
+                current_theme.accent_glow.to_color().b(),
                 200,
             ),
         );

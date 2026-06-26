@@ -10,6 +10,7 @@ use crate::{
     ui::{
         blaze_ui_state::BlazeUiState,
         icons_cache::{icons::*, thumbnails::thumbnails_manager::Thumbnail},
+        themes::{platform::structs::ToColor, theme_manager::with_theme},
     },
 };
 use egui::{
@@ -23,16 +24,20 @@ pub fn resolve_icon(
     file: &Arc<FileEntry>,
     color_snapshot: &HashMap<FileId, Color32>,
 ) -> (String, &'static [u8], Color32) {
+    let current_theme = with_theme(|t| t.current());
     if file.is_dir() {
         let (color, cache_key) = if let Some(file_id) = &file.unique_id {
             let color = color_snapshot
                 .get(file_id)
                 .copied()
-                .unwrap_or(Color32::YELLOW);
+                .unwrap_or(current_theme.file_theme.folder_default.to_color());
             let cache_key = format!("folder-{:?}", file_id);
             (color, cache_key)
         } else {
-            (Color32::YELLOW, "folder-unknown".to_string())
+            (
+                current_theme.file_theme.folder_default.to_color(),
+                "folder-unknown".to_string(),
+            )
         };
         (cache_key, ICON_FOLDER_OPEN, color)
     } else {
@@ -40,52 +45,59 @@ pub fn resolve_icon(
             FileExtension::Image(_) => (
                 "image".to_string(),
                 ICON_IMAGE,
-                Color32::from_rgb(100, 200, 255),
+                current_theme.file_theme.image.to_color(),
             ),
-            FileExtension::Document(DocType::Pdf) => {
-                ("pdf".to_string(), ICON_PDF, Color32::from_rgb(255, 80, 80))
-            }
+            FileExtension::Document(DocType::Pdf) => (
+                "pdf".to_string(),
+                ICON_PDF,
+                current_theme.file_theme.pdf.to_color(),
+            ),
             FileExtension::Document(_) => (
                 "doc".to_string(),
                 ICON_DOC,
-                Color32::from_rgb(100, 140, 255),
+                current_theme.file_theme.document.to_color(),
             ),
             FileExtension::Video(_) => (
                 "video".to_string(),
                 ICON_VIDEO,
-                Color32::from_rgb(200, 100, 255),
+                current_theme.file_theme.video.to_color(),
             ),
             FileExtension::Audio(_) => (
                 "audio".to_string(),
                 ICON_VIDEO,
-                Color32::from_rgb(255, 200, 80),
+                current_theme.file_theme.audio.to_color(),
             ),
             FileExtension::Archive(_) => (
                 "archive".to_string(),
                 ICON_ARCHIVE,
-                Color32::from_rgb(255, 160, 60),
+                current_theme.file_theme.archive.to_color(),
             ),
             FileExtension::Code(_) => (
                 "code".to_string(),
                 ICON_CODE,
-                Color32::from_rgb(100, 255, 150),
+                current_theme.file_theme.code.to_color(),
             ),
             FileExtension::Font(_) => (
                 "font".to_string(),
                 ICON_FONT,
-                Color32::from_rgb(200, 200, 200),
+                current_theme.file_theme.font.to_color(),
             ),
             FileExtension::Executable(_) => (
                 "exe".to_string(),
                 ICON_EXE,
-                Color32::from_rgb(255, 100, 100),
+                current_theme.file_theme.executable.to_color(),
             ),
-            FileExtension::Unknown => ("file".to_string(), ICON_FILE, Color32::WHITE),
+            FileExtension::Unknown => (
+                "file".to_string(),
+                ICON_FILE,
+                current_theme.file_theme.fallback.to_color(),
+            ),
         }
     }
 }
 
 pub fn text_color_for_git(git: Option<&GitStatus>) -> Color32 {
+    let current_theme = with_theme(|t| t.current());
     match git {
         Some(GitStatus::Modified) => Color32::from_rgb(255, 200, 80),
         Some(GitStatus::Staged) => Color32::from_rgb(100, 220, 100),
@@ -93,7 +105,7 @@ pub fn text_color_for_git(git: Option<&GitStatus>) -> Color32 {
         Some(GitStatus::Ignored) => Color32::from_rgb(100, 100, 100),
         Some(GitStatus::Conflict) => Color32::from_rgb(255, 80, 80),
         Some(GitStatus::Deleted) => Color32::from_rgb(255, 60, 60),
-        Some(GitStatus::Clean) | None => Color32::from_rgb(189, 189, 189),
+        Some(GitStatus::Clean) | None => current_theme.text_primary.to_color(),
     }
 }
 
@@ -109,7 +121,9 @@ pub fn git_dot_color(git: Option<&GitStatus>) -> Option<Color32> {
     }
 }
 
-pub fn ensure_min_lightness(color: Color32, min_lightness: f32) -> Color32 {
+pub fn ensure_min_lightness(color: Color32) -> Color32 {
+    let min_lightness = with_theme(|t| t.current().luminance);
+
     let r = color.r() as f32 / 255.0;
     let g = color.g() as f32 / 255.0;
     let b = color.b() as f32 / 255.0;
@@ -230,10 +244,16 @@ pub fn render_button<F, C>(
     F: FnMut(),
     C: Fn(&mut Ui),
 {
+    let current_theme = with_theme(|t| t.current());
+
     let mut font = TextStyle::Button.resolve(ui.style());
 
     let galley = ui.fonts_mut(|f| {
-        f.layout_no_wrap(label.to_string(), font.clone(), ui.visuals().text_color())
+        f.layout_no_wrap(
+            label.to_string(),
+            font.clone(),
+            current_theme.text_primary.to_color(),
+        )
     });
 
     let clickable = callback.is_some();

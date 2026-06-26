@@ -10,7 +10,7 @@ use crate::{
             grid_view::render_grid_panel_view::grid_panel_frame, render_tags_view::tag_views,
             row_view::render_row_panel_view::row_panel_frame, tools_view::tools,
         },
-        themes::colors::*,
+        themes::{platform::structs::ToColor, theme_manager::with_theme},
     },
 };
 use egui::{CentralPanel, Event, Frame, Margin, MouseWheelUnit, Ui};
@@ -22,6 +22,8 @@ pub fn render_views(
     state: &mut BlazeCoreState,
     ui_state: &mut BlazeUiState,
 ) {
+    let current_theme = with_theme(|t| t.current());
+
     state.resize_selection(files.len());
 
     let tabs_height: i8 = if state.motor.borrow_mut().tabs.len() > 1 {
@@ -32,12 +34,14 @@ pub fn render_views(
 
     let bottom_padding = 10.0 as i8;
 
-    let custom_frame = Frame::NONE.fill(COLOR_BG_MAIN).inner_margin(Margin {
-        left: 15,
-        right: 15,
-        top: 0,
-        bottom: bottom_padding + tabs_height,
-    });
+    let custom_frame = Frame::NONE
+        .fill(current_theme.bg_main.to_color())
+        .inner_margin(Margin {
+            left: 15,
+            right: 15,
+            top: 0,
+            bottom: bottom_padding + tabs_height,
+        });
 
     let ctrl_scroll = ui.input(|i| {
         if i.modifiers.ctrl {

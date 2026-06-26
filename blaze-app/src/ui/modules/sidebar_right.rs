@@ -23,7 +23,8 @@ use crate::ui::blaze_ui_state::BlazeUiState;
 use crate::ui::icons_cache::icons;
 use crate::ui::icons_cache::thumbnails::thumbnails_manager::Thumbnail;
 use crate::ui::modules::utilities::{ensure_min_lightness, resolve_icon};
-use crate::ui::themes::colors::*;
+use crate::ui::themes::platform::structs::ToColor;
+use crate::ui::themes::theme_manager::with_theme;
 use crate::utils::formating::{format_date, format_size};
 use egui::{
     pos2, vec2, Align, Button, Color32, ColorImage, CornerRadius, Frame, Grid, Label, Layout,
@@ -43,6 +44,8 @@ pub fn render_ordering_btn<F>(
 ) where
     F: FnMut(),
 {
+    let current_theme = with_theme(|t| t.current());
+
     let icon_size = vec2(18.0, 18.0);
 
     let (icon_rect, resp) = ui.allocate_exact_size(icon_size, Sense::click());
@@ -66,11 +69,11 @@ pub fn render_ordering_btn<F>(
         callback();
     }
 
-    let mut color = Color32::WHITE;
+    let mut color = current_theme.tools_secondary.to_color();
 
     if resp.hovered() {
         ui.set_cursor_icon(egui::CursorIcon::PointingHand);
-        color = COLOR_ACCENT_GLOW;
+        color = current_theme.tools_primary.to_color();
     }
 
     let rounded_rect = Rect::from_min_max(
@@ -96,13 +99,17 @@ pub fn sidebar_right_component(
     ui_state: &mut BlazeUiState,
     files: &[Arc<FileEntry>],
 ) {
+    let current_theme = with_theme(|t| t.current());
+
     let i18n = with_configs(|c| c.get_i18n());
-    let custom_frame = Frame::NONE.fill(COLOR_BG_MAIN).inner_margin(Margin {
-        left: 0,
-        right: 15,
-        top: 0,
-        bottom: 0,
-    });
+    let custom_frame = Frame::NONE
+        .fill(current_theme.bg_main.to_color())
+        .inner_margin(Margin {
+            left: 0,
+            right: 15,
+            top: 0,
+            bottom: 0,
+        });
 
     Panel::right("info_panel")
         .resizable(false)
@@ -112,20 +119,20 @@ pub fn sidebar_right_component(
 
             Frame::NONE
                 .inner_margin(egui::Margin::same(10))
-                .fill(COLOR_BG_PANEL)
+                .fill(current_theme.bg_panel.to_color())
                 .corner_radius(CornerRadius::same(20))
                 .stroke(Stroke {
                     width: 0.5,
-                    color: COLOR_ACCENT_GLOW,
+                    color: current_theme.accent_glow.to_color(),
                 })
                 .show(ui, |ui| {
 
                     Frame::NONE
-                        .fill(COLOR_BG_MAIN)
+                        .fill(current_theme.bg_main.to_color())
                         .stroke(
                             Stroke::new(
                                 0.5,
-                                COLOR_ACCENT_GLOW
+                                current_theme.accent_glow.to_color()
                             )
                         )
                         .corner_radius(CornerRadius::same(99))
@@ -187,9 +194,9 @@ pub fn sidebar_right_component(
                         Layout::top_down(Align::Center),
                         |ui| {
                             Frame::NONE
-                                .fill(COLOR_BG_MAIN)
+                                .fill(current_theme.border_panel.to_color())
                                 .stroke(
-                                    Stroke::new(0.5, COLOR_ACCENT_GLOW)
+                                    Stroke::new(0.5, current_theme.accent_glow.to_color())
                                 )
                                 .corner_radius(CornerRadius::same(99))
                                 .inner_margin(Margin::symmetric(10, 6))
@@ -358,7 +365,7 @@ pub fn sidebar_right_component(
 
                         let animated_stroke = Stroke::new(
                             (0.5 * anim).clamp(0.0, 0.5),
-                            COLOR_ACCENT_GLOW.linear_multiply(anim)
+                            current_theme.accent_glow.to_color().linear_multiply(anim)
                         );
 
                         let animated_radius = CornerRadius::same((20.0 * anim) as u8);
@@ -369,7 +376,7 @@ pub fn sidebar_right_component(
                                 .outer_margin(Margin::symmetric(1, 1))
                                 .inner_margin(Margin::same(10))
                                 .stroke(animated_stroke)
-                                .fill(COLOR_BG_MAIN)
+                                .fill(current_theme.bg_main.to_color())
                                 .corner_radius(animated_radius)
                                 .show(ui, |ui| {
 
@@ -379,7 +386,7 @@ pub fn sidebar_right_component(
                                         Label::new(
                                             RichText::new(i18n.t("right_sidebar.info"))
                                                 .heading()
-                                                .color(Color32::WHITE.linear_multiply(anim))
+                                                .color(current_theme.text_primary.to_color().linear_multiply(anim))
                                         )
                                     );
 
@@ -462,7 +469,7 @@ pub fn sidebar_right_component(
                                                 icon_size,
                                             );
 
-                                            let normalized_color = ensure_min_lightness(color, 0.70);
+                                            let normalized_color = ensure_min_lightness(color);
 
                                             ui.painter().image(
                                                 icon.id(),
@@ -479,7 +486,7 @@ pub fn sidebar_right_component(
                                                 ui.add(
                                                     Label::new(
                                                         RichText::new(file.name.clone())
-                                                            .color(Color32::WHITE.linear_multiply(anim))
+                                                            .color(current_theme.text_primary.to_color().linear_multiply(anim))
                                                     ).wrap()
                                                 );
                                             },

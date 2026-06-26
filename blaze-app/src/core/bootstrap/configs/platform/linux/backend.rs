@@ -57,7 +57,7 @@ pub struct LinuxConfigs {
     pub display_backend: DisplayBackend,
 
     #[serde(default)]
-    pub theme: String,
+    pub theme: Box<str>,
 
     #[serde(default)]
     pub accent_color: Option<String>,
@@ -121,7 +121,7 @@ impl Default for LinuxConfigs {
             item_file_list_size: 10,
             default_terminal: String::new(),
             display_backend: DisplayBackend::Auto,
-            theme: "system".to_string(),
+            theme: "Blaze Dark".into(),
             accent_color: None,
             font_size: 14.0,
             confirm_on_delete: true,

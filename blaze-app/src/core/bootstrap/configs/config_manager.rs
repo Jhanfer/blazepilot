@@ -114,6 +114,10 @@ impl ConfigManager {
         self.platform.view_mode.to_owned()
     }
 
+    pub fn get_current_theme_name(&self) -> Box<str> {
+        self.platform.theme.clone()
+    }
+
     //--__--__--__--__ Setters  __--__--__--__--__--__--__
 
     pub fn set_ordering_mode(&mut self, mode: OrderingMode) {
@@ -159,6 +163,11 @@ impl ConfigManager {
 
     pub fn set_view_mode(&mut self, view_mode: ViewMode) {
         self.platform.view_mode = view_mode;
+        self.save();
+    }
+
+    pub fn set_current_theme_name(&mut self, theme_name: &str) {
+        self.platform.theme = theme_name.into();
         self.save();
     }
 

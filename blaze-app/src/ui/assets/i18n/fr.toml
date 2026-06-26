@@ -131,8 +131,64 @@ X11 : Plus grande compatibilité avec les anciennes applications. Permet le glis
 """
 disclaimer = "Ces modifications nécessitent un redémarrage de l'application."
 
+
 [configs_appearance]
-title = "En cours :D"
+title = "Changer l'apparence"
+reload_theme = "Recharger le thème"
+selection = "Sélectionner un thème"
+message = "Vous pouvez modifier chaque thème dans ~/.config/blazepilotapp/themes"
+
+color_editor = "Éditeur de couleurs"
+
+states = "États"
+error = "Erreur"
+success = "Succès"
+warn = "Avertissement"
+
+background = "Arrière-plans"
+main_bg = "Arrière-plan principal"
+panel_bg = "Arrière-plan du panneau"
+container_bg = "Arrière-plan du conteneur"
+hover_bg = "Arrière-plan au survol"
+
+border-buttons = "Bordures et boutons"
+border_panel = "Bordure du panneau"
+main_buttons = "Boutons principaux"
+
+accent = "Accents"
+accent_glow = "Lueur d'accent"
+rubberband = "Bande de sélection"
+selected_item = "Élément sélectionné"
+
+texts = "Textes"
+primary_text = "Texte principal"
+secondary_text = "Texte secondaire"
+muted_text = "Texte atténué"
+
+tools = "Outils"
+primary-tool-color = "Couleur principale de l'outil"
+secondary-tool-color = "Couleur secondaire de l'outil"
+tool-btn-active = "Bouton d'outil actif"
+tool-btn-inactive = "Bouton d'outil inactif"
+tool-btn-hovered = "Bouton d'outil au survol"
+
+files = "Fichiers"
+folder = "Dossier"
+image = "Image"
+pdf = "PDF"
+doc = "Document"
+video = "Vidéo"
+audio = "Audio"
+archive = "Archive compressée"
+code = "Code"
+font = "Police"
+exe = "Exécutable"
+fallback = "Par défaut"
+
+theme-name = "Nom du thème"
+save-as-custom = "Enregistrer comme thème personnalisé"
+reset-defaults = "Rétablir les valeurs par défaut"
+
 
 [configs_behavior]
 title = "En cours :D"
