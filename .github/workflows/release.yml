@@ -75,13 +75,13 @@ jobs:
           echo "file=$FILE" >> "$GITHUB_OUTPUT"
 
       - name: Generar checksum SHA-256
-              id: checksum
-              run: |
-                FILE="${{ steps.rename.outputs.file }}"
-                sha256sum "$FILE" > "${FILE}.sha256"
-                HASH=$(cut -d' ' -f1 "${FILE}.sha256")
-                echo "sha256=$HASH" >> "$GITHUB_OUTPUT"
-                echo "✅ SHA-256: $HASH"
+        id: checksum
+        run: |
+          FILE="${{ steps.rename.outputs.file }}"
+          sha256sum "$FILE" > "${FILE}.sha256"
+          HASH=$(cut -d' ' -f1 "${FILE}.sha256")
+          echo "sha256=$HASH" >> "$GITHUB_OUTPUT"
+          echo "✅ SHA-256: $HASH"
 
       - name: Generar Release Notes
         id: changelog
