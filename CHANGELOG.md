@@ -1,3 +1,26 @@
+## [0.15.0] - 2026-06-26
+
+### 🚀 Features
+- **(ui)** Ordenamiento independiente, navegación con historial y sidebar derecha rediseñada([`b2cc3eb`](https://github.com/Jhanfer/blazepilot/commit/b2cc3eb8487b033c4459cb6d16d5409c5f548ea4))
+- **(theming)** Introduce sistema completo de temas dinámicos para BlazePilot([`abaa3eb`](https://github.com/Jhanfer/blazepilot/commit/abaa3eb8ceafe8a35b699fe61228186053820d32))
+
+
+### 🐛 Bug fixes
+- **(ui)** Corrige cierre de Quick Dialogs retornando should_close([`2bb07df`](https://github.com/Jhanfer/blazepilot/commit/2bb07df4981591b9205cb221740cfedfcaac47b0))
+
+
+### ⚡ Performance
+- **(cache)** Migra de tokio::sync::RwLock a parking_lot::RwLock y simplifica accesos([`6f51508`](https://github.com/Jhanfer/blazepilot/commit/6f51508afe9308922d01c59276c38d21bec37bc1))
+
+
+### 📚 Docs
+- Corrige indentación checksum en release.yml([`16464cc`](https://github.com/Jhanfer/blazepilot/commit/16464cc881863962da77b5ad7ae3f9c34019ebbf))
+
+
+### ⚙️ Miscelánea
+- **(release)** Añade checksum SHA-256 y hace workflow reutilizable([`5b37226`](https://github.com/Jhanfer/blazepilot/commit/5b37226eef44bae1729d9d0a696e7f28fe62bd9a))
+
+
 ## [0.14.0] - 2026-06-19
 
 ### 🚀 Features
