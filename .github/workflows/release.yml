@@ -93,7 +93,11 @@ jobs:
             exit 1
           fi
 
-          CHANGELOG=$(awk "/^## \[${VERSION//./\\.}\]/{found=1; next} found && /^## \[/{exit} found{print}" CHANGELOG.md)
+          CHANGELOG=$(awk -v ver="$VERSION" '
+            $0 ~ "^## \\[" ver "\\] - " {found=1; next}
+            found && /^## \[/ {exit}
+            found {print}
+          ' CHANGELOG.md)
 
           if [ -z "$CHANGELOG" ]; then
             echo "❌ No se encontró changelog para ${VERSION}"
