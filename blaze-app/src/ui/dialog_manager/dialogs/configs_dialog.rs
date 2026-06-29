@@ -433,21 +433,21 @@ impl ConfigDialog {
             });
         }
 
-        if let Some(rx) = &mut self.terminal_rx {
-            if let Ok(terminals) = rx.try_recv() {
-                self.available_terminals = terminals.clone();
-                self.loading_terminals = false;
-                self.terminals_loaded = true;
-                self.terminal_rx = None;
+        if let Some(rx) = &mut self.terminal_rx
+            && let Ok(terminals) = rx.try_recv()
+        {
+            self.available_terminals = terminals.clone();
+            self.loading_terminals = false;
+            self.terminals_loaded = true;
+            self.terminal_rx = None;
 
-                if terminals.is_empty() {
-                    self.no_terminals_error = true;
-                    if self.retry_count >= self.max_retries {
-                        warn!("Máximo de reintentos alcanzado para cargar terminales");
-                    }
-                } else {
-                    self.no_terminals_error = false;
+            if terminals.is_empty() {
+                self.no_terminals_error = true;
+                if self.retry_count >= self.max_retries {
+                    warn!("Máximo de reintentos alcanzado para cargar terminales");
                 }
+            } else {
+                self.no_terminals_error = false;
             }
         }
 
@@ -754,7 +754,7 @@ impl ConfigDialog {
 
                 ScrollArea::vertical().max_height(420.0).show(ui, |ui| {
                     macro_rules! color_field {
-                        ($label:expr, $($path:tt)*) => {{
+                        ($label:expr_2021, $($path:tt)*) => {{
                             ui.horizontal(|ui| {
                                 let current_hex = &current_theme.$($path)*;
                                 let mut color = Color32::from_hex(current_hex)

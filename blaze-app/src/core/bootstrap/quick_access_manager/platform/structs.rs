@@ -3,8 +3,8 @@ use serde::{Deserialize, Serialize};
 use std::{
     path::{Path, PathBuf},
     sync::{
-        atomic::{AtomicBool, Ordering},
         Arc, Mutex,
+        atomic::{AtomicBool, Ordering},
     },
     time::{Duration, Instant, SystemTime},
 };
@@ -81,14 +81,14 @@ impl QuickLinks {
                 is_computing.store(false, Ordering::Release);
                 match size_res {
                     Ok(size) => {
-                        if let Ok(m) = std::fs::metadata(&path) {
-                            if let Ok(mut guard) = meta_arc.lock() {
-                                *guard = Some(CachedMeta {
-                                    size,
-                                    modified: m.modified().unwrap_or(SystemTime::UNIX_EPOCH),
-                                    refreshed_at: Instant::now(),
-                                });
-                            }
+                        if let Ok(m) = std::fs::metadata(&path)
+                            && let Ok(mut guard) = meta_arc.lock()
+                        {
+                            *guard = Some(CachedMeta {
+                                size,
+                                modified: m.modified().unwrap_or(SystemTime::UNIX_EPOCH),
+                                refreshed_at: Instant::now(),
+                            });
                         }
                     }
                     Err(e) => {
@@ -98,14 +98,14 @@ impl QuickLinks {
             });
         } else {
             TOKIO_RUNTIME.spawn_blocking(move || {
-                if let Ok(m) = std::fs::metadata(&path) {
-                    if let Ok(mut guard) = meta_arc.lock() {
-                        *guard = Some(CachedMeta {
-                            size: m.len(),
-                            modified: m.modified().unwrap_or(SystemTime::UNIX_EPOCH),
-                            refreshed_at: Instant::now(),
-                        });
-                    }
+                if let Ok(m) = std::fs::metadata(&path)
+                    && let Ok(mut guard) = meta_arc.lock()
+                {
+                    *guard = Some(CachedMeta {
+                        size: m.len(),
+                        modified: m.modified().unwrap_or(SystemTime::UNIX_EPOCH),
+                        refreshed_at: Instant::now(),
+                    });
                 }
                 is_computing.store(false, Ordering::Release);
             });

@@ -20,7 +20,7 @@ use std::{
 use tracing::{debug, info, warn};
 
 use crate::core::bootstrap::install_manager::platform::{
-    installation_trait::InstallationTrait, PlatformInstallation,
+    PlatformInstallation, installation_trait::InstallationTrait,
 };
 
 pub static GLOBAL_INSTALLATION_MANAGER: LazyLock<Mutex<InstallationManager>> =

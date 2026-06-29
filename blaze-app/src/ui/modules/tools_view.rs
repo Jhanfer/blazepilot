@@ -17,8 +17,8 @@ use crate::{
     },
 };
 use egui::{
-    containers::Frame, pos2, vec2, Align, Color32, CornerRadius, CursorIcon, Layout, Margin, Rect,
-    Sense, Stroke, Ui,
+    Align, Color32, CornerRadius, CursorIcon, Layout, Margin, Rect, Sense, Stroke, Ui,
+    containers::Frame, pos2, vec2,
 };
 use std::sync::Arc;
 use tracing::warn;

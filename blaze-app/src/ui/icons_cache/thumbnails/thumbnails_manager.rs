@@ -16,7 +16,7 @@ use crate::{
     core::{
         runtime::{
             bus_structs::UiEvent,
-            event_bus::{with_event_bus, Dispatcher},
+            event_bus::{Dispatcher, with_event_bus},
         },
         system::{cache::cache_manager::CacheManager, clipboard::global_clipboard::TOKIO_RUNTIME},
     },
@@ -452,7 +452,7 @@ impl ThumbnailManager {
 
     async fn generate_svg_thumb(path: &Path) -> Result<Thumbnail, ThumbError> {
         let path = path.to_path_buf();
-        let out = tokio::task::spawn_blocking(move || {
+        tokio::task::spawn_blocking(move || {
             let data = std::fs::read(&path).map_err(ThumbError::Io)?;
 
             let opt = resvg::usvg::Options::default();
@@ -475,9 +475,7 @@ impl ThumbnailManager {
             })
         })
         .await
-        .map_err(ThumbError::ThreadError)?;
-
-        out
+        .map_err(ThumbError::ThreadError)?
     }
 
     async fn run_ffmpeg(args: &[&str]) -> Result<Vec<u8>, ThumbError> {
@@ -516,7 +514,7 @@ impl ThumbnailManager {
         {
             Ok(out) => out,
             Err(_) => {
-                let fallback = Self::run_ffmpeg(&[
+                Self::run_ffmpeg(&[
                     "-i",
                     &path_str,
                     "-vframes",
@@ -527,8 +525,7 @@ impl ThumbnailManager {
                     "png",
                     "-",
                 ])
-                .await?;
-                fallback
+                .await?
             }
         };
 

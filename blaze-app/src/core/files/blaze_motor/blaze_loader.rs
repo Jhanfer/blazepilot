@@ -21,7 +21,7 @@ use file_id::get_file_id;
 use std::collections::HashMap;
 use std::path::Path;
 use std::sync::atomic::Ordering;
-use std::sync::{atomic::AtomicBool, Arc};
+use std::sync::{Arc, atomic::AtomicBool};
 use std::time::Duration;
 use tokio::sync::Mutex;
 use tracing::warn;

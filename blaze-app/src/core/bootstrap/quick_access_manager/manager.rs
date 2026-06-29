@@ -6,7 +6,7 @@ use uuid::Uuid;
 
 use crate::core::bootstrap::quick_access_manager::{
     error::QuickAccResult,
-    platform::{structs::QuickLinks, PlatformQuickAccess, QuickAccessTrait, QuickTag},
+    platform::{PlatformQuickAccess, QuickAccessTrait, QuickTag, structs::QuickLinks},
 };
 
 pub static GLOBAL_QUICK_ACCESS: LazyLock<Mutex<QuickAccessManager>> =

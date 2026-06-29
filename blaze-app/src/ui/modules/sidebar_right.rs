@@ -27,8 +27,8 @@ use crate::ui::themes::platform::structs::ToColor;
 use crate::ui::themes::theme_manager::with_theme;
 use crate::utils::formating::{format_date, format_size};
 use egui::{
-    pos2, vec2, Align, Button, Color32, ColorImage, CornerRadius, Frame, Grid, Label, Layout,
-    Margin, Panel, Rect, RichText, Sense, Stroke, TextEdit, TextureOptions, Ui,
+    Align, Button, Color32, ColorImage, CornerRadius, Frame, Grid, Label, Layout, Margin, Panel,
+    Rect, RichText, Sense, Stroke, TextEdit, TextureOptions, Ui, pos2, vec2,
 };
 use std::collections::HashMap;
 use std::path::Path;

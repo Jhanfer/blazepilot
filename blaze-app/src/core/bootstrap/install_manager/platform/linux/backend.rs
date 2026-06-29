@@ -166,10 +166,10 @@ impl LinuxInstallation {
     }
 
     fn get_data_home(&self) -> Arc<Path> {
-        if let Some(path) = std::env::var_os("XDG_DATA_HOME") {
-            if !path.is_empty() {
-                return Path::new(&path).into();
-            }
+        if let Some(path) = std::env::var_os("XDG_DATA_HOME")
+            && !path.is_empty()
+        {
+            return Path::new(&path).into();
         }
 
         if let Some(home) = std::env::var_os("HOME") {

@@ -15,7 +15,7 @@
 use crate::core::{
     runtime::{
         bus_structs::FileOperation,
-        event_bus::{with_event_bus, Dispatcher},
+        event_bus::{Dispatcher, with_event_bus},
     },
     system::{cache::cache_manager::CacheManager, clipboard::global_clipboard::TOKIO_RUNTIME},
 };
@@ -26,8 +26,8 @@ use std::{
     os::unix::fs::MetadataExt,
     path::Path,
     sync::{
-        atomic::{AtomicBool, AtomicU64, Ordering},
         Arc,
+        atomic::{AtomicBool, AtomicU64, Ordering},
     },
     time::{Duration, UNIX_EPOCH},
 };

@@ -33,8 +33,8 @@ use crate::{
             fileopener_module::{FileOpenerManager, GLOBAL_FILE_OPENER},
             operationstate::operation_manager::with_history,
             sizer_manager::manager::{SizerManager, SizerMessages},
-            terminal_opener::terminal_manager::{TerminalManager, GLOBAL_TERMINAL_MANAGER},
-            trash_manager::manager::{get_backend, TrashDestination},
+            terminal_opener::terminal_manager::{GLOBAL_TERMINAL_MANAGER, TerminalManager},
+            trash_manager::manager::{TrashDestination, get_backend},
             updater::updater_manager::Updater,
             zip_manager::manager::ZipManager,
         },
@@ -42,7 +42,7 @@ use crate::{
     ui::task_manager::tasks::TaskManager,
 };
 use bitvec::vec::BitVec;
-use egui::{pos2, Pos2};
+use egui::{Pos2, pos2};
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -51,8 +51,8 @@ use std::{
     path::{Path, PathBuf},
     rc::Rc,
     sync::{
-        atomic::{AtomicU64, Ordering},
         Arc,
+        atomic::{AtomicU64, Ordering},
     },
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
@@ -1124,14 +1124,13 @@ impl BlazeCoreState {
                 } => {
                     let mut motor = self.motor.borrow_mut();
 
-                    if let Some(tab) = motor.tabs.iter_mut().find(|t| t.id == tab_id) {
-                        if let Ok(e) = tab.update_dir_size(full_path.to_owned(), size) {
-                            if e {
-                                self.calculating_dir_sizes.remove(&full_path);
-                                self.calculated_dir_sizes.insert(full_path);
-                                self.needs_sort = true;
-                            }
-                        }
+                    if let Some(tab) = motor.tabs.iter_mut().find(|t| t.id == tab_id)
+                        && let Ok(e) = tab.update_dir_size(full_path.to_owned(), size)
+                        && e
+                    {
+                        self.calculating_dir_sizes.remove(&full_path);
+                        self.calculated_dir_sizes.insert(full_path);
+                        self.needs_sort = true;
                     }
                 }
 
@@ -1156,22 +1155,22 @@ impl BlazeCoreState {
             }
         }
 
-        if let Some(last_event) = self.last_fs_event {
-            if last_event.elapsed() > std::time::Duration::from_millis(50) {
-                self.last_fs_event = None;
-                if self.active_tasks == 0 {
-                    let dispatcher = with_event_bus(|e| e.dispatcher(self.active_id));
-                    self.calculating_dir_sizes.clear();
-                    self.calculated_dir_sizes.clear();
+        if let Some(last_event) = self.last_fs_event
+            && last_event.elapsed() > std::time::Duration::from_millis(50)
+        {
+            self.last_fs_event = None;
+            if self.active_tasks == 0 {
+                let dispatcher = with_event_bus(|e| e.dispatcher(self.active_id));
+                self.calculating_dir_sizes.clear();
+                self.calculated_dir_sizes.clear();
 
-                    if let Err(e) = self
-                        .motor
-                        .borrow_mut()
-                        .active_tab_mut()
-                        .load_path(true, dispatcher)
-                    {
-                        warn!("Ha ocurrido un error al cargar los archivos: {}", e);
-                    }
+                if let Err(e) = self
+                    .motor
+                    .borrow_mut()
+                    .active_tab_mut()
+                    .load_path(true, dispatcher)
+                {
+                    warn!("Ha ocurrido un error al cargar los archivos: {}", e);
                 }
             }
         }

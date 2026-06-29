@@ -15,7 +15,7 @@
 use eframe::{HardwareAcceleration, NativeOptions};
 use std::{path::Path, sync::Arc, time::Duration};
 use tracing::{error, info, warn};
-use tracing_subscriber::{fmt, EnvFilter};
+use tracing_subscriber::{EnvFilter, fmt};
 mod app;
 mod core;
 mod ui;
@@ -60,11 +60,12 @@ fn main() {
 
     if std::env::var("BLAZE_IS_CHILD").is_ok() {
         let present_mode = parse_present_mode_from_env();
+        let with_trasnparency = parse_transparency_from_env();
         let backend = parse_backend_from_env();
         let initial_path = parse_initial_path();
         let _ = init_dir_trash().map_err(|e| warn!("Error inicializando: {}", e));
 
-        let config = RunConfigs::wgpu_present(backend, present_mode);
+        let config = RunConfigs::wgpu_present(backend, present_mode, with_trasnparency);
         if let Err(e) = run_application(config, initial_path) {
             error!("Fallo al arrancar: {}", e);
             std::process::exit(1);
@@ -92,24 +93,29 @@ fn try_run_with_retries() -> anyhow::Result<()> {
     let backend = with_configs(|c| c.get_display_backend());
 
     let configs = [
-        (backend.clone(), "Immediate"),
-        (backend, "Fifo"),
-        (DisplayBackend::Auto, "Fifo"),
+        (backend.clone(), "Immediate", true),
+        (backend.clone(), "Immediate", false),
+        (backend.clone(), "Fifo", true),
+        (backend, "Fifo", false),
+        (DisplayBackend::Auto, "Fifo", true),
+        (DisplayBackend::Auto, "Fifo", false),
     ];
 
-    for (attempt, (backend, present_mode)) in configs.iter().enumerate() {
+    for (attempt, (backend, present_mode, with_transparency)) in configs.iter().enumerate() {
         info!(
-            "Intento {}/{}: Backend={:?}, PresentMode={}",
+            "Intento {}/{}: Backend={:?}, PresentMode={}, Transparencias={}",
             attempt + 1,
             configs.len(),
             backend,
-            present_mode
+            present_mode,
+            with_transparency,
         );
 
         let mut cmd = std::process::Command::new(&exe);
         cmd.args(&args)
             .env("BLAZE_PRESENT_MODE", present_mode)
             .env("BLAZE_BACKEND", format!("{:?}", backend))
+            .env("BALZE_TRANSPARENCY", format!("{:?}", with_transparency))
             .env("BLAZE_IS_CHILD", "1");
 
         let status = cmd.status()?;
@@ -135,6 +141,17 @@ fn try_run_with_retries() -> anyhow::Result<()> {
     Err(anyhow::anyhow!(
         "Todos los intentos fallaron. Instala drivers Vulkan o ejecuta con LIBGL_ALWAYS_SOFTWARE=1"
     ))
+}
+
+fn parse_transparency_from_env() -> bool {
+    match std::env::var("BALZE_TRANSPARENCY").as_deref() {
+        Ok(transp) => match transp.to_lowercase().as_ref() {
+            "true" => true,
+            "false" => false,
+            _ => false,
+        },
+        _ => false,
+    }
 }
 
 fn parse_present_mode_from_env() -> eframe::wgpu::PresentMode {
@@ -186,16 +203,22 @@ struct RunConfigs {
     multisampling: u16,
     power_preference: eframe::wgpu::PowerPreference,
     present_mode: eframe::wgpu::PresentMode,
+    transparency: bool,
 }
 
 impl RunConfigs {
-    fn wgpu_present(backend: DisplayBackend, present_mode: eframe::wgpu::PresentMode) -> Self {
+    fn wgpu_present(
+        backend: DisplayBackend,
+        present_mode: eframe::wgpu::PresentMode,
+        transparency: bool,
+    ) -> Self {
         Self {
             backend,
             present_mode,
             vsync: matches!(present_mode, eframe::wgpu::PresentMode::Fifo),
             multisampling: 0,
             power_preference: eframe::wgpu::PowerPreference::LowPower,
+            transparency,
         }
     }
 }
@@ -206,7 +229,7 @@ fn create_native_options(configs: &RunConfigs) -> NativeOptions {
         .with_min_inner_size([800.0, 500.0])
         .with_title("BlazePilot")
         .with_decorations(true)
-        .with_transparent(true)
+        .with_transparent(configs.transparency)
         .with_resizable(true)
         .with_maximized(false)
         .with_fullscreen(false);

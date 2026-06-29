@@ -160,11 +160,7 @@ impl FileExtension {
         let ext = if file_name.starts_with('.') {
             file_name.find('.').and_then(|i| {
                 let after = &file_name[i + 1..];
-                if after.is_empty() {
-                    None
-                } else {
-                    Some(after)
-                }
+                if after.is_empty() { None } else { Some(after) }
             })
         } else {
             path.extension().and_then(|e| e.to_str())

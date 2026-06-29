@@ -25,8 +25,8 @@ use crate::{
     },
 };
 use egui::{
-    pos2, vec2, Button, Color32, CornerRadius, Frame, Margin, Panel, Rect, RichText, Sense, Stroke,
-    Ui,
+    Button, Color32, CornerRadius, Frame, Margin, Panel, Rect, RichText, Sense, Stroke, Ui, pos2,
+    vec2,
 };
 use std::path::PathBuf;
 

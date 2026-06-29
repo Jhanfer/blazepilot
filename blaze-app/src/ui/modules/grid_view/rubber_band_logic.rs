@@ -2,7 +2,7 @@ use crate::{
     core::{blaze_state::BlazeCoreState, files::blaze_motor::motor_structs::FileEntry},
     ui::themes::{platform::structs::ToColor, theme_manager::with_theme},
 };
-use egui::{pos2, vec2, Color32, Painter, Rect, Stroke};
+use egui::{Color32, Painter, Rect, Stroke, pos2, vec2};
 use std::sync::Arc;
 
 pub fn render_grid_rubberband(

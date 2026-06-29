@@ -53,9 +53,20 @@ impl OpenerFileKind {
             [b'#', b'!', b'/', b'b', b'i', b'n', b'/', b's', b'h', ..] => {
                 OpenerFileKind::ShellScript
             }
-            [b'#', b'!', b'/', b'b', b'i', b'n', b'/', b'b', b'a', b's', b'h', ..] => {
-                OpenerFileKind::ShellScript
-            }
+            [
+                b'#',
+                b'!',
+                b'/',
+                b'b',
+                b'i',
+                b'n',
+                b'/',
+                b'b',
+                b'a',
+                b's',
+                b'h',
+                ..,
+            ] => OpenerFileKind::ShellScript,
             // Cualquier otro shebang, se lee la línea completa
             [b'#', b'!', ..] => Self::classify_shebang(path),
             // PNG

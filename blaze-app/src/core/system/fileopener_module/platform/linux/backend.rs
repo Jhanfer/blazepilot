@@ -124,10 +124,10 @@ impl DesktopApp {
                 for entry in entries.flatten() {
                     let path = entry.path();
 
-                    if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
-                        if !extensions.contains(&ext.to_lowercase().as_str()) {
-                            continue;
-                        }
+                    if let Some(ext) = path.extension().and_then(|e| e.to_str())
+                        && !extensions.contains(&ext.to_lowercase().as_str())
+                    {
+                        continue;
                     }
 
                     if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
@@ -439,10 +439,10 @@ impl LinuxOpener {
 
             for entry in entries.flatten() {
                 let path = entry.path();
-                if path.extension().is_some_and(|e| e == "desktop") {
-                    if let Some(app) = Self::parse_desktop_file(&path) {
-                        apps.insert(app.id.clone(), Arc::new(app));
-                    }
+                if path.extension().is_some_and(|e| e == "desktop")
+                    && let Some(app) = Self::parse_desktop_file(&path)
+                {
+                    apps.insert(app.id.clone(), Arc::new(app));
                 }
             }
         }
@@ -523,11 +523,11 @@ impl LinuxOpener {
             if let Some(v) = line.strip_prefix("Name=") {
                 name = Some(v.trim().to_string());
             } else if line.starts_with("Name[") {
-                if let Some(rest) = line.strip_prefix("Name[") {
-                    if let Some((lang, val)) = rest.split_once(']') {
-                        let val = val.strip_prefix('=').unwrap_or(val).trim();
-                        localized_names.insert(lang.to_string(), val.trim().to_string());
-                    }
+                if let Some(rest) = line.strip_prefix("Name[")
+                    && let Some((lang, val)) = rest.split_once(']')
+                {
+                    let val = val.strip_prefix('=').unwrap_or(val).trim();
+                    localized_names.insert(lang.to_string(), val.trim().to_string());
                 }
             } else if let Some(v) = line.strip_prefix("Exec=") {
                 exec = Some(v.trim().to_string());

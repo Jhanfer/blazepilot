@@ -45,11 +45,7 @@ pub fn hot_keys_logic(
     //tecla de arriba
     if input.key_pressed(Key::ArrowUp) && disable_keys {
         let prev = if let Some(i) = state.last_selected_index {
-            if i == 0 {
-                0
-            } else {
-                i - 1
-            }
+            if i == 0 { 0 } else { i - 1 }
         } else {
             state
                 .row_view
@@ -100,17 +96,17 @@ pub fn hot_keys_logic(
 
     //tecla enter
     if ui.input(|i| i.key_pressed(Key::Enter)) && disable_keys {
-        if let Some(idx) = state.last_selected_index {
-            if idx < files.len() {
-                let file = &files[idx];
-                if file.is_dir() {
-                    state.navigate_to(file.full_path.to_owned());
-                } else {
-                    state.open_file(file);
-                }
+        if let Some(idx) = state.last_selected_index
+            && idx < files.len()
+        {
+            let file = &files[idx];
+            if file.is_dir() {
+                state.navigate_to(file.full_path.to_owned());
             } else {
-                state.last_selected_index = None;
+                state.open_file(file);
             }
+        } else {
+            state.last_selected_index = None;
         }
     }
 

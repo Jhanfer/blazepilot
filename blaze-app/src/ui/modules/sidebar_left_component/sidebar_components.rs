@@ -8,7 +8,7 @@ use crate::{
     },
 };
 use egui::{
-    pos2, vec2, Align2, Color32, FontId, PointerButton, Rect, Sense, Stroke, StrokeKind, Ui,
+    Align2, Color32, FontId, PointerButton, Rect, Sense, Stroke, StrokeKind, Ui, pos2, vec2,
 };
 use std::{
     path::{Path, PathBuf},

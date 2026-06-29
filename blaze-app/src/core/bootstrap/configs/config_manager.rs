@@ -18,8 +18,8 @@ use crate::core::{
         configs::{
             error::ConfigResult,
             platform::{
-                linux::conf_structs::{DisplayBackend, OrderingMode},
                 PlatformConfigTrait, PlatformConfigs,
+                linux::conf_structs::{DisplayBackend, OrderingMode},
             },
         },
         i18n::I18n,

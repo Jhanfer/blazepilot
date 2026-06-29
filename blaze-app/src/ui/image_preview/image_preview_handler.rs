@@ -19,7 +19,7 @@ use crate::{
         image_preview::error::{ImagePreviewError, ImagePreviewResult},
     },
 };
-use crossbeam_channel::{bounded, Receiver};
+use crossbeam_channel::{Receiver, bounded};
 use egui::{Color32, ColorImage, TextureHandle, TextureOptions, Ui, Vec2};
 use std::{
     io::Read,
@@ -183,16 +183,16 @@ impl ImagePreviewState {
         name: &str,
         ui: &mut Ui,
     ) -> Option<Color32> {
-        if let Some(r) = rx {
-            if let Ok(Some(img)) = r.try_recv() {
-                let bg_color = Self::extract_dominant_color(&img);
+        if let Some(r) = rx
+            && let Ok(Some(img)) = r.try_recv()
+        {
+            let bg_color = Self::extract_dominant_color(&img);
 
-                *texture = Some(ui.load_texture(name, img, TextureOptions::LINEAR));
-                *loading = false;
-                *rx = None;
+            *texture = Some(ui.load_texture(name, img, TextureOptions::LINEAR));
+            *loading = false;
+            *rx = None;
 
-                return Some(bg_color);
-            }
+            return Some(bg_color);
         }
         None
     }
@@ -203,15 +203,15 @@ impl ImagePreviewState {
         name: &str,
         ui: &mut Ui,
     ) -> Option<Color32> {
-        if let Some(r) = rx {
-            if let Ok(Some(img)) = r.try_recv() {
-                let bg_color = Self::extract_dominant_color(&img);
+        if let Some(r) = rx
+            && let Ok(Some(img)) = r.try_recv()
+        {
+            let bg_color = Self::extract_dominant_color(&img);
 
-                *texture = Some(ui.load_texture(name, img, TextureOptions::LINEAR));
-                *rx = None;
+            *texture = Some(ui.load_texture(name, img, TextureOptions::LINEAR));
+            *rx = None;
 
-                return Some(bg_color);
-            }
+            return Some(bg_color);
         }
         None
     }

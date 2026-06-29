@@ -23,8 +23,8 @@ use crate::{
     utils::formating::{format_date, format_size},
 };
 use egui::{
-    lerp, pos2, vec2, Align, Color32, CornerRadius, Frame, Label, Layout, Margin, Rect, RichText,
-    ScrollArea, Sense, Stroke, StrokeKind, Ui, UiBuilder,
+    Align, Color32, CornerRadius, Frame, Label, Layout, Margin, Rect, RichText, ScrollArea, Sense,
+    Stroke, StrokeKind, Ui, UiBuilder, lerp, pos2, vec2,
 };
 use std::{
     collections::HashMap,
@@ -525,20 +525,20 @@ pub fn tag_views(
 
                                                     ui.label(item.name.to_owned());
 
-                                                    if let Ok(guard) = item.meta.lock() {
-                                                        if let Some(meta) = guard.as_ref() {
-                                                            let modified = meta
-                                                                .modified
-                                                                .duration_since(UNIX_EPOCH)
-                                                                .unwrap_or_default()
-                                                                .as_secs();
+                                                    if let Ok(guard) = item.meta.lock()
+                                                        && let Some(meta) = guard.as_ref()
+                                                    {
+                                                        let modified = meta
+                                                            .modified
+                                                            .duration_since(UNIX_EPOCH)
+                                                            .unwrap_or_default()
+                                                            .as_secs();
 
-                                                            ui.add_space(spacing);
-                                                            ui.label(format_date(modified));
+                                                        ui.add_space(spacing);
+                                                        ui.label(format_date(modified));
 
-                                                            ui.add_space(spacing);
-                                                            ui.label(format_size(meta.size));
-                                                        }
+                                                        ui.add_space(spacing);
+                                                        ui.label(format_size(meta.size));
                                                     }
                                                 });
                                             },

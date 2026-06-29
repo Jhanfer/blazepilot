@@ -20,7 +20,7 @@ use crate::core::system::{
 use egui::Color32;
 use file_id::FileId;
 
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use std::{
     collections::{HashMap, HashSet},
     hash::Hash,
@@ -106,11 +106,11 @@ impl CacheManager {
     {
         let cache_path = self.cache_dir.join(filename);
 
-        if let Some(parent) = cache_path.parent() {
-            if let Err(e) = tokio::fs::create_dir_all(parent).await {
-                error!("Error al crear el directorio de caché {:?}: {}", parent, e);
-                return;
-            }
+        if let Some(parent) = cache_path.parent()
+            && let Err(e) = tokio::fs::create_dir_all(parent).await
+        {
+            error!("Error al crear el directorio de caché {:?}: {}", parent, e);
+            return;
         }
 
         let bytes = match postcard::to_allocvec(data) {

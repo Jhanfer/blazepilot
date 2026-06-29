@@ -15,7 +15,7 @@
 use crate::core::{
     runtime::{
         bus_structs::FileOperation,
-        event_bus::{with_event_bus, Dispatcher},
+        event_bus::{Dispatcher, with_event_bus},
     },
     system::{
         cache::cache_manager::CacheManager,

@@ -23,7 +23,7 @@ use crate::{
         bootstrap::configs::config_manager::with_configs,
         system::knowndirs::knowndirs_manager::KnownDirsManager,
     },
-    ui::themes::platform::{structs::Theme, ColorsTrait},
+    ui::themes::platform::{ColorsTrait, structs::Theme},
 };
 
 #[derive(Serialize, Deserialize)]

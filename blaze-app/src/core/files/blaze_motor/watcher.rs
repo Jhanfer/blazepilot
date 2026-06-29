@@ -19,8 +19,8 @@ use crate::core::{
 };
 use notify::{Event, EventKind, RecursiveMode, Watcher};
 use std::sync::{
-    atomic::{AtomicBool, Ordering},
     Arc,
+    atomic::{AtomicBool, Ordering},
 };
 use std::{path::Path, time::Duration};
 use tokio::time::sleep;
@@ -54,11 +54,11 @@ impl FileWatcher {
     where
         F: Fn(&str),
     {
-        if let Some(path) = event.paths.first() {
-            if let Some(name) = path.file_name() {
-                let name = name.to_string_lossy();
-                callback(&name)
-            }
+        if let Some(path) = event.paths.first()
+            && let Some(name) = path.file_name()
+        {
+            let name = name.to_string_lossy();
+            callback(&name)
         }
     }
 

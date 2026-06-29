@@ -16,8 +16,8 @@ use crate::ui::image_preview::image_preview_handler::ImagePreviewState;
 use crate::ui::themes::platform::structs::ToColor;
 use crate::ui::{dialog_manager::manager::ModalDialog, themes::theme_manager::with_theme};
 use egui::{
-    pos2, vec2, Button, Color32, CornerRadius, Frame, Key, Margin, Order, Rect, Sense, Stroke, Ui,
-    Vec2, Window,
+    Button, Color32, CornerRadius, Frame, Key, Margin, Order, Rect, Sense, Stroke, Ui, Vec2,
+    Window, pos2, vec2,
 };
 
 pub struct ImagePreviewDialog {

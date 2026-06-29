@@ -27,9 +27,9 @@ use crate::{
     utils::formating::{format_date, format_size},
 };
 use egui::{
-    pos2, scroll_area::ScrollSource, vec2, Button, Color32, ColorImage, CursorIcon, FontId, Id,
-    Key, Modifiers, PointerButton, Rect, RichText, ScrollArea, Sense, Stroke, StrokeKind, TextEdit,
-    TextureOptions, Ui,
+    Button, Color32, ColorImage, CursorIcon, FontId, Id, Key, Modifiers, PointerButton, Rect,
+    RichText, ScrollArea, Sense, Stroke, StrokeKind, TextEdit, TextureOptions, Ui, pos2,
+    scroll_area::ScrollSource, vec2,
 };
 use std::{collections::HashMap, path::Path, sync::Arc};
 use tracing::info;
@@ -424,20 +424,20 @@ pub fn new_render_scrollview(
     //Creacion de carpetas nuevas
     new_ff_logic(state, ui);
 
-    if let Some(target_row) = state.pending_scroll_to.take() {
-        if !files.is_empty() {
-            let target_row = target_row.min(files.len() - 1);
-            let row_top = target_row as f32 * row_height;
-            let row_bottom = row_top + row_height;
+    if let Some(target_row) = state.pending_scroll_to.take()
+        && !files.is_empty()
+    {
+        let target_row = target_row.min(files.len() - 1);
+        let row_top = target_row as f32 * row_height;
+        let row_bottom = row_top + row_height;
 
-            let viewport_top = state.scroll_offset;
-            let viewport_bottop = state.scroll_offset + state.row_view.viewport_height;
+        let viewport_top = state.scroll_offset;
+        let viewport_bottop = state.scroll_offset + state.row_view.viewport_height;
 
-            if row_top < viewport_top {
-                state.scroll_offset = row_top;
-            } else if row_bottom > viewport_bottop {
-                state.scroll_offset = row_bottom - state.row_view.viewport_height;
-            }
+        if row_top < viewport_top {
+            state.scroll_offset = row_top;
+        } else if row_bottom > viewport_bottop {
+            state.scroll_offset = row_bottom - state.row_view.viewport_height;
         }
     }
 
@@ -556,15 +556,15 @@ pub fn new_render_scrollview(
                         StrokeKind::Outside,
                     );
                 }
-            } else if let Some(ref target_invalid) = state.row_view.drop_invalid_target.clone() {
-                if *file.full_path == **target_invalid {
-                    ui.painter().rect_stroke(
-                        rect,
-                        5.0,
-                        Stroke::new(2.0, Color32::from_rgb(255, 150, 150)),
-                        StrokeKind::Outside,
-                    );
-                }
+            } else if let Some(ref target_invalid) = state.row_view.drop_invalid_target.clone()
+                && *file.full_path == **target_invalid
+            {
+                ui.painter().rect_stroke(
+                    rect,
+                    5.0,
+                    Stroke::new(2.0, Color32::from_rgb(255, 150, 150)),
+                    StrokeKind::Outside,
+                );
             }
 
             // --- Toda la lógica de interacción original ---

@@ -21,7 +21,7 @@ use std::{ffi::CString, path::PathBuf};
 use tokio::sync::Mutex as TokioMutex;
 use tokio_stream::StreamExt;
 use tracing::{info, warn};
-use udisks2::{block::BlockProxy, filesystem::FilesystemProxy, Client};
+use udisks2::{Client, block::BlockProxy, filesystem::FilesystemProxy};
 use uzers::{get_current_gid, get_current_uid};
 use zbus::zvariant::{ObjectPath, Value};
 use zbus::{Connection, MatchRule, MessageStream};

@@ -84,10 +84,10 @@ impl FileOpenerManager {
                 PathBuf::from("mime_associations.toml")
             });
 
-        if !path.exists() {
-            if let Err(e) = std::fs::File::create(&path) {
-                warn!("No se pudo crear mime_associations.toml: {e}");
-            }
+        if !path.exists()
+            && let Err(e) = std::fs::File::create(&path)
+        {
+            warn!("No se pudo crear mime_associations.toml: {e}");
         }
 
         path.into()

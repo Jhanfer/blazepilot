@@ -14,8 +14,8 @@ use crate::{
     },
 };
 use egui::{
-    lerp, pos2, vec2, Align, Align2, Color32, ColorImage, CornerRadius, CursorIcon, Layout, Rect,
-    Sense, Stroke, StrokeKind, TextStyle, TextureOptions, Ui, Vec2,
+    Align, Align2, Color32, ColorImage, CornerRadius, CursorIcon, Layout, Rect, Sense, Stroke,
+    StrokeKind, TextStyle, TextureOptions, Ui, Vec2, lerp, pos2, vec2,
 };
 use file_id::FileId;
 use std::{collections::HashMap, path::Path, sync::Arc};
@@ -294,10 +294,10 @@ pub fn render_button<F, C>(
         resp.context_menu(|ui| dp(ui));
     }
 
-    if resp.clicked() {
-        if let Some(cb) = callback.as_mut() {
-            cb();
-        }
+    if resp.clicked()
+        && let Some(cb) = callback.as_mut()
+    {
+        cb();
     }
 
     ui.painter().rect(

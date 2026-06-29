@@ -64,18 +64,18 @@ impl LinuxTerminalOpener {
         path: &Path,
         preferred_terminal: Option<&str>,
     ) -> std::io::Result<()> {
-        if let Some(term) = preferred_terminal {
-            if !term.trim().is_empty() {
-                if let Ok(status) = Command::new(term).current_dir(path).spawn() {
-                    if status.id() != 0 {
-                        return Ok(());
-                    }
-                }
-                warn!(
-                    "Terminal preferido '{}' no se pudo lanzar, usando fallback",
-                    term
-                );
+        if let Some(term) = preferred_terminal
+            && !term.trim().is_empty()
+        {
+            if let Ok(status) = Command::new(term).current_dir(path).spawn()
+                && status.id() != 0
+            {
+                return Ok(());
             }
+            warn!(
+                "Terminal preferido '{}' no se pudo lanzar, usando fallback",
+                term
+            );
         }
 
         if let Ok(term) = std::env::var("TERMINAL") {

@@ -5,7 +5,7 @@ use crate::{
         system::{
             clipboard::global_clipboard::TOKIO_RUNTIME,
             knowndirs::knowndirs_manager::KnownDirsManager,
-            trash_manager::manager::{get_backend, TrashDestination},
+            trash_manager::manager::{TrashDestination, get_backend},
         },
     },
     ui::{
@@ -20,7 +20,7 @@ use crate::{
     },
 };
 use egui::{
-    scroll_area::ScrollBarVisibility, CornerRadius, Frame, Margin, Panel, ScrollArea, Stroke, Ui,
+    CornerRadius, Frame, Margin, Panel, ScrollArea, Stroke, Ui, scroll_area::ScrollBarVisibility,
 };
 
 pub fn sidebar_left_component(

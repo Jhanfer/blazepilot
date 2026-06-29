@@ -1,8 +1,8 @@
 use std::{cell::Cell, path::PathBuf, sync::Arc};
 
 use egui::{
-    pos2, vec2, Align2, Area, Color32, CursorIcon, FontId, Frame, Id, Key, Order, Pos2, Rect,
-    Response, Sense, Stroke, TextEdit, Ui, UiBuilder,
+    Align2, Area, Color32, CursorIcon, FontId, Frame, Id, Key, Order, Pos2, Rect, Response, Sense,
+    Stroke, TextEdit, Ui, UiBuilder, pos2, vec2,
 };
 use tracing::{info, warn};
 
@@ -16,7 +16,7 @@ use crate::{
         files::blaze_motor::motor_structs::FileEntry,
         runtime::{
             bus_structs::{FileOperation, QuickTagEvent, SureTo, UiEvent},
-            event_bus::{with_event_bus, Dispatcher},
+            event_bus::{Dispatcher, with_event_bus},
         },
         system::{clipboard::global_clipboard::TOKIO_RUNTIME, disk_reader::disk::Disk},
     },
@@ -201,10 +201,11 @@ impl ContextMenuState {
 
         if ui.input(|i| i.pointer.any_click()) {
             let mouse_pos = ui.input(|i| i.pointer.interact_pos());
-            if let Some(pos) = mouse_pos {
-                if !popup_rect.contains(pos) && !rect.contains(pos) {
-                    ui.memory_mut(|m| m.data.insert_temp(popup_id, false));
-                }
+            if let Some(pos) = mouse_pos
+                && !popup_rect.contains(pos)
+                && !rect.contains(pos)
+            {
+                ui.memory_mut(|m| m.data.insert_temp(popup_id, false));
             }
         }
     }
@@ -314,17 +315,17 @@ impl ContextMenuState {
 
         ui.memory_mut(|m| m.data.insert_temp(popup_id, is_open));
 
-        if let Some(mut callback) = callback_two {
-            if is_open {
-                Self::render_small_context(
-                    ui,
-                    ui_state,
-                    rect,
-                    hint_pos,
-                    popup_id,
-                    |ui: &mut Ui, state: &mut BlazeUiState| callback(ui, state),
-                )
-            }
+        if let Some(mut callback) = callback_two
+            && is_open
+        {
+            Self::render_small_context(
+                ui,
+                ui_state,
+                rect,
+                hint_pos,
+                popup_id,
+                |ui: &mut Ui, state: &mut BlazeUiState| callback(ui, state),
+            )
         }
     }
 

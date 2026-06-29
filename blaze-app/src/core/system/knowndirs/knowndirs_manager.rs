@@ -150,9 +150,12 @@ impl KnownDirsManager {
         let mut dirs = vec![("home", i18n.t("left_sidebar.home"), &self.home)];
 
         macro_rules! push_opt {
-            ($key:expr, $label_key:expr, $field:expr) => {
-                if let Some(ref p) = $field {
-                    dirs.push(($key, i18n.t($label_key).into(), p));
+            ($key:expr_2021, $label_key:expr_2021, $field:expr_2021) => {
+                match $field {
+                    Some(p) => {
+                        dirs.push(($key, i18n.t($label_key).into(), p));
+                    }
+                    _ => {}
                 }
             };
         }

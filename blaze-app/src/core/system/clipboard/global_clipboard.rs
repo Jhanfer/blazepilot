@@ -20,11 +20,11 @@ use crate::core::runtime::event_bus::Dispatcher;
 use crate::core::system::clipboard::error::{ClipBoardError, ClipBoardResult};
 use crate::core::system::operationstate::operation_manager::with_history;
 use crate::core::system::operationstate::undo_record::UndoRecord;
-use crate::core::system::trash_manager::manager::{get_backend, TrashBackend, TrashDestination};
+use crate::core::system::trash_manager::manager::{TrashBackend, TrashDestination, get_backend};
 use crate::ui::task_manager::tasks::TaskMessage;
 use once_cell::sync::Lazy;
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::OnceLock;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::vec;
 use std::{fs, path::Path};
@@ -1100,10 +1100,10 @@ impl Clipboard {
             ));
         }
 
-        if let Ok(meta) = current_cwd.metadata() {
-            if meta.permissions().readonly() {
-                return Err(ClipBoardError::PermissionDenied(current_cwd));
-            }
+        if let Ok(meta) = current_cwd.metadata()
+            && meta.permissions().readonly()
+        {
+            return Err(ClipBoardError::PermissionDenied(current_cwd));
         }
 
         let final_path_name = current_cwd.join(file_name);
@@ -1140,10 +1140,10 @@ impl Clipboard {
             ));
         }
 
-        if let Ok(meta) = current_cwd.metadata() {
-            if meta.permissions().readonly() {
-                return Err(ClipBoardError::PermissionDenied(current_cwd));
-            }
+        if let Ok(meta) = current_cwd.metadata()
+            && meta.permissions().readonly()
+        {
+            return Err(ClipBoardError::PermissionDenied(current_cwd));
         }
 
         let final_path_name = current_cwd.join(file_name);

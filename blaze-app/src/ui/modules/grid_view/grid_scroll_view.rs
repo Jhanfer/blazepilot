@@ -24,9 +24,8 @@ use crate::{
     utils::formating::{format_date, format_size},
 };
 use egui::{
-    pos2, scroll_area::ScrollSource, vec2, Color32, ColorImage, CursorIcon, FontId, Id, Key,
-    Modifiers, PointerButton, Rect, ScrollArea, Sense, Stroke, StrokeKind, TextEdit,
-    TextureOptions, Ui,
+    Color32, ColorImage, CursorIcon, FontId, Id, Key, Modifiers, PointerButton, Rect, ScrollArea,
+    Sense, Stroke, StrokeKind, TextEdit, TextureOptions, Ui, pos2, scroll_area::ScrollSource, vec2,
 };
 use file_id::FileId;
 use std::{collections::HashMap, path::Path, sync::Arc};
@@ -323,21 +322,21 @@ pub fn render_grid_scrollview(
     let total_rows = files.len().div_ceil(cols);
 
     // --- Scroll-to ---
-    if let Some(target_idx) = state.pending_scroll_to.take() {
-        if !files.is_empty() {
-            let target_idx = target_idx.min(files.len() - 1);
-            let target_row = target_idx / cols;
-            let row_top = target_row as f32 * row_height;
-            let row_bottom = row_top + row_height;
+    if let Some(target_idx) = state.pending_scroll_to.take()
+        && !files.is_empty()
+    {
+        let target_idx = target_idx.min(files.len() - 1);
+        let target_row = target_idx / cols;
+        let row_top = target_row as f32 * row_height;
+        let row_bottom = row_top + row_height;
 
-            let viewport_top = state.scroll_offset;
-            let viewport_bottom = state.scroll_offset + state.grid_view.viewport_height;
+        let viewport_top = state.scroll_offset;
+        let viewport_bottom = state.scroll_offset + state.grid_view.viewport_height;
 
-            if row_top < viewport_top {
-                state.scroll_offset = row_top;
-            } else if row_bottom > viewport_bottom {
-                state.scroll_offset = row_bottom - state.grid_view.viewport_height;
-            }
+        if row_top < viewport_top {
+            state.scroll_offset = row_top;
+        } else if row_bottom > viewport_bottom {
+            state.scroll_offset = row_bottom - state.grid_view.viewport_height;
         }
     }
 
@@ -499,15 +498,14 @@ pub fn render_grid_scrollview(
                         );
                     }
                 } else if let Some(ref target_invalid) = state.grid_view.drop_invalid_target.clone()
+                    && *file.full_path == **target_invalid
                 {
-                    if *file.full_path == **target_invalid {
-                        ui.painter().rect_stroke(
-                            rect,
-                            8.0,
-                            Stroke::new(2.0, Color32::from_rgb(255, 150, 150)),
-                            StrokeKind::Outside,
-                        );
-                    }
+                    ui.painter().rect_stroke(
+                        rect,
+                        8.0,
+                        Stroke::new(2.0, Color32::from_rgb(255, 150, 150)),
+                        StrokeKind::Outside,
+                    );
                 }
 
                 handle_grid_interactions(

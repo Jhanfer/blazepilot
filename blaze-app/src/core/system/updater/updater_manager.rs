@@ -16,8 +16,8 @@ use self_update::cargo_crate_version;
 use std::{
     error::Error,
     sync::{
-        atomic::{AtomicBool, Ordering},
         Arc,
+        atomic::{AtomicBool, Ordering},
     },
 };
 use tracing::{error, info};
@@ -79,10 +79,10 @@ impl Updater {
                     .build()?
                     .fetch()?;
 
-                if let Some(latest) = release.first() {
-                    if latest.version != version {
-                        return Ok(Some(latest.version.clone()));
-                    }
+                if let Some(latest) = release.first()
+                    && latest.version != version
+                {
+                    return Ok(Some(latest.version.clone()));
                 }
                 Ok(None)
             })();

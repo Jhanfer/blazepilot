@@ -5,7 +5,7 @@ use toml::Value;
 use tracing::info;
 
 macro_rules! load_locale_str {
-    ($locale:expr) => {
+    ($locale:expr_2021) => {
         match $locale {
             "es" => include_str!("../../../ui/assets/i18n/es.toml"),
             "en" => include_str!("../../../ui/assets/i18n/en.toml"),

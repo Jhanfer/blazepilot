@@ -142,11 +142,14 @@ impl EventBus {
     }
 
     pub fn remove_tab(&self, tab_id: Uuid) {
-        if let Some((_, group)) = self.tabs.remove(&tab_id) {
-            drop(group);
-            info!("Tab {} eliminada", tab_id);
-        } else {
-            warn!("Intento de eliminar una tab inexistente {}", tab_id);
+        match self.tabs.remove(&tab_id) {
+            Some((_, group)) => {
+                drop(group);
+                info!("Tab {} eliminada", tab_id);
+            }
+            _ => {
+                warn!("Intento de eliminar una tab inexistente {}", tab_id);
+            }
         }
     }
 

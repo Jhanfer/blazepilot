@@ -25,11 +25,11 @@ use crate::{
     core::system::{
         clipboard::global_clipboard::TOKIO_RUNTIME,
         fileopener_module::{
+            GLOBAL_FILE_OPENER,
             platform::{
                 linux::backend::DesktopApp,
                 opener_trait::{AppIconSource, AppInfo},
             },
-            GLOBAL_FILE_OPENER,
         },
     },
     ui::{
@@ -111,19 +111,20 @@ impl AppSelectorDialog {
 
         let slot_clone = slot.clone();
 
-        if let Some(mut guard) = slot_clone.try_lock() {
-            if let Some(apps) = guard.take() {
-                let count = apps.len();
+        match slot_clone.try_lock() {
+            Some(mut guard) => {
+                if let Some(apps) = guard.take() {
+                    let count = apps.len();
 
-                self.state = Some(SelectorState::Ready(SelectorData {
-                    path,
-                    apps,
-                    textures: vec![None; count],
-                }));
-                self.pending_apps = None;
+                    self.state = Some(SelectorState::Ready(SelectorData {
+                        path,
+                        apps,
+                        textures: vec![None; count],
+                    }));
+                    self.pending_apps = None;
+                }
             }
-        } else {
-            self.pending_apps = Some((path, slot))
+            _ => self.pending_apps = Some((path, slot)),
         };
     }
 
@@ -173,8 +174,8 @@ impl AppSelectorDialog {
             };
 
             let texture = match icon_path.extension().and_then(|e| e.to_str()) {
-                Some("png") | Some("jpg") | Some("jpeg") => {
-                    if let Ok(mut file) = std::fs::File::open(icon_path) {
+                Some("png") | Some("jpg") | Some("jpeg") => match std::fs::File::open(icon_path) {
+                    Ok(mut file) => {
                         let mut buffer = Vec::new();
                         use std::io::Read;
 
@@ -219,10 +220,9 @@ impl AppSelectorDialog {
                         } else {
                             None
                         }
-                    } else {
-                        None
                     }
-                }
+                    _ => None,
+                },
                 Some("svg") => Self::load_svg_as_texture(ui, icon_path, 64),
                 _ => None,
             };

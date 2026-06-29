@@ -3,7 +3,7 @@ use parking_lot::Mutex;
 use std::sync::{Arc, LazyLock};
 use tracing::warn;
 
-use crate::ui::themes::platform::{structs::Theme, ColorsTrait, PlatformTheme};
+use crate::ui::themes::platform::{ColorsTrait, PlatformTheme, structs::Theme};
 
 pub static GLOBAL_THEMES: LazyLock<Mutex<ThemeManager>> =
     LazyLock::new(|| Mutex::new(ThemeManager::new()));

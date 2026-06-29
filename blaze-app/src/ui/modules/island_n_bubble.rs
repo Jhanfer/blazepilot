@@ -14,10 +14,10 @@ use crate::{
     utils::formating::format_size,
 };
 use egui::{
-    pos2,
+    Align2, Area, Color32, CornerRadius, FontId, Frame, Margin, Rect, RichText, ScrollArea, Sense,
+    Stroke, TextFormat, Ui, pos2,
     text::{LayoutJob, TextWrapping},
-    vec2, Align2, Area, Color32, CornerRadius, FontId, Frame, Margin, Rect, RichText, ScrollArea,
-    Sense, Stroke, TextFormat, Ui,
+    vec2,
 };
 
 fn ease_out_bounce(t: f32) -> f32 {

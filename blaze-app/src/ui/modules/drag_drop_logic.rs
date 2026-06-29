@@ -2,7 +2,7 @@ use crate::{
     core::{blaze_state::BlazeCoreState, files::blaze_motor::motor_structs::FileEntry},
     ui::themes::{platform::structs::ToColor, theme_manager::with_theme},
 };
-use egui::{vec2, Color32, Painter, Rect, Ui};
+use egui::{Color32, Painter, Rect, Ui, vec2};
 use std::sync::Arc;
 
 pub fn drag_files(

@@ -13,8 +13,8 @@
 // limitations under the License.
 
 use file_id::get_file_id;
-use fuzzy_matcher::skim::SkimMatcherV2;
 use fuzzy_matcher::FuzzyMatcher;
+use fuzzy_matcher::skim::SkimMatcherV2;
 use jwalk::{Parallelism, WalkDir};
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -34,7 +34,7 @@ use crate::core::files::blaze_motor::motor_structs::{
 use crate::core::files::blaze_motor::utilities::build_entry;
 use crate::core::files::blaze_motor::watcher::FileWatcher;
 use crate::core::runtime::bus_structs::UiEvent;
-use crate::core::runtime::event_bus::{with_event_bus, Dispatcher};
+use crate::core::runtime::event_bus::{Dispatcher, with_event_bus};
 use crate::core::system::clipboard::global_clipboard::TOKIO_RUNTIME;
 use crate::core::system::knowndirs::knowndirs_manager::KnownDirsManager;
 use crate::core::system::sizer_manager::manager::SizerManager;
@@ -382,12 +382,11 @@ impl BlazeTabState {
                         continue;
                     }
 
-                    if !show_hidden {
-                        if let Some(name) = path.file_name() {
-                            if name.to_string_lossy().starts_with('.') {
-                                continue;
-                            }
-                        }
+                    if !show_hidden
+                        && let Some(name) = path.file_name()
+                        && name.to_string_lossy().starts_with('.')
+                    {
+                        continue;
                     }
 
                     let name = entry.file_name().to_string_lossy().to_string();
@@ -399,28 +398,26 @@ impl BlazeTabState {
                         name_norm.contains(&query_norm)
                     };
 
-                    if is_match {
-                        if let Ok(metadata) = entry.metadata() {
-                            let entry_path = path.to_path_buf();
-                            let unique_id = get_file_id(&entry_path).ok();
+                    if is_match && let Ok(metadata) = entry.metadata() {
+                        let entry_path = path.to_path_buf();
+                        let unique_id = get_file_id(&entry_path).ok();
 
-                            let file_entry = build_entry(&entry_path, metadata, unique_id);
+                        let file_entry = build_entry(&entry_path, metadata, unique_id);
 
-                            let arc_entry = Arc::from(file_entry);
+                        let arc_entry = Arc::from(file_entry);
 
-                            batch.push(arc_entry);
-                            total_files += 1;
+                        batch.push(arc_entry);
+                        total_files += 1;
 
-                            if batch.len() >= 150 {
-                                let send_batch = std::mem::take(&mut batch);
-                                sender_clone
-                                    .send(FileLoadingMessage::RecursiveBatch {
-                                        generation: loading_generation,
-                                        batch: send_batch,
-                                        source_dir: cwd_clone.clone(),
-                                    })
-                                    .ok();
-                            }
+                        if batch.len() >= 150 {
+                            let send_batch = std::mem::take(&mut batch);
+                            sender_clone
+                                .send(FileLoadingMessage::RecursiveBatch {
+                                    generation: loading_generation,
+                                    batch: send_batch,
+                                    source_dir: cwd_clone.clone(),
+                                })
+                                .ok();
                         }
                     }
                 }

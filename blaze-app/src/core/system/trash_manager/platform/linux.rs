@@ -181,16 +181,16 @@ impl LinuxTrashBackend {
         let mut current = file;
 
         while let Some(parent) = current.parent() {
-            if parent.file_name() == Some(std::ffi::OsStr::new("files")) {
-                if let Some(root) = parent.parent() {
-                    let root_name = root.file_name().and_then(|n| n.to_str()).unwrap_or("");
-                    let is_home_trash = root.ends_with(".local/share/Trash");
-                    let is_uid_trash =
-                        root_name == format!(".Trash-{}", uid_str) || root_name == uid_str;
+            if parent.file_name() == Some(std::ffi::OsStr::new("files"))
+                && let Some(root) = parent.parent()
+            {
+                let root_name = root.file_name().and_then(|n| n.to_str()).unwrap_or("");
+                let is_home_trash = root.ends_with(".local/share/Trash");
+                let is_uid_trash =
+                    root_name == format!(".Trash-{}", uid_str) || root_name == uid_str;
 
-                    if is_home_trash || is_uid_trash {
-                        return Ok(root.to_path_buf());
-                    }
+                if is_home_trash || is_uid_trash {
+                    return Ok(root.to_path_buf());
                 }
             }
             current = parent;
@@ -297,10 +297,10 @@ impl TrashBackend for LinuxTrashBackend {
             return true;
         }
 
-        if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
-            if name == format!(".Trash-{}", self.uid) {
-                return true;
-            }
+        if let Some(name) = path.file_name().and_then(|n| n.to_str())
+            && name == format!(".Trash-{}", self.uid)
+        {
+            return true;
         }
 
         if let (Some(name), Some(parent_name)) = (
@@ -308,10 +308,10 @@ impl TrashBackend for LinuxTrashBackend {
             path.parent()
                 .and_then(|p| p.file_name())
                 .and_then(|n| n.to_str()),
-        ) {
-            if name == self.uid.to_string() && parent_name == ".Trash" {
-                return true;
-            }
+        ) && name == self.uid.to_string()
+            && parent_name == ".Trash"
+        {
+            return true;
         }
 
         false
@@ -426,20 +426,20 @@ impl TrashBackend for LinuxTrashBackend {
         fs::set_permissions(&info_path, fs::Permissions::from_mode(0o600))
             .map_err(TrashError::Io)?;
 
-        if let Err(e) = fs::rename(source, &trash_path) {
-            if e.kind() == io::ErrorKind::CrossesDevices {
-                if source.is_dir() {
-                    Self::copy_dir_recursive(source, &trash_path)?;
-                    fs::remove_dir_all(source).map_err(TrashError::Io)?;
-                } else {
-                    fs::copy(source, &trash_path).map_err(TrashError::Io)?;
-                    fs::set_permissions(
-                        &trash_path,
-                        fs::metadata(source).map_err(TrashError::Io)?.permissions(),
-                    )
-                    .map_err(TrashError::Io)?;
-                    fs::remove_file(source).map_err(TrashError::Io)?;
-                }
+        if let Err(e) = fs::rename(source, &trash_path)
+            && e.kind() == io::ErrorKind::CrossesDevices
+        {
+            if source.is_dir() {
+                Self::copy_dir_recursive(source, &trash_path)?;
+                fs::remove_dir_all(source).map_err(TrashError::Io)?;
+            } else {
+                fs::copy(source, &trash_path).map_err(TrashError::Io)?;
+                fs::set_permissions(
+                    &trash_path,
+                    fs::metadata(source).map_err(TrashError::Io)?.permissions(),
+                )
+                .map_err(TrashError::Io)?;
+                fs::remove_file(source).map_err(TrashError::Io)?;
             }
         }
 

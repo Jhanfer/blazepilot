@@ -94,10 +94,7 @@ impl DiskManager {
     #[cfg(target_os = "linux")]
     pub async fn mount_disk(&mut self, disk: &Disk) -> anyhow::Result<String> {
         match &mut self.disks {
-            PlatformDisks::Linux(disks) => {
-                let result = disks.lock().await.mount(disk).await;
-                result
-            }
+            PlatformDisks::Linux(disks) => disks.lock().await.mount(disk).await,
         }
     }
 
@@ -105,20 +102,14 @@ impl DiskManager {
     #[cfg(target_os = "linux")]
     pub async fn unmount_disk(&mut self, disk: &Disk) -> anyhow::Result<String> {
         match &mut self.disks {
-            PlatformDisks::Linux(disks) => {
-                let result = disks.lock().await.unmount(disk).await;
-                result
-            }
+            PlatformDisks::Linux(disks) => disks.lock().await.unmount(disk).await,
         }
     }
 
     #[cfg(target_os = "linux")]
     pub async fn eject_disk(&mut self, disk: &Disk) -> anyhow::Result<String> {
         match &mut self.disks {
-            PlatformDisks::Linux(disks) => {
-                let result = disks.lock().await.eject(disk).await;
-                result
-            }
+            PlatformDisks::Linux(disks) => disks.lock().await.eject(disk).await,
         }
     }
 

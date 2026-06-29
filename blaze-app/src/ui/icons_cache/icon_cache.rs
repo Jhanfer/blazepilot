@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use egui::{vec2, ColorImage, TextureHandle, Ui};
+use egui::{ColorImage, TextureHandle, Ui, vec2};
 use resvg::usvg::Options;
 use std::collections::HashMap;
 
