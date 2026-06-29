@@ -39,7 +39,7 @@ commit_parsers = [
     { message = "^style",                 group = "<!-- 4 -->🎨 Estilo"      },
     { message = "^doc",                   group = "<!-- 5 -->📚 Docs"        },
     { message = "^test",                  group = "<!-- 6 -->🧪 Tests"       },
-    { message = "^chore\\(release\\):",   skip  = true                       },
+    { message = "^chore\\(release\\):",   group = "<!-- 0 -->🚀 Release"     },
     { message = "^chore\\(deps.*\\)",     skip  = true                       },
     { message = "^chore|^ci",             group = "<!-- 7 -->⚙️ Miscelánea"  },
     { body    = ".*security",             group = "<!-- 8 -->🛡️ Seguridad"   },

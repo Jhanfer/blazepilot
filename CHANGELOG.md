@@ -1,3 +1,8 @@
+## [0.15.1] - 2026-06-29
+
+### 🚀 Release
+- **(release)** V0.15.1 – actualización de deps, Rust 2024 y refactorización([`8e54215`](https://github.com/Jhanfer/blazepilot/commit/8e5421594dc42926b4a7d5bab4c904fe3c00015a))
+
 ## [0.15.0] - 2026-06-26
 
 ### 🚀 Features
