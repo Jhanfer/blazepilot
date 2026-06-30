@@ -155,6 +155,9 @@ cd blazepilot
 cargo run --bin blazepilot
 ```
 
+Requerimientos de compilación: rust nightly, cargo, make, ninja, nasm, libdav1d, pkg-config y headers de desarrollo x11, wayland y dbus.
+
+
 ---
 
 ## 📋 Roadmap
