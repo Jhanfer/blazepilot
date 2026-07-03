@@ -63,8 +63,9 @@ use uuid::Uuid;
 // Para el guardado en caché
 static LAST_SAVE_REQUEST: AtomicU64 = AtomicU64::new(0);
 
-#[derive(PartialEq, Clone, Serialize, Deserialize, Debug)]
+#[derive(PartialEq, Clone, Serialize, Deserialize, Debug, Default)]
 pub enum LayoutMode {
+    #[default]
     Row,
     Grid,
 }
@@ -73,6 +74,12 @@ pub enum LayoutMode {
 pub enum ViewMode {
     Normal(LayoutMode),
     Tags(LayoutMode),
+}
+
+impl Default for ViewMode {
+    fn default() -> Self {
+        ViewMode::Normal(LayoutMode::Row)
+    }
 }
 
 pub enum TagViewFilter {
@@ -245,6 +252,7 @@ impl BlazeCoreBuilder {
             navigation_cooldown: Duration::from_millis(100),
             view_mode,
             tag_filter: TagViewFilter::All { all_items_len: 0 },
+            files_just_loaded: false,
         };
 
         let dispatcher = with_event_bus(|e| e.dispatcher(active_id));
@@ -332,6 +340,7 @@ pub struct BlazeCoreState {
     navigation_cooldown: Duration,
     pub view_mode: ViewMode,
     pub tag_filter: TagViewFilter,
+    pub files_just_loaded: bool,
 }
 
 impl BlazeCoreState {
@@ -881,6 +890,7 @@ impl BlazeCoreState {
         for msg in file_messages {
             match msg {
                 FileLoadingMessage::Batch(gene, batch) => {
+                    self.files_just_loaded = false;
                     let motor = self.motor.borrow();
                     let tab = motor.active_tab();
 
@@ -989,6 +999,8 @@ impl BlazeCoreState {
                             }
                             self.needs_sort = true;
                         }
+
+                        self.files_just_loaded = true;
                     }
                 }
 

@@ -357,8 +357,7 @@ impl ExtendedInfoManager {
                     let cache_valid = if is_dir {
                         false
                     } else {
-                        let guard = cm.extended_info_cache.read();
-                        guard
+                        cm.extended_info_cache
                             .get(key.as_ref())
                             .map(|c| c.modified == current_mtime)
                             .unwrap_or(false)

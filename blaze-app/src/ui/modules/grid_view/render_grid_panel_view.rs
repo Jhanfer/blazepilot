@@ -208,43 +208,39 @@ pub fn grid_panel_frame(
             let dispatcher = with_event_bus(|e| e.dispatcher(tab_id));
 
             //Disparador de sizer
-            for file in files
-                .iter()
-                .take(state.grid_view.last_visible.min(files.len()))
-                .skip(state.grid_view.first_visible)
-            {
-                if file.is_dir()
-                    && !state.calculating_dir_sizes.contains(&file.full_path)
-                    && !state.calculated_dir_sizes.contains(&file.full_path)
-                {
-                    state.calculating_dir_sizes.insert(file.full_path.clone());
-                    if let Err(e) = dispatcher.send(SizerMessages::StartCal(
-                        file.full_path.to_owned(),
-                        Uuid::new_v4(),
-                    )) {
-                        warn!("Error enviando Sizer: {}", e);
-                    }
-                }
-            }
-
-            //Disparador de Info extendida
-            for file in files
-                .iter()
-                .take(state.grid_view.last_visible.min(files.len()))
-                .skip(state.grid_view.first_visible)
-            {
-                if !state.calculating_extended_info.contains(&file.full_path)
-                    && !state.calculated_extended_info.contains(&file.full_path)
-                {
-                    state
-                        .calculating_extended_info
-                        .insert(file.full_path.clone());
-                    if let Err(e) =
-                        dispatcher.send(ExtendedInfoMessages::StartScan(file.full_path.to_owned()))
+            if state.files_just_loaded {
+                for file in files.iter() {
+                    if file.is_dir()
+                        && !state.calculating_dir_sizes.contains(&file.full_path)
+                        && !state.calculated_dir_sizes.contains(&file.full_path)
                     {
-                        warn!("Error enviando Sizer: {}", e);
+                        state.calculating_dir_sizes.insert(file.full_path.clone());
+                        if let Err(e) = dispatcher.send(SizerMessages::StartCal(
+                            file.full_path.to_owned(),
+                            Uuid::new_v4(),
+                        )) {
+                            warn!("Error enviando Sizer: {}", e);
+                        }
                     }
                 }
+
+                //Disparador de Info extendida
+                for file in files.iter() {
+                    if !state.calculating_extended_info.contains(&file.full_path)
+                        && !state.calculated_extended_info.contains(&file.full_path)
+                    {
+                        state
+                            .calculating_extended_info
+                            .insert(file.full_path.clone());
+                        if let Err(e) = dispatcher
+                            .send(ExtendedInfoMessages::StartScan(file.full_path.to_owned()))
+                        {
+                            warn!("Error enviando Sizer: {}", e);
+                        }
+                    }
+                }
+
+                state.files_just_loaded = false;
             }
 
             //disparador de thumbnails

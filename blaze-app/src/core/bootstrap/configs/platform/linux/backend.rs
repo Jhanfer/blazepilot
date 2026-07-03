@@ -80,10 +80,13 @@ pub struct LinuxConfigs {
     #[serde(skip)]
     pub i18n: Arc<I18n>,
 
+    #[serde(default)]
     pub view_mode: ViewMode,
 
+    #[serde(default)]
     pub row_icon_size: f32,
 
+    #[serde(default)]
     pub grid_icon_size: f32,
 }
 

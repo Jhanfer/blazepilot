@@ -237,7 +237,6 @@ impl BlazeTabState {
         sizer_manager
             .cache_manager
             .size_cache
-            .read()
             .get(key.as_ref())
             .map(|c| c.size)
             .unwrap_or(0)

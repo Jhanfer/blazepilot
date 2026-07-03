@@ -117,8 +117,7 @@ impl SizerManager {
                     let cache_valid = if force {
                         false
                     } else {
-                        let guard = cm.size_cache.read();
-                        guard
+                        cm.size_cache
                             .get(key.as_ref())
                             .map(|c| c.modified == current_mtime)
                             .unwrap_or(false)

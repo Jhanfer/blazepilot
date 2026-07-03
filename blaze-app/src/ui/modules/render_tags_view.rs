@@ -301,19 +301,16 @@ pub fn tag_views(
                                 ui.add_space(10.0);
 
                                 let thumb_snapshot: HashMap<Arc<Path>, Thumbnail> = {
-                                    match ui_state.thumbnail_manager.thumb_map.try_write() {
-                                        Ok(mut guard) => tags
-                                            .iter()
-                                            .flat_map(|t| &t.items)
-                                            .filter_map(|item| {
-                                                guard
-                                                    .get(&item.path)
-                                                    .cloned()
-                                                    .map(|t| (item.path.clone(), t))
-                                            })
-                                            .collect(),
-                                        Err(_) => HashMap::new(),
-                                    }
+                                    let mut guard = ui_state.thumbnail_manager.thumb_map.write();
+                                    tags.iter()
+                                        .flat_map(|t| &t.items)
+                                        .filter_map(|item| {
+                                            guard
+                                                .get(&item.path)
+                                                .cloned()
+                                                .map(|t| (item.path.clone(), t))
+                                        })
+                                        .collect()
                                 };
 
                                 ui.vertical(|ui| {

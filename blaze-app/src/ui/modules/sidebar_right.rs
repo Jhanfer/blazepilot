@@ -408,19 +408,12 @@ pub fn sidebar_right_component(
                                         let (icon_rect, _) = ui.allocate_exact_size(icon_size, Sense::click());
 
                                         let thumbnail_snapshot: HashMap<Arc<Path>, Thumbnail> = {
-                                            match ui_state.thumbnail_manager.thumb_map.try_write() {
-                                                Ok(mut guard) => {
-                                                    let mut map = HashMap::new();
-                                                    if let Some(thumb) = guard.get(&file.full_path).cloned() {
-                                                        map.insert(file.full_path.clone(), thumb);
-                                                    }
-                                                    map
-                                                }
-                                                Err(_) => {
-                                                    ui_state.needs_repaint = true;
-                                                    HashMap::new()
-                                                }
+                                            let mut guard = ui_state.thumbnail_manager.thumb_map.write();
+                                            let mut map = HashMap::new();
+                                            if let Some(thumb) = guard.get(&file.full_path).cloned() {
+                                                map.insert(file.full_path.clone(), thumb);
                                             }
+                                            map
                                         };
 
                                         if let Some(thumb) = thumbnail_snapshot.get(&file.full_path) {

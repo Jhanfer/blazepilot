@@ -468,11 +468,7 @@ pub fn new_render_scrollview(
         };
 
         ui_state.color_snapshot = {
-            let guard = ui_state
-                .folder_color_manager
-                .cache_manager
-                .color_cache
-                .read();
+            let color_map = &ui_state.folder_color_manager.cache_manager.color_cache;
 
             row_range
                 .clone()
@@ -480,25 +476,20 @@ pub fn new_render_scrollview(
                     files[i]
                         .unique_id
                         .as_ref()
-                        .and_then(|id| guard.get(id).map(|c| (*id, c.color)))
+                        .and_then(|id| color_map.get(id).map(|c| (*id, c.color)))
                 })
                 .collect()
         };
 
         let thumbnail_snapshot: HashMap<Arc<Path>, Thumbnail> = {
-            match ui_state.thumbnail_manager.thumb_map.try_write() {
-                Ok(mut guard) => row_range
-                    .clone()
-                    .filter_map(|i| {
-                        let p = &files[i].full_path;
-                        guard.get(p).cloned().map(|t| (p.clone(), t))
-                    })
-                    .collect(),
-                Err(_) => {
-                    ui_state.needs_repaint = true;
-                    HashMap::new()
-                }
-            }
+            let mut guard = ui_state.thumbnail_manager.thumb_map.write();
+            row_range
+                .clone()
+                .filter_map(|i| {
+                    let p = &files[i].full_path;
+                    guard.get(p).cloned().map(|t| (p.clone(), t))
+                })
+                .collect()
         };
 
         for i in row_range.clone() {

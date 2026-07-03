@@ -22,11 +22,15 @@ use crate::{
     },
     ui::icons_cache::thumbnails::utils::resolve_tiff_data,
 };
+use egui::ahash::{HashSet, HashSetExt};
 use fast_image_resize as fr;
 use ffmpeg_sidecar::{download::auto_download, paths::ffmpeg_path};
 use lru::LruCache;
-use sha2::{Digest, Sha256};
-use std::num::NonZeroUsize;
+use parking_lot::RwLock;
+use std::{
+    hash::{DefaultHasher, Hasher},
+    num::NonZeroUsize,
+};
 use std::{
     io::Read,
     path::{Path, PathBuf},
@@ -34,8 +38,8 @@ use std::{
     time::UNIX_EPOCH,
 };
 use thiserror::Error;
-use tokio::sync::{RwLock, Semaphore};
-use tracing::error;
+use tokio::sync::Semaphore;
+use tracing::{error, warn};
 use uuid::Uuid;
 
 const DEFAULT_THUMB_CACHE_CAPACITY: usize = 400;
@@ -89,7 +93,7 @@ impl ThumbnailManager {
 
         TOKIO_RUNTIME.spawn(async {
             if let Err(e) = ThumbnailManager::cleanup_orphans().await {
-                error!("cleanup failed: {}", e);
+                warn!("Limpieza ha fallado: {}", e);
             }
         });
 
@@ -101,6 +105,7 @@ impl ThumbnailManager {
             Some(n) => n,
             None => unreachable!(),
         };
+
         let cap = NonZeroUsize::new(cap).unwrap_or(def_cap);
 
         Self {
@@ -114,13 +119,10 @@ impl ThumbnailManager {
     }
 
     fn path_hash(path: &Path) -> String {
-        let mut hasher = Sha256::new();
-        hasher.update(path.to_string_lossy().as_bytes());
-        hasher
-            .finalize()
-            .iter()
-            .map(|b| format!("{:02x}", b))
-            .collect()
+        let mut hasher = DefaultHasher::new();
+        hasher.write(path.as_os_str().as_encoded_bytes());
+        let hash_u64 = hasher.finish();
+        format!("{:02x}", hash_u64)
     }
 
     fn cache_path_for(path: &Path) -> PathBuf {
@@ -206,73 +208,99 @@ impl ThumbnailManager {
             msgs
         });
 
-        for msg in messages {
-            match msg {
-                ThumbnailMessages::RequestThumb(path) => {
-                    if path.starts_with(Self::thumb_cache_dir()) {
-                        continue;
-                    }
+        let mut seen: HashSet<Arc<Path>> = HashSet::new();
+        let unique_paths: Vec<Arc<Path>> = messages
+            .into_iter()
+            .map(|m| match m {
+                ThumbnailMessages::RequestThumb(path) => path,
+            })
+            .filter(|p| seen.insert(Arc::clone(p)))
+            .collect();
 
-                    if !Self::is_image(&path) && !Self::is_svg(&path) && !Self::is_video(&path) {
-                        continue;
-                    }
+        let mut need_load = Vec::new();
 
-                    let thumb_map = self.thumb_map.clone();
-                    let sender_clone = sender.clone();
-                    let sem = self.semaphore.clone();
-
-                    let current_mtime = Self::get_real_mtime(&path);
-                    let cache_path = Self::cache_path_for(&path);
-
-                    if Self::is_cache_valid(&cache_path, current_mtime) {
-                        let thumb_map = thumb_map.clone();
-                        TOKIO_RUNTIME.spawn(async move {
-                            let Ok(_permit) = sem.acquire_owned().await else {
-                                return;
-                            };
-
-                            //lee la imagen en cache
-                            if let Ok(thumb) = Self::load_from_cache(&cache_path).await {
-                                thumb_map.write().await.put(path.clone(), thumb);
-                                sender_clone
-                                    .send(UiEvent::ThumbnailReady { full_path: path })
-                                    .ok();
-                            }
-                        });
-                    } else {
-                        TOKIO_RUNTIME.spawn(async move {
-                            let Ok(_permit) = sem.acquire_owned().await else {
-                                return;
-                            };
-
-                            //genera el thumnail dependiendo del tipo
-                            let thumb = if Self::is_image(&path) {
-                                Self::generate_image_thumb(&path).await
-                            } else if Self::is_svg(&path) {
-                                Self::generate_svg_thumb(&path).await
-                            } else {
-                                Self::generate_video_thumb(&path).await
-                            };
-
-                            if let Ok(thumb) = thumb {
-                                // Guardar en cache
-                                if let Err(e) =
-                                    Self::save_to_cache(&cache_path, &thumb, current_mtime, &path)
-                                        .await
-                                {
-                                    let err = format!("Error en el caché de miniaturas: {}", e);
-                                    error!(err);
-                                    sender_clone.send(UiEvent::ShowError(err.into())).ok();
-                                }
-
-                                thumb_map.write().await.put(path.clone(), thumb);
-                                sender_clone
-                                    .send(UiEvent::ThumbnailReady { full_path: path })
-                                    .ok();
-                            }
-                        });
-                    }
+        {
+            let cache = self.thumb_map.read();
+            for path in unique_paths {
+                if cache.contains(&path) {
+                    sender
+                        .send(UiEvent::ThumbnailReady { full_path: path })
+                        .ok();
+                } else {
+                    need_load.push(path);
                 }
+            }
+        }
+
+        for path in need_load {
+            if self.thumb_map.read().contains(&path) {
+                sender
+                    .send(UiEvent::ThumbnailReady { full_path: path })
+                    .ok();
+                continue;
+            }
+
+            if path.starts_with(Self::thumb_cache_dir()) {
+                continue;
+            }
+
+            if !Self::is_image(&path) && !Self::is_svg(&path) && !Self::is_video(&path) {
+                continue;
+            }
+
+            let thumb_map = self.thumb_map.clone();
+            let sender_clone = sender.clone();
+            let sem = self.semaphore.clone();
+
+            let current_mtime = Self::get_real_mtime(&path);
+            let cache_path = Self::cache_path_for(&path);
+
+            if Self::is_cache_valid(&cache_path, current_mtime) {
+                let thumb_map = thumb_map.clone();
+                TOKIO_RUNTIME.spawn(async move {
+                    let Ok(_permit) = sem.acquire_owned().await else {
+                        return;
+                    };
+
+                    //lee la imagen en cache
+                    if let Ok(thumb) = Self::load_from_cache(&cache_path).await {
+                        thumb_map.write().put(path.clone(), thumb);
+                        sender_clone
+                            .send(UiEvent::ThumbnailReady { full_path: path })
+                            .ok();
+                    }
+                });
+            } else {
+                TOKIO_RUNTIME.spawn(async move {
+                    let Ok(_permit) = sem.acquire_owned().await else {
+                        return;
+                    };
+
+                    //genera el thumnail dependiendo del tipo
+                    let thumb = if Self::is_image(&path) {
+                        Self::generate_image_thumb(&path).await
+                    } else if Self::is_svg(&path) {
+                        Self::generate_svg_thumb(&path).await
+                    } else {
+                        Self::generate_video_thumb(&path).await
+                    };
+
+                    if let Ok(thumb) = thumb {
+                        // Guardar en cache
+                        if let Err(e) =
+                            Self::save_to_cache(&cache_path, &thumb, current_mtime, &path).await
+                        {
+                            let err = format!("Error en el caché de miniaturas: {}", e);
+                            error!(err);
+                            sender_clone.send(UiEvent::ShowError(err.into())).ok();
+                        }
+
+                        thumb_map.write().put(path.clone(), thumb);
+                        sender_clone
+                            .send(UiEvent::ThumbnailReady { full_path: path })
+                            .ok();
+                    }
+                });
             }
         }
     }
@@ -315,6 +343,8 @@ impl ThumbnailManager {
         let pixels = thumb.pixels.clone();
         let (w, h) = (thumb.width, thumb.height);
         let cache_path_clone = cache_path.to_path_buf();
+        let meta_path = cache_path.with_extension("meta");
+        let meta_content = format!("{}\n{}", mtime, original_path.to_string_lossy());
 
         //guardar binario
         tokio::task::spawn_blocking(move || -> Result<(), ThumbError> {
@@ -324,17 +354,13 @@ impl ThumbnailManager {
             buf.extend_from_slice(&pixels);
             std::fs::write(&cache_path_clone, buf).map_err(ThumbError::Io)?;
 
+            // Guardar meta
+            std::fs::write(&meta_path, meta_content).map_err(ThumbError::Io)?;
+
             Ok(())
         })
         .await
         .map_err(ThumbError::ThreadError)??;
-
-        // Guardar meta
-        let meta_path = cache_path.with_extension("meta");
-        let meta_content = format!("{}\n{}", mtime, original_path.to_string_lossy());
-        tokio::fs::write(&meta_path, meta_content)
-            .await
-            .map_err(ThumbError::Io)?;
 
         Ok(())
     }
