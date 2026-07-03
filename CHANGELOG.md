@@ -1,3 +1,12 @@
+## [0.16.0] - 2026-07-03
+
+### ⚡ Performance
+- **(blaze)** Migra caché a DashMap, rendimiento en miniaturas mejorado y estados atómicos en caché manager([`e2d2f0a`](https://github.com/Jhanfer/blazepilot/commit/e2d2f0a339cbee3e9da8c74222add781fa723c0f))
+
+
+### 📚 Docs
+- Actualiza readmes para incluir dependencias de compilación([`c739c52`](https://github.com/Jhanfer/blazepilot/commit/c739c524effc2e71f398822ba496285fc71bd798))
+
 ## [0.15.1] - 2026-06-29
 
 ### 🚀 Release
