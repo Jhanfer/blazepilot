@@ -81,11 +81,17 @@ pub enum FileConflict {
 }
 
 pub enum UiEvent {
-    OpenWithSelector { path: Arc<Path> },
+    OpenWithSelector {
+        path: Arc<Path>,
+    },
 
-    ThumbnailReady { full_path: Arc<Path> },
+    ThumbnailReady {
+        full_path: Arc<Path>,
+    },
 
-    ShowImagePvw { pvw: Option<ImagePreviewState> },
+    ShowImagePvw {
+        pvw: Option<ImagePreviewState>,
+    },
 
     SureTo(SureTo),
 
@@ -95,15 +101,26 @@ pub enum UiEvent {
 
     ShowError(Box<str>),
 
-    ShowGeneric { title: Box<str>, message: Box<str> },
+    ShowGeneric {
+        title: Box<str>,
+        message: Box<str>,
+    },
 
-    ShowFolderColorSelector { folder_id: FileId },
+    ShowFolderColorSelector {
+        folder_id: FileId,
+    },
 
     ShowWantToInstall,
 
     OpenConfigs,
 
     QuickTagEvent(QuickTagEvent),
+
+    WantToDownload {
+        mime: Box<str>,
+        url: Box<str>,
+        cwd: Arc<Path>,
+    },
 }
 
 pub enum QuickTagEvent {

@@ -115,7 +115,7 @@ pub fn sidebar_right_component(
         .resizable(false)
         .frame(custom_frame)
         .show_separator_line(false)
-        .show_inside(ui, |ui| {
+        .show(ui, |ui| {
 
             Frame::NONE
                 .inner_margin(egui::Margin::same(10))

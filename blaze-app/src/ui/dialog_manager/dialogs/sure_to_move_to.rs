@@ -13,7 +13,10 @@
 // limitations under the License.
 
 use crate::{
-    core::runtime::{bus_structs::FileOperation, event_bus::Dispatcher},
+    core::{
+        bootstrap::configs::config_manager::with_configs,
+        runtime::{bus_structs::FileOperation, event_bus::Dispatcher},
+    },
     ui::{
         dialog_manager::manager::ModalDialog,
         themes::{platform::structs::ToColor, theme_manager::with_theme},
@@ -60,6 +63,8 @@ impl SureToMoveToDialog {
     }
 
     pub fn render_dialog(&mut self, ui: &mut Ui) -> bool {
+        let i18n = with_configs(|c| c.get_i18n());
+
         let current_theme = with_theme(|t| t.current());
 
         let mut should_close = false;
@@ -73,7 +78,7 @@ impl SureToMoveToDialog {
             .corner_radius(CornerRadius::same(10))
             .inner_margin(Margin::same(10));
 
-        Window::new("Mover...")
+        Window::new(i18n.t("move_to_dialog.title"))
             .frame(custom_frame)
             .order(Order::Foreground)
             .collapsible(false)
@@ -84,7 +89,7 @@ impl SureToMoveToDialog {
                 ui.set_min_width(250.0);
                 ui.set_min_height(100.0);
 
-                ui.heading("¿Deseas mover...");
+                ui.heading(i18n.t("move_to_dialog.heading"));
 
                 const MAX_SHOWN: usize = 5;
                 let total = sources.len();
@@ -94,24 +99,27 @@ impl SureToMoveToDialog {
                         let file_name = source
                             .file_name()
                             .map(|f| f.to_string_lossy().into_owned())
-                            .unwrap_or_else(|| "Archivo".to_string());
+                            .unwrap_or_else(|| i18n.t("move_to_dialog.file").into_string());
 
-                        ui.label(format!("• {}", file_name));
+                        ui.label(i18n.t_args("move_to_dialog.file_dot", &[("query", &file_name)]));
                     }
                 } else {
                     for source in sources {
                         let file_name = source
                             .file_name()
                             .map(|f| f.to_string_lossy().into_owned())
-                            .unwrap_or_else(|| "Archivo".to_string());
+                            .unwrap_or_else(|| i18n.t("move_to_dialog.file").into_string());
 
-                        ui.label(format!("• {}", file_name));
+                        ui.label(i18n.t_args("move_to_dialog.file_dot", &[("query", &file_name)]));
                     }
                     ui.label(
-                        RichText::new(format!("...y {} archivos más", total - MAX_SHOWN))
-                            .color(current_theme.text_primary.to_color())
-                            .weak()
-                            .italics(),
+                        RichText::new(i18n.t_args(
+                            "move_to_dialog.and_more",
+                            &[("query", &(total - MAX_SHOWN).to_string())],
+                        ))
+                        .color(current_theme.text_primary.to_color())
+                        .weak()
+                        .italics(),
                     );
                 }
 
@@ -121,7 +129,7 @@ impl SureToMoveToDialog {
                     .unwrap_or_else(|| dest.to_string_lossy().into_owned());
 
                 ui.add_space(8.0);
-                ui.label(format!("a {}", dest_name));
+                ui.label(i18n.t_args("move_to_dialog.to", &[("query", &dest_name)]));
 
                 ui.add_space(50.0);
 
@@ -131,12 +139,12 @@ impl SureToMoveToDialog {
                     let spacing = (width - button_width * 2.0) / 3.0;
 
                     ui.add_space(spacing);
-                    if ui.button("Cancelar").clicked() {
+                    if ui.button(i18n.t("general_dialog.cancel")).clicked() {
                         should_close = true;
                     }
 
                     ui.add_space(spacing);
-                    if ui.button("Aceptar").clicked() {
+                    if ui.button(i18n.t("general_dialog.accept")).clicked() {
                         Dispatcher::current()
                             .send(FileOperation::Move {
                                 sources: sources.to_vec(),

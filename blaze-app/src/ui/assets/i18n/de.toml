@@ -202,38 +202,11 @@ message = "Welche Sprache lässt dein Interface heute strahlen? 🌟"
 accept = "Akzeptieren"
 cancel = "Abbrechen"
 close = "Schließen"
+save = "Speichern"
+delete = "Löschen"
 
 [error_dialog]
 title = "Ein Fehler ist aufgetreten!"
-
-[select_folder_color_dialog]
-title = "Farbe auswählen"
-reset_pred = "Standard wiederherstellen"
-
-[quick_tag_dialog_add]
-title = "Zum Tag hinzufügen"
-selection = "Tag auswählen"
-
-[quick_tag_dialog_create]
-title = "Neuen Tag erstellen"
-selection = "Tag auswählen"
-name = "Tag-Name: "
-
-[quick_tag_dialog_edit]
-title = "Tag bearbeiten"
-selection = "Tag auswählen"
-name = "Tag-Name: "
-
-[quick_tag_dialog_delete]
-title = "Möchten Sie den Tag \"{query}\" löschen?"
-
-[quick_tag_dialog_delete_quick]
-title = "Möchten Sie den Link \"{query}\" löschen?"
-
-[quick_tag_dialog_edit_quick]
-title = "Quick bearbeiten"
-name = "Quick-Name: "
-
 
 [search_keywords_terminal]
 terminal = "Terminal"
@@ -241,13 +214,13 @@ shell = "Shell"
 size = "Größe"
 font = "Schriftart"
 command = "Befehl"
-prompt = "Prompt"
+prompt = "Eingabeaufforderung"
 
 [search_keywords_backend]
 backend = "Backend"
 gpu = "GPU"
 cpu = "CPU"
-render = "Render"
+render = "Rendern"
 renderer = "Renderer"
 acceleration = "Beschleunigung"
 display_protocol = "Anzeigeprotokoll"
@@ -271,4 +244,84 @@ undo = "Rückgängig"
 
 [search_keywords_language]
 language = "Sprache"
-idiom = "Idiom"
+idiom = "Sprache"
+
+[want_download_dialog]
+title_web = "Seiten-URL"
+title_img = "Bild-URL"
+message_web = "Möchten Sie die Seite im Browser öffnen?"
+message_url = "Möchten Sie das Bild herunterladen?"
+
+[want_to_donwload_dialog]  
+title = "Möchten Sie die App installieren?"
+message = "Dies erstellt eine '.desktop'-Datei"
+hint = "Sie können später über die Einstellungen installieren"
+yes = "Ja"
+remind_me_later = "Später erinnern"
+installation_success = "Erfolgreich installiert"
+installation_path = "Installiert unter: \"{query}\""
+
+[update_dialog]
+title = "Neue Version verfügbar!"
+message = "Es gibt ein Update für Blazepilot."
+current_version = "Aktuelle Version: \"{query}\""
+new_version = "Möchten Sie auf Version \"{query}\" aktualisieren?"
+
+[move_to_dialog]
+title = "Verschieben..."
+heading = "Möchten Sie verschieben..."
+file = "Datei"
+file_dot = "• {query}"
+and_more = "... und {query} weitere Dateien"
+to = "nach {query}"
+
+[sure_to_delete_dialog]
+title = "Möchten Sie endgültig löschen?"
+file = "Datei"
+file_dot = "• {query}"
+and_more = "... und {query} weitere Dateien"
+
+[selector_dialog]
+searching_apps = "Suche nach Anwendungen..."
+open_with = "Öffne «{query}» mit..."
+select_app = "Anwendung auswählen"
+recomends = "Empfohlen"
+all_apps = "Alle Apps"
+select_as_default = "Als Standard festlegen"
+
+[quick_dialog_quick_to_tag]
+title = "Zum Tag hinzufügen"
+select_tag = "Tag auswählen"
+tag_already_exists = "Bereits im Tag vorhanden"
+
+[quick_dialog_create]
+title = "Neuen Tag erstellen"
+text_edit_hint = "Name des Tags:"
+title_empty = "Titel ist leer"
+title_on_tag_already_exists = "Ein Tag mit diesem Titel existiert bereits"
+
+[quick_dialog_edit_tag]
+title = "Tag bearbeiten"
+text_edit_hint = "Name des Tags:"
+title_empty = "Titel ist leer"
+update_error = "Fehler beim Aktualisieren des Tags"
+
+[quick_dialog_delete_tag]
+title = "Möchten Sie den Tag \"{query}\" löschen?"
+
+[quick_dialog_delete_quick]
+title = "Möchten Sie den Quick \"{query}\" löschen?"
+
+[quick_dialog_edit_quick]
+title = "Quick bearbeiten"
+text_edit_hint = "Name des Quick:"
+name_empty = "Name ist leer"
+update_error = "Fehler beim Aktualisieren des Tags"
+
+[image_preview_dialog]
+image_loading = "Lade Bild..."
+image_not_loaded = "Bild konnte nicht geladen werden"
+
+[select_folder_color_dialog]
+title = "Wähle eine Farbe"
+reset_pred = "Standard wiederherstellen"

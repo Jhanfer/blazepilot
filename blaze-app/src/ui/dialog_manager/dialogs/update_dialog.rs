@@ -13,7 +13,10 @@
 // limitations under the License.
 
 use crate::{
-    core::runtime::{bus_structs::FileOperation, event_bus::Dispatcher},
+    core::{
+        bootstrap::configs::config_manager::with_configs,
+        runtime::{bus_structs::FileOperation, event_bus::Dispatcher},
+    },
     ui::{
         dialog_manager::manager::ModalDialog,
         themes::{platform::structs::ToColor, theme_manager::with_theme},
@@ -63,6 +66,8 @@ impl UpdateDialog {
     }
 
     pub fn render_dialog(&mut self, ui: &mut Ui) -> bool {
+        let i18n = with_configs(|c| c.get_i18n());
+
         let current_theme = with_theme(|t| t.current());
 
         let mut should_close = false;
@@ -80,7 +85,7 @@ impl UpdateDialog {
             .corner_radius(CornerRadius::same(10))
             .inner_margin(Margin::same(10));
 
-        Window::new("¡Nueva versión disponible!")
+        Window::new(i18n.t("update_dialog.title"))
             .frame(custom_frame)
             .order(Order::Foreground)
             .collapsible(false)
@@ -92,13 +97,15 @@ impl UpdateDialog {
                 ui.set_min_height(100.0);
 
                 ui.vertical_centered(|ui| {
-                    ui.label("Hay una actualización de Blazepilot.");
+                    ui.label(i18n.t("update_dialog.message"));
                     ui.add_space(8.0);
 
-                    ui.label(format! {"¿Quieres actualizar a la versión {}?", new_ver});
+                    ui.label(
+                        i18n.t_args("update_dialog.current_version", &[("query", current_ver)]),
+                    );
                     ui.add_space(8.0);
 
-                    ui.label(format!("Versión actual: {}", current_ver));
+                    ui.label(i18n.t_args("update_dialog.new_version", &[("query", new_ver)]));
                 });
 
                 ui.add_space(50.0);
@@ -109,12 +116,12 @@ impl UpdateDialog {
                     let spacing = (width - button_width * 2.0) / 3.0;
 
                     ui.add_space(spacing);
-                    if ui.button("Cancelar").clicked() {
+                    if ui.button(i18n.t("general_dialog.cancel")).clicked() {
                         should_close = true;
                     }
 
                     ui.add_space(spacing);
-                    if ui.button("Aceptar").clicked() {
+                    if ui.button(i18n.t("general_dialog.accept")).clicked() {
                         Dispatcher::current().send(FileOperation::Update).ok();
 
                         should_close = true;

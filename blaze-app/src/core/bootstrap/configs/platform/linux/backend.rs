@@ -20,7 +20,7 @@ use std::{
 
 use directories::ProjectDirs;
 use serde::{Deserialize, Serialize};
-use tracing::info;
+use tracing::debug;
 
 use crate::core::{
     blaze_state::{LayoutMode, ViewMode},
@@ -115,7 +115,7 @@ impl Default for LinuxConfigs {
         let locale = lang.split("_").next().unwrap_or("en");
 
         let i18n = Arc::new(I18n::load(locale));
-        info!("Llamando i18n en default");
+        debug!("Llamando i18n en default");
 
         Self {
             app_ordering_mode: OrderingMode::default(),
@@ -165,7 +165,7 @@ impl PlatformConfigTrait for LinuxConfigs {
         let locale = &loaded.locale;
         let i18n = Arc::new(I18n::load(locale));
         loaded.i18n = i18n;
-        info!("Llamando i18n en load de linux");
+        debug!("Llamando i18n en load de linux");
 
         loaded.config_file_path = path;
         *self = loaded;

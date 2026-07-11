@@ -22,13 +22,16 @@ use std::{path::Path, sync::Arc};
 use tracing::warn;
 
 use crate::{
-    core::system::{
-        clipboard::global_clipboard::TOKIO_RUNTIME,
-        fileopener_module::{
-            GLOBAL_FILE_OPENER,
-            platform::{
-                linux::backend::DesktopApp,
-                opener_trait::{AppIconSource, AppInfo},
+    core::{
+        bootstrap::configs::config_manager::with_configs,
+        system::{
+            clipboard::global_clipboard::TOKIO_RUNTIME,
+            fileopener_module::{
+                GLOBAL_FILE_OPENER,
+                platform::{
+                    linux::backend::DesktopApp,
+                    opener_trait::{AppIconSource, AppInfo},
+                },
             },
         },
     },
@@ -244,6 +247,8 @@ impl AppSelectorDialog {
         data: &SelectorData,
         index: usize,
     ) -> bool {
+        let i18n = with_configs(|c| c.get_i18n());
+
         let mut should_close = false;
         let opener = GLOBAL_FILE_OPENER.clone();
 
@@ -272,7 +277,10 @@ impl AppSelectorDialog {
             }
 
             br.context_menu(|ui| {
-                if ui.button("Seleccionar como predeterminado").clicked() {
+                if ui
+                    .button(i18n.t("selector_dialog.select_as_default"))
+                    .clicked()
+                {
                     let app_id = app.id.clone();
                     let path_owned = data.path.clone();
                     let opener_clone = opener.clone();
@@ -305,13 +313,15 @@ impl AppSelectorDialog {
             self.load_textures(ui);
         }
 
+        let i18n = with_configs(|c| c.get_i18n());
+
         let mut should_close = self.show_modal;
 
         match &self.state {
             None => false,
             Some(SelectorState::Loading) => {
                 ui.spinner();
-                ui.label("Buscando aplicaciones...");
+                ui.label(i18n.t("selector_dialog.searching_apps"));
                 false
             }
             Some(SelectorState::Ready(data)) => {
@@ -324,11 +334,11 @@ impl AppSelectorDialog {
                     .path
                     .file_name()
                     .map(|f| f.to_string_lossy().into_owned())
-                    .unwrap_or_else(|| "".to_string());
+                    .unwrap_or_else(|| "unknown".to_string());
 
                 let mut close_requested = false;
 
-                Window::new(format!("Abrir «{}» con...", file_name))
+                Window::new(i18n.t_args("selector_dialog.open_with", &[("query", &file_name)]))
                     .frame(custom_frame)
                     .order(Order::Foreground)
                     .collapsible(false)
@@ -338,14 +348,14 @@ impl AppSelectorDialog {
                     .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
                     .open(&mut should_close)
                     .show(ui, |ui| {
-                        ui.heading("Seleccionar aplicación");
+                        ui.heading(i18n.t("selector_dialog.select_app"));
                         ui.separator();
 
                         let height = 320.0;
 
                         ScrollArea::vertical().max_height(height).show(ui, |ui| {
                             ui.label(
-                                RichText::new("Recomendadas")
+                                RichText::new(i18n.t("selector_dialog.recomends"))
                                     .color(current_theme.text_primary.to_color())
                                     .strong(),
                             );
@@ -363,7 +373,7 @@ impl AppSelectorDialog {
                             ui.add_space(12.0);
 
                             ui.label(
-                                RichText::new("Todas las apps")
+                                RichText::new(i18n.t("selector_dialog.all_apps"))
                                     .color(current_theme.text_primary.to_color())
                                     .strong(),
                             );
@@ -379,7 +389,7 @@ impl AppSelectorDialog {
 
                         ui.separator();
                         ui.horizontal(|ui| {
-                            if ui.button("Cerrar").clicked() {
+                            if ui.button(i18n.t("general_dialog.cancel")).clicked() {
                                 close_requested = true;
                             }
                         });

@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::core::bootstrap::configs::config_manager::with_configs;
 use crate::ui::image_preview::image_preview_handler::ImagePreviewState;
 use crate::ui::themes::platform::structs::ToColor;
 use crate::ui::{dialog_manager::manager::ModalDialog, themes::theme_manager::with_theme};
@@ -68,6 +69,8 @@ impl ImagePreviewDialog {
             *needs_initial_load = false;
         }
 
+        let i18n = with_configs(|c| c.get_i18n());
+
         preview.poll_loading(ui);
 
         if preview.loading {
@@ -75,13 +78,15 @@ impl ImagePreviewDialog {
                 ui.add_space(50.0);
                 ui.spinner();
                 ui.add_space(20.0);
-                ui.label("Cargando imagen...");
+                ui.label(i18n.t("image_preview_dialog.image_loading"));
             });
             return;
         }
 
         let Some(texture) = &preview.current_texture else {
-            ui.centered_and_justified(|ui| ui.label("No se pudo cargar la imagen"));
+            ui.centered_and_justified(|ui| {
+                ui.label(i18n.t("image_preview_dialog.image_not_loaded"))
+            });
             return;
         };
 

@@ -2,17 +2,21 @@ use crate::{
     core::{blaze_state::BlazeCoreState, files::blaze_motor::motor_structs::FileEntry},
     ui::themes::{platform::structs::ToColor, theme_manager::with_theme},
 };
-use egui::{Color32, Painter, Rect, Ui, vec2};
+use egui::{Color32, Rect, Ui, vec2};
 use std::sync::Arc;
 
 pub fn drag_files(
     ui: &mut Ui,
     state: &mut BlazeCoreState,
     files: &[Arc<FileEntry>],
-    clipped_painter: &Painter,
     content_rect: Rect,
     row_height: f32,
 ) {
+    let clipped_painter = ui.layer_painter(egui::LayerId::new(
+        egui::Order::Foreground,
+        egui::Id::new("drag_ghost"),
+    ));
+
     let current_theme = with_theme(|t| t.current());
 
     if let Some(pos) = state.row_view.drag_ghost_pos {

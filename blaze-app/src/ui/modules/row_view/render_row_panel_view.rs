@@ -173,7 +173,7 @@ pub fn row_panel_frame(
 
             //Drag
             if state.row_view.is_dragging_files {
-                drag_files(ui, state, files, clipped_painter, content_rect, row_height);
+                drag_files(ui, state, files, content_rect, row_height);
             }
 
             //Rubberband
@@ -289,7 +289,7 @@ pub fn row_panel_frame(
             render_island_bubble(ui, state, ui_state, files, bottom_padding, tabs_height);
 
             //hotkeys
-            hot_keys_logic(state, ui_state, files, ui, total_rows);
+            hot_keys_logic(state, ui_state, files, ui);
 
             ui.set_clip_rect(original_clip);
         });

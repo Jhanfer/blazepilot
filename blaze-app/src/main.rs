@@ -12,20 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use eframe::{HardwareAcceleration, NativeOptions};
+use eframe::NativeOptions;
 use std::{path::Path, sync::Arc, time::Duration};
-use tracing::{error, info, warn};
+use tracing::{debug, error, info, warn};
 use tracing_subscriber::{EnvFilter, fmt};
 mod app;
 mod core;
+mod platform;
 mod ui;
 mod utils;
-use mimalloc::MiMalloc;
 
-#[cfg(target_os = "linux")]
-use winit::platform::wayland::EventLoopBuilderExtWayland;
-#[cfg(target_os = "linux")]
-use winit::platform::x11::EventLoopBuilderExtX11;
+#[cfg(unix)]
+use std::os::unix::process::ExitStatusExt;
 
 use crate::{
     app::BlazeAppBuilder,
@@ -41,6 +39,7 @@ use crate::{
     utils::initial_path_handler::parse_initial_path,
 };
 
+use mimalloc::MiMalloc;
 #[global_allocator]
 static GLOBAL: MiMalloc = MiMalloc;
 
@@ -102,7 +101,7 @@ fn try_run_with_retries() -> anyhow::Result<()> {
     ];
 
     for (attempt, (backend, present_mode, with_transparency)) in configs.iter().enumerate() {
-        info!(
+        debug!(
             "Intento {}/{}: Backend={:?}, PresentMode={}, Transparencias={}",
             attempt + 1,
             configs.len(),
@@ -122,6 +121,12 @@ fn try_run_with_retries() -> anyhow::Result<()> {
 
         if status.success() {
             info!("Intento {} completado correctamente.", attempt + 1);
+            return Ok(());
+        }
+
+        #[cfg(unix)]
+        if let Some(signal) = status.signal() {
+            info!("Proceso terminado por señal {} (cierre normal)", signal);
             return Ok(());
         }
 
@@ -176,6 +181,10 @@ fn run_application(config: RunConfigs, initial_path: Option<Arc<Path>>) -> anyho
     {
         let backend = config.backend.clone();
         options.event_loop_builder = Some(Box::new(move |builder| {
+            use egui_winit::winit::platform::{
+                wayland::EventLoopBuilderExtWayland, x11::EventLoopBuilderExtX11,
+            };
+
             match backend {
                 DisplayBackend::X11 => builder.with_x11(),
                 DisplayBackend::Wayland => builder.with_wayland(),
@@ -184,14 +193,46 @@ fn run_application(config: RunConfigs, initial_path: Option<Arc<Path>>) -> anyho
         }));
     }
 
-    let blazeapp = BlazeAppBuilder::default()
-        .with_start_path(initial_path)
-        .build();
-
     eframe::run_native(
         "BlazePilot",
         options,
-        Box::new(|_cc| Ok(Box::new(blazeapp))),
+        Box::new(|cc| {
+            let display_ptr: Option<*mut std::ffi::c_void> = {
+                #[cfg(target_os = "linux")]
+                {
+                    use egui_winit::winit::raw_window_handle::{
+                        HasDisplayHandle, RawDisplayHandle,
+                    };
+                    match cc.display_handle() {
+                        Ok(handle) => match handle.as_raw() {
+                            RawDisplayHandle::Wayland(h) => {
+                                debug!("Backend Wayland Ok");
+                                Some(h.display.as_ptr())
+                            }
+
+                            other => {
+                                warn!("El backend es: {:?}", other);
+                                None
+                            }
+                        },
+                        Err(e) => {
+                            error!("display_handle() ha fallado: {e}");
+                            None
+                        }
+                    }
+                }
+                #[cfg(not(target_os = "linux"))]
+                {
+                    None
+                }
+            };
+
+            Ok(Box::new(
+                BlazeAppBuilder::default()
+                    .with_start_path(initial_path)
+                    .build(display_ptr),
+            ))
+        }),
     )
     .map_err(|e| anyhow::anyhow!("Error al ejecutar: {}", e))
 }
@@ -199,7 +240,6 @@ fn run_application(config: RunConfigs, initial_path: Option<Arc<Path>>) -> anyho
 #[derive(Clone, Debug)]
 struct RunConfigs {
     backend: DisplayBackend,
-    vsync: bool,
     multisampling: u16,
     power_preference: eframe::wgpu::PowerPreference,
     present_mode: eframe::wgpu::PresentMode,
@@ -215,7 +255,6 @@ impl RunConfigs {
         Self {
             backend,
             present_mode,
-            vsync: matches!(present_mode, eframe::wgpu::PresentMode::Fifo),
             multisampling: 0,
             power_preference: eframe::wgpu::PowerPreference::LowPower,
             transparency,
@@ -232,19 +271,20 @@ fn create_native_options(configs: &RunConfigs) -> NativeOptions {
         .with_transparent(configs.transparency)
         .with_resizable(true)
         .with_maximized(false)
-        .with_fullscreen(false);
+        .with_fullscreen(false)
+        .with_taskbar(true);
     NativeOptions {
         viewport,
         renderer: eframe::Renderer::Wgpu,
-        hardware_acceleration: HardwareAcceleration::Preferred,
-        vsync: configs.vsync,
         multisampling: configs.multisampling,
         depth_buffer: 0,
         stencil_buffer: 0,
         dithering: false,
         wgpu_options: eframe::egui_wgpu::WgpuConfiguration {
-            present_mode: configs.present_mode,
-            desired_maximum_frame_latency: Some(1),
+            surface: eframe::SurfaceConfig {
+                present_mode: configs.present_mode,
+                desired_maximum_frame_latency: Some(1),
+            },
             wgpu_setup: eframe::egui_wgpu::WgpuSetup::CreateNew(
                 eframe::egui_wgpu::WgpuSetupCreateNew {
                     power_preference: configs.power_preference,

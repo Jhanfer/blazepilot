@@ -281,7 +281,7 @@ impl BlazeCoreBuilder {
             if is_installed && (c.get_should_ask_install() || day_elapsed) {
                 dispatcher.send(UiEvent::ShowWantToInstall).ok();
             } else {
-                info!(
+                debug!(
                     "Instalado {} {} {}",
                     !is_installed,
                     c.get_should_ask_install(),
@@ -643,12 +643,12 @@ impl BlazeCoreState {
 
     pub fn move_to_trash(&mut self, items: Vec<(Arc<str>, Arc<Path>)>) {
         let dispatcher = with_event_bus(|e| e.dispatcher(self.active_id));
-        self.clipboard.move_to_trash(items, &dispatcher).ok();
-    }
-
-    fn move_to_trash_event_only(&self, items: Vec<(Arc<str>, Arc<Path>)>) {
-        let dispatcher = with_event_bus(|e| e.dispatcher(self.active_id));
-        self.clipboard.move_to_trash(items, &dispatcher).ok();
+        match self.clipboard.move_to_trash(items, &dispatcher) {
+            Ok(_) => {
+                self.refresh();
+            }
+            Err(e) => warn!("Ha ocurridoun error al mover a papelera: {e}"),
+        }
     }
 
     pub fn move_files(&mut self, sources: Vec<Arc<Path>>, dest: Arc<Path>) {
@@ -1095,7 +1095,8 @@ impl BlazeCoreState {
                     let tab = motor.active_tab();
 
                     if let Ok(ftd) = tab.get_item_to_delete(files) {
-                        self.move_to_trash_event_only(ftd);
+                        drop(motor);
+                        self.move_to_trash(ftd);
                     }
                 }
 

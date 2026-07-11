@@ -45,7 +45,7 @@ pub fn sidebar_left_component(
         .show_separator_line(false)
         .resizable(false)
         .frame(custom_frame)
-        .show_inside(ui, |ui| {
+        .show(ui, |ui| {
             ui.set_width(200.0);
 
             Frame::NONE

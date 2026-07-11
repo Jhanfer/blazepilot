@@ -12,9 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::ui::{
-    dialog_manager::manager::ModalDialog,
-    themes::{platform::structs::ToColor, theme_manager::with_theme},
+use crate::{
+    core::bootstrap::configs::config_manager::with_configs,
+    ui::{
+        dialog_manager::manager::ModalDialog,
+        themes::{platform::structs::ToColor, theme_manager::with_theme},
+    },
 };
 use egui::{CornerRadius, Frame, Margin, Order, Ui, Window};
 
@@ -56,6 +59,8 @@ impl ShowGenericDialog {
     }
 
     pub fn render_dialog(&mut self, ui: &mut Ui) -> bool {
+        let i18n = with_configs(|c| c.get_i18n());
+
         let current_theme = with_theme(|t| t.current());
 
         let mut should_close = false;
@@ -93,7 +98,7 @@ impl ShowGenericDialog {
                     let spacing = (width - button_width * 2.0) / 2.0;
 
                     ui.add_space(spacing);
-                    if ui.button("Cerrar").clicked() {
+                    if ui.button(i18n.t("general_dialog.cancel")).clicked() {
                         should_close = true;
                     }
                 });

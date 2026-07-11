@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::core::bootstrap::configs::config_manager::with_configs;
 use crate::core::system::{cache::cache_manager, clipboard::global_clipboard::TOKIO_RUNTIME};
 use crate::ui::dialog_manager::manager::ModalDialog;
 use crate::ui::themes::platform::structs::ToColor;
@@ -61,6 +62,7 @@ impl FolderColorSelector {
 
     pub fn render_dialog(&mut self, ui: &mut Ui) -> bool {
         let current_theme = with_theme(|t| t.current());
+        let i18n = with_configs(|c| c.get_i18n());
 
         let mut should_close = false;
 
@@ -76,7 +78,7 @@ impl FolderColorSelector {
             .corner_radius(CornerRadius::same(10))
             .inner_margin(Margin::same(10));
 
-        Window::new("Selecciona un color")
+        Window::new(i18n.t("select_folder_color_dialog.title"))
             .frame(custom_frame)
             .order(Order::Foreground)
             .collapsible(false)
@@ -110,15 +112,18 @@ impl FolderColorSelector {
 
                     ui.add_space(spacing);
 
-                    if ui.button("Restaurar predeterminado").clicked() {
+                    if ui
+                        .button(i18n.t("select_folder_color_dialog.reset_pred"))
+                        .clicked()
+                    {
                         *temp_color = Color32::YELLOW;
                     }
 
-                    if ui.button("Cancelar").clicked() {
+                    if ui.button(i18n.t("general_dialog.cancel")).clicked() {
                         should_close = true;
                     }
 
-                    if ui.button("Aceptar").clicked() {
+                    if ui.button(i18n.t("general_dialog.accept")).clicked() {
                         let cm = cache_manager::CacheManager::global();
                         let (folder_id, temp_color) = (*folder_id, *temp_color);
 
@@ -127,7 +132,7 @@ impl FolderColorSelector {
                             cm.save_color_cache().await;
                         });
 
-                        ui.ctx().request_repaint();
+                        ui.request_repaint();
                         should_close = true;
                     }
                 });

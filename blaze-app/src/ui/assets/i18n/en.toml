@@ -211,38 +211,11 @@ message = "Pick a language that makes your interface feel like home 🏡✨"
 accept = "Accept"
 cancel = "Cancel"
 close = "Close"
+save = "Save"
+delete = "Delete"
 
 [error_dialog]
 title = "An error has occurred!"
-
-[select_folder_color_dialog]
-title = "Select a color"
-reset_pred = "Restore default"
-
-[quick_tag_dialog_add]
-title = "Add to tag"
-selection = "Select tag"
-
-[quick_tag_dialog_create]
-title = "Create new tag"
-selection = "Select tag"
-name = "Tag name: "
-
-[quick_tag_dialog_edit]
-title = "Edit tag"
-selection = "Select tag"
-name = "Tag name: "
-
-[quick_tag_dialog_delete]
-title = "Do you want to delete the tag: \"{query}\"?"
-
-[quick_tag_dialog_delete_quick]
-title = "Do you want to delete the link: \"{query}\"?"
-
-[quick_tag_dialog_edit_quick]
-title = "Edit quick"
-name = "Quick name: "
-
 
 [search_keywords_terminal]
 terminal = "terminal"
@@ -280,4 +253,84 @@ undo = "undo"
 
 [search_keywords_language]
 language = "language"
-idiom = "idiom"
+idiom = "language"
+
+[want_download_dialog]
+title_web = "Page URL"
+title_img = "Image URL"
+message_web = "Do you want to open the page in a browser?"
+message_url = "Do you want to download the image?"
+
+[want_to_donwload_dialog]  
+title = "Do you want to install the app?"
+message = "This will create a '.desktop' file"
+hint = "You can install from settings later"
+yes = "Yes"
+remind_me_later = "Remind me later"
+installation_success = "Installed successfully"
+installation_path = "Installed at: \"{query}\""
+
+[update_dialog]
+title = "New version available!"
+message = "There is an update for Blazepilot."
+current_version = "Current version: \"{query}\""
+new_version = "Do you want to update to version \"{query}\"?"
+
+[move_to_dialog]
+title = "Move..."
+heading = "Do you want to move..."
+file = "File"
+file_dot = "• {query}"
+and_more = "... and {query} more files"
+to = "to {query}"
+
+[sure_to_delete_dialog]
+title = "Do you want to permanently delete?"
+file = "File"
+file_dot = "• {query}"
+and_more = "... and {query} more files"
+
+[selector_dialog]
+searching_apps = "Searching for applications..."
+open_with = "Open «{query}» with..."
+select_app = "Select application"
+recomends = "Recommended"
+all_apps = "All apps"
+select_as_default = "Set as default"
+
+[quick_dialog_quick_to_tag]
+title = "Add to tag"
+select_tag = "Select tag"
+tag_already_exists = "Already exists in the tag"
+
+[quick_dialog_create]
+title = "Create new tag"
+text_edit_hint = "Tag name:"
+title_empty = "Title is empty"
+title_on_tag_already_exists = "A tag with that title already exists"
+
+[quick_dialog_edit_tag]
+title = "Edit Tag"
+text_edit_hint = "Tag name:"
+title_empty = "Title is empty"
+update_error = "Error updating the tag"
+
+[quick_dialog_delete_tag]
+title = "Do you want to delete the tag: \"{query}\"?"
+
+[quick_dialog_delete_quick]
+title = "Do you want to delete the Quick: \"{query}\"?"
+
+[quick_dialog_edit_quick]
+title = "Edit Quick"
+text_edit_hint = "Quick name:"
+name_empty = "Name is empty"
+update_error = "Error updating the tag"
+
+[image_preview_dialog]
+image_loading = "Loading image..."
+image_not_loaded = "Could not load image"
+
+[select_folder_color_dialog]
+title = "Select a color"
+reset_pred = "Restore default"

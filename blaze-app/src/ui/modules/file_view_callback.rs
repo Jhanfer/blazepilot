@@ -100,25 +100,23 @@ pub fn render_views(
         _ => {}
     }
 
-    CentralPanel::default()
-        .frame(custom_frame)
-        .show_inside(ui, |ui| {
-            ui.spacing_mut().item_spacing.y = 0.0;
+    CentralPanel::default().frame(custom_frame).show(ui, |ui| {
+        ui.spacing_mut().item_spacing.y = 0.0;
 
-            tools(state, ui_state, files, ui);
+        tools(state, ui_state, files, ui);
 
-            match &state.view_mode {
-                ViewMode::Normal(layout) => match layout.to_owned() {
-                    LayoutMode::Row => {
-                        row_panel_frame(ui, files, state, ui_state, bottom_padding, tabs_height);
-                    }
-                    LayoutMode::Grid => {
-                        grid_panel_frame(ui, files, state, ui_state, bottom_padding, tabs_height);
-                    }
-                },
-                ViewMode::Tags(_) => {
-                    tag_views(ui, state, ui_state, bottom_padding, tabs_height);
+        match &state.view_mode {
+            ViewMode::Normal(layout) => match layout.to_owned() {
+                LayoutMode::Row => {
+                    row_panel_frame(ui, files, state, ui_state, bottom_padding, tabs_height);
                 }
+                LayoutMode::Grid => {
+                    grid_panel_frame(ui, files, state, ui_state, bottom_padding, tabs_height);
+                }
+            },
+            ViewMode::Tags(_) => {
+                tag_views(ui, state, ui_state, bottom_padding, tabs_height);
             }
-        });
+        }
+    });
 }

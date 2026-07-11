@@ -16,7 +16,7 @@ use std::{path::Path, sync::Arc};
 
 use egui::Color32;
 use serde::{Deserialize, Serialize};
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
 
 use crate::{
     core::{
@@ -95,7 +95,7 @@ impl ColorsTrait for LinuxTheme {
             self.active_theme = Arc::clone(first);
         }
 
-        info!(
+        debug!(
             "ThemeManager cargado: {} temas disponibles",
             self.available_themes.len()
         );
@@ -174,7 +174,7 @@ impl LinuxTheme {
         };
 
         match std::fs::create_dir_all(&theme_path) {
-            Ok(_) => info!("generado path de temas: {}", theme_path.display()),
+            Ok(_) => debug!("generado path de temas: {}", theme_path.display()),
             Err(e) => warn!("Ha ocurrido un error generando el directorio de temas: {e}."),
         }
 

@@ -197,6 +197,10 @@ impl BlazeUiState {
                 UiEvent::QuickTagEvent(event) => {
                     self.dialog_manager.open_quick_acc_dialog(event);
                 }
+
+                UiEvent::WantToDownload { mime, url, cwd } => {
+                    self.dialog_manager.open_want_to_donwload(&mime, &url, cwd);
+                }
             }
         }
     }

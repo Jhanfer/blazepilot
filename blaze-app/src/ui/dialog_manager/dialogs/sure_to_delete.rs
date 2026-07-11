@@ -14,6 +14,7 @@
 
 use std::{path::Path, sync::Arc};
 
+use crate::core::bootstrap::configs::config_manager::with_configs;
 use crate::core::runtime::{bus_structs::FileOperation, event_bus::Dispatcher};
 use crate::ui::dialog_manager::manager::ModalDialog;
 use crate::ui::themes::platform::structs::ToColor;
@@ -59,6 +60,8 @@ impl SureToDeleteDialog {
     }
 
     pub fn render_dialog(&mut self, ui: &mut Ui) -> bool {
+        let i18n = with_configs(|c| c.get_i18n());
+
         let current_theme = with_theme(|t| t.current());
 
         let mut should_close = false;
@@ -83,7 +86,7 @@ impl SureToDeleteDialog {
                 ui.set_min_width(250.0);
                 ui.set_min_height(100.0);
 
-                ui.heading("¿Deseas eliminar permanentemente?");
+                ui.heading(i18n.t("sure_to_delete_dialog.title"));
 
                 const MAX_SHOWN: usize = 5;
                 let total = sources.len();
@@ -92,17 +95,22 @@ impl SureToDeleteDialog {
                     let file_name = source
                         .file_name()
                         .map(|f| f.to_string_lossy().into_owned())
-                        .unwrap_or_else(|| "Archivo".to_string());
+                        .unwrap_or_else(|| i18n.t("sure_to_delete_dialog.file").into_string());
 
-                    ui.label(format!("• {}", file_name));
+                    ui.label(
+                        i18n.t_args("sure_to_delete_dialog.file_dot", &[("query", &file_name)]),
+                    );
                 }
 
                 if total > MAX_SHOWN {
                     ui.label(
-                        RichText::new(format!("...y {} archivos más", total - MAX_SHOWN))
-                            .color(current_theme.text_primary.to_color())
-                            .weak()
-                            .italics(),
+                        RichText::new(i18n.t_args(
+                            "sure_to_delete_dialog.and_more",
+                            &[("query", &(total - MAX_SHOWN).to_string())],
+                        ))
+                        .color(current_theme.text_primary.to_color())
+                        .weak()
+                        .italics(),
                     );
                 }
 
@@ -114,12 +122,12 @@ impl SureToDeleteDialog {
                     let spacing = (width - button_width * 2.0) / 3.0;
 
                     ui.add_space(spacing);
-                    if ui.button("Cancelar").clicked() {
+                    if ui.button(i18n.t("general_dialog.cancel")).clicked() {
                         should_close = true;
                     }
 
                     ui.add_space(spacing);
-                    if ui.button("Aceptar").clicked() {
+                    if ui.button(i18n.t("general_dialog.accept")).clicked() {
                         Dispatcher::current()
                             .send(FileOperation::Trash {
                                 files: sources.to_vec(),

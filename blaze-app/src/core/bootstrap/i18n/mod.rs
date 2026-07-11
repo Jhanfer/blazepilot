@@ -2,7 +2,7 @@ use parking_lot::RwLock;
 use std::collections::HashMap;
 use std::sync::Arc;
 use toml::Value;
-use tracing::info;
+use tracing::debug;
 
 macro_rules! load_locale_str {
     ($locale:expr_2021) => {
@@ -27,7 +27,7 @@ pub struct I18n {
 impl I18n {
     pub fn load(locale: &str) -> Self {
         let translations = Self::load_locale(locale);
-        info!("Cargando idioma: {locale}");
+        debug!("Cargando idioma: {locale}");
         Self {
             translations: Arc::new(RwLock::new(translations)),
             current_locale: Arc::new(RwLock::new(locale.to_string())),

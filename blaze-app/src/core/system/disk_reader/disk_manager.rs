@@ -15,7 +15,6 @@
 use crate::core::system::disk_reader::disk::Disk;
 use std::sync::Arc;
 use tokio::sync::Mutex as TokioMutex;
-use tracing::info;
 
 #[cfg(target_os = "linux")]
 use crate::core::system::disk_reader::platform::linux::LinuxDisks;
@@ -38,7 +37,9 @@ impl DiskManager {
     pub async fn new() -> Self {
         #[cfg(target_os = "linux")]
         {
-            info!("Iniciando DiskManager Linux");
+            use tracing::debug;
+
+            debug!("Iniciando DiskManager Linux");
             Self {
                 disks: PlatformDisks::Linux(TokioMutex::new(LinuxDisks::init().await).into()),
                 watcher_started: false,
@@ -57,11 +58,13 @@ impl DiskManager {
         &mut self,
         manager_arc: Arc<TokioMutex<DiskManager>>,
     ) -> anyhow::Result<()> {
+        use tracing::debug;
+
         if self.watcher_started {
-            info!("Disk Watcher inciado.");
+            debug!("Disk Watcher inciado.");
             return Ok(());
         }
-        info!("Inciando watcher");
+        debug!("Inciando watcher");
 
         let PlatformDisks::Linux(mutex_arc) = &self.disks;
         let linux_disks = mutex_arc.lock().await;

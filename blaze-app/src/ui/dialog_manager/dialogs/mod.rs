@@ -8,4 +8,5 @@ pub mod show_generic_message;
 pub mod sure_to_delete;
 pub mod sure_to_move_to;
 pub mod update_dialog;
+pub mod want_donwload;
 pub mod want_to_install;

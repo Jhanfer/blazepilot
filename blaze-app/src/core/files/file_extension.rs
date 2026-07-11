@@ -1,3 +1,8 @@
+//Trait para pasar lo que necesito a str
+pub trait StrExtension {
+    fn extension(&self) -> &'static str;
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum DocType {
     Pdf,
@@ -31,6 +36,23 @@ pub enum ImageType {
     Heic,
 }
 
+impl StrExtension for ImageType {
+    fn extension(&self) -> &'static str {
+        match self {
+            ImageType::Png => "png",
+            ImageType::Jpg => "jpg",
+            ImageType::Gif => "gif",
+            ImageType::Webp => "webp",
+            ImageType::Bmp => "bmp",
+            ImageType::Tiff => "tiff",
+            ImageType::Svg => "svg",
+            ImageType::Ico => "ico",
+            ImageType::Avif => "avif",
+            ImageType::Heic => "heic",
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum VideoType {
     Mp4,
@@ -43,6 +65,21 @@ pub enum VideoType {
     M4v,
 }
 
+impl StrExtension for VideoType {
+    fn extension(&self) -> &'static str {
+        match self {
+            VideoType::Mp4 => "mp4",
+            VideoType::Mkv => "mkv",
+            VideoType::Avi => "avi",
+            VideoType::Mov => "mov",
+            VideoType::Wmv => "wmv",
+            VideoType::Flv => "flv",
+            VideoType::Webm => "webm",
+            VideoType::M4v => "m4v",
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum AudioType {
     Mp3,
@@ -53,6 +90,21 @@ pub enum AudioType {
     M4a,
     Opus,
     Wma,
+}
+
+impl StrExtension for AudioType {
+    fn extension(&self) -> &'static str {
+        match self {
+            AudioType::Mp3 => "mp3s",
+            AudioType::Wav => "wav",
+            AudioType::Flac => "flac",
+            AudioType::Ogg => "ogg",
+            AudioType::Aac => "aac",
+            AudioType::M4a => "m4a",
+            AudioType::Opus => "opus",
+            AudioType::Wma => "wma",
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -268,6 +320,53 @@ impl FileExtension {
             _ => Self::Unknown,
         }
     }
+
+    pub fn from_mime(mime: &str) -> Self {
+        match mime {
+            m if m.trim().to_lowercase().starts_with("image/") => match m.trim().to_lowercase() {
+                png if png.contains("png") => Self::Image(ImageType::Png),
+                jpg if jpg.contains("jpg") => Self::Image(ImageType::Jpg),
+                gif if gif.contains("gif") => Self::Image(ImageType::Gif),
+                webp if webp.contains("webp") => Self::Image(ImageType::Webp),
+                bmp if bmp.contains("bmp") => Self::Image(ImageType::Bmp),
+                tiff if tiff.contains("tiff") => Self::Image(ImageType::Tiff),
+                svg if svg.contains("svg") => Self::Image(ImageType::Svg),
+                ico if ico.contains("ico") => Self::Image(ImageType::Ico),
+                avif if avif.contains("avif") => Self::Image(ImageType::Avif),
+                heic if heic.contains("heic") => Self::Image(ImageType::Heic),
+
+                _ => Self::Unknown,
+            },
+
+            m if m.trim().to_lowercase().starts_with("video/") => match m.trim().to_lowercase() {
+                mp4 if mp4.contains("mp4") => Self::Video(VideoType::Mp4),
+                mkv if mkv.contains("mkv") => Self::Video(VideoType::Mkv),
+                avi if avi.contains("avi") => Self::Video(VideoType::Avi),
+                mov if mov.contains("mov") => Self::Video(VideoType::Mov),
+                wmv if wmv.contains("wmv") => Self::Video(VideoType::Wmv),
+                flv if flv.contains("flv") => Self::Video(VideoType::Flv),
+                webm if webm.contains("webm") => Self::Video(VideoType::Webm),
+                m4v if m4v.contains("m4v") => Self::Video(VideoType::M4v),
+
+                _ => Self::Unknown,
+            },
+
+            m if m.trim().to_lowercase().starts_with("audio/") => match m.trim().to_lowercase() {
+                mp3 if mp3.contains("mp3") => Self::Audio(AudioType::Mp3),
+                wav if wav.contains("wav") => Self::Audio(AudioType::Wav),
+                flac if flac.contains("flac") => Self::Audio(AudioType::Flac),
+                ogg if ogg.contains("ogg") => Self::Audio(AudioType::Ogg),
+                aac if aac.contains("aac") => Self::Audio(AudioType::Aac),
+                m4a if m4a.contains("m4a") => Self::Audio(AudioType::M4a),
+                opus if opus.contains("opus") => Self::Audio(AudioType::Opus),
+                wma if wma.contains("wma") => Self::Audio(AudioType::Wma),
+
+                _ => Self::Unknown,
+            },
+
+            _ => Self::Unknown,
+        }
+    }
 }
 
 impl FileExtension {
@@ -283,6 +382,10 @@ impl FileExtension {
         matches!(self, FileExtension::Video(_))
     }
 
+    pub fn is_audio(&self) -> bool {
+        matches!(self, FileExtension::Audio(_))
+    }
+
     #[allow(unused)]
     pub fn is_code(&self) -> bool {
         matches!(self, FileExtension::Code(_))
@@ -293,5 +396,150 @@ impl FileExtension {
             FileExtension::Archive(t) => Some(t.clone()),
             _ => None,
         }
+    }
+}
+
+pub fn sniff_magic_bytes(bytes: &[u8]) -> Option<FileExtension> {
+    match bytes {
+        // _-_-_- imágenes _-_-_-
+
+        //png
+        [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, ..] => {
+            Some(FileExtension::Image(ImageType::Png))
+        }
+        //jpg
+        [0xFF, 0xD8, 0xFF, ..] => {
+            Some(FileExtension::Image(ImageType::Jpg))
+        }
+        //gif
+        [0x47, 0x49, 0x46, 0x38, ..] => {
+            Some(FileExtension::Image(ImageType::Gif))
+        }
+
+        // riff / webp
+        [0x52, 0x49, 0x46, 0x46, _, _, _, _, 0x57, 0x45, 0x42, 0x50, ..] => {
+            Some(FileExtension::Image(ImageType::Webp))
+        }
+
+        // bmp
+        [0x42, 0x4D, ..] => {
+            Some(FileExtension::Image(ImageType::Bmp))
+        }
+
+        // tiff little endian
+        [0x49, 0x49, 0x2A, 0x00, ..] => {
+            Some(FileExtension::Image(ImageType::Tiff))
+        }
+
+        // tiff big endian
+        [0x4D, 0x4D, 0x00, 0x2A, ..] => {
+            Some(FileExtension::Image(ImageType::Tiff))
+        }
+
+        // ico
+        [0x00, 0x00, 0x01, 0x00, ..] => {
+            Some(FileExtension::Image(ImageType::Ico))
+        }
+
+        //avif (iso bmff)
+        [_, _, _, _, 0x66, 0x74, 0x79, 0x70, 0x61, 0x76, 0x69, 0x66, ..]
+        | [_, _, _, _, 0x66, 0x74, 0x79, 0x70, 0x61, 0x76, 0x69, 0x73, ..] => {
+            Some(FileExtension::Image(ImageType::Avif))
+        }
+
+        //heic (iso bmff)
+        [_, _, _, _, 0x66, 0x74, 0x79, 0x70, 0x68, 0x65, 0x69, 0x63, ..]
+        | [_, _, _, _, 0x66, 0x74, 0x79, 0x70, 0x68, 0x65, 0x69, 0x78, ..]
+        | [_, _, _, _, 0x66, 0x74, 0x79, 0x70, 0x6D, 0x69, 0x66, 0x31, ..] => {
+            Some(FileExtension::Image(ImageType::Heic))
+        }
+
+        // _-_-_- vídeo _-_-_- 
+
+        // m4a
+        [_, _, _, _, 0x66, 0x74, 0x79, 0x70, 0x4D, 0x34, 0x41, 0x20, ..] => {
+            Some(FileExtension::Audio(AudioType::M4a))
+        }
+
+        // mkv / webm
+        [0x1A, 0x45, 0xDF, 0xA3, ..] => {
+            // No se puede distinguir de WebM solo con los primeros bytes.
+            Some(FileExtension::Video(VideoType::Mkv))
+        }
+
+        // riff / avi
+        [0x52, 0x49, 0x46, 0x46, _, _, _, _, 0x41, 0x56, 0x49, 0x20, ..] => {
+            Some(FileExtension::Video(VideoType::Avi))
+        }
+
+        // mov
+        [_, _, _, _, 0x66, 0x74, 0x79, 0x70, 0x71, 0x74, 0x20, 0x20, ..] => {
+            Some(FileExtension::Video(VideoType::Mov))
+        }
+
+        // m4v
+        [_, _, _, _, 0x66, 0x74, 0x79, 0x70, 0x4D, 0x34, 0x56, 0x20, ..]
+        | [_, _, _, _, 0x66, 0x74, 0x79, 0x70, 0x4D, 0x34, 0x56, 0x48, ..] => {
+            Some(FileExtension::Video(VideoType::M4v))
+        }
+
+        // mp4
+        [_, _, _, _, 0x66, 0x74, 0x79, 0x70, ..] => {
+            Some(FileExtension::Video(VideoType::Mp4))
+        }
+
+        // flv
+        [0x46, 0x4C, 0x56, 0x01, ..] => {
+            Some(FileExtension::Video(VideoType::Flv))
+        }
+
+        // wmc - mwa no se puede detectar solo con magic bytes
+        [
+            0x30, 0x26, 0xB2, 0x75,
+            0x8E, 0x66, 0xCF, 0x11,
+            0xA6, 0xD9, 0x00, 0xAA,
+            0x00, 0x62, 0xCE, 0x6C,
+            ..
+        ] => {
+            Some(FileExtension::Video(VideoType::Wmv))
+        }
+
+        // _-_-_- audio _-_-_- 
+
+        // mp3 id3
+        [0x49, 0x44, 0x33, ..]
+        // mp3 frame
+        | [0xFF, 0xFB, ..]
+        | [0xFF, 0xF3, ..]
+        | [0xFF, 0xF2, ..] => {
+            Some(FileExtension::Audio(AudioType::Mp3))
+        }
+
+        // riff / wave
+        [0x52, 0x49, 0x46, 0x46, _, _, _, _, 0x57, 0x41, 0x56, 0x45, ..] => {
+            Some(FileExtension::Audio(AudioType::Wav))
+        }
+
+        // flac
+        [0x66, 0x4C, 0x61, 0x43, ..] => {
+            Some(FileExtension::Audio(AudioType::Flac))
+        }
+
+        // ogg / opus
+        [0x4F, 0x67, 0x67, 0x53, ..] => {
+            if bytes.windows(8).any(|w| w == b"OpusHead") {
+                Some(FileExtension::Audio(AudioType::Opus))
+            } else {
+                Some(FileExtension::Audio(AudioType::Ogg))
+            }
+        }
+
+        // aac
+        [0xFF, 0xF1, ..]
+        | [0xFF, 0xF9, ..] => {
+            Some(FileExtension::Audio(AudioType::Aac))
+        }
+
+        _ => None,
     }
 }

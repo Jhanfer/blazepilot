@@ -8,20 +8,20 @@ name = "blazepilot"
 path = "blaze-app/src/main.rs"
 
 [dependencies]
-egui = { version = "0.34.3", features = ["serde"] }
-egui_extras = "0.34.3"
+egui = { version = "0.35.0", features = ["serde"] }
+egui_extras = { version = "0.35.0", default-features = false }
 openssl = { version = "0.10.79", features = ["vendored"] }
 once_cell = "1.19"
 tokio = { version = "1.52.3", features = ["full"] }
 tokio-stream = "0.1.18"
-lru = "0.18.0"
+lru = "0.18.1"
 uuid = { version = "1.23.1", features = ["v4"] }
 notify = "8.2.0"
 directories = "6.0.0"
 serde_json = "1.0.149"
 serde = "1.0.228"
 chrono = "0.4.44"
-crossbeam-channel = "0.5.15"
+crossbeam-channel = "0.5.16"
 cfg-if = "1.0.4"
 shell-words = "1.1.1"
 mime_guess = "2.0.5"
@@ -30,7 +30,7 @@ tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.22", features = ["env-filter"] }
 mimalloc = "0.1.50"
 anyhow = "1.0.102"
-zbus = "5.15.0"
+zbus = "5.17.0"
 udisks2 = "0.3.1"
 libc = "0.2.186"
 uzers = "0.12.2"
@@ -55,23 +55,27 @@ urlencoding = "2.1.3"
 parking_lot = "0.12.5"
 toml = "1.1.2"
 resvg = "0.47.0"
-imagesize = "0.14.0"
+imagesize = "0.15.0"
 stb_image = "0.3"
 image-webp = "0.2"
 libavif-image = "0.14.0"
 fast_image_resize = "6.0.0"
 tiff = { version = "0.11.3", default-features = false, features = ["deflate", "fax", "lzw"] }
+url = "2.5.8"
+reqwest = "0.13.4"
 
 [target.'cfg(target_os = "linux")'.dependencies]
-eframe = { version = "0.34.3", default-features = false, features = ["wgpu", "x11", "wayland", "wgpu_no_default_features"] }
-winit = { version = "0.30", default-features = false, features = ["x11", "wayland",] }
+eframe = { git = "https://github.com/Jhanfer/egui-custom.git", branch = "main", default-features = false, features = ["wgpu", "x11", "wayland", "wgpu_no_default_features"] }
+egui-winit = { git = "https://github.com/Jhanfer/egui-custom.git", branch = "main", default-features = false, features = ["x11", "wayland"] }
 linicon = "2.3.0"
+wayland-client = "0.31.14"
+rustix = "1.1.4"
 
 [target.'cfg(not(target_os = "linux"))'.dependencies]
-eframe = { version = "0.34.3", features = ["wgpu"] }
+eframe = { git = "https://github.com/Jhanfer/egui-custom.git", branch = "main", default-features = false, features = ["wgpu"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
-eframe = { version = "0.34.3", features = ["wgpu"] }
+eframe = { git = "https://github.com/Jhanfer/egui-custom.git", branch = "main", default-features = false, features = ["wgpu"] }
 
 
 [profile.dev]
@@ -96,3 +100,8 @@ overflow-checks = false
 
 [profile.release.package."*"]
 opt-level = "z"
+
+[patch.crates-io]
+eframe = { git = "https://github.com/Jhanfer/egui-custom.git", branch = "main" }
+egui = { git = "https://github.com/Jhanfer/egui-custom.git", branch = "main" }
+egui-winit = { git = "https://github.com/Jhanfer/egui-custom.git", branch = "main" }

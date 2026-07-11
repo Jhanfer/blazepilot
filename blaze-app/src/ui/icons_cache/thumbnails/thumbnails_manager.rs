@@ -22,12 +22,13 @@ use crate::{
     },
     ui::icons_cache::thumbnails::utils::resolve_tiff_data,
 };
-use egui::ahash::{HashSet, HashSetExt};
+
 use fast_image_resize as fr;
 use ffmpeg_sidecar::{download::auto_download, paths::ffmpeg_path};
 use lru::LruCache;
 use parking_lot::RwLock;
 use std::{
+    collections::HashSet,
     hash::{DefaultHasher, Hasher},
     num::NonZeroUsize,
 };

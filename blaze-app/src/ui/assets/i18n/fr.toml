@@ -202,38 +202,11 @@ message = "Quelle langue fera battre votre interface aujourd'hui ? 💓"
 accept = "Accepter"
 cancel = "Annuler"
 close = "Fermer"
+save = "Enregistrer"
+delete = "Supprimer"
 
 [error_dialog]
 title = "Une erreur est survenue !"
-
-[select_folder_color_dialog]
-title = "Sélectionner une couleur"
-reset_pred = "Restaurer par défaut"
-
-[quick_tag_dialog_add]
-title = "Ajouter au tag"
-selection = "Sélectionner un tag"
-
-[quick_tag_dialog_create]
-title = "Créer un nouveau tag"
-selection = "Sélectionner un tag"
-name = "Nom du tag : "
-
-[quick_tag_dialog_edit]
-title = "Modifier le tag"
-selection = "Sélectionner un tag"
-name = "Nom du tag : "
-
-[quick_tag_dialog_delete]
-title = "Voulez-vous supprimer le tag : \"{query}\" ?"
-
-[quick_tag_dialog_delete_quick]
-title = "Voulez-vous supprimer le lien : \"{query}\" ?"
-
-[quick_tag_dialog_edit_quick]
-title = "Modifier quick"
-name = "Nom du quick : "
-
 
 [search_keywords_terminal]
 terminal = "terminal"
@@ -245,8 +218,8 @@ prompt = "invite"
 
 [search_keywords_backend]
 backend = "backend"
-gpu = "GPU"
-cpu = "CPU"
+gpu = "gpu"
+cpu = "cpu"
 render = "rendu"
 renderer = "moteur de rendu"
 acceleration = "accélération"
@@ -259,11 +232,11 @@ dark = "sombre"
 light = "clair"
 font = "police"
 icon = "icône"
-background = "arrière-plan"
+background = "fond"
 
 [search_keywords_behavior]
 auto = "auto"
-save = "sauvegarder"
+save = "enregistrer"
 backup = "sauvegarde"
 behavior = "comportement"
 confirm = "confirmer"
@@ -271,4 +244,84 @@ undo = "annuler"
 
 [search_keywords_language]
 language = "langue"
-idiom = "idiome"
+idiom = "langue"
+
+[want_download_dialog]
+title_web = "URL de la page"
+title_img = "URL de l'image"
+message_web = "Ouvrir la page dans un navigateur ?"
+message_url = "Télécharger l'image ?"
+
+[want_to_donwload_dialog]  
+title = "Installer l'application ?"
+message = "Cela créera un fichier '.desktop'"
+hint = "Vous pouvez installer depuis les paramètres plus tard"
+yes = "Oui"
+remind_me_later = "Me rappeler plus tard"
+installation_success = "Installation réussie"
+installation_path = "Installé dans : \"{query}\""
+
+[update_dialog]
+title = "Nouvelle version disponible !"
+message = "Une mise à jour de Blazepilot est disponible."
+current_version = "Version actuelle : \"{query}\""
+new_version = "Voulez-vous mettre à jour vers la version \"{query}\" ?"
+
+[move_to_dialog]
+title = "Déplacer..."
+heading = "Voulez-vous déplacer..."
+file = "Fichier"
+file_dot = "• {query}"
+and_more = "... et {query} autres fichiers"
+to = "vers {query}"
+
+[sure_to_delete_dialog]
+title = "Supprimer définitivement ?"
+file = "Fichier"
+file_dot = "• {query}"
+and_more = "... et {query} autres fichiers"
+
+[selector_dialog]
+searching_apps = "Recherche d'applications en cours..."
+open_with = "Ouvrir « {query} » avec..."
+select_app = "Sélectionner une application"
+recomends = "Recommandées"
+all_apps = "Toutes les apps"
+select_as_default = "Définir par défaut"
+
+[quick_dialog_quick_to_tag]
+title = "Ajouter au tag"
+select_tag = "Sélectionner un tag"
+tag_already_exists = "Déjà présent dans le tag"
+
+[quick_dialog_create]
+title = "Créer un nouveau tag"
+text_edit_hint = "Nom du tag :"
+title_empty = "Le titre est vide"
+title_on_tag_already_exists = "Un tag avec ce titre existe déjà"
+
+[quick_dialog_edit_tag]
+title = "Modifier le tag"
+text_edit_hint = "Nom du tag :"
+title_empty = "Le titre est vide"
+update_error = "Erreur lors de la mise à jour du tag"
+
+[quick_dialog_delete_tag]
+title = "Supprimer le tag : \"{query}\" ?"
+
+[quick_dialog_delete_quick]
+title = "Supprimer le Quick : \"{query}\" ?"
+
+[quick_dialog_edit_quick]
+title = "Modifier le Quick"
+text_edit_hint = "Nom du Quick :"
+name_empty = "Le nom est vide"
+update_error = "Erreur lors de la mise à jour du tag"
+
+[image_preview_dialog]
+image_loading = "Chargement de l'image..."
+image_not_loaded = "Impossible de charger l'image"
+
+[select_folder_color_dialog]
+title = "Sélectionner une couleur"
+reset_pred = "Restaurer les paramètres par défaut"

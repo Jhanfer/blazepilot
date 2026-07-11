@@ -84,7 +84,7 @@ impl GlobalClipboard {
     fn inner() -> &'static Clipboard {
         static INSTANCE: OnceLock<Clipboard> = OnceLock::new();
         INSTANCE.get_or_init(|| {
-            info!("Clipboard global creado");
+            debug!("Clipboard global creado");
             Clipboard::new()
         })
     }

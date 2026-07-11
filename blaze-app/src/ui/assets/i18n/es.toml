@@ -211,37 +211,12 @@ message = "¿En qué idioma te gustaría escuchar tu corazón hoy? 💖"
 accept = "Aceptar"
 cancel = "Cancelar"
 close = "Cerrar"
+save = "Guardar"
+delete = "Eliminar"
+
 
 [error_dialog]
 title = "¡Ha ocurrido un error!"
-
-[select_folder_color_dialog]
-title = "Selecciona un color"
-reset_pred = "Restaurar predeterminado"
-
-[quick_tag_dialog_add]
-title = "Añadir al tag"
-selection = "Seleccionar tag"
-
-[quick_tag_dialog_create]
-title = "Crear nuevo tag"
-selection = "Seleccionar tag"
-name = "Nombre del tag: "
-
-[quick_tag_dialog_edit]
-title = "Editar tag"
-selection = "Seleccionar tag"
-name = "Nombre del tag: "
-
-[quick_tag_dialog_delete]
-title = "¿Desea eliminar el tag: \"{query}\"?"
-
-[quick_tag_dialog_delete_quick]
-title = "¿Desea eliminar el link: \"{query}\"?"
-
-[quick_tag_dialog_edit_quick]
-title = "Editar quick"
-name = "Nombre del quick: "
 
 
 [search_keywords_terminal]
@@ -281,3 +256,92 @@ undo = "deshacer"
 [search_keywords_language]
 language = "idioma"
 idiom = "lenguaje"
+
+
+[want_download_dialog]
+title_web = "Url de página"
+title_img = "Url de imagen"
+message_web = "¿Desea abrir la página en un navegador?"
+message_url = "¿Desea descargar la imagen?"
+
+
+[want_to_donwload_dialog]  
+title = "¿Deseas instalar la app?"
+message = "Esto creará un '.desktop'"
+hint = "Puedes instalar desde configuraciones más tarde"
+yes = "Sí"
+remind_me_later = "Recuerdame luego"
+installation_success = "Instalado con éxito"
+installation_path = "Se ha instalado en: \"{query}\""
+
+
+[update_dialog]
+title = "¡Nueva versión disponible!"
+message = "Hay una actualización de Blazepilot."
+current_version = "Versión actual: \"{query}\""
+new_version = "¿Quieres actualizar a la versión \"{query}\"?"
+
+
+[move_to_dialog]
+title = "Mover..."
+heading = "¿Deseas mover..."
+file = "Archivo"
+file_dot = "• {query}"
+and_more = "... y {query} archivos más"
+to = "a {query}"
+
+
+[sure_to_delete_dialog]
+title = "¿Deseas eliminar permanentemente?"
+file = "Archivo"
+file_dot = "• {query}"
+and_more = "... y {query} archivos más"
+
+
+[selector_dialog]
+searching_apps = "Buscando aplicaciones..."
+open_with = "Abrir «{query}» con..."
+select_app = "Seleccionar aplicación"
+recomends = "Recomendadas"
+all_apps = "Todas las apps"
+select_as_default = "Seleccionar como predeterminado"
+
+
+[quick_dialog_quick_to_tag]
+title = "Añadir al tag"
+select_tag = "Seleccionar tag"
+tag_already_exists = "Ya existe dentro del tag"
+
+[quick_dialog_create]
+title = "Crear nuevo tag"
+text_edit_hint = "Nombre del tag:"
+title_empty = "El título está vacío"
+title_on_tag_already_exists = "Ya existe tag con ese título"
+
+[quick_dialog_edit_tag]
+title = "Editar Tag"
+text_edit_hint = "Nombre del tag:"
+title_empty = "El título está vacío"
+update_error = "Error al actualizar el tag"
+
+[quick_dialog_delete_tag]
+title = "¿Desea eliminar el tag: \"{query}\"?"
+
+[quick_dialog_delete_quick]
+title = "¿Desea eliminar el Quick: \"{query}\"?"
+
+[quick_dialog_edit_quick]
+title = "Editar Quick"
+text_edit_hint = "Nombre del Quick:"
+name_empty = "El nombre está vacío"
+update_error = "Error al actualizar el tag"
+
+
+[image_preview_dialog]
+image_loading = "Cargando imagen..."
+image_not_loaded = "No se ha podido cargar la imagen"
+
+
+[select_folder_color_dialog]
+title = "Selecciona un color"
+reset_pred = "Restaurar predeterminado"

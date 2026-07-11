@@ -202,38 +202,11 @@ message = "Выберите язык, который сделает ваш ин�
 accept = "Принять"
 cancel = "Отмена"
 close = "Закрыть"
+save = "Сохранить"
+delete = "Удалить"
 
 [error_dialog]
 title = "Произошла ошибка!"
-
-[select_folder_color_dialog]
-title = "Выберите цвет"
-reset_pred = "Восстановить по умолчанию"
-
-[quick_tag_dialog_add]
-title = "Добавить к тегу"
-selection = "Выберите тег"
-
-[quick_tag_dialog_create]
-title = "Создать новый тег"
-selection = "Выберите тег"
-name = "Название тега: "
-
-[quick_tag_dialog_edit]
-title = "Редактировать тег"
-selection = "Выберите тег"
-name = "Название тега: "
-
-[quick_tag_dialog_delete]
-title = "Вы хотите удалить тег: \"{query}\"?"
-
-[quick_tag_dialog_delete_quick]
-title = "Вы хотите удалить ссылку: \"{query}\"?"
-
-[quick_tag_dialog_edit_quick]
-title = "Редактировать быстрый доступ"
-name = "Название быстрого доступа: "
-
 
 [search_keywords_terminal]
 terminal = "терминал"
@@ -245,12 +218,12 @@ prompt = "приглашение"
 
 [search_keywords_backend]
 backend = "бэкенд"
-gpu = "видеокарта"
-cpu = "процессор"
-render = "рендер"
+gpu = "gpu"
+cpu = "cpu"
+render = "рендеринг"
 renderer = "рендерер"
 acceleration = "ускорение"
-display_protocol = "протокол отображения"
+display_protocol = "протокол дисплея"
 
 [search_keywords_appearance]
 color = "цвет"
@@ -271,4 +244,84 @@ undo = "отменить"
 
 [search_keywords_language]
 language = "язык"
-idiom = "идиома"
+idiom = "язык"
+
+[want_download_dialog]
+title_web = "URL страницы"
+title_img = "URL изображения"
+message_web = "Открыть страницу в браузере?"
+message_url = "Скачать изображение?"
+
+[want_to_donwload_dialog]  
+title = "Установить приложение?"
+message = "Будет создан файл '.desktop'"
+hint = "Позже можно установить из настроек"
+yes = "Да"
+remind_me_later = "Напомнить позже"
+installation_success = "Установка выполнена успешно"
+installation_path = "Установлено в: \"{query}\""
+
+[update_dialog]
+title = "Доступна новая версия!"
+message = "Доступно обновление Blazepilot."
+current_version = "Текущая версия: \"{query}\""
+new_version = "Обновить до версии \"{query}\"?"
+
+[move_to_dialog]
+title = "Переместить..."
+heading = "Переместить..."
+file = "Файл"
+file_dot = "• {query}"
+and_more = "... и ещё {query} файлов"
+to = "в {query}"
+
+[sure_to_delete_dialog]
+title = "Удалить навсегда?"
+file = "Файл"
+file_dot = "• {query}"
+and_more = "... и ещё {query} файлов"
+
+[selector_dialog]
+searching_apps = "Поиск приложений..."
+open_with = "Открыть «{query}» с помощью..."
+select_app = "Выберите приложение"
+recomends = "Рекомендуемые"
+all_apps = "Все приложения"
+select_as_default = "Использовать по умолчанию"
+
+[quick_dialog_quick_to_tag]
+title = "Добавить в тег"
+select_tag = "Выберите тег"
+tag_already_exists = "Уже существует в этом теге"
+
+[quick_dialog_create]
+title = "Создать новый тег"
+text_edit_hint = "Имя тега:"
+title_empty = "Название не заполнено"
+title_on_tag_already_exists = "Тег с таким названием уже существует"
+
+[quick_dialog_edit_tag]
+title = "Редактировать тег"
+text_edit_hint = "Имя тега:"
+title_empty = "Название не заполнено"
+update_error = "Ошибка обновления тега"
+
+[quick_dialog_delete_tag]
+title = "Удалить тег: \"{query}\"?"
+
+[quick_dialog_delete_quick]
+title = "Удалить Quick: \"{query}\"?"
+
+[quick_dialog_edit_quick]
+title = "Редактировать Quick"
+text_edit_hint = "Имя Quick:"
+name_empty = "Название не заполнено"
+update_error = "Ошибка обновления тега"
+
+[image_preview_dialog]
+image_loading = "Загрузка изображения..."
+image_not_loaded = "Не удалось загрузить изображение"
+
+[select_folder_color_dialog]
+title = "Выберите цвет"
+reset_pred = "Вернуть стандартный"

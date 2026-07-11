@@ -103,7 +103,7 @@ pub fn toolbar_component(ui: &mut Ui, state: &mut BlazeCoreState, ui_state: &mut
         )
         .exact_size(80.0)
         .show_separator_line(false)
-        .show_inside(ui, |ui| {
+        .show(ui, |ui| {
             let total_height = 35.0;
             let spacing = 8.0;
 

@@ -55,6 +55,8 @@ impl WantToInstallDialog {
     }
 
     pub fn render_dialog(&mut self, ui: &mut Ui) -> bool {
+        let i18n = with_configs(|c| c.get_i18n());
+
         let current_theme = with_theme(|t| t.current());
 
         let mut should_close = false;
@@ -63,7 +65,7 @@ impl WantToInstallDialog {
             .corner_radius(CornerRadius::same(10))
             .inner_margin(Margin::same(10));
 
-        Window::new("¿Deseas instalar la app?")
+        Window::new(i18n.t("want_to_donwload_dialog.title"))
             .frame(custom_frame)
             .order(Order::Foreground)
             .collapsible(false)
@@ -76,9 +78,9 @@ impl WantToInstallDialog {
 
                 ui.vertical_centered(|ui| {
                     ui.add_space(8.0);
-                    ui.label("Esto creará un '.desktop' ");
+                    ui.label(i18n.t("want_to_donwload_dialog.message"));
 
-                    ui.label("Puedes instalar desde configuraciones más tarde");
+                    ui.label(i18n.t("want_to_donwload_dialog.hint"));
                 });
 
                 ui.add_space(50.0);
@@ -89,7 +91,7 @@ impl WantToInstallDialog {
                     let spacing = (width - button_width * 2.0) / 2.0;
 
                     ui.add_space(spacing);
-                    if ui.button("Sí").clicked() {
+                    if ui.button(i18n.t("want_to_donwload_dialog.yes")).clicked() {
                         let dispatcher = Dispatcher::current();
 
                         with_installation_manager(|im| {
@@ -98,12 +100,12 @@ impl WantToInstallDialog {
                                 InstallResult::InstalledSystem(path)
                                 | InstallResult::InstalledLocal(path) => dispatcher
                                     .send(UiEvent::ShowGeneric {
-                                        title: "!Instalado con éxito!".into(),
-                                        message: format!(
-                                            "Se ha instalado en: '{}'",
-                                            path.display()
-                                        )
-                                        .into(),
+                                        title: i18n
+                                            .t("want_to_donwload_dialog.installation_success"),
+                                        message: i18n.t_args(
+                                            "want_to_donwload_dialog.installation_path",
+                                            &[("query", &path.display().to_string())],
+                                        ),
                                     })
                                     .ok(),
                                 InstallResult::Failed(e) => {
@@ -115,7 +117,7 @@ impl WantToInstallDialog {
                         should_close = true;
                     }
 
-                    if ui.button("Recuerdame luego").clicked() {
+                    if ui.button(i18n.t("")).clicked() {
                         with_configs(|im| {
                             im.set_should_ask_install(false);
                         });

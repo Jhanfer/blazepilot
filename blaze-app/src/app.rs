@@ -16,6 +16,9 @@ use crate::core::blaze_state::{BlazeCoreBuilder, BlazeCoreState};
 use crate::core::bootstrap::configs::config_manager::with_configs;
 use crate::core::system::clipboard::global_clipboard::TOKIO_RUNTIME;
 use crate::core::system::knowndirs::knowndirs_manager::KnownDirsManager;
+use crate::platform::wayland::wayland_dnd::WaylandDndReceiver;
+use crate::platform::wayland::wayland_events::EventTrait;
+use crate::platform::x11::x11_events::process_event_x11;
 use crate::ui::blaze_ui_state::BlazeUiState;
 use crate::ui::modules::ui_callback::connect_ui_components_callback;
 use crate::ui::themes::platform::structs::ToColor;
@@ -44,7 +47,9 @@ impl BlazeAppBuilder {
     }
 
     #[must_use]
-    pub fn build(self) -> BlazeApp {
+    pub fn build(self, display_ptr: Option<*mut std::ffi::c_void>) -> BlazeApp {
+        let dnd = display_ptr.and_then(WaylandDndReceiver::spawn);
+
         let state = TOKIO_RUNTIME.block_on(
             BlazeCoreBuilder::default()
                 .with_start_path(self.start_path)
@@ -52,7 +57,11 @@ impl BlazeAppBuilder {
         );
         let ui_state = BlazeUiState::default();
 
-        BlazeApp { state, ui_state }
+        BlazeApp {
+            state,
+            ui_state,
+            dnd,
+        }
     }
 }
 
@@ -65,6 +74,7 @@ impl Default for BlazeAppBuilder {
 pub struct BlazeApp {
     pub state: BlazeCoreState,  //motor, archivos, mover
     pub ui_state: BlazeUiState, //visuales
+    pub dnd: Option<WaylandDndReceiver>,
 }
 
 impl BlazeApp {
@@ -150,6 +160,31 @@ impl BlazeApp {
 }
 
 impl eframe::App for BlazeApp {
+    fn raw_input_hook(&mut self, ctx: &egui::Context, _raw_input: &mut egui::RawInput) {
+        //simulador de evento ctrl + v
+        for event in &_raw_input.events {
+            if let egui::Event::Key { key, modifiers, .. } = event
+                && *key == egui::Key::V
+                && modifiers.ctrl
+            {
+                _raw_input.events.push(egui::Event::Paste("".into()));
+                debug!("Ctrl + V detectado: enviando Event::Paste");
+                break;
+            }
+        }
+
+        if let Some(ref receiver) = self.dnd {
+            receiver.process_event(self.state.cwd.clone(), self.state.active_id);
+        } else {
+            // Por ahora x11 solo detecta dropeo de files pero no de bytes, por lo que esta condición no se cumplirá al soltar imágenes o texto plano
+            if !ctx.input(|i| i.raw.dropped_files.is_empty()) {
+                let dropped_files = ctx.input(|i| i.raw.dropped_files.clone());
+
+                process_event_x11(self.state.cwd.clone(), self.state.active_id, &dropped_files);
+            }
+        }
+    }
+
     fn ui(&mut self, ui: &mut Ui, _frame: &mut Frame) {
         self.set_custom_visuals(ui);
 
@@ -163,26 +198,6 @@ impl eframe::App for BlazeApp {
         ui.options_mut(|opt| {
             opt.reduce_texture_memory = true;
         });
-
-        //Dropeo de archivos
-        if !ui.ctx().input(|i| i.raw.dropped_files.is_empty()) {
-            debug!("Se dropea el objeto");
-            let dropped_files: Vec<Arc<Path>> = ui
-                .input(|i| i.raw.dropped_files.clone())
-                .iter()
-                .map(|d| {
-                    let path_buf = &d.path.clone().unwrap_or_default();
-                    let path: &Path = path_buf.as_ref();
-                    Arc::from(path)
-                })
-                .collect();
-
-            let dest = self.state.cwd.clone();
-
-            self.state.move_files(dropped_files, dest);
-
-            ui.input_mut(|i| i.raw.dropped_files.clear());
-        }
 
         self.state.process_messages();
 

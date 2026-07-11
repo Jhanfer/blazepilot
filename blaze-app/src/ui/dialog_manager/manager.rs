@@ -13,7 +13,8 @@ use crate::{
             image_preview_dialog::ImagePreviewDialog, quick_dialogs::QuickAccDialog,
             selector_dialog::AppSelectorDialog, show_generic_message::ShowGenericDialog,
             sure_to_delete::SureToDeleteDialog, sure_to_move_to::SureToMoveToDialog,
-            update_dialog::UpdateDialog, want_to_install::WantToInstallDialog,
+            update_dialog::UpdateDialog, want_donwload::WantToDonwloadDialog,
+            want_to_install::WantToInstallDialog,
         },
         image_preview::image_preview_handler::ImagePreviewState,
     },
@@ -37,6 +38,7 @@ pub struct DialogManager {
     pub want_to_install_dialog: WantToInstallDialog,
     pub generic_dialog: ShowGenericDialog,
     pub quick_dialog: QuickAccDialog,
+    pub want_to_donwload: WantToDonwloadDialog,
 }
 
 impl DialogManager {
@@ -53,6 +55,7 @@ impl DialogManager {
             want_to_install_dialog: WantToInstallDialog::new(),
             generic_dialog: ShowGenericDialog::new(),
             quick_dialog: QuickAccDialog::new(),
+            want_to_donwload: WantToDonwloadDialog::new(),
         }
     }
 
@@ -106,6 +109,10 @@ impl DialogManager {
         self.quick_dialog.open(event);
     }
 
+    pub fn open_want_to_donwload(&mut self, mime: &str, url: &str, cwd: Arc<Path>) {
+        self.want_to_donwload.open(mime, url, cwd);
+    }
+
     pub fn render_area(&mut self, ui: &mut Ui) {
         let dialogs: Vec<&mut dyn ModalDialog> = vec![
             &mut self.selector_dialog,
@@ -119,6 +126,7 @@ impl DialogManager {
             &mut self.want_to_install_dialog,
             &mut self.generic_dialog,
             &mut self.quick_dialog,
+            &mut self.want_to_donwload,
         ];
 
         let open_dialog = dialogs.into_iter().find(|d| d.is_open());

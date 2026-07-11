@@ -1005,14 +1005,14 @@ impl ConfigDialog {
                 .show_separator_line(false)
                 .resizable(false)
                 .frame(frame)
-                .show_inside(ui, |ui| {
+                .show(ui, |ui| {
                     ui.set_width(160.0);
                     ui.add_space(8.0);
 
                     self.render_config_sidebar(ui);
                 });
 
-            CentralPanel::default().frame(frame).show_inside(ui, |ui| {
+            CentralPanel::default().frame(frame).show(ui, |ui| {
                 ui.set_max_width(ui.available_width());
                 ui.set_max_height(ui.available_height());
 

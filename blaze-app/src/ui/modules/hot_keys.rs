@@ -27,7 +27,6 @@ pub fn hot_keys_logic(
     ui_state: &mut BlazeUiState,
     files: &[Arc<FileEntry>],
     ui: &mut Ui,
-    _total_rows: usize,
 ) {
     let input = ui.input(|i| i.clone());
     let disable_keys = state.renaming_file.is_none() && state.creating_new.is_none();

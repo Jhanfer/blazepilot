@@ -20,7 +20,7 @@ use std::sync::Arc;
 use std::{ffi::CString, path::PathBuf};
 use tokio::sync::Mutex as TokioMutex;
 use tokio_stream::StreamExt;
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
 use udisks2::{Client, block::BlockProxy, filesystem::FilesystemProxy};
 use uzers::{get_current_gid, get_current_uid};
 use zbus::zvariant::{ObjectPath, Value};
@@ -33,7 +33,7 @@ pub struct LinuxDisks {
 
 impl LinuxDisks {
     pub async fn init() -> Self {
-        info!("Iniciando LinuxDisks");
+        debug!("Iniciando LinuxDisks");
         let client = Client::new()
             .await
             .expect("Fallo al conectar a Udisk2 via D-Bus");
@@ -60,7 +60,7 @@ impl LinuxDisks {
             }
         };
 
-        info!("UDisks2 devolvió {} block devices", block_paths.len());
+        debug!("UDisks2 devolvió {} block devices", block_paths.len());
 
         for path in block_paths {
             if let Some(disk) = self.process_block_device(path.into()).await {
@@ -70,7 +70,7 @@ impl LinuxDisks {
 
         self.partitions
             .sort_by_key(|d| d.device.clone().unwrap_or_default());
-        info!("Procesadas {} entradas válidas", self.partitions.len());
+        debug!("Procesadas {} entradas válidas", self.partitions.len());
     }
 
     async fn process_block_device(&self, path: ObjectPath<'_>) -> Option<Disk> {
