@@ -1,3 +1,12 @@
+## [0.17.0] - 2026-07-11
+
+### 🚀 Features
+- **(app)** Refactor de drag & drop, internacionalización completa y descarga desde URL([`d1c5176`](https://github.com/Jhanfer/blazepilot/commit/d1c5176de883bfc616faa2c95309e80ded14fcf7))
+
+
+### 🚀 Release
+- **(release)** V0.17.0([`7b5dff3`](https://github.com/Jhanfer/blazepilot/commit/7b5dff3c4b8bc39e24812ebf9c28f576ac6cdd9c))
+
 ## [0.16.0] - 2026-07-03
 
 ### ⚡ Performance
