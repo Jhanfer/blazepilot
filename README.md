@@ -1,5 +1,5 @@
 # BlazePilot
-🌐 **[English](README.md)** | 🇪🇸 **[Español]**
+🌐 **[English](README.md)** | 🇪🇸 **[Español](README.es.md)**
 
 File explorer made with egui in Rust.
 
