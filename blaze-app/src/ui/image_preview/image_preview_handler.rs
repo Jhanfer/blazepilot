@@ -119,6 +119,10 @@ impl ImagePreviewState {
 
         self.next_rx = Self::spawn_load(self.path_at(self.next_index()), ui);
 
+        if self.current_texture.is_none() && self.current_rx.is_none() {
+            self.current_rx = Self::spawn_load(self.path_at(self.current_index), ui);
+        }
+
         self.loading = self.current_texture.is_none();
     }
 
@@ -141,6 +145,10 @@ impl ImagePreviewState {
         self.current_rx = self.prev_rx.take();
 
         self.prev_rx = Self::spawn_load(self.path_at(self.prev_index()), ui);
+
+        if self.current_texture.is_none() && self.current_rx.is_none() {
+            self.current_rx = Self::spawn_load(self.path_at(self.current_index), ui);
+        }
 
         self.loading = self.current_texture.is_none();
     }
