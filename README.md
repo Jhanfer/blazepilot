@@ -1,9 +1,14 @@
-# 🔥 BlazePilot
-🌐 **[English]** | 🇪🇸 **[Español](README.es.md)**
+# BlazePilot
+🌐 **[English](README.md)** | 🇪🇸 **[Español]**
 
-**Blazing-fast file explorer** built with **egui** in Rust ⚡
+File explorer made with egui in Rust.
 
-A modern, lightweight, and highly customizable graphical file manager. Navigate your files smoothly with multi-language support, a tag system, thumbnails, Git integration, disk management, and much more.
+*BlazePilot was born as a personal project. I was tired of the limitations of the explorers I used daily, so I started developing it as a way to practice Rust while learning, adapting it to my own needs.*
+
+BlazePilot is a modern and customizable file manager. Navigate through your files smoothly, incorporates a tag system to organize files, support for multiple languages, thumbnails, partial Git support, disk management and more.
+
+> [!IMPORTANT]
+> Currently BlazePilot is compatible with Linux. Support for Windows and macOS is under development.
 
 ![Rust](https://img.shields.io/badge/Rust-000000?logo=rust&logoColor=white)
 ![egui](https://img.shields.io/badge/egui-FF9900?logo=egui&logoColor=white)
@@ -17,137 +22,147 @@ A modern, lightweight, and highly customizable graphical file manager. Navigate 
 
 ---
 
-## ✨ Features
+## Features
 
-### ⚡ Performance
-- Blazing fast thanks to Rust + egui with a **wgpu** backend (hardware acceleration)
-- **MiMalloc** memory allocator to reduce fragmentation
-- **Tokio** asynchronous runtime — file operations never block the UI
-- LRU cache of 50 directories with debounced saving (3s)
+### Performance
+- Fast asynchronous file loading
+- Thumbnails and directory size calculation in the background
+- **Tokio** async runtime to run file operations without blocking the interface
+- **mimalloc** memory allocator
 
-### 📁 File operations
-- **Copy / Cut / Paste** with global clipboard and conflict resolution
-- **Rename** preserving original casing
-- **Delete** with trash support (XDG Trash compliant)
-- **Create** files and folders
-- **Move** with drag & drop
-- **Undo** file operations (Ctrl+Z)
-- **Extract ZIP** directly from the explorer
+### File operations
+- Copy, paste, cut managed by a custom global clipboard
+- Renaming preserves original casing
+- Delete with system trash support
+- Create files and folders
+- Move with drag & drop within the app
+- Undo file operations with **Ctrl + Z**
+- Basic support for extracting ZIP and other formats directly from the explorer
 
-### 🔍 Navigation and search
-- **Tabbed navigation** with history (Ctrl+← / Ctrl+→)
-- **Recursive search** with the `rec:` prefix — powered by jwalk
-- **Type-to-search** for instant filtering in the current directory
-- **Auto-scroll** when selecting search results
+### Drag & Drop (Wayland)
+- Native support for drag & drop on Wayland
+- Content type detection using MIME and magic bytes
+- Accepts files, text, images and URLs
+- Dragged files, images and text are saved directly to the current directory
+- Image URLs offer to download them
+- Web page URLs can be opened in the browser
 
-### 🏷️ Tag System / Quick Access *(v0.11.0)*
-- Flexible tags replacing hardcoded favorites
-- Toggle Tag/Normal view with **Ctrl+T**
-- Create tags with **Ctrl+Shift+T**
-- Bottom floating island for tag management
+ >[!NOTE]
+When dragging data from another application, Blaze does not rely solely on the announced MIME type. It inspects the _magic bytes_ of the content to correctly identify images, videos, text, URLs and other formats before deciding how to process them.
 
-### 🎨 Interface and customization
-- **Custom folder colors** with color picker and live preview
-- **Thumbnails** with persistent disk cache
-- **Icons** with SVG rasterization and concurrency semaphore
-- Centralized color palette and rounded corners
-- **Image preview** in dedicated dialog
-- Full context menu with all operations
+### Navigation and search
+- Tab navigation **Ctrl + <- / Ctrl + -> / Ctrl + Nums**
+- Recursive search with the prefix **rec:** in the search box
+- Instant search while typing to filter in the current directory
 
-### 🌍 Internationalization *(v0.12.0)*
+### Tag / quick access system
+- Tags that allow organization by types
+- Toggle tags/normal view with **Ctrl+T**
+- Create tag with **Ctrl + Shift + T**
+
+### Interface and customization
+- Customizable folder colors
+- Thumbnails with persistent disk cache
+- Icons with SVG rasterization and concurrency semaphore
+- Centralized color palette and rounded borders
+- Image preview in dedicated dialog
+
+### Internationalization
 - **6 languages**: English, Spanish, French, German, Italian, Russian
-- Language switching **at runtime** without restarting
+- Runtime language switching without restarting
 
-### 🖥️ System integration
-- **Open with** — application selector based on MIME type
-- **Open in terminal** from any folder
-- **Disk management** — mount/unmount with drive sidebar (UDisks2 / D-Bus)
-- **Real MIME detection** using `xdg-mime` + magic byte signature
-- **Git integration** — file status with state-specific colors
-- **Automatic updates** with new version notification
-- **Stable FileId** — the identifier persists even when renaming or moving files
+### System Management and Integration
+- *Open with...* launches an application picker based on MIME type
+- Open terminal from any folder
+- Disk management with mounting and unmounting
+- Git integration that reads file statuses from a local repository
+- Automatic updates with new version notification
+- File identifier with persistent File ID
+- Offers to install if not already installed
 
 ---
 
-## ⌨️ Keyboard shortcuts
+## Keyboard shortcuts
 
 ### Navigation
 
-| Shortcut | Action |
-| :--- | :--- |
-| `↑` / `↓` | Select previous / next item |
-| `Enter` | Open selected folder or file |
-| `Cmd + A` | Select all |
-| `F5` / `Cmd + R` | Reload / refresh |
-| Extra Mouse Button 1 | Navigate backward |
-| Extra Mouse Button 2 | Navigate forward |
+| Shortcut           | Action                                    |     |
+| :----------------- | :---------------------------------------- | --- |
+| `↑` / `↓`          | Select previous or next item              |     |
+| `Enter`            | Open selected folder or file              |     |
+| `Cmd + A`          | Select all                                |     |
+| `F5` / `Cmd + R`   | Reload / refresh                          |     |
+| Mouse button Extra1| Navigate back                             |     |
+| Mouse button Extra2| Navigate forward                          |     |
 
 ### File operations
 
-| Shortcut | Action |
-| :--- | :--- |
-| `Delete` | Delete (move to trash) |
-| `Ctrl + Z` | Undo last operation |
-| `Cmd + C` | Copy |
-| `Cmd + X` | Cut |
-| `Cmd + V` | Paste |
-| `Cmd + Shift + N` | Create new folder |
-| `Cmd + Shift + F` | Create new file |
+| Shortcut           | Action                                                     |
+| :----------------  | :--------------------------------------------------------- |
+| `Delete`           | Move to trash (delete if already in trash)                 |
+| `Ctrl + Z`         | Undo last operation                                        |
+| `Cmd + C`          | Copy                                                       |
+| `Cmd + X`          | Cut                                                        |
+| `Cmd + V`          | Paste                                                      |
+| `Cmd + Shift + N`  | Create new folder                                          |
+| `Cmd + Shift + F`  | Create new file                                            |
 
 ### Search and view
 
-| Shortcut | Action |
-| :--- | :--- |
-| `Alt + R` | Toggle recursive search |
-| `Ctrl + T` | Toggle Tag / Normal view |
-| `Ctrl + Shift + T` | Create new tag |
+| Shortcut           | Action                            |
+| :----------------  | :-------------------------------- |
+| `Alt + R`          | Activate recursive search         |
+| `Ctrl + T`         | Toggle tags / normal view         |
+| `Ctrl + Shift + T` | Create new tag                    |
 
 ### Terminal
 
 | Shortcut | Action |
-| :--- | :--- |
-| `Alt + T` | Open terminal in the current directory |
+| :---     | :--- |
+| `Alt + T` | Open terminal in current directory |
 
 ### Tabs
 
-| Shortcut | Action |
-| :--- | :--- |
-| `Cmd + N` | New tab |
-| `Cmd + W` | Close current tab |
-| `Ctrl + Tab` / `Ctrl + →` | Next tab |
-| `Ctrl + Shift + Tab` / `Ctrl + ←` | Previous tab |
-| `Ctrl + 1` … `Ctrl + 5` | Go to tab 1–5 |
+| Shortcut                           | Action                |
+| :--------------------------------- | :-------------------- |
+| `Cmd + N`                          | New tab               |
+| `Cmd + W`                          | Close current tab     |
+| `Ctrl + Tab` / `Ctrl + ->`         | Next tab              |
+| `Ctrl + Shift + Tab` / `Ctrl + <-` | Previous tab          |
+| `Ctrl + 1` … `Ctrl + 5`            | Go to tab 1–5         |
 
-### Dialogs
+### Renaming and file creation
 
-| Shortcut | Action |
-| :--- | :--- |
-| `Enter` | Confirm (rename / create folder or file) |
-| `Escape` | Cancel (rename / create folder or file) |
+| Shortcut | Action                                        |
+| :------- | :-------------------------------------------- |
+| `Enter`  | Confirm rename / create folder or file        |
+| `Escape` | Cancel rename / create folder or file         |
 
 ---
 
-## 🚀 Installation
+## Installation
 
-Just download the binary — no installation or external dependencies required:
+BlazePilot is distributed as a single binary. Just download and run it:
+> [!NOTE]
+> BlazePilot uses `wgpu` as eframe's renderer, so it requires a system with compatible graphics support (Vulkan on most Linux distributions).
 
 1. Go to the **[Releases](https://github.com/Jhanfer/blazepilot/releases/latest)** page
-2. Download the binary for your system (currently Linux only)
+2. Download the binary for your system (currently Blaze is only compatible with Linux)
 3. Give it execution permissions:
 
 ```bash
-chmod +x blazepilot
+chmod +x blazepilot-x86_64-unknown-linux-gnu-vX.X.X
 ```
 
 4. Run it!
 
 ```bash
-./blazepilot
+./blazepilot-x86_64-unknown-linux-gnu-vX.X.X
 ```
 
 ---
 
-## 🛠️ Build from source
+## Build from source
 
 ```bash
 git clone https://github.com/Jhanfer/blazepilot.git
@@ -155,27 +170,42 @@ cd blazepilot
 cargo run --bin blazepilot
 ```
 
-Compilation requirements: rust nightly, cargo, make, ninja, nasm, libdav1d, pkg-config y development headers x11, wayland and dbus.
+>[!NOTE]
+>**Build requirements**
+>- rust nightly
+>- cargo
+>- make
+>- ninja
+>- nasm
+>- libdav1d
+>- pkg-config
+>- Development headers for X11, Wayland and D-Bus
 
 
 ---
 
-## 📋 Roadmap
+## Project status
 
-- Full native support for Windows and macOS
-- Complete and configurable themes
-- Plugins / extensions
+BlazePilot is in active development. Although it is already usable, some features continue to evolve and compatibility with Windows and macOS is still under development.
 
 ---
 
-## 📄 License
+## Roadmap
 
-This project is licensed under the **Apache License 2.0** — see the `LICENSE` file for details.
+- Full and native support for Windows and macOS
+- Complete and configurable themes (still WIP)
+- Plugins or extensions
 
 ---
 
-## 💜 Do you like BlazePilot?
+## License
 
-Give the repository a ⭐ and help me grow! 🚀
+This project is licensed under the **Apache License 2.0**. See the `LICENSE` file for more details.
 
-Made with ❤️ by **[Jhanfer](https://github.com/Jhanfer/)**
+---
+
+## Do you like BlazePilot?
+
+Give the repo a ⭐ and help me grow!
+
+Made with ❤️ by **[Jhanfer](https://github.com/Jhanfer/)**"
