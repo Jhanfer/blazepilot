@@ -86,14 +86,14 @@ When dragging data from another application, Blaze does not rely solely on the a
 
 ### Navigation
 
-| Shortcut           | Action                                    |     |
-| :----------------- | :---------------------------------------- | --- |
-| `↑` / `↓`          | Select previous or next item              |     |
-| `Enter`            | Open selected folder or file              |     |
-| `Cmd + A`          | Select all                                |     |
-| `F5` / `Cmd + R`   | Reload / refresh                          |     |
-| Mouse button Extra1| Navigate back                             |     |
-| Mouse button Extra2| Navigate forward                          |     |
+| Shortcut            | Action                       |
+| :------------------ | :--------------------------- |
+| `↑` / `↓`           | Select previous or next item |
+| `Enter`             | Open selected folder or file |
+| `Cmd + A`           | Select all                   |
+| `F5` / `Cmd + R`    | Reload / refresh             |
+| Mouse button Extra1 | Navigate back                |
+| Mouse button Extra2 | Navigate forward             |
 
 ### File operations
 

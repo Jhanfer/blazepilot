@@ -86,14 +86,14 @@ Cuando se arrastran datos desde otra aplicación, Blaze no depende únicamente d
 
 ### Navegación
 
-| Atajo              | Acción                                    |     |
-| :----------------- | :---------------------------------------- | --- |
-| `↑` / `↓`          | Seleccionar elemento anterior o siguiente |     |
-| `Enter`            | Abrir carpeta o archivo seleccionado      |     |
-| `Cmd + A`          | Seleccionar todo                          |     |
-| `F5` / `Cmd + R`   | Recargar / refrescar                      |     |
-| Botón ratón Extra1 | Navegar atrás                             |     |
-| Botón ratón Extra2 | Navegar adelante                          |     |
+| Atajo              | Acción                                    |
+| :----------------- | :---------------------------------------- |
+| `↑` / `↓`          | Seleccionar elemento anterior o siguiente |
+| `Enter`            | Abrir carpeta o archivo seleccionado      |
+| `Cmd + A`          | Seleccionar todo                          |
+| `F5` / `Cmd + R`   | Recargar / refrescar                      |
+| Botón ratón Extra1 | Navegar atrás                             |
+| Botón ratón Extra2 | Navegar adelante                          |
 
 ### Operaciones de archivos
 
