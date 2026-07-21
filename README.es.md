@@ -148,6 +148,15 @@ BlazePilot se distribuye como un único binario. Basta con descargarlo y ejecuta
 
 1. Ve a la página de **[Releases](https://github.com/Jhanfer/blazepilot/releases/latest)**
 2. Descarga el binario para tu sistema (actualmente Blaze es sólo compatible con Linux)
+> [!IMPORTANT]
+A partir de la versión **0.18.0**, BlazePilot requiere que las bibliotecas de FFmpeg estén instaladas en el sistema. En la mayoría de distribuciones Linux basta con instalar FFmpeg:
+>- Arch Linux / Manjaro:
+>`sudo pacman -S ffmpeg`
+>- Ubuntu / Debian
+>	`sudo apt install ffmpeg`
+>- Fedora
+`sudo dnf install ffmpeg`
+
 3. Dale permisos de ejecución:
 
 ```bash
