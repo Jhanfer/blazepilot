@@ -149,13 +149,17 @@ BlazePilot se distribuye como un único binario. Basta con descargarlo y ejecuta
 1. Ve a la página de **[Releases](https://github.com/Jhanfer/blazepilot/releases/latest)**
 2. Descarga el binario para tu sistema (actualmente Blaze es sólo compatible con Linux)
 > [!IMPORTANT]
-A partir de la versión **0.18.0**, BlazePilot requiere que las bibliotecas de FFmpeg estén instaladas en el sistema. En la mayoría de distribuciones Linux basta con instalar FFmpeg:
->- Arch Linux / Manjaro:
->`sudo pacman -S ffmpeg`
->- Ubuntu / Debian
->	`sudo apt install ffmpeg`
->- Fedora
-`sudo dnf install ffmpeg`
+> A partir de la versión **0.18.0**, BlazePilot requiere:
+>
+> - FFmpeg para decodificación de los archivos multimedia:
+>   - Arch Linux / Manjaro: `sudo pacman -S ffmpeg`
+>   - Ubuntu / Debian: `sudo apt install ffmpeg`
+>   - Fedora: `sudo dnf install ffmpeg`
+> 
+> - ALSA para salida de audio:
+>   - Arch Linux / Manjaro: `sudo pacman -S alsa-lib`
+>   - Ubuntu / Debian: `sudo apt install libasound2`
+>   - Fedora: `sudo dnf install alsa-lib`
 
 3. Dale permisos de ejecución:
 
@@ -188,6 +192,7 @@ cargo run --bin blazepilot
 >- nasm
 >- libdav1d
 >- pkg-config 
+>- libasound2-dev (ALSA)
 >- Headers de desarrollo para X11, Wayland y D-Bus
 
 

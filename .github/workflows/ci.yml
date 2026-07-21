@@ -36,7 +36,7 @@ jobs:
             libwayland-dev libwayland-client0 \
             libegl1-mesa-dev libgles2-mesa-dev libgl1-mesa-dev \
             libvulkan-dev libdbus-1-dev \
-            meson ninja-build nasm libdav1d-dev
+            meson ninja-build nasm libdav1d-dev \ libasound2-dev
 
       - name: cargo fmt --check
         run: cargo fmt --all -- --check
