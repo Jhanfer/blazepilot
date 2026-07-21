@@ -121,6 +121,12 @@ pub enum UiEvent {
         url: Box<str>,
         cwd: Arc<Path>,
     },
+
+    OpenMediaPlayer {
+        media_path: Arc<Path>,
+        media_name: Box<str>,
+        is_audio_only: bool,
+    },
 }
 
 pub enum QuickTagEvent {

@@ -26,7 +26,6 @@ pub enum DocType {
 pub enum ImageType {
     Png,
     Jpg,
-    Gif,
     Webp,
     Bmp,
     Tiff,
@@ -41,7 +40,6 @@ impl StrExtension for ImageType {
         match self {
             ImageType::Png => "png",
             ImageType::Jpg => "jpg",
-            ImageType::Gif => "gif",
             ImageType::Webp => "webp",
             ImageType::Bmp => "bmp",
             ImageType::Tiff => "tiff",
@@ -63,6 +61,7 @@ pub enum VideoType {
     Flv,
     Webm,
     M4v,
+    Gif,
 }
 
 impl StrExtension for VideoType {
@@ -76,6 +75,7 @@ impl StrExtension for VideoType {
             VideoType::Flv => "flv",
             VideoType::Webm => "webm",
             VideoType::M4v => "m4v",
+            VideoType::Gif => "gif",
         }
     }
 }
@@ -239,7 +239,6 @@ impl FileExtension {
 
             Some("png") => Self::Image(ImageType::Png),
             Some("jpg") | Some("jpeg") => Self::Image(ImageType::Jpg),
-            Some("gif") => Self::Image(ImageType::Gif),
             Some("webp") => Self::Image(ImageType::Webp),
             Some("bmp") => Self::Image(ImageType::Bmp),
             Some("tiff") | Some("tif") => Self::Image(ImageType::Tiff),
@@ -256,6 +255,7 @@ impl FileExtension {
             Some("flv") => Self::Video(VideoType::Flv),
             Some("webm") => Self::Video(VideoType::Webm),
             Some("m4v") => Self::Video(VideoType::M4v),
+            Some("gif") => Self::Video(VideoType::Gif),
 
             Some("mp3") => Self::Audio(AudioType::Mp3),
             Some("wav") => Self::Audio(AudioType::Wav),
@@ -326,7 +326,6 @@ impl FileExtension {
             m if m.trim().to_lowercase().starts_with("image/") => match m.trim().to_lowercase() {
                 png if png.contains("png") => Self::Image(ImageType::Png),
                 jpg if jpg.contains("jpg") => Self::Image(ImageType::Jpg),
-                gif if gif.contains("gif") => Self::Image(ImageType::Gif),
                 webp if webp.contains("webp") => Self::Image(ImageType::Webp),
                 bmp if bmp.contains("bmp") => Self::Image(ImageType::Bmp),
                 tiff if tiff.contains("tiff") => Self::Image(ImageType::Tiff),
@@ -347,6 +346,7 @@ impl FileExtension {
                 flv if flv.contains("flv") => Self::Video(VideoType::Flv),
                 webm if webm.contains("webm") => Self::Video(VideoType::Webm),
                 m4v if m4v.contains("m4v") => Self::Video(VideoType::M4v),
+                gif if gif.contains("gif") => Self::Video(VideoType::Gif),
 
                 _ => Self::Unknown,
             },
@@ -411,10 +411,6 @@ pub fn sniff_magic_bytes(bytes: &[u8]) -> Option<FileExtension> {
         [0xFF, 0xD8, 0xFF, ..] => {
             Some(FileExtension::Image(ImageType::Jpg))
         }
-        //gif
-        [0x47, 0x49, 0x46, 0x38, ..] => {
-            Some(FileExtension::Image(ImageType::Gif))
-        }
 
         // riff / webp
         [0x52, 0x49, 0x46, 0x46, _, _, _, _, 0x57, 0x45, 0x42, 0x50, ..] => {
@@ -455,6 +451,11 @@ pub fn sniff_magic_bytes(bytes: &[u8]) -> Option<FileExtension> {
         }
 
         // _-_-_- vídeo _-_-_- 
+
+        //gif
+        [0x47, 0x49, 0x46, 0x38, ..] => {
+            Some(FileExtension::Video(VideoType::Gif))
+        }
 
         // m4a
         [_, _, _, _, 0x66, 0x74, 0x79, 0x70, 0x4D, 0x34, 0x41, 0x20, ..] => {

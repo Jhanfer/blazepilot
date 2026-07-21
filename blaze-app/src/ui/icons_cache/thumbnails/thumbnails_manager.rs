@@ -24,7 +24,13 @@ use crate::{
 };
 
 use fast_image_resize as fr;
-use ffmpeg_sidecar::{download::auto_download, paths::ffmpeg_path};
+use ffmpeg_next::{
+    Packet,
+    format::{Pixel, input},
+    media::Type,
+    software::scaling::{context::Context as ScalingContext, flag::Flags},
+    util::frame::video::Video as VideoFrame,
+};
 use lru::LruCache;
 use parking_lot::RwLock;
 use std::{
@@ -62,14 +68,14 @@ pub enum ThumbError {
     #[error("Error procesando SVG")]
     SvgError,
 
-    #[error("Error generando thumbnail de video")]
-    VideoError,
-
     #[error("Slice error")]
     SliceError(#[from] std::array::TryFromSliceError),
 
     #[error("Directorio de caché de miniaturas no existe")]
     ThumbsDirDoesNotExist,
+
+    #[error("FfmpegError: {0}")]
+    FfmpegError(#[from] ffmpeg_next::Error),
 }
 #[derive(Debug)]
 pub enum ThumbnailMessages {
@@ -505,69 +511,105 @@ impl ThumbnailManager {
         .map_err(ThumbError::ThreadError)?
     }
 
-    async fn run_ffmpeg(args: &[&str]) -> Result<Vec<u8>, ThumbError> {
-        let output = tokio::process::Command::new(ffmpeg_path())
-            .args(args)
-            .output()
-            .await
-            .map_err(ThumbError::Io)?;
-
-        if !output.status.success() || output.stdout.is_empty() {
-            return Err(ThumbError::VideoError);
-        }
-
-        Ok(output.stdout)
-    }
-
     async fn generate_video_thumb(path: &Path) -> Result<Thumbnail, ThumbError> {
-        let path_str = path.to_string_lossy().to_string();
+        let mut ictx = input(path).map_err(ThumbError::FfmpegError)?;
 
-        auto_download().map_err(|_| ThumbError::VideoError)?;
+        let video_stream = ictx
+            .streams()
+            .best(Type::Video)
+            .ok_or(ffmpeg_next::Error::StreamNotFound)?;
 
-        let output = match Self::run_ffmpeg(&[
-            "-ss",
-            "00:00:01",
-            "-i",
-            &path_str,
-            "-vframes",
-            "1",
-            "-f",
-            "image2pipe",
-            "-vcodec",
-            "png",
-            "-",
-        ])
-        .await
-        {
-            Ok(out) => out,
-            Err(_) => {
-                Self::run_ffmpeg(&[
-                    "-i",
-                    &path_str,
-                    "-vframes",
-                    "1",
-                    "-f",
-                    "image2pipe",
-                    "-vcodec",
-                    "png",
-                    "-",
-                ])
-                .await?
+        let context_decoder =
+            ffmpeg_next::codec::context::Context::from_parameters(video_stream.parameters())
+                .map_err(ThumbError::FfmpegError)?;
+
+        let mut decoder = context_decoder
+            .decoder()
+            .video()
+            .map_err(ThumbError::FfmpegError)?;
+
+        let mut scaler = ScalingContext::get(
+            decoder.format(),
+            decoder.width(),
+            decoder.height(),
+            Pixel::RGBA,
+            decoder.width(),
+            decoder.height(),
+            Flags::FAST_BILINEAR,
+        )
+        .map_err(ThumbError::FfmpegError)?;
+
+        let width = decoder.width();
+        let height = decoder.height();
+        let mut frame_buffer: Vec<u8> = Vec::new();
+
+        let mut packet = Packet::empty();
+
+        loop {
+            match packet.read(&mut ictx) {
+                Ok(()) => {
+                    decoder
+                        .send_packet(&packet)
+                        .map_err(ThumbError::FfmpegError)?;
+
+                    let mut decoded = VideoFrame::empty();
+
+                    if decoder.receive_frame(&mut decoded).is_ok() {
+                        let mut rgba_frame = VideoFrame::empty();
+                        scaler
+                            .run(&decoded, &mut rgba_frame)
+                            .map_err(ThumbError::FfmpegError)?;
+
+                        let stride = rgba_frame.stride(0);
+                        let raw = rgba_frame.data(0);
+                        let row_bytes = width as usize * 4;
+
+                        frame_buffer.clear();
+                        frame_buffer.reserve(row_bytes * height as usize);
+                        for row in 0..height as usize {
+                            let start = row * stride;
+                            frame_buffer.extend_from_slice(&raw[start..start + row_bytes]);
+                        }
+
+                        return Ok(Thumbnail {
+                            pixels: Arc::new(frame_buffer),
+                            width,
+                            height,
+                        });
+                    }
+                }
+                Err(ffmpeg_next::Error::Eof) => {
+                    decoder.send_eof().map_err(ThumbError::FfmpegError)?;
+
+                    let mut decoded = VideoFrame::empty();
+
+                    if decoder.receive_frame(&mut decoded).is_ok() {
+                        let mut rgba_frame = VideoFrame::empty();
+                        scaler
+                            .run(&decoded, &mut rgba_frame)
+                            .map_err(ThumbError::FfmpegError)?;
+
+                        let stride = rgba_frame.stride(0);
+                        let raw = rgba_frame.data(0);
+                        let row_bytes = width as usize * 4;
+
+                        frame_buffer.clear();
+                        frame_buffer.reserve(row_bytes * height as usize);
+                        for row in 0..height as usize {
+                            let start = row * stride;
+                            frame_buffer.extend_from_slice(&raw[start..start + row_bytes]);
+                        }
+
+                        return Ok(Thumbnail {
+                            pixels: Arc::new(frame_buffer),
+                            width,
+                            height,
+                        });
+                    }
+                }
+                Err(e) => return Err(ThumbError::FfmpegError(e)),
             }
-        };
-
-        let (raw, w, h) = match stb_image::image::load_from_memory_with_depth(&output, 4, false) {
-            stb_image::image::LoadResult::ImageU8(image) => {
-                (image.data, image.width as u32, image.height as u32)
-            }
-            _ => return Err(ThumbError::ImageError),
-        };
-
-        Ok(Thumbnail {
-            pixels: Arc::new(raw),
-            width: w,
-            height: h,
-        })
+        }
     }
 
     pub async fn cleanup_orphans() -> Result<(), ThumbError> {

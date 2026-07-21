@@ -201,6 +201,15 @@ impl BlazeUiState {
                 UiEvent::WantToDownload { mime, url, cwd } => {
                     self.dialog_manager.open_want_to_donwload(&mime, &url, cwd);
                 }
+
+                UiEvent::OpenMediaPlayer {
+                    media_path,
+                    media_name,
+                    is_audio_only,
+                } => {
+                    self.dialog_manager
+                        .open_mediaplayer(media_path, media_name, is_audio_only);
+                }
             }
         }
     }

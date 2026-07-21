@@ -930,6 +930,7 @@ impl ContextMenuState {
         };
 
         let mut should_close = false;
+        let is_media = file.extension.is_video() || file.extension.is_audio();
 
         self.show_menu(ui, "custom_ctx_menu_files", |ui| {
             if file.extension.is_image() {
@@ -965,6 +966,53 @@ impl ContextMenuState {
 
                         sender.send(UiEvent::ShowImagePvw { pvw: Some(pvw) }).ok();
 
+                        should_close = true;
+                    }
+
+                    //Añadirle hotkey
+                });
+                ui.separator();
+            } else if is_media {
+                ui.horizontal(|ui| {
+                    let icon = if file.extension.is_video() {
+                        ("video", icons::ICON_VIDEO)
+                    } else {
+                        ("music", icons::ICON_MUSIC)
+                    };
+
+                    let label = if file.extension.is_video() {
+                        i18n.t("file_ctx_menu.preview_video")
+                    } else {
+                        i18n.t("file_ctx_menu.preview_audio")
+                    };
+
+                    let hint = "";
+
+                    let action: Cell<Option<u8>> = Cell::new(None);
+
+                    Self::render_context_button(
+                        ui,
+                        ui_state,
+                        &label,
+                        hint,
+                        icon,
+                        true,
+                        || {
+                            action.set(Some(0));
+                        },
+                        None::<fn(&mut Ui, &mut BlazeUiState)>,
+                    );
+
+                    if let Some(0) = action.get() {
+                        let media_path = file.full_path.clone();
+                        let media_name = file.name.clone();
+                        sender
+                            .send(UiEvent::OpenMediaPlayer {
+                                media_path,
+                                media_name,
+                                is_audio_only: file.extension.is_audio(),
+                            })
+                            .ok();
                         should_close = true;
                     }
 

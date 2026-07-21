@@ -39,6 +39,8 @@ new_file = "Nuovo file"
 
 [file_ctx_menu]
 preview = "Anteprima"
+preview_video = "Anteprima vid"
+preview_audio = "Anteprima aud"
 open = "Apri"
 open_with = "Apri con..."
 open_in_new_tab = "Apri in una nuova scheda"

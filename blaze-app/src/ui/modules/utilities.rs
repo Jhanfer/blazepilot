@@ -64,7 +64,7 @@ pub fn resolve_icon(
             ),
             FileExtension::Audio(_) => (
                 "audio".to_string(),
-                ICON_VIDEO,
+                ICON_FILE_AUDIO,
                 current_theme.file_theme.audio.to_color(),
             ),
             FileExtension::Archive(_) => (

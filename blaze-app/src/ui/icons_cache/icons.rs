@@ -8,6 +8,7 @@ pub const ICON_POLAROID: &[u8] = include_bytes!("../assets/icons/polaroid.svg");
 pub const ICON_PDF: &[u8] = include_bytes!("../assets/icons/file-type-pdf.svg");
 pub const ICON_DOC: &[u8] = include_bytes!("../assets/icons/file-type-doc.svg");
 pub const ICON_VIDEO: &[u8] = include_bytes!("../assets/icons/movie.svg");
+pub const ICON_FILE_AUDIO: &[u8] = include_bytes!("../assets/icons/file-music.svg");
 pub const ICON_CODE: &[u8] = include_bytes!("../assets/icons/file-code.svg");
 pub const ICON_FONT: &[u8] = include_bytes!("../assets/icons/file-typography.svg");
 pub const ICON_EXE: &[u8] = include_bytes!("../assets/icons/file-digit.svg");

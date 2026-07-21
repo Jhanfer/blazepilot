@@ -10,11 +10,11 @@ use crate::{
         dialog_manager::dialogs::{
             configs_dialog::ConfigDialog, error_dialog::ErrorDialog,
             folder_color_selector_dialog::FolderColorSelector,
-            image_preview_dialog::ImagePreviewDialog, quick_dialogs::QuickAccDialog,
-            selector_dialog::AppSelectorDialog, show_generic_message::ShowGenericDialog,
-            sure_to_delete::SureToDeleteDialog, sure_to_move_to::SureToMoveToDialog,
-            update_dialog::UpdateDialog, want_donwload::WantToDonwloadDialog,
-            want_to_install::WantToInstallDialog,
+            image_preview_dialog::ImagePreviewDialog, media_player_dialog::MediaPlayerDialog,
+            quick_dialogs::QuickAccDialog, selector_dialog::AppSelectorDialog,
+            show_generic_message::ShowGenericDialog, sure_to_delete::SureToDeleteDialog,
+            sure_to_move_to::SureToMoveToDialog, update_dialog::UpdateDialog,
+            want_donwload::WantToDonwloadDialog, want_to_install::WantToInstallDialog,
         },
         image_preview::image_preview_handler::ImagePreviewState,
     },
@@ -39,6 +39,7 @@ pub struct DialogManager {
     pub generic_dialog: ShowGenericDialog,
     pub quick_dialog: QuickAccDialog,
     pub want_to_donwload: WantToDonwloadDialog,
+    pub media_player_dialog: MediaPlayerDialog,
 }
 
 impl DialogManager {
@@ -56,6 +57,7 @@ impl DialogManager {
             generic_dialog: ShowGenericDialog::new(),
             quick_dialog: QuickAccDialog::new(),
             want_to_donwload: WantToDonwloadDialog::new(),
+            media_player_dialog: MediaPlayerDialog::new(),
         }
     }
 
@@ -113,6 +115,16 @@ impl DialogManager {
         self.want_to_donwload.open(mime, url, cwd);
     }
 
+    pub fn open_mediaplayer(
+        &mut self,
+        media_path: Arc<Path>,
+        media_name: Box<str>,
+        is_audio_only: bool,
+    ) {
+        self.media_player_dialog
+            .open(media_path, media_name, is_audio_only);
+    }
+
     pub fn render_area(&mut self, ui: &mut Ui) {
         let dialogs: Vec<&mut dyn ModalDialog> = vec![
             &mut self.selector_dialog,
@@ -127,6 +139,7 @@ impl DialogManager {
             &mut self.generic_dialog,
             &mut self.quick_dialog,
             &mut self.want_to_donwload,
+            &mut self.media_player_dialog,
         ];
 
         let open_dialog = dialogs.into_iter().find(|d| d.is_open());

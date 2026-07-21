@@ -107,3 +107,10 @@ fn _format_time(seconds: u64) -> String {
     let datetime: DateTime<Local> = d.into();
     datetime.format("%d/%m/%Y %H:%M").to_string()
 }
+
+pub fn format_hms(total_segundos: u32) -> String {
+    let horas = total_segundos / 3600;
+    let minutos = (total_segundos % 3600) / 60;
+    let segundos = total_segundos % 60;
+    format!("{:02}:{:02}:{:02}", horas, minutos, segundos)
+}

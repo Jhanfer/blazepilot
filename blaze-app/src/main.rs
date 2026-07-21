@@ -74,6 +74,8 @@ fn main() {
 
     let _ = init_dir_trash().map_err(|e| warn!("Ha ocurrido un error inicializando: {}", e));
 
+    let _ = ffmpeg_next::init().map_err(|e| warn!("Ha ocurrido un error inicializando: {}", e));
+
     if let Err(e) = try_run_with_retries() {
         error!("Todos los intentos han fallado: {}", e);
         std::process::exit(1);
