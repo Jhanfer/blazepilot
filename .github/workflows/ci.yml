@@ -42,7 +42,8 @@ jobs:
             libvulkan-dev \
             libdbus-1-dev \
             meson ninja-build libdav1d-dev \
-            nasm libasound2-dev
+            nasm libasound2-dev \
+            libavutil-dev libavcodec-dev libavformat-dev libswscale-dev
 
       - name: cargo fmt --check
         run: cargo fmt --all -- --check
