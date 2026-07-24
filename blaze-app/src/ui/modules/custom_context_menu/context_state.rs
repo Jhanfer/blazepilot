@@ -2,7 +2,7 @@ use std::{cell::Cell, path::PathBuf, sync::Arc};
 
 use egui::{
     Align2, Area, Color32, CursorIcon, FontId, Frame, Id, Key, Order, Pos2, Rect, Response, Sense,
-    Stroke, TextEdit, Ui, UiBuilder, pos2, vec2,
+    Stroke, Ui, UiBuilder, pos2, vec2,
 };
 use tracing::{info, warn};
 
@@ -22,6 +22,7 @@ use crate::{
     },
     ui::{
         blaze_ui_state::BlazeUiState,
+        custom_components::text_edit::BlazeTextEdit,
         icons_cache::icons,
         image_preview::image_preview_handler::ImagePreviewState,
         themes::{platform::structs::ToColor, theme_manager::with_theme},
@@ -622,7 +623,7 @@ impl ContextMenuState {
 
                 let search_id = egui::Id::new("search_ctx_menu");
 
-                let text_edit = TextEdit::singleline(&mut state.search_filter)
+                let text_edit = BlazeTextEdit::singleline(&mut state.search_filter)
                     .id(search_id)
                     .hint_text(i18n.t("search.placeholder"))
                     .font(FontId::proportional(13.0))

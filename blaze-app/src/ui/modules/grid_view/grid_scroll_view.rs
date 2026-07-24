@@ -14,6 +14,7 @@ use crate::{
     },
     ui::{
         blaze_ui_state::BlazeUiState,
+        custom_components::text_edit::BlazeTextEdit,
         icons_cache::thumbnails::thumbnails_manager::Thumbnail,
         modules::{
             custom_context_menu::context_state::ContextMenuKind,
@@ -25,7 +26,7 @@ use crate::{
 };
 use egui::{
     Color32, ColorImage, CursorIcon, FontId, Id, Key, Modifiers, PointerButton, Rect, ScrollArea,
-    Sense, Stroke, StrokeKind, TextEdit, TextureOptions, Ui, pos2, scroll_area::ScrollSource, vec2,
+    Sense, Stroke, StrokeKind, TextureOptions, Ui, pos2, scroll_area::ScrollSource, vec2,
 };
 use file_id::FileId;
 use std::{collections::HashMap, path::Path, sync::Arc};
@@ -93,7 +94,7 @@ fn grid_file_creation(
 
         let response = ui.put(
             text_rect,
-            TextEdit::singleline(&mut state.new_item_buffer).id(creating_new_id),
+            BlazeTextEdit::singleline(&mut state.new_item_buffer).id(creating_new_id),
         );
 
         if !state.focus_requested {
@@ -258,7 +259,7 @@ fn render_rename_field(
 
     let response = ui.put(
         rect,
-        TextEdit::singleline(&mut state.rename_buffer)
+        BlazeTextEdit::singleline(&mut state.rename_buffer)
             .id(rename_id)
             .margin(vec2(0.0, 5.0))
             .font(FontId::default()),

@@ -1,3 +1,4 @@
+pub mod clipboard_wayland;
 mod mime_handler;
 pub mod reader;
 pub mod wayland_dnd;

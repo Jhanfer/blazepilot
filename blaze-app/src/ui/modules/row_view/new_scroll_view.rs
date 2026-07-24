@@ -17,6 +17,7 @@ use crate::{
     },
     ui::{
         blaze_ui_state::BlazeUiState,
+        custom_components::text_edit::BlazeTextEdit,
         icons_cache::thumbnails::thumbnails_manager::Thumbnail,
         modules::{
             custom_context_menu::context_state::ContextMenuKind,
@@ -28,7 +29,7 @@ use crate::{
 };
 use egui::{
     Button, Color32, ColorImage, CursorIcon, FontId, Id, Key, Modifiers, PointerButton, Rect,
-    RichText, ScrollArea, Sense, Stroke, StrokeKind, TextEdit, TextureOptions, Ui, pos2,
+    RichText, ScrollArea, Sense, Stroke, StrokeKind, TextureOptions, Ui, pos2,
     scroll_area::ScrollSource, vec2,
 };
 use std::{collections::HashMap, path::Path, sync::Arc};
@@ -40,7 +41,7 @@ fn new_ff_logic(state: &mut BlazeCoreState, ui: &mut Ui) {
 
         ui.horizontal(|ui| {
             let response =
-                ui.add(TextEdit::singleline(&mut state.new_item_buffer).id(creating_new_id));
+                ui.add(BlazeTextEdit::singleline(&mut state.new_item_buffer).id(creating_new_id));
 
             if !state.focus_requested {
                 response.request_focus();
@@ -205,7 +206,7 @@ fn render_rename_field(
 
     let response = ui.put(
         rect,
-        TextEdit::singleline(&mut state.rename_buffer)
+        BlazeTextEdit::singleline(&mut state.rename_buffer)
             .id(rename_id)
             .margin(vec2(0.0, 5.0))
             .font(FontId::default()),

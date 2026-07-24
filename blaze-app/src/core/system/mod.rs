@@ -1,5 +1,6 @@
 pub mod cache;
 pub mod clipboard;
+pub mod clipboard_text;
 pub mod disk_reader;
 pub mod extended_info;
 pub mod fileopener_module;

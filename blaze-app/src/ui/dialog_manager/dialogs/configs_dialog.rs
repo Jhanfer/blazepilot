@@ -12,22 +12,25 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::core::{
-    bootstrap::configs::{
-        config_manager::with_configs, platform::linux::conf_structs::DisplayBackend,
-    },
-    system::{
-        clipboard::global_clipboard::TOKIO_RUNTIME,
-        terminal_opener::terminal_manager::GLOBAL_TERMINAL_MANAGER,
-    },
-};
 use crate::ui::dialog_manager::manager::ModalDialog;
 use crate::ui::themes::platform::structs::ToColor;
 use crate::ui::themes::theme_manager::with_theme;
+use crate::{
+    core::{
+        bootstrap::configs::{
+            config_manager::with_configs, platform::linux::conf_structs::DisplayBackend,
+        },
+        system::{
+            clipboard::global_clipboard::TOKIO_RUNTIME,
+            terminal_opener::terminal_manager::GLOBAL_TERMINAL_MANAGER,
+        },
+    },
+    ui::custom_components::text_edit::BlazeTextEdit,
+};
 use core::f32;
 use egui::{
     CentralPanel, Color32, ComboBox, CornerRadius, Frame, Id, Key, Label, Margin, OpenUrl, Order,
-    Panel, RichText, ScrollArea, TextEdit, Ui, Window,
+    Panel, RichText, ScrollArea, Ui, Window,
 };
 use std::time::Duration;
 use tracing::{info, warn};
@@ -208,7 +211,7 @@ impl ConfigDialog {
             let search_id = egui::Id::new("config_search_bar");
 
             let resp = ui.add(
-                TextEdit::singleline(&mut self.config_search)
+                BlazeTextEdit::singleline(&mut self.config_search)
                     .id(search_id)
                     .hint_text("Buscar configs...")
                     .desired_width(f32::INFINITY)
@@ -900,7 +903,7 @@ impl ConfigDialog {
                             .color(current_theme.text_primary.to_color()),
                     );
 
-                    let text_edit = TextEdit::singleline(&mut self.custom_theme_name)
+                    let text_edit = BlazeTextEdit::singleline(&mut self.custom_theme_name)
                         .id("save_theme_placeholder".into());
 
                     ui.add(text_edit);

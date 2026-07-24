@@ -16,6 +16,7 @@ use crate::{
     core::{
         blaze_state::BlazeCoreState,
         runtime::{bus_structs::UiEvent, event_bus::with_event_bus},
+        system::clipboard_text::text_clipboard::with_text_clipboard,
     },
     ui::{
         blaze_ui_state::BlazeUiState,
@@ -235,7 +236,9 @@ pub fn toolbar_component(ui: &mut Ui, state: &mut BlazeCoreState, ui_state: &mut
                                 let remaining = ui.available_width();
                                 ui.add_space(remaining - 36.0);
                                 if ui.small_button("📋").clicked() {
-                                    ui.copy_text(cwd.to_string_lossy().to_string());
+                                    with_text_clipboard(|c| {
+                                        c.copy(cwd.to_string_lossy().to_string());
+                                    });
                                 }
                             });
                     });

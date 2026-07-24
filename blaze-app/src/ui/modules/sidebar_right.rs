@@ -20,6 +20,7 @@ use crate::core::bootstrap::configs::platform::linux::conf_structs::{
 use crate::core::files::blaze_motor::motor_structs::FileEntry;
 use crate::core::system::extended_info::extended_info_manager::ExtendedInfo;
 use crate::ui::blaze_ui_state::BlazeUiState;
+use crate::ui::custom_components::text_edit::BlazeTextEdit;
 use crate::ui::icons_cache::icons;
 use crate::ui::icons_cache::thumbnails::thumbnails_manager::Thumbnail;
 use crate::ui::modules::utilities::{ensure_min_lightness, resolve_icon};
@@ -28,7 +29,7 @@ use crate::ui::themes::theme_manager::with_theme;
 use crate::utils::formating::{format_date, format_size};
 use egui::{
     Align, Button, Color32, ColorImage, CornerRadius, Frame, Grid, Label, Layout, Margin, Panel,
-    Rect, RichText, Sense, Stroke, TextEdit, TextureOptions, Ui, pos2, vec2,
+    Rect, RichText, Sense, Stroke, TextureOptions, Ui, pos2, vec2,
 };
 use std::collections::HashMap;
 use std::path::Path;
@@ -165,11 +166,10 @@ pub fn sidebar_right_component(
                                 let mut search = state.search_filter.clone();
 
                                 let response = ui.add(
-                                    TextEdit::singleline(&mut search)
-                                        .id("search_bar".into())
-                                        .frame(Frame::NONE)
-                                        .desired_width(150.0)
-                                        .hint_text(i18n.t("search.placeholder"))
+                                    BlazeTextEdit::singleline(&mut search)
+                                    .hint_text(i18n.t("search.placeholder"))
+                                    .desired_width(150.0)
+                                    .id("search_bar".into())
                                 );
 
                                 if response.changed() {

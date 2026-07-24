@@ -20,11 +20,12 @@ use crate::{
         runtime::bus_structs::QuickTagEvent,
     },
     ui::{
+        custom_components::text_edit::BlazeTextEdit,
         dialog_manager::manager::ModalDialog,
         themes::{platform::structs::ToColor, theme_manager::with_theme},
     },
 };
-use egui::{Color32, CornerRadius, Frame, Margin, Modal, Order, TextEdit, Ui, Window};
+use egui::{Color32, CornerRadius, Frame, Margin, Modal, Order, Ui, Window};
 
 pub struct QuickAccDialog {
     event: Option<QuickTagEvent>,
@@ -190,7 +191,7 @@ impl QuickAccDialog {
 
                         ui.vertical_centered(|ui| {
                             ui.add(
-                                TextEdit::singleline(&mut title)
+                                BlazeTextEdit::singleline(&mut title)
                                     .id("quick_tag_name".into())
                                     .hint_text(i18n.t("quick_dialog_create.text_edit_hint"))
                                     .margin(Margin::symmetric(8, 4)),
@@ -279,7 +280,7 @@ impl QuickAccDialog {
                     |ui, mut should_close| {
                         ui.vertical_centered(|ui| {
                             ui.add(
-                                TextEdit::singleline(&mut title)
+                                BlazeTextEdit::singleline(&mut title)
                                     .id("quick_tag_name".into())
                                     .hint_text(i18n.t("quick_dialog_edit_tag.text_edit_hint"))
                                     .margin(Margin::symmetric(8, 4)),
@@ -462,7 +463,7 @@ impl QuickAccDialog {
                     |ui, mut should_close| {
                         ui.vertical_centered(|ui| {
                             ui.add(
-                                TextEdit::singleline(&mut title)
+                                BlazeTextEdit::singleline(&mut title)
                                     .id("quick_tag_name".into())
                                     .hint_text(i18n.t("quick_dialog_edit_quick.text_edit_hint"))
                                     .margin(Margin::symmetric(8, 4)),

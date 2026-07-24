@@ -15,6 +15,8 @@
 use crate::core::blaze_state::{BlazeCoreBuilder, BlazeCoreState};
 use crate::core::bootstrap::configs::config_manager::with_configs;
 use crate::core::system::clipboard::global_clipboard::TOKIO_RUNTIME;
+use crate::core::system::clipboard_text::keyboard_state::{KeyboardAction, with_keyboard_state};
+use crate::core::system::clipboard_text::text_clipboard::with_text_clipboard;
 use crate::core::system::knowndirs::knowndirs_manager::KnownDirsManager;
 use crate::platform::wayland::wayland_dnd::WaylandDndReceiver;
 use crate::platform::wayland::wayland_events::EventTrait;
@@ -27,7 +29,7 @@ use eframe::Frame;
 use egui::{FontData, FontDefinitions, FontFamily, Ui};
 use std::path::Path;
 use std::sync::Arc;
-use tracing::{debug, error};
+use tracing::error;
 
 #[must_use = "llama .build() para construir la aap"]
 pub struct BlazeAppBuilder {
@@ -49,6 +51,14 @@ impl BlazeAppBuilder {
     #[must_use]
     pub fn build(self, display_ptr: Option<*mut std::ffi::c_void>) -> BlazeApp {
         let dnd = display_ptr.and_then(WaylandDndReceiver::spawn);
+
+        if let Some(dnd) = &dnd {
+            let backend = crate::platform::wayland::clipboard_wayland::WaylandClipboard {
+                copy_tx: Some(dnd.copy_tx.clone()),
+                clipboard_text: Arc::clone(&dnd.clipboard_text),
+            };
+            with_text_clipboard(|c| c.init(backend));
+        }
 
         let state = TOKIO_RUNTIME.block_on(
             BlazeCoreBuilder::default()
@@ -160,18 +170,9 @@ impl BlazeApp {
 }
 
 impl eframe::App for BlazeApp {
-    fn raw_input_hook(&mut self, ctx: &egui::Context, _raw_input: &mut egui::RawInput) {
-        //simulador de evento ctrl + v
-        for event in &_raw_input.events {
-            if let egui::Event::Key { key, modifiers, .. } = event
-                && *key == egui::Key::V
-                && modifiers.ctrl
-            {
-                _raw_input.events.push(egui::Event::Paste("".into()));
-                debug!("Ctrl + V detectado: enviando Event::Paste");
-                break;
-            }
-        }
+    fn raw_input_hook(&mut self, ctx: &egui::Context, raw_input: &mut egui::RawInput) {
+        //limpiar keyboard_state
+        with_keyboard_state(|k| k.clear());
 
         if let Some(ref receiver) = self.dnd {
             receiver.process_event(self.state.cwd.clone(), self.state.active_id);
@@ -181,6 +182,40 @@ impl eframe::App for BlazeApp {
                 let dropped_files = ctx.input(|i| i.raw.dropped_files.clone());
 
                 process_event_x11(self.state.cwd.clone(), self.state.active_id, &dropped_files);
+            }
+        }
+
+        //simulador de evento ctrl + (c, v, x)
+        for event in &raw_input.events {
+            if let egui::Event::Key { key, modifiers, .. } = event {
+                if *key == egui::Key::V && modifiers.ctrl {
+                    if let Some(text) = with_text_clipboard(|c| c.paste()) {
+                        with_keyboard_state(|k| {
+                            k.set_action(
+                                KeyboardAction::Paste(text.clone()),
+                                ctx.cumulative_frame_nr(),
+                            )
+                        });
+                        raw_input.events.push(egui::Event::Paste(text));
+                    }
+                    break;
+                }
+
+                if *key == egui::Key::C && modifiers.ctrl {
+                    tracing::debug!("Ctrl + C");
+                    with_keyboard_state(|k| {
+                        k.set_action(KeyboardAction::Copy, ctx.cumulative_frame_nr())
+                    });
+                    break;
+                }
+
+                if *key == egui::Key::X && modifiers.ctrl {
+                    tracing::debug!("Ctrl + X");
+                    with_keyboard_state(|k| {
+                        k.set_action(KeyboardAction::Cut, ctx.cumulative_frame_nr())
+                    });
+                    break;
+                }
             }
         }
     }

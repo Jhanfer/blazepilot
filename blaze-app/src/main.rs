@@ -189,7 +189,16 @@ fn run_application(config: RunConfigs, initial_path: Option<Arc<Path>>) -> anyho
 
             match backend {
                 DisplayBackend::X11 => builder.with_x11(),
-                DisplayBackend::Wayland => builder.with_wayland(),
+                DisplayBackend::Wayland => {
+                    use crate::{
+                        core::system::clipboard_text::text_clipboard::with_text_clipboard,
+                        platform::wayland::clipboard_wayland::WaylandClipboard,
+                    };
+
+                    with_text_clipboard(|c| c.init(WaylandClipboard::new()));
+
+                    builder.with_wayland()
+                }
                 _ => builder,
             };
         }));

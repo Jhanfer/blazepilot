@@ -1,20 +1,14 @@
-use std::fs::File;
-use std::io::Read;
-use std::os::fd::AsFd;
-use std::path::Path;
-use std::sync::Arc;
+use std::{fs::File, io::Read, os::fd::AsFd, path::Path, sync::Arc, sync::mpsc::Receiver};
 use wayland_client::protocol::wl_data_offer::WlDataOffer;
 
-pub fn receive_raw_bytes(offer: &WlDataOffer, mime: &str) -> std::sync::mpsc::Receiver<Vec<u8>> {
-    let (read_fd, write_fd) = rustix::pipe::pipe().unwrap();
+pub fn receive_raw_bytes(offer: &WlDataOffer, mime: &str) -> Result<Receiver<Vec<u8>>, String> {
+    let (read_fd, write_fd) =
+        rustix::pipe::pipe().map_err(|e| format!("Error creando pipe: {e}"))?;
     offer.receive(mime.to_string(), write_fd.as_fd());
     drop(write_fd); // cerrar el extremo de escritura
 
     let (tx, rx) = std::sync::mpsc::channel();
     let mut file = File::from(read_fd);
-
-    //let mut buf = [0u8; 16];
-
     std::thread::spawn(move || {
         // se lee el pipe y enviamos los datos por el canal
         let mut buf: Vec<u8> = Vec::new();
@@ -26,7 +20,7 @@ pub fn receive_raw_bytes(offer: &WlDataOffer, mime: &str) -> std::sync::mpsc::Re
         let _ = tx.send(buf);
     });
 
-    rx
+    Ok(rx)
 }
 
 #[derive(Debug)]
@@ -41,7 +35,7 @@ pub enum DroppedData {
 pub fn parse_payload(mime: &str, raw: Vec<u8>) -> DroppedData {
     match mime {
         "text/uri-list" => {
-            let text = String::from_utf8_lossy(&raw);
+            let text = decode_text(raw);
             let paths: Vec<Arc<Path>> = text
                 .lines()
                 .filter(|l| l.starts_with("file://"))
@@ -54,7 +48,7 @@ pub fn parse_payload(mime: &str, raw: Vec<u8>) -> DroppedData {
         }
 
         "text/plain" | "text/plain;charset=utf-8" => {
-            let text = String::from_utf8_lossy(&raw);
+            let text = decode_text(raw);
             let text = text.trim();
             match url::Url::parse(text) {
                 Ok(url) => match url.scheme() {
@@ -83,4 +77,52 @@ pub fn parse_payload(mime: &str, raw: Vec<u8>) -> DroppedData {
 
         _ => DroppedData::Unknown,
     }
+}
+
+pub fn decode_text(raw: Vec<u8>) -> String {
+    // UTF-8 válido
+    if let Ok(s) = String::from_utf8(raw.clone()) {
+        return s;
+    }
+
+    // quítar BOM UTF-8,
+    if raw.starts_with(&[0xEF, 0xBB, 0xBF])
+        && let Ok(s) = String::from_utf8(raw[3..].to_vec())
+    {
+        return s;
+    }
+
+    // UTF-16LE con BOM
+    if raw.starts_with(&[0xFF, 0xFE]) {
+        let u16s: Vec<u16> = raw[2..]
+            .chunks_exact(2)
+            .map(|c| u16::from_le_bytes([c[0], c[1]]))
+            .collect();
+        return String::from_utf16_lossy(&u16s);
+    }
+
+    // UTF-16BE con BOM
+    if raw.starts_with(&[0xFE, 0xFF]) {
+        let u16s: Vec<u16> = raw[2..]
+            .chunks_exact(2)
+            .map(|c| u16::from_be_bytes([c[0], c[1]]))
+            .collect();
+        return String::from_utf16_lossy(&u16s);
+    }
+
+    // UTF-16LE sin BOM
+    if raw.len().is_multiple_of(2) {
+        let u16s: Vec<u16> = raw
+            .chunks_exact(2)
+            .map(|c| u16::from_le_bytes([c[0], c[1]]))
+            .collect();
+        let decoded = String::from_utf16_lossy(&u16s);
+        // si tiene caracteres nulos intercalados es UTF-16
+        if decoded.contains('\0') {
+            return decoded.replace('\0', "");
+        }
+    }
+
+    // fallback latin-1/ISO-8859-1
+    raw.into_iter().map(|b| b as char).collect()
 }
