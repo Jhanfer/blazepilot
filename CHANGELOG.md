@@ -1,3 +1,23 @@
+## [0.18.0] - 2026-07-24
+
+### 🚀 Features
+- **(media)** Reproductor integrado de video y audio, previsualización contextual y soporte para GIFs([`1faaf6d`](https://github.com/Jhanfer/blazepilot/commit/1faaf6dc52b5ea487d8bb5672012f31907595b7a))
+- **(clipboard)** Implementa portapapeles en Wayland, corrige atajos de teclado y reemplaza TextEdit por componente personalizado([`7697447`](https://github.com/Jhanfer/blazepilot/commit/769744782df191520d150c8026939d2831e0d7ba))
+
+
+### 🐛 Bug fixes
+- **(preview)** Evita vista vacía y estabiliza navegación([`1cebb2a`](https://github.com/Jhanfer/blazepilot/commit/1cebb2a12aae671fe408978127561b8444320229))
+
+
+### 📚 Docs
+- Añade ALSA como dependencia obligatoria para audio en 0.18.0([`895a80d`](https://github.com/Jhanfer/blazepilot/commit/895a80dfcca4e71fc30818b9ffa2cb0d4bbfd75e))
+
+
+### ⚙️ Miscelánea
+- **(ci)** Reorganiza dependencias, corrige sintaxis([`d7076b5`](https://github.com/Jhanfer/blazepilot/commit/d7076b5b70d5dfa5a174e2121d35ad91f6b438cf))
+- **(ci)** Agrega dependencias de FFmpeg en workflows de CI y release([`593ca12`](https://github.com/Jhanfer/blazepilot/commit/593ca12c2180dcc89b0068520611acbf96ea8168))
+- **(ci)** Amplía deps FFmpeg con libavfilter, libavdevice y libswresample([`02088cc`](https://github.com/Jhanfer/blazepilot/commit/02088cc0ca1a6760068d7a52d59a1eacef37b8d6))
+
 ## [0.17.0] - 2026-07-11
 
 ### 🚀 Features
