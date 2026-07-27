@@ -10,6 +10,7 @@ use crate::{
     },
     ui::{
         blaze_ui_state::BlazeUiState,
+        fonts::fonts_manager::with_fonts,
         icons_cache::thumbnails::thumbnails_manager::ThumbnailMessages,
         modules::{
             custom_context_menu::context_state::ContextMenuKind,
@@ -265,6 +266,11 @@ pub fn row_panel_frame(
                             .insert(file.full_path.clone());
                     }
                 }
+
+                //Procesa nombres de los files para encontrar las fuentes necesarias
+                with_fonts(|f| {
+                    f.process_file(&file.name);
+                })
             }
 
             //Scrollview

@@ -22,11 +22,12 @@ use crate::platform::wayland::wayland_dnd::WaylandDndReceiver;
 use crate::platform::wayland::wayland_events::EventTrait;
 use crate::platform::x11::x11_events::process_event_x11;
 use crate::ui::blaze_ui_state::BlazeUiState;
+use crate::ui::fonts::fonts_manager::with_fonts;
 use crate::ui::modules::ui_callback::connect_ui_components_callback;
 use crate::ui::themes::platform::structs::ToColor;
 use crate::ui::themes::theme_manager::with_theme;
 use eframe::Frame;
-use egui::{FontData, FontDefinitions, FontFamily, Ui};
+use egui::Ui;
 use std::path::Path;
 use std::sync::Arc;
 use tracing::error;
@@ -88,29 +89,6 @@ pub struct BlazeApp {
 }
 
 impl BlazeApp {
-    pub fn set_up_custom_font(&self, ui: &mut Ui) {
-        let mut fonts = FontDefinitions::default();
-
-        fonts.font_data.insert(
-            "NotoSans".to_owned(),
-            FontData::from_static(include_bytes!("./ui/assets/noto/NotoSans-Regular.ttf")).into(),
-        );
-
-        fonts
-            .families
-            .entry(FontFamily::Proportional)
-            .or_default()
-            .insert(0, "NotoSans".to_owned());
-
-        fonts
-            .families
-            .entry(FontFamily::Monospace)
-            .or_default()
-            .insert(0, "NotoSans".to_owned());
-
-        ui.set_fonts(fonts);
-    }
-
     pub fn set_custom_visuals(&self, ui: &mut Ui) {
         let current_theme = with_theme(|t| t.current());
         ui.global_style_mut(|style| {
@@ -223,7 +201,16 @@ impl eframe::App for BlazeApp {
     fn ui(&mut self, ui: &mut Ui, _frame: &mut Frame) {
         self.set_custom_visuals(ui);
 
-        self.set_up_custom_font(ui);
+        //Nuevo cargador de fuentes dinámico
+        // Recarga las fuentes en caso de necesitarse
+        with_fonts(|f| {
+            if f.dirty {
+                let defs = f.build_font_definitions();
+                ui.set_fonts(defs);
+                f.dirty = false;
+                ui.request_repaint();
+            }
+        });
 
         with_configs(|c| match c.tick() {
             Ok(_) => {}
