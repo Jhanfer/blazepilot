@@ -63,10 +63,10 @@ jobs:
         run: |
           BIN="target/x86_64-unknown-linux-gnu/release/blazepilot"
           if [ ! -f "$BIN" ]; then
-            echo "❌ Binario no encontrado: $BIN"
+            echo "¡El binario no encontrado: $BIN!"
             exit 1
           fi
-          echo "✅ $(du -sh $BIN | cut -f1) — $BIN"
+          echo "$(du -sh $BIN | cut -f1) — $BIN"
 
       - name: Renombrar binario
         id: rename
@@ -83,7 +83,13 @@ jobs:
           sha256sum "$FILE" > "${FILE}.sha256"
           HASH=$(cut -d' ' -f1 "${FILE}.sha256")
           echo "sha256=$HASH" >> "$GITHUB_OUTPUT"
-          echo "✅ SHA-256: $HASH"
+          echo "¡SHA-256: $HASH!"
+
+      - name: Configurar Locale
+        run: |
+          sudo locale-gen en_US.UTF-8
+          export LANG=en_US.UTF-8
+          export LC_ALL=en_US.UTF-8
 
       - name: Generar Release Notes
         id: changelog
@@ -91,7 +97,7 @@ jobs:
           VERSION=${GITHUB_REF_NAME#v}
 
           if [ ! -f CHANGELOG.md ]; then
-            echo "❌ CHANGELOG.md no encontrado"
+            echo "CHANGELOG.md no encontrado"
             exit 1
           fi
 
@@ -102,26 +108,44 @@ jobs:
           ' CHANGELOG.md)
 
           if [ -z "$CHANGELOG" ]; then
-            echo "❌ No se encontró changelog para ${VERSION}"
+            echo "No se ha encontrado changelog para ${VERSION}"
             exit 1
           fi
+
+          BASE_URL="https://github.com/Jhanfer/blazepilot/releases/download/v${VERSION}"
 
           {
             echo "body<<EOF"
 
-            echo "# 🚀 BlazePilot ${VERSION}"
+            echo "# BlazePilot ${VERSION}"
             echo
             echo "$CHANGELOG"
             echo
             echo "---"
             echo
-            echo "## 📦 Descargas"
+            echo "## Descargas"
             echo
-            echo "- Linux x86_64 GNU"
+            echo "- [Linux x86_64 GNU](${BASE_URL}/blazepilot-x86_64-unknown-linux-gnu-v${VERSION})"
             echo
             echo "---"
             echo
-            echo "❤️ Gracias por usar BlazePilot"
+            echo "# Gracias por usar BlazePilot <3"
+            echo
+            echo '⢸⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⠿⠛⠉⠀⠉⠻⢿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿'
+            echo '⢸⣿⣿⣿⣿⣿⣿⣿⣿⠟⠋⠁⠀⠀⠀⠀⠀⠀⠀⠈⠛⢿⣿⣿⣿⣿⣿⣿⣿⣿'
+            echo '⢸⣿⣿⣿⣿⡿⠟⠉⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠙⠿⣿⣿⣿⣿⣿'
+            echo '⢸⣿⡿⠛⠉⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠙⠻⣿⣿'
+            echo '⢸⣿⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣠⣶⣷⣦⣀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢹⣿'
+            echo '⢸⣿⠀⠀⠀⠀⠀⠀⠀⢀⣤⣶⣿⣿⣿⣿⣿⣿⣿⣦⣄⠀⠀⠀⠀⠀⠀⠀⢸⣿'
+            echo '⢸⣿⠀⠀⠀⠀⠀⠀⠀⢸⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡇⠀⠀⠀⠀⠀⠀⢸⣿'
+            echo '⢸⣿⠀⠀⠀⠀⠀⠀⠀⢸⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡇⠀⠀⠀⠀⠀⠀⢸⣿'
+            echo '⢸⣿⠀⠀⠀⠀⠀⠀⠀⢸⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡇⢀⣤⣤⣤⣄⣄⢸⣿'
+            echo '⢸⣿⠀⠀⠀⠀⠀⠀⠀⠈⠛⢿⣿⣿⣿⣿⣿⠟⠛⠛⠛⠒⠚⠁⠀⠀⠀⢸⢸⣿'
+            echo '⢸⣿⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠛⢿⣿⡇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢸⢸⣿'
+            echo '⢸⣿⣷⣄⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢸⣿⣿'
+            echo '⢸⣿⣿⣿⣿⣶⣤⡀⠀⠀⠀⠀⠀⠀⠀⠀⣷⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣸⣿⣿'
+            echo '⢸⣿⣿⣿⣿⣿⣿⣿⣷⣤⣀⠀⠀⠀⠀⠀⠈⠉⠉⢉⣩⣽⣿⣿⣿⣿⣿⣿⣿⣿'
+            echo '⢸⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣷⣦⣀⠀⠀⢀⣠⣶⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿'
 
             echo "EOF"
           } >> "$GITHUB_OUTPUT"
