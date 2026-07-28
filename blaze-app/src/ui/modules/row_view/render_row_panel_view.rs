@@ -4,6 +4,7 @@ use crate::{
         files::blaze_motor::motor_structs::FileEntry,
         runtime::event_bus::with_event_bus,
         system::{
+            clipboard::global_clipboard::TOKIO_RUNTIME,
             extended_info::extended_info_manager::ExtendedInfoMessages,
             sizer_manager::manager::SizerMessages, trash_manager::manager::get_backend,
         },
@@ -268,9 +269,12 @@ pub fn row_panel_frame(
                 }
 
                 //Procesa nombres de los files para encontrar las fuentes necesarias
-                with_fonts(|f| {
-                    f.process_file(&file.name);
-                })
+                let file_name = file.name.clone();
+                TOKIO_RUNTIME.spawn_blocking(move || {
+                    with_fonts(|f| {
+                        f.process_file(&file_name);
+                    })
+                });
             }
 
             //Scrollview
