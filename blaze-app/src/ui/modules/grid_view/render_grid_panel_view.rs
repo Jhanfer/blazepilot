@@ -4,12 +4,14 @@ use crate::{
         files::blaze_motor::motor_structs::FileEntry,
         runtime::event_bus::with_event_bus,
         system::{
+            clipboard::global_clipboard::TOKIO_RUNTIME,
             extended_info::extended_info_manager::ExtendedInfoMessages,
             sizer_manager::manager::SizerMessages, trash_manager::manager::get_backend,
         },
     },
     ui::{
         blaze_ui_state::BlazeUiState,
+        fonts::fonts_manager::with_fonts,
         icons_cache::thumbnails::thumbnails_manager::ThumbnailMessages,
         modules::{
             custom_context_menu::context_state::ContextMenuKind,
@@ -264,6 +266,13 @@ pub fn grid_panel_frame(
                             .insert(file.full_path.clone());
                     }
                 }
+
+                let file_name = file.name.clone();
+                TOKIO_RUNTIME.spawn_blocking(move || {
+                    with_fonts(|f| {
+                        f.process_file(&file_name);
+                    })
+                });
             }
 
             //Scrollview
