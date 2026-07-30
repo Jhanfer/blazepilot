@@ -1,3 +1,24 @@
+# Changelog
+
+---
+## [0.19.0](https://github.com/Jhanfer/blazepilot/compare/v0.18.0..v0.19.0) - 2026-07-30
+
+### ✦ Bug fixes
+
+-  Carga de fuentes del sistema via fc-match para fallback unicode (#3)([`545d7c2`](https://github.com/Jhanfer/blazepilot/commit/545d7c2550a946fc1d69785dcfcac8c24bb5c350)) - Jhan
+
+### ✦ Docs
+
+-  Añade secure policy([`cbd03fb`](https://github.com/Jhanfer/blazepilot/commit/cbd03fb81c7e7add32558581e246d934c82e17bc)) - Jhanfer
+
+### ✦ Refactor
+
+- **(theme)** Migra a sistema de tokens semánticos, implementa migración automática y unifica uso en UI (#5)([`2079dc4`](https://github.com/Jhanfer/blazepilot/commit/2079dc424498f408ddfdb4514e90bcdb2cac0bab)) - Jhan
+
+### ✦ Release
+
+- **(release)** Simplifica mensajes de workflow, añade locale y enlaces y mejora formato de changelog([`ea7321f`](https://github.com/Jhanfer/blazepilot/commit/ea7321f6955686e79c3cef668fef86ec2598af7d)) - Jhanfer
+
 ## [0.18.0] - 2026-07-24
 
 ### 🚀 Features
