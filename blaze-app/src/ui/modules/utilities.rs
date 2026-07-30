@@ -105,7 +105,7 @@ pub fn text_color_for_git(git: Option<&GitStatus>) -> Color32 {
         Some(GitStatus::Ignored) => Color32::from_rgb(100, 100, 100),
         Some(GitStatus::Conflict) => Color32::from_rgb(255, 80, 80),
         Some(GitStatus::Deleted) => Color32::from_rgb(255, 60, 60),
-        Some(GitStatus::Clean) | None => current_theme.text_primary.to_color(),
+        Some(GitStatus::Clean) | None => current_theme.semantic.text_primary.to_color(),
     }
 }
 
@@ -154,7 +154,7 @@ pub fn ensure_min_lightness(color: Color32) -> Color32 {
     };
 
     let new_l = min_lightness;
-    let c = (1.0 - (2.0 * new_l - 1.0).abs()) * s;
+    let c = (1.0_f32 - (2.0_f32 * new_l - 1.0_f32).abs()) * s;
     let x = c * (1.0 - ((h / 60.0) % 2.0 - 1.0).abs());
     let m = new_l - c / 2.0;
 
@@ -252,7 +252,7 @@ pub fn render_button<F, C>(
         f.layout_no_wrap(
             label.to_string(),
             font.clone(),
-            current_theme.text_primary.to_color(),
+            current_theme.semantic.text_primary.to_color(),
         )
     });
 
@@ -416,7 +416,7 @@ pub fn render_op_buttons<F, C>(
                 animated_rect1,
                 CornerRadius::same(20),
                 bg_color1,
-                Stroke::new(0.8, accent1),
+                Stroke::new(0.5, accent1),
                 StrokeKind::Outside,
             );
 
@@ -432,7 +432,7 @@ pub fn render_op_buttons<F, C>(
                 animated_rect2,
                 CornerRadius::same(20),
                 bg_color2,
-                Stroke::new(0.8, accent2),
+                Stroke::new(0.5, accent2),
                 StrokeKind::Outside,
             );
 

@@ -18,20 +18,24 @@ use egui::Color32;
 use serde::{Deserialize, Serialize};
 use tracing::{debug, info, warn};
 
+#[allow(deprecated)]
 use crate::{
     core::{
         bootstrap::configs::config_manager::with_configs,
         system::knowndirs::knowndirs_manager::KnownDirsManager,
     },
-    ui::themes::platform::{ColorsTrait, structs::Theme},
+    ui::themes::platform::{
+        ColorsTrait,
+        structs::{NewTheme, Theme, ThemeDefault},
+    },
 };
 
 #[derive(Serialize, Deserialize)]
 pub struct LinuxTheme {
     path: Arc<Path>,
-    active_theme: Arc<Theme>,
+    active_theme: Arc<NewTheme>,
     available_themes_names: Vec<Box<str>>,
-    available_themes: Vec<Arc<Theme>>,
+    available_themes: Vec<Arc<NewTheme>>,
 }
 
 impl ColorsTrait for LinuxTheme {
@@ -39,7 +43,7 @@ impl ColorsTrait for LinuxTheme {
         Self::init_defaults()
     }
 
-    fn update_theme(&mut self, mutator: fn(&mut Theme, Color32), value: Color32) {
+    fn update_theme(&mut self, mutator: fn(&mut NewTheme, Color32), value: Color32) {
         let theme_mutable = Arc::make_mut(&mut self.active_theme);
         mutator(theme_mutable, value);
     }
@@ -58,7 +62,7 @@ impl ColorsTrait for LinuxTheme {
         self.available_themes_names.clone()
     }
 
-    fn current_theme(&self) -> Arc<Theme> {
+    fn current_theme(&self) -> Arc<NewTheme> {
         self.active_theme.clone()
     }
 
@@ -121,11 +125,11 @@ impl ColorsTrait for LinuxTheme {
         let current_name = self.active_theme.name.clone();
 
         let default_theme = match &*current_name {
-            "Blaze Dark" => Theme::blaze_dark(),
-            "Blaze Light" => Theme::blaze_light(),
-            "VS Code Dark" => Theme::vscode_dark(),
-            "VS Code Light" => Theme::vscode_light(),
-            _ => Theme::default(),
+            "Blaze Dark" => NewTheme::default_dark(),
+            "Blaze Light" => NewTheme::default_light(),
+            "VS Code Dark" => NewTheme::default_vscode_dark(),
+            "VS Code Light" => NewTheme::default_vscode_light(),
+            _ => NewTheme::default_dark(),
         };
 
         self.active_theme = Arc::new(default_theme);
@@ -180,7 +184,7 @@ impl LinuxTheme {
 
         Self {
             path: theme_path,
-            active_theme: Arc::new(Theme::default()),
+            active_theme: Arc::new(NewTheme::default_dark()),
             available_themes: Vec::new(),
             available_themes_names: Vec::new(),
         }
@@ -188,10 +192,10 @@ impl LinuxTheme {
 
     fn write_missing_defaults(&self) -> Result<(), String> {
         let defaults = [
-            Theme::blaze_dark(),
-            Theme::blaze_light(),
-            Theme::vscode_dark(),
-            Theme::vscode_light(),
+            NewTheme::default_dark(),
+            NewTheme::default_light(),
+            NewTheme::default_vscode_dark(),
+            NewTheme::default_vscode_light(),
         ];
 
         for theme in &defaults {
@@ -209,12 +213,13 @@ impl LinuxTheme {
         Ok(())
     }
 
+    #[allow(deprecated)]
     fn scan_themes(&mut self) {
         let Ok(entries) = std::fs::read_dir(&self.path) else {
             return;
         };
 
-        let mut themes: Vec<Arc<Theme>> = vec![];
+        let mut themes: Vec<Arc<NewTheme>> = vec![];
         let mut names: Vec<Box<str>> = vec![];
 
         for entry in entries.flatten() {
@@ -226,10 +231,40 @@ impl LinuxTheme {
             let Ok(content) = std::fs::read_to_string(&path) else {
                 continue;
             };
-            let Ok(theme) = serde_json::from_str::<Theme>(&content) else {
-                warn!("JSON inválido: {:?}", path);
+
+            let theme = if let Ok(t) = serde_json::from_str::<NewTheme>(&content) {
+                t
+            } else if let Ok(old) = serde_json::from_str::<Theme>(&content) {
+                let migrated = old.migrate_to_new();
+
+                match serde_json::to_string_pretty(&migrated) {
+                    Ok(json) => {
+                        if let Err(e) = std::fs::write(&path, json) {
+                            warn!(
+                                "No se ha podido guardar el tema migrado {}: {}",
+                                path.display(),
+                                e
+                            );
+                        } else {
+                            info!("Tema migrado a v2: {:?}", path);
+                        }
+                    }
+
+                    Err(e) => {
+                        warn!(
+                            "No se ha podido serializar el tema migrado {}: {}",
+                            path.display(),
+                            e
+                        );
+                    }
+                }
+
+                migrated
+            } else {
+                warn!("JSON inválido, no se ha podido migrar: {}", path.display());
                 continue;
             };
+
             names.push(theme.name.clone());
             themes.push(Arc::new(theme));
         }

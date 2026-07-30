@@ -15,6 +15,7 @@
 use crate::{
     core::bootstrap::configs::config_manager::with_configs,
     ui::{
+        custom_components::label::UiExt,
         dialog_manager::manager::ModalDialog,
         themes::{platform::structs::ToColor, theme_manager::with_theme},
     },
@@ -65,7 +66,7 @@ impl ErrorDialog {
         };
 
         let custom_frame = Frame::NONE
-            .fill(current_theme.bg_main.to_color())
+            .fill(current_theme.semantic.bg_main.to_color())
             .corner_radius(CornerRadius::same(10))
             .inner_margin(Margin::same(10));
 
@@ -81,7 +82,7 @@ impl ErrorDialog {
                 ui.set_min_height(100.0);
 
                 ui.vertical_centered(|ui| {
-                    ui.label(message);
+                    ui.label_ns(message);
                     ui.add_space(8.0);
                 });
 

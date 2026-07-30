@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use crate::core::bootstrap::configs::config_manager::with_configs;
+use crate::ui::custom_components::label::UiExt;
 use crate::ui::image_preview::image_preview_handler::ImagePreviewState;
 use crate::ui::themes::platform::structs::ToColor;
 use crate::ui::{dialog_manager::manager::ModalDialog, themes::theme_manager::with_theme};
@@ -78,14 +79,14 @@ impl ImagePreviewDialog {
                 ui.add_space(50.0);
                 ui.spinner();
                 ui.add_space(20.0);
-                ui.label(i18n.t("image_preview_dialog.image_loading"));
+                ui.label_ns(i18n.t("image_preview_dialog.image_loading"));
             });
             return;
         }
 
         let Some(texture) = &preview.current_texture else {
             ui.centered_and_justified(|ui| {
-                ui.label(i18n.t("image_preview_dialog.image_not_loaded"))
+                ui.label_ns(i18n.t("image_preview_dialog.image_not_loaded"))
             });
             return;
         };
@@ -180,7 +181,7 @@ impl ImagePreviewDialog {
                 preview.zoom = (preview.zoom * 0.75).max(min_zoom);
             }
 
-            ui.label(format!("{:.0}%", preview.zoom * 100.0));
+            ui.label_ns(format!("{:.0}%", preview.zoom * 100.0));
 
             if ui.button("+").clicked() {
                 preview.zoom = (preview.zoom * 1.3).min(max_zoom);
@@ -242,7 +243,10 @@ impl ImagePreviewDialog {
 
             Frame::NONE
                 .fill(pvw.background_color.linear_multiply(0.8))
-                .stroke(Stroke::new(0.5, current_theme.accent_glow.to_color()))
+                .stroke(Stroke::new(
+                    0.5,
+                    current_theme.semantic.accent_glow.to_color(),
+                ))
                 .corner_radius(8.0)
                 .inner_margin(10.0)
                 .show(ui, |ui| {

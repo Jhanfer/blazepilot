@@ -296,9 +296,9 @@ pub fn new_render_scrollview(
             Button::new(
                 RichText::new(name_label)
                     .size(11.0)
-                    .color(current_theme.text_secondary.to_color()),
+                    .color(current_theme.semantic.text_primary.to_color()),
             )
-            .fill(current_theme.bg_container.to_color())
+            .fill(current_theme.semantic.bg_container.to_color())
             .stroke(Stroke::NONE)
             .frame(true),
         )
@@ -336,9 +336,9 @@ pub fn new_render_scrollview(
             Button::new(
                 RichText::new(date_label)
                     .size(11.0)
-                    .color(current_theme.text_secondary.to_color()),
+                    .color(current_theme.semantic.text_primary.to_color()),
             )
-            .fill(current_theme.bg_container.to_color())
+            .fill(current_theme.semantic.bg_container.to_color())
             .stroke(Stroke::NONE)
             .frame(true),
         )
@@ -376,9 +376,9 @@ pub fn new_render_scrollview(
             Button::new(
                 RichText::new(size_label)
                     .size(11.0)
-                    .color(current_theme.text_secondary.to_color()),
+                    .color(current_theme.semantic.text_primary.to_color()),
             )
-            .fill(current_theme.bg_container.to_color())
+            .fill(current_theme.semantic.bg_container.to_color())
             .stroke(Stroke::NONE)
             .frame(true),
         )
@@ -411,9 +411,13 @@ pub fn new_render_scrollview(
 
         if handle_response.hovered() || handle_response.dragged() {
             ui.set_cursor_icon(CursorIcon::ResizeColumn);
-            painter.rect_filled(handle_rect, 0.0, current_theme.accent.to_color());
+            painter.rect_filled(handle_rect, 0.0, current_theme.semantic.accent.to_color());
         } else {
-            painter.rect_filled(handle_rect, 0.0, current_theme.text_muted.to_color());
+            painter.rect_filled(
+                handle_rect,
+                0.0,
+                current_theme.semantic.text_muted.to_color(),
+            );
         }
 
         if handle_response.dragged() {
@@ -521,8 +525,11 @@ pub fn new_render_scrollview(
             // --- Selección y hover ---
             if response.hovered() {
                 ui.set_cursor_icon(CursorIcon::PointingHand);
-                ui.painter()
-                    .rect_filled(rect, 5.0, current_theme.bg_hover.to_color());
+                ui.painter().rect_filled(
+                    rect,
+                    5.0,
+                    current_theme.components.list_item.bg_hover.to_color(),
+                );
             }
 
             if state.is_selected(i) {
@@ -530,9 +537,24 @@ pub fn new_render_scrollview(
                     rect,
                     5.0,
                     Color32::from_rgba_unmultiplied(
-                        current_theme.item_selected.to_color().r(),
-                        current_theme.item_selected.to_color().g(),
-                        current_theme.item_selected.to_color().b(),
+                        current_theme
+                            .components
+                            .list_item
+                            .bg_selected
+                            .to_color()
+                            .r(),
+                        current_theme
+                            .components
+                            .list_item
+                            .bg_selected
+                            .to_color()
+                            .g(),
+                        current_theme
+                            .components
+                            .list_item
+                            .bg_selected
+                            .to_color()
+                            .b(),
                         60,
                     ),
                 );
@@ -756,7 +778,7 @@ pub fn new_render_scrollview(
                 f.layout_no_wrap(
                     format_date(file.modified).to_string(),
                     FontId::proportional(date_font_size),
-                    current_theme.text_secondary.to_color(),
+                    current_theme.semantic.text_primary.to_color(),
                 )
             });
             ui.painter().with_clip_rect(date_rect).galley(
@@ -795,7 +817,7 @@ pub fn new_render_scrollview(
                 f.layout_no_wrap(
                     size_text,
                     FontId::proportional(size_font_size),
-                    current_theme.text_secondary.to_color(),
+                    current_theme.semantic.text_primary.to_color(),
                 )
             });
             ui.painter().with_clip_rect(size_rect).galley(

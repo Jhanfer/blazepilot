@@ -74,7 +74,7 @@ impl FolderColorSelector {
         };
 
         let custom_frame = Frame::NONE
-            .fill(current_theme.bg_main.to_color())
+            .fill(current_theme.semantic.bg_main.to_color())
             .corner_radius(CornerRadius::same(10))
             .inner_margin(Margin::same(10));
 

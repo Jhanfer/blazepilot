@@ -3,12 +3,15 @@ use crate::{
     ui::{
         blaze_ui_state::BlazeUiState,
         icons_cache::icons::*,
-        modules::custom_context_menu::context_state::ContextMenuKind,
+        modules::{
+            custom_context_menu::context_state::ContextMenuKind, utilities::ensure_min_lightness,
+        },
         themes::{platform::structs::ToColor, theme_manager::with_theme},
     },
 };
 use egui::{
-    Align2, Color32, FontId, PointerButton, Rect, Sense, Stroke, StrokeKind, Ui, pos2, vec2,
+    Align2, Color32, CursorIcon, FontId, PointerButton, Rect, Sense, Stroke, StrokeKind, Ui, pos2,
+    vec2,
 };
 use std::{
     path::{Path, PathBuf},
@@ -79,7 +82,7 @@ pub fn render_header_text(icon_key: &str, label: &str, ui: &mut Ui, ui_state: &m
         ui,
         ui_state,
         icon_name,
-        current_theme.text_primary.to_color(),
+        current_theme.semantic.text_primary.to_color(),
         icon_bytes,
         rect,
     );
@@ -89,7 +92,7 @@ pub fn render_header_text(icon_key: &str, label: &str, ui: &mut Ui, ui_state: &m
         Align2::LEFT_CENTER,
         label,
         FontId::proportional(20.0),
-        current_theme.text_primary.to_color(),
+        current_theme.semantic.text_primary.to_color(),
     );
 }
 
@@ -103,36 +106,37 @@ pub fn render_local_buttons(
 ) {
     let current_theme = with_theme(|t| t.current());
 
-    let is_dark_theme = current_theme.text_primary.to_color().r() > 128;
+    let is_dark_theme = current_theme.semantic.text_primary.to_color().r() > 128;
 
-    let (rect, response) = ui.allocate_exact_size(
-        egui::vec2(ui.available_width(), 35.0),
-        Sense::click_and_drag(),
-    );
+    let (rect, response) =
+        ui.allocate_exact_size(vec2(ui.available_width(), 35.0), Sense::click_and_drag());
 
     let (bg_color, icon_color) = if response.hovered() {
-        ui.set_cursor_icon(egui::CursorIcon::PointingHand);
+        ui.set_cursor_icon(CursorIcon::PointingHand);
         let hover_bg = if is_dark_theme {
             Color32::from_rgba_unmultiplied(
-                current_theme.accent_glow.to_color().r(),
-                current_theme.accent_glow.to_color().g(),
-                current_theme.accent_glow.to_color().b(),
+                current_theme.components.button.bg_hover.to_color().r(),
+                current_theme.components.button.bg_hover.to_color().g(),
+                current_theme.components.button.bg_hover.to_color().b(),
                 80,
             )
         } else {
             Color32::from_rgba_unmultiplied(
-                current_theme.accent_glow.to_color().r(),
-                current_theme.accent_glow.to_color().g(),
-                current_theme.accent_glow.to_color().b(),
+                current_theme.components.button.bg_hover.to_color().r(),
+                current_theme.components.button.bg_hover.to_color().g(),
+                current_theme.components.button.bg_hover.to_color().b(),
                 10,
             )
         };
 
-        (hover_bg, current_theme.accent.to_color())
+        let icon_hover =
+            ensure_min_lightness(current_theme.components.button.label_hover.to_color());
+
+        (hover_bg, icon_hover)
     } else {
         (
-            current_theme.bg_hover.to_color(),
-            current_theme.tools_secondary.to_color(),
+            current_theme.components.button.bg.to_color(),
+            current_theme.components.button.label_active.to_color(),
         )
     };
 
@@ -173,7 +177,7 @@ pub fn render_local_buttons(
         Align2::LEFT_CENTER,
         label,
         FontId::default(),
-        current_theme.text_secondary.to_color(),
+        current_theme.semantic.text_secondary.to_color(),
     );
 }
 
@@ -214,31 +218,34 @@ pub fn render_drives_button(
         ui_state.context_menu_state.target_drive = Some(drive);
     }
 
-    let is_dark_theme = current_theme.text_primary.to_color().r() > 128;
+    let is_dark_theme = current_theme.semantic.text_primary.to_color().r() > 128;
 
     let (bg_color, icon_color) = if response.hovered() {
-        ui.set_cursor_icon(egui::CursorIcon::PointingHand);
+        ui.set_cursor_icon(CursorIcon::PointingHand);
         let hover_bg = if is_dark_theme {
             Color32::from_rgba_unmultiplied(
-                current_theme.accent_glow.to_color().r(),
-                current_theme.accent_glow.to_color().g(),
-                current_theme.accent_glow.to_color().b(),
+                current_theme.components.button.bg_hover.to_color().r(),
+                current_theme.components.button.bg_hover.to_color().g(),
+                current_theme.components.button.bg_hover.to_color().b(),
                 80,
             )
         } else {
             Color32::from_rgba_unmultiplied(
-                current_theme.accent_glow.to_color().r(),
-                current_theme.accent_glow.to_color().g(),
-                current_theme.accent_glow.to_color().b(),
+                current_theme.components.button.bg_hover.to_color().r(),
+                current_theme.components.button.bg_hover.to_color().g(),
+                current_theme.components.button.bg_hover.to_color().b(),
                 10,
             )
         };
 
-        (hover_bg, current_theme.accent.to_color())
+        let icon_hover =
+            ensure_min_lightness(current_theme.components.button.label_hover.to_color());
+
+        (hover_bg, icon_hover)
     } else {
         (
-            current_theme.bg_hover.to_color(),
-            current_theme.tools_secondary.to_color(),
+            current_theme.components.button.bg.to_color(),
+            current_theme.components.button.label_active.to_color(),
         )
     };
 
@@ -315,6 +322,6 @@ pub fn render_drives_button(
         Align2::LEFT_CENTER,
         display_name,
         FontId::default(),
-        current_theme.text_secondary.to_color(),
+        current_theme.semantic.text_secondary.to_color(),
     );
 }

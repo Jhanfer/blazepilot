@@ -456,7 +456,7 @@ pub fn render_grid_scrollview(
                     ui.painter().rect_filled(
                         selection_rect,
                         8.0,
-                        current_theme.bg_hover.to_color(),
+                        current_theme.components.list_item.bg_hover.to_color(),
                     );
                 }
 
@@ -471,9 +471,24 @@ pub fn render_grid_scrollview(
                         selection_rect,
                         8.0,
                         Color32::from_rgba_unmultiplied(
-                            current_theme.item_selected.to_color().r(),
-                            current_theme.item_selected.to_color().g(),
-                            current_theme.item_selected.to_color().b(),
+                            current_theme
+                                .components
+                                .list_item
+                                .bg_selected
+                                .to_color()
+                                .r(),
+                            current_theme
+                                .components
+                                .list_item
+                                .bg_selected
+                                .to_color()
+                                .g(),
+                            current_theme
+                                .components
+                                .list_item
+                                .bg_selected
+                                .to_color()
+                                .b(),
                             60,
                         ),
                     );
@@ -696,7 +711,7 @@ pub fn render_grid_scrollview(
                             let mut truncated = display_name.clone();
                             if absolute_byte_idx > 0 && absolute_byte_idx <= truncated.len() {
                                 truncated.truncate(absolute_byte_idx);
-                            }
+                            } // revisar esto <----
 
                             truncated.push_str("...");
 

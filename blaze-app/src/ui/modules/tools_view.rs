@@ -40,7 +40,7 @@ fn render_tag_button(ui: &mut Ui, state: &mut BlazeCoreState, ui_state: &mut Bla
     }
 
     ui.painter()
-        .rect_filled(container_rect, 20.0, current_theme.border_panel.to_color());
+        .rect_filled(container_rect, 20.0, Color32::TRANSPARENT);
 
     let is_tags = matches!(
         state.view_mode,
@@ -68,7 +68,7 @@ fn render_tag_button(ui: &mut Ui, state: &mut BlazeCoreState, ui_state: &mut Bla
     ui.painter().rect_stroke(
         capsule_rect,
         radius,
-        Stroke::new(1.0, current_theme.accent_glow.to_color()),
+        Stroke::new(1.0, current_theme.components.panel.border.to_color()),
         egui::StrokeKind::Outside,
     );
 
@@ -104,9 +104,9 @@ fn render_tag_button(ui: &mut Ui, state: &mut BlazeCoreState, ui_state: &mut Bla
 
     for (name, bytes, rect, is_active) in icons {
         let base_color = if is_active {
-            current_theme.accent.to_color()
+            current_theme.components.button.label_active.to_color()
         } else {
-            current_theme.tools_secondary.to_color()
+            current_theme.components.button.label_inactive.to_color()
         };
 
         let color = ensure_min_lightness(base_color);
@@ -133,7 +133,7 @@ pub fn tools(
     let current_theme = with_theme(|t| t.current());
 
     Frame::new()
-        .fill(current_theme.border_panel.to_color())
+        .fill(current_theme.components.tools.bg.to_color())
         .inner_margin(Margin {
             left: 15,
             right: 15,
@@ -148,7 +148,7 @@ pub fn tools(
         })
         .stroke(Stroke {
             width: 0.5,
-            color: current_theme.accent_glow.to_color(),
+            color: current_theme.components.panel.border.to_color(),
         })
         .show(ui, |ui| {
             let toolbar_height = 25.0;
@@ -171,25 +171,25 @@ pub fn tools(
                         pos2(icon_rect.max.x.round(), icon_rect.max.y.round()),
                     );
 
+                    let plus_color = if new_fol.hovered() {
+                        current_theme.components.tools.label_hover.to_color()
+                    } else {
+                        current_theme.components.tools.label_active.to_color()
+                    };
+
                     let icon = ui_state.icon_cache.get_or_load(
                         ui,
                         icon_plus_fol,
                         icon_bytes_plus_fol,
-                        ensure_min_lightness(Color32::GRAY),
+                        ensure_min_lightness(plus_color),
                         icon_size,
                     );
-
-                    let plus_color = if new_fol.hovered() {
-                        current_theme.tools_primary.to_color()
-                    } else {
-                        current_theme.tools_secondary.to_color()
-                    };
 
                     ui.painter().image(
                         icon.id(),
                         rounded_rect,
                         Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
-                        plus_color,
+                        Color32::WHITE,
                     );
 
                     if new_fol.clicked() {
@@ -207,25 +207,25 @@ pub fn tools(
                         pos2(icon_rect.max.x.round(), icon_rect.max.y.round()),
                     );
 
+                    let plus_color = if new_file.hovered() {
+                        current_theme.components.tools.label_hover.to_color()
+                    } else {
+                        current_theme.components.tools.label_active.to_color()
+                    };
+
                     let icon = ui_state.icon_cache.get_or_load(
                         ui,
                         icon_plus_file,
                         icon_bytes_plus_file,
-                        ensure_min_lightness(Color32::GRAY),
+                        ensure_min_lightness(plus_color),
                         icon_size,
                     );
-
-                    let plus_color = if new_file.hovered() {
-                        current_theme.tools_primary.to_color()
-                    } else {
-                        current_theme.tools_secondary.to_color()
-                    };
 
                     ui.painter().image(
                         icon.id(),
                         rounded_rect,
                         Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
-                        plus_color,
+                        Color32::WHITE,
                     );
 
                     if new_file.clicked() {
@@ -263,28 +263,28 @@ pub fn tools(
                     pos2(icon_rect.max.x.round(), icon_rect.max.y.round()),
                 );
 
+                let sissors_color = if cut_resp.hovered() && has_selection {
+                    current_theme.components.tools.label_hover.to_color()
+                } else {
+                    current_theme.components.tools.label_active.to_color()
+                };
+
                 let icon = ui_state.icon_cache.get_or_load(
                     ui,
                     icon_cut,
                     icon_bytes_cut,
-                    ensure_min_lightness(Color32::GRAY),
+                    ensure_min_lightness(sissors_color),
                     icon_size,
                 );
-
-                let sissors_color = if cut_resp.hovered() && has_selection {
-                    current_theme.tools_primary.to_color()
-                } else {
-                    current_theme.tools_secondary.to_color()
-                };
 
                 ui.painter().image(
                     icon.id(),
                     rounded_rect,
                     Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
-                    sissors_color,
+                    Color32::WHITE,
                 );
 
-                if cut_resp.clicked() {
+                if cut_resp.clicked() && has_selection {
                     state.cut(files);
                 }
 
@@ -301,28 +301,28 @@ pub fn tools(
                     pos2(icon_rect.max.x.round(), icon_rect.max.y.round()),
                 );
 
+                let clip_color = if cop_resp.hovered() && has_selection {
+                    current_theme.components.tools.label_hover.to_color()
+                } else {
+                    current_theme.components.tools.label_active.to_color()
+                };
+
                 let icon = ui_state.icon_cache.get_or_load(
                     ui,
                     icon_copy,
                     icon_bytes_copy,
-                    ensure_min_lightness(Color32::GRAY),
+                    ensure_min_lightness(clip_color),
                     icon_size,
                 );
-
-                let clip_color = if cop_resp.hovered() && has_selection {
-                    current_theme.tools_primary.to_color()
-                } else {
-                    current_theme.tools_secondary.to_color()
-                };
 
                 ui.painter().image(
                     icon.id(),
                     rounded_rect,
                     Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
-                    clip_color,
+                    Color32::WHITE,
                 );
 
-                if cop_resp.clicked() {
+                if cop_resp.clicked() && has_selection {
                     state.copy(files);
                 }
 
@@ -339,28 +339,28 @@ pub fn tools(
                     pos2(icon_rect.max.x.round(), icon_rect.max.y.round()),
                 );
 
+                let pas_color = if pas_resp.hovered() && has_clipboard {
+                    current_theme.components.tools.label_hover.to_color()
+                } else {
+                    current_theme.components.tools.label_active.to_color()
+                };
+
                 let icon = ui_state.icon_cache.get_or_load(
                     ui,
                     icon_paste,
                     icon_bytes_paste,
-                    ensure_min_lightness(Color32::GRAY),
+                    ensure_min_lightness(pas_color),
                     icon_size,
                 );
-
-                let pas_color = if pas_resp.hovered() && has_clipboard {
-                    current_theme.tools_primary.to_color()
-                } else {
-                    current_theme.tools_secondary.to_color()
-                };
 
                 ui.painter().image(
                     icon.id(),
                     rounded_rect,
                     Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
-                    pas_color,
+                    Color32::WHITE,
                 );
 
-                if pas_resp.clicked() {
+                if pas_resp.clicked() && has_clipboard {
                     let cwd = state.cwd.clone();
                     state.paste(cwd);
                 }
@@ -378,25 +378,25 @@ pub fn tools(
                     pos2(icon_rect.max.x.round(), icon_rect.max.y.round()),
                 );
 
+                let del_color = if del_resp.hovered() && has_selection {
+                    current_theme.components.tools.label_hover.to_color()
+                } else {
+                    current_theme.components.tools.label_active.to_color()
+                };
+
                 let icon = ui_state.icon_cache.get_or_load(
                     ui,
                     icon_trash,
                     icon_bytes_trash,
-                    ensure_min_lightness(Color32::GRAY),
+                    ensure_min_lightness(del_color),
                     icon_size,
                 );
-
-                let del_color = if del_resp.hovered() && has_selection {
-                    current_theme.tools_primary.to_color()
-                } else {
-                    current_theme.tools_secondary.to_color()
-                };
 
                 ui.painter().image(
                     icon.id(),
                     rounded_rect,
                     Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
-                    del_color,
+                    Color32::WHITE,
                 );
 
                 if del_resp.clicked() && has_selection {
@@ -441,25 +441,25 @@ pub fn tools(
                     pos2(icon_rect.max.x.round(), icon_rect.max.y.round()),
                 );
 
+                let sel_color = if select_resp.hovered() {
+                    current_theme.components.tools.label_hover.to_color()
+                } else {
+                    current_theme.components.tools.label_active.to_color()
+                };
+
                 let icon = ui_state.icon_cache.get_or_load(
                     ui,
                     icon_name,
                     icon_bytes,
-                    ensure_min_lightness(Color32::GRAY),
+                    ensure_min_lightness(sel_color),
                     icon_size,
                 );
-
-                let sel_color = if select_resp.hovered() {
-                    current_theme.tools_primary.to_color()
-                } else {
-                    current_theme.tools_secondary.to_color()
-                };
 
                 ui.painter().image(
                     icon.id(),
                     rounded_rect,
                     Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
-                    sel_color,
+                    Color32::WHITE,
                 );
 
                 if select_resp.clicked() {
@@ -477,25 +477,25 @@ pub fn tools(
                     pos2(icon_rect.max.x.round(), icon_rect.max.y.round()),
                 );
 
+                let ref_color = if refresh_resp.hovered() {
+                    current_theme.components.tools.label_hover.to_color()
+                } else {
+                    current_theme.components.tools.label_active.to_color()
+                };
+
                 let icon = ui_state.icon_cache.get_or_load(
                     ui,
                     icon_refresh,
                     icon_bytes_refresh,
-                    ensure_min_lightness(Color32::GRAY),
+                    ensure_min_lightness(ref_color),
                     icon_size,
                 );
-
-                let ref_color = if refresh_resp.hovered() {
-                    current_theme.tools_primary.to_color()
-                } else {
-                    current_theme.tools_secondary.to_color()
-                };
 
                 ui.painter().image(
                     icon.id(),
                     rounded_rect,
                     Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
-                    ref_color,
+                    Color32::WHITE,
                 );
 
                 if refresh_resp.clicked() {
@@ -528,25 +528,25 @@ pub fn tools(
                         pos2(icon_rect.max.x.round(), icon_rect.max.y.round()),
                     );
 
+                    let hidd_color = if hidd_resp.hovered() {
+                        current_theme.components.tools.label_hover.to_color()
+                    } else {
+                        current_theme.components.tools.label_active.to_color()
+                    };
+
                     let icon = ui_state.icon_cache.get_or_load(
                         ui,
                         icon_refresh,
                         icon_bytes_refresh,
-                        ensure_min_lightness(Color32::GRAY),
+                        ensure_min_lightness(hidd_color),
                         icon_size,
                     );
-
-                    let hidd_color = if hidd_resp.hovered() {
-                        current_theme.tools_primary.to_color()
-                    } else {
-                        current_theme.tools_secondary.to_color()
-                    };
 
                     ui.painter().image(
                         icon.id(),
                         rounded_rect,
                         Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
-                        hidd_color,
+                        Color32::WHITE,
                     );
 
                     if hidd_resp.clicked() {

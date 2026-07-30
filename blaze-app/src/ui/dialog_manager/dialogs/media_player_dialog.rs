@@ -266,8 +266,11 @@ impl MediaPlayerDialog {
             let preview_height = (available_height * 0.9).max(200.0);
 
             Frame::NONE
-                .fill(current_theme.bg_container.to_color())
-                .stroke(Stroke::new(0.5, current_theme.accent_glow.to_color()))
+                .fill(current_theme.semantic.bg_container.to_color())
+                .stroke(Stroke::new(
+                    0.5,
+                    current_theme.semantic.accent_glow.to_color(),
+                ))
                 .corner_radius(8.0)
                 .inner_margin(10.0)
                 .show(ui, |ui| {

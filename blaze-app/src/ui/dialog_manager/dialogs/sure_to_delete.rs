@@ -16,6 +16,7 @@ use std::{path::Path, sync::Arc};
 
 use crate::core::bootstrap::configs::config_manager::with_configs;
 use crate::core::runtime::{bus_structs::FileOperation, event_bus::Dispatcher};
+use crate::ui::custom_components::label::UiExt;
 use crate::ui::dialog_manager::manager::ModalDialog;
 use crate::ui::themes::platform::structs::ToColor;
 use crate::ui::themes::theme_manager::with_theme;
@@ -71,7 +72,7 @@ impl SureToDeleteDialog {
         };
 
         let custom_frame = Frame::NONE
-            .fill(current_theme.bg_main.to_color())
+            .fill(current_theme.semantic.bg_main.to_color())
             .corner_radius(CornerRadius::same(10))
             .inner_margin(Margin::same(10));
 
@@ -97,18 +98,18 @@ impl SureToDeleteDialog {
                         .map(|f| f.to_string_lossy().into_owned())
                         .unwrap_or_else(|| i18n.t("sure_to_delete_dialog.file").into_string());
 
-                    ui.label(
+                    ui.label_ns(
                         i18n.t_args("sure_to_delete_dialog.file_dot", &[("query", &file_name)]),
                     );
                 }
 
                 if total > MAX_SHOWN {
-                    ui.label(
+                    ui.label_ns(
                         RichText::new(i18n.t_args(
                             "sure_to_delete_dialog.and_more",
                             &[("query", &(total - MAX_SHOWN).to_string())],
                         ))
-                        .color(current_theme.text_primary.to_color())
+                        .color(current_theme.semantic.text_primary.to_color())
                         .weak()
                         .italics(),
                     );

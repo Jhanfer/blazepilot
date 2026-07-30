@@ -29,9 +29,9 @@ pub fn render_grid_rubberband(
             rect,
             10.0,
             Color32::from_rgba_unmultiplied(
-                current_theme.accent_glow.to_color().r(),
-                current_theme.accent_glow.to_color().g(),
-                current_theme.accent_glow.to_color().b(),
+                current_theme.semantic.accent_glow.to_color().r(),
+                current_theme.semantic.accent_glow.to_color().g(),
+                current_theme.semantic.accent_glow.to_color().b(),
                 40,
             ),
         );
@@ -40,9 +40,9 @@ pub fn render_grid_rubberband(
         let stroke = Stroke::new(
             3.0,
             Color32::from_rgba_unmultiplied(
-                current_theme.accent_glow.to_color().r(),
-                current_theme.accent_glow.to_color().g(),
-                current_theme.accent_glow.to_color().b(),
+                current_theme.semantic.accent_glow.to_color().r(),
+                current_theme.semantic.accent_glow.to_color().g(),
+                current_theme.semantic.accent_glow.to_color().b(),
                 200,
             ),
         );

@@ -18,6 +18,7 @@ use crate::{
         runtime::{bus_structs::FileOperation, event_bus::Dispatcher},
     },
     ui::{
+        custom_components::label::UiExt,
         dialog_manager::manager::ModalDialog,
         themes::{platform::structs::ToColor, theme_manager::with_theme},
     },
@@ -81,7 +82,7 @@ impl UpdateDialog {
         };
 
         let custom_frame = Frame::NONE
-            .fill(current_theme.bg_main.to_color())
+            .fill(current_theme.semantic.bg_main.to_color())
             .corner_radius(CornerRadius::same(10))
             .inner_margin(Margin::same(10));
 
@@ -97,15 +98,15 @@ impl UpdateDialog {
                 ui.set_min_height(100.0);
 
                 ui.vertical_centered(|ui| {
-                    ui.label(i18n.t("update_dialog.message"));
+                    ui.label_ns(i18n.t("update_dialog.message"));
                     ui.add_space(8.0);
 
-                    ui.label(
+                    ui.label_ns(
                         i18n.t_args("update_dialog.current_version", &[("query", current_ver)]),
                     );
                     ui.add_space(8.0);
 
-                    ui.label(i18n.t_args("update_dialog.new_version", &[("query", new_ver)]));
+                    ui.label_ns(i18n.t_args("update_dialog.new_version", &[("query", new_ver)]));
                 });
 
                 ui.add_space(50.0);
