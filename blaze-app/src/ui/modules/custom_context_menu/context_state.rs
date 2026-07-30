@@ -25,6 +25,7 @@ use crate::{
         custom_components::text_edit::BlazeTextEdit,
         icons_cache::icons,
         image_preview::image_preview_handler::ImagePreviewState,
+        modules::utilities::ensure_min_lightness,
         themes::{platform::structs::ToColor, theme_manager::with_theme},
     },
 };
@@ -138,9 +139,12 @@ impl ContextMenuState {
             .constrain_to(screen)
             .show(ui.ctx(), |ui| {
                 Frame::new()
-                    .fill(current_theme.bg_panel.to_color())
+                    .fill(current_theme.components.panel.bg.to_color())
                     .corner_radius(12.0)
-                    .stroke(Stroke::new(0.8, current_theme.accent_glow.to_color()))
+                    .stroke(Stroke::new(
+                        0.5,
+                        current_theme.components.panel.border.to_color(),
+                    ))
                     .inner_margin(8.0)
                     .show(ui, |ui| {
                         ui.set_min_width(190.0);
@@ -173,6 +177,7 @@ impl ContextMenuState {
     ) where
         I: FnMut(&mut Ui, &mut BlazeUiState),
     {
+        let current_theme = with_theme(|t| t.current());
         let popup_size = vec2(120.0, 80.0);
         let screen_rect = ui.content_rect();
 
@@ -192,7 +197,11 @@ impl ContextMenuState {
             .fixed_pos(popup_pos)
             .show(ui.ctx(), |ui| {
                 Frame::popup(ui.style())
-                    .fill(Color32::from_rgb(45, 45, 55))
+                    .fill(current_theme.components.panel.bg.to_color())
+                    .stroke(Stroke::new(
+                        0.5,
+                        current_theme.components.panel.border.to_color(),
+                    ))
                     .show(ui, |ui| {
                         ui.set_min_size(popup_size);
                         ui.set_max_size(popup_size);
@@ -236,19 +245,25 @@ impl ContextMenuState {
         let paint_rect = rect.shrink2(vec2(h_padding, 0.0));
 
         let text_color = if enabled {
-            current_theme.text_primary.to_color()
+            current_theme.semantic.text_primary.to_color()
         } else {
-            current_theme.text_secondary.to_color()
+            current_theme.semantic.text_secondary.to_color()
         };
 
         let popup_id = response.id.with("popup");
         let mut is_open = ui.memory_mut(|m| m.data.get_temp::<bool>(popup_id).unwrap_or(false));
 
-        let bg_color = if response.hovered() && enabled {
+        let (bg_color, icon_color) = if response.hovered() && enabled {
             ui.set_cursor_icon(CursorIcon::PointingHand);
-            Color32::from_rgba_unmultiplied(100, 100, 255, 60)
+            (
+                current_theme.components.button.bg.to_color(),
+                current_theme.components.button.label_hover.to_color(),
+            )
         } else {
-            Color32::TRANSPARENT
+            (
+                Color32::TRANSPARENT,
+                current_theme.components.button.label_active.to_color(),
+            )
         };
 
         ui.painter().rect_filled(paint_rect, 12.0, bg_color);
@@ -266,7 +281,7 @@ impl ContextMenuState {
 
         let icon = ui_state
             .icon_cache
-            .get_or_load(ui, icon.0, icon.1, Color32::GRAY, icon_size);
+            .get_or_load(ui, icon.0, icon.1, icon_color, icon_size);
 
         let painter = ui.painter();
 
@@ -290,7 +305,7 @@ impl ContextMenuState {
         let hint_galley = ui.painter().layout_no_wrap(
             hint.to_string(),
             FontId::proportional(10.0),
-            current_theme.text_primary.to_color(),
+            current_theme.semantic.text_primary.to_color(),
         );
 
         let hint_width = hint_galley.size().x;
@@ -300,8 +315,11 @@ impl ContextMenuState {
             rect.center().y - hint_galley.size().y / 2.0,
         );
 
-        ui.painter()
-            .galley(hint_pos, hint_galley, current_theme.text_primary.to_color());
+        ui.painter().galley(
+            hint_pos,
+            hint_galley,
+            current_theme.semantic.text_secondary.to_color(),
+        );
 
         if enabled {
             if response.clicked() {
@@ -574,6 +592,7 @@ impl ContextMenuState {
         ui_state: &mut BlazeUiState,
     ) {
         let i18n = with_configs(|c| c.get_i18n());
+        let current_theme = with_theme(|f| f.current());
 
         if !self.open {
             return;
@@ -590,9 +609,21 @@ impl ContextMenuState {
                 let (rect, _) =
                     ui.allocate_exact_size(vec2(ui.available_width() - 2.0, 30.0), Sense::hover());
 
+                let search_id = Id::new("search_ctx_menu");
+                let has_focus = ui.memory(|mem| mem.has_focus(search_id));
+
+                let search_color = if has_focus {
+                    ensure_min_lightness(current_theme.components.input.border_focus.to_color())
+                } else {
+                    ensure_min_lightness(current_theme.components.input.border_idle.to_color())
+                };
+
                 let paint_rect = rect.shrink2(vec2(4.0, 0.0));
-                ui.painter()
-                    .rect_filled(paint_rect, 12.0, Color32::from_rgb(30, 30, 40));
+                ui.painter().rect_filled(
+                    paint_rect,
+                    12.0,
+                    current_theme.components.input.bg.to_color(),
+                );
 
                 let icon_pos = rect.left_top() + vec2(padding, (rect.height() - icon_size.y) / 2.0);
                 let icon_rect = Rect::from_min_size(icon_pos, icon_size);
@@ -605,7 +636,7 @@ impl ContextMenuState {
                 let icon =
                     ui_state
                         .icon_cache
-                        .get_or_load(ui, icon.0, icon.1, Color32::GRAY, icon_size);
+                        .get_or_load(ui, icon.0, icon.1, search_color, icon_size);
 
                 ui.painter().image(
                     icon.id(),
@@ -620,8 +651,6 @@ impl ContextMenuState {
                 );
 
                 let mut child_ui = ui.new_child(UiBuilder::new().max_rect(text_rect));
-
-                let search_id = egui::Id::new("search_ctx_menu");
 
                 let text_edit = BlazeTextEdit::singleline(&mut state.search_filter)
                     .id(search_id)

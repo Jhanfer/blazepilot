@@ -93,56 +93,41 @@ impl BlazeApp {
         let current_theme = with_theme(|t| t.current());
         ui.global_style_mut(|style| {
             let vmut = &mut style.visuals;
+            let s = &current_theme.semantic;
+            let c = &current_theme.components;
 
-            let text_p = current_theme.text_primary.to_color();
-            let text_s = current_theme.text_secondary.to_color();
-            let border = current_theme.border_panel.to_color();
+            vmut.widgets.inactive.bg_fill = c.button.bg.to_color();
+            vmut.widgets.inactive.bg_stroke = egui::Stroke::new(1.0, c.panel.border.to_color());
+            vmut.widgets.inactive.fg_stroke = egui::Stroke::new(1.0, s.text_primary.to_color());
+            vmut.widgets.inactive.weak_bg_fill = s.bg_container.to_color();
 
-            // Inactive
-            vmut.widgets.inactive.bg_fill = current_theme.main_buttons.to_color();
-            vmut.widgets.inactive.bg_stroke = egui::Stroke::new(1.0, border);
-            vmut.widgets.inactive.fg_stroke = egui::Stroke::new(1.0, text_p);
-            vmut.widgets.inactive.weak_bg_fill = current_theme.bg_container.to_color();
+            vmut.widgets.hovered.bg_fill = c.button.bg_hover.to_color();
+            vmut.widgets.hovered.bg_stroke = egui::Stroke::new(1.0, s.accent_glow.to_color());
+            vmut.widgets.hovered.fg_stroke = egui::Stroke::new(1.0, s.text_primary.to_color());
+            vmut.widgets.hovered.weak_bg_fill = c.button.bg_hover.to_color();
 
-            // Hover
-            vmut.widgets.hovered.bg_fill = current_theme.bg_hover.to_color();
-            vmut.widgets.hovered.bg_stroke =
-                egui::Stroke::new(1.0, current_theme.accent_glow.to_color());
-            vmut.widgets.hovered.fg_stroke =
-                egui::Stroke::new(1.0, current_theme.text_primary.to_color());
-            vmut.widgets.hovered.weak_bg_fill = current_theme.bg_hover.to_color();
+            vmut.widgets.active.bg_fill = c.list_item.bg_selected.to_color();
+            vmut.widgets.active.bg_stroke = egui::Stroke::new(1.0, s.accent.to_color());
+            vmut.widgets.active.fg_stroke = egui::Stroke::new(1.0, s.text_primary.to_color());
+            vmut.widgets.active.weak_bg_fill = c.list_item.bg_selected.to_color();
 
-            // Selected
-            vmut.widgets.active.bg_fill = current_theme.item_selected.to_color();
-            vmut.widgets.active.bg_stroke = egui::Stroke::new(1.0, current_theme.accent.to_color());
-            vmut.widgets.active.fg_stroke =
-                egui::Stroke::new(1.0, current_theme.text_primary.to_color());
-            vmut.widgets.active.weak_bg_fill = current_theme.item_selected.to_color();
+            vmut.widgets.open.bg_fill = s.bg_container.to_color();
+            vmut.widgets.open.bg_stroke = egui::Stroke::new(1.0, c.panel.border.to_color());
+            vmut.widgets.open.fg_stroke = egui::Stroke::new(1.0, s.text_secondary.to_color());
+            vmut.widgets.open.weak_bg_fill = s.bg_container.to_color();
 
-            // ComboBox opened
-            vmut.widgets.open.bg_fill = current_theme.bg_container.to_color();
-            vmut.widgets.open.bg_stroke = egui::Stroke::new(1.0, border);
-            vmut.widgets.open.fg_stroke = egui::Stroke::new(1.0, text_s);
-            vmut.widgets.open.weak_bg_fill = current_theme.bg_container.to_color();
+            vmut.widgets.noninteractive.bg_stroke = egui::Stroke::new(1.0, s.separator.to_color());
+            vmut.widgets.noninteractive.fg_stroke = egui::Stroke::new(1.0, s.text_muted.to_color());
+            vmut.widgets.noninteractive.weak_bg_fill = s.bg_main.to_color();
 
-            vmut.selection.bg_fill = current_theme.rubberband.to_color();
-            vmut.selection.stroke = egui::Stroke::new(1.0, current_theme.accent.to_color());
+            vmut.selection.bg_fill = s.rubberband.to_color();
+            vmut.selection.stroke = egui::Stroke::new(1.0, s.accent.to_color());
 
-            vmut.extreme_bg_color = current_theme.bg_container.to_color();
-
-            vmut.window_fill = current_theme.bg_panel.to_color();
-            vmut.window_stroke = egui::Stroke::new(1.0, border);
-
-            vmut.widgets.noninteractive.bg_stroke = egui::Stroke::new(1.0, border);
-
-            vmut.widgets.noninteractive.fg_stroke =
-                egui::Stroke::new(1.0, current_theme.text_muted.to_color());
-
-            vmut.widgets.noninteractive.weak_bg_fill = current_theme.bg_main.to_color();
-
-            vmut.panel_fill = current_theme.bg_main.to_color();
-            vmut.faint_bg_color = current_theme.bg_container.to_color();
-            vmut.override_text_color = Some(current_theme.text_primary.to_color());
+            vmut.extreme_bg_color = s.bg_container.to_color();
+            vmut.window_fill = c.panel.bg.to_color();
+            vmut.panel_fill = s.bg_main.to_color();
+            vmut.faint_bg_color = s.bg_container.to_color();
+            vmut.override_text_color = Some(s.text_primary.to_color());
         });
     }
 }

@@ -36,6 +36,7 @@ use crate::{
         },
     },
     ui::{
+        custom_components::label::UiExt,
         dialog_manager::manager::ModalDialog,
         themes::{platform::structs::ToColor, theme_manager::with_theme},
     },
@@ -256,7 +257,7 @@ impl AppSelectorDialog {
             if let Some(texture) = &data.textures[index] {
                 ui.add(Image::new(texture).fit_to_exact_size(egui::vec2(20.0, 20.0)));
             } else {
-                ui.label("🖼");
+                ui.label_ns("🖼");
             }
 
             let br = ui.button(&app.name);
@@ -321,14 +322,14 @@ impl AppSelectorDialog {
             None => false,
             Some(SelectorState::Loading) => {
                 ui.spinner();
-                ui.label(i18n.t("selector_dialog.searching_apps"));
+                ui.label_ns(i18n.t("selector_dialog.searching_apps"));
                 false
             }
             Some(SelectorState::Ready(data)) => {
                 let current_theme = with_theme(|t| t.current());
 
                 let custom_frame = Frame::NONE
-                    .fill(current_theme.bg_main.to_color())
+                    .fill(current_theme.semantic.bg_main.to_color())
                     .inner_margin(Margin::same(20));
                 let file_name = data
                     .path
@@ -354,9 +355,9 @@ impl AppSelectorDialog {
                         let height = 320.0;
 
                         ScrollArea::vertical().max_height(height).show(ui, |ui| {
-                            ui.label(
+                            ui.label_ns(
                                 RichText::new(i18n.t("selector_dialog.recomends"))
-                                    .color(current_theme.text_primary.to_color())
+                                    .color(current_theme.semantic.text_primary.to_color())
                                     .strong(),
                             );
                             ui.add_space(6.0);
@@ -372,9 +373,9 @@ impl AppSelectorDialog {
                             ui.separator();
                             ui.add_space(12.0);
 
-                            ui.label(
+                            ui.label_ns(
                                 RichText::new(i18n.t("selector_dialog.all_apps"))
-                                    .color(current_theme.text_primary.to_color())
+                                    .color(current_theme.semantic.text_primary.to_color())
                                     .strong(),
                             );
                             ui.add_space(6.0);

@@ -33,7 +33,7 @@ pub fn sidebar_left_component(
     let i18n = with_configs(|c| c.get_i18n());
 
     let custom_frame = Frame::NONE
-        .fill(current_theme.bg_main.to_color())
+        .fill(current_theme.semantic.bg_main.to_color())
         .inner_margin(Margin {
             left: 15,
             right: 0,
@@ -50,11 +50,11 @@ pub fn sidebar_left_component(
 
             Frame::NONE
                 .inner_margin(egui::Margin::same(10))
-                .fill(current_theme.bg_panel.to_color())
+                .fill(current_theme.components.panel.bg.to_color())
                 .corner_radius(CornerRadius::same(20))
                 .stroke(Stroke {
                     width: 0.5,
-                    color: current_theme.accent_glow.to_color(),
+                    color: current_theme.components.panel.border.to_color(),
                 })
                 .show(ui, |ui| {
                     ui.set_width(200.0);

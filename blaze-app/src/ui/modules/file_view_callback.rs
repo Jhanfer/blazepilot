@@ -35,7 +35,7 @@ pub fn render_views(
     let bottom_padding = 10.0 as i8;
 
     let custom_frame = Frame::NONE
-        .fill(current_theme.bg_main.to_color())
+        .fill(current_theme.semantic.bg_main.to_color())
         .inner_margin(Margin {
             left: 15,
             right: 15,

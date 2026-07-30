@@ -3,7 +3,7 @@ use parking_lot::Mutex;
 use std::sync::{Arc, LazyLock};
 use tracing::warn;
 
-use crate::ui::themes::platform::{ColorsTrait, PlatformTheme, structs::Theme};
+use crate::ui::themes::platform::{ColorsTrait, PlatformTheme, structs::NewTheme};
 
 pub static GLOBAL_THEMES: LazyLock<Mutex<ThemeManager>> =
     LazyLock::new(|| Mutex::new(ThemeManager::new()));
@@ -31,7 +31,7 @@ impl ThemeManager {
 
     //--__--__--__-- Getters __--__--__--__--__
 
-    pub fn current(&self) -> Arc<Theme> {
+    pub fn current(&self) -> Arc<NewTheme> {
         self.platform.current_theme()
     }
 
@@ -41,7 +41,7 @@ impl ThemeManager {
 
     //--__--__--__-- Setters __--__--__--__--__
 
-    pub fn update_theme(&mut self, mutator: fn(&mut Theme, Color32), value: Color32) {
+    pub fn update_theme(&mut self, mutator: fn(&mut NewTheme, Color32), value: Color32) {
         self.platform.update_theme(mutator, value);
         self.save().ok();
     }

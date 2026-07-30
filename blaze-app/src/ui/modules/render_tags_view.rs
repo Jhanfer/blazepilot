@@ -11,6 +11,7 @@ use crate::{
     },
     ui::{
         blaze_ui_state::BlazeUiState,
+        custom_components::label::UiExt,
         icons_cache::thumbnails::thumbnails_manager::Thumbnail,
         modules::{
             island_n_bubble::render_tags_island_bubble,
@@ -55,7 +56,7 @@ pub fn tag_views(
             top: 0,
             bottom: 10,
         })
-        .fill(current_theme.bg_panel.to_color())
+        .fill(current_theme.components.panel.bg.to_color())
         .corner_radius(CornerRadius {
             nw: 0,
             ne: 0,
@@ -64,7 +65,7 @@ pub fn tag_views(
         })
         .stroke(Stroke {
             width: 0.5,
-            color: current_theme.accent_glow.to_color(),
+            color: current_theme.semantic.accent_glow.to_color(),
         })
         .show(ui, |ui| {
             let current_theme = with_theme(|t| t.current());
@@ -109,8 +110,8 @@ pub fn tag_views(
                         render_button(
                             ui,
                             &i18n.t("tags_quick.new"),
-                            current_theme.bg_main.to_color(),
-                            current_theme.accent_glow.to_color(),
+                            current_theme.semantic.bg_main.to_color(),
+                            current_theme.semantic.accent_glow.to_color(),
                             Some(|| {
                                 dispatcher
                                     .send(UiEvent::QuickTagEvent(QuickTagEvent::CreateNewTag {
@@ -125,8 +126,8 @@ pub fn tag_views(
                         render_button(
                             ui,
                             &i18n.t("tags_quick.all"),
-                            current_theme.bg_main.to_color(),
-                            current_theme.accent_glow.to_color(),
+                            current_theme.semantic.bg_main.to_color(),
+                            current_theme.semantic.accent_glow.to_color(),
                             Some(|| {
                                 state.tag_filter = TagViewFilter::All {
                                     all_items_len: total_items,
@@ -210,9 +211,9 @@ pub fn tag_views(
                         vec2(ui.available_width(), 80.0),
                         egui::Layout::centered_and_justified(egui::Direction::TopDown),
                         |ui| {
-                            ui.label(
+                            ui.label_ns(
                                 egui::RichText::new(&*i18n.t("tags_quick.empty"))
-                                    .color(current_theme.text_secondary.to_color())
+                                    .color(current_theme.semantic.text_secondary.to_color())
                                     .size(14.0)
                                     .strong(),
                             );
@@ -241,7 +242,7 @@ pub fn tag_views(
                         Frame::NONE
                             .corner_radius(CornerRadius::same(20))
                             .fill(color)
-                            .stroke(Stroke::new(0.8, vivid_color))
+                            .stroke(Stroke::new(0.5, vivid_color))
                             .show(ui, |ui| {
                                 ui.set_width(ui.available_width());
 
@@ -264,7 +265,7 @@ pub fn tag_views(
                                                 "tags_quick.count",
                                                 &[("query", &tag.items.len().to_string())],
                                             ))
-                                            .color(current_theme.text_secondary.to_color())
+                                            .color(current_theme.semantic.text_secondary.to_color())
                                             .size(11.0),
                                         )
                                         .selectable(false),
@@ -324,11 +325,16 @@ pub fn tag_views(
                                                 egui::Direction::BottomUp,
                                             ),
                                             |ui| {
-                                                ui.label(
+                                                ui.label_ns(
                                                     RichText::new(
                                                         &*i18n.t("tags_quick.add_something"),
                                                     )
-                                                    .color(current_theme.text_secondary.to_color())
+                                                    .color(
+                                                        current_theme
+                                                            .semantic
+                                                            .text_secondary
+                                                            .to_color(),
+                                                    )
                                                     .size(14.0)
                                                     .strong(),
                                                 );
@@ -447,7 +453,7 @@ pub fn tag_views(
                                                 color.g().saturating_add(bg_alpha),
                                                 color.b().saturating_add(bg_alpha),
                                             ),
-                                            Stroke::new(0.8, color),
+                                            Stroke::new(0.5, color),
                                             StrokeKind::Outside,
                                         );
 
@@ -520,7 +526,7 @@ pub fn tag_views(
 
                                                     ui.add_space(20.0);
 
-                                                    ui.label(item.name.to_owned());
+                                                    ui.label_ns(item.name.to_owned());
 
                                                     if let Ok(guard) = item.meta.lock()
                                                         && let Some(meta) = guard.as_ref()
@@ -532,10 +538,10 @@ pub fn tag_views(
                                                             .as_secs();
 
                                                         ui.add_space(spacing);
-                                                        ui.label(format_date(modified));
+                                                        ui.label_ns(format_date(modified));
 
                                                         ui.add_space(spacing);
-                                                        ui.label(format_size(meta.size));
+                                                        ui.label_ns(format_size(meta.size));
                                                     }
                                                 });
                                             },

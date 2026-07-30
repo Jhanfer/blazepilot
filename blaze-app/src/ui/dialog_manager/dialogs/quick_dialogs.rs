@@ -20,7 +20,7 @@ use crate::{
         runtime::bus_structs::QuickTagEvent,
     },
     ui::{
-        custom_components::text_edit::BlazeTextEdit,
+        custom_components::{label::UiExt, text_edit::BlazeTextEdit},
         dialog_manager::manager::ModalDialog,
         themes::{platform::structs::ToColor, theme_manager::with_theme},
     },
@@ -69,7 +69,7 @@ impl QuickAccDialog {
 
     fn show_warn(&mut self, message: &str, ui: &mut Ui) {
         Modal::new("warn_modal".into()).show(ui, |ui| {
-            ui.label(message);
+            ui.label_ns(message);
             if ui.button("Cerrar").clicked() {
                 self.show_warn = false;
             }
@@ -555,7 +555,7 @@ impl QuickAccDialog {
         let mut should_close = false;
 
         let custom_frame = Frame::NONE
-            .fill(current_theme.bg_main.to_color())
+            .fill(current_theme.semantic.bg_main.to_color())
             .corner_radius(CornerRadius::same(10))
             .inner_margin(Margin::same(10));
 

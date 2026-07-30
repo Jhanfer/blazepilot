@@ -20,6 +20,7 @@ use crate::core::{
     },
     runtime::{bus_structs::UiEvent, event_bus::Dispatcher},
 };
+use crate::ui::custom_components::label::UiExt;
 use crate::ui::dialog_manager::manager::ModalDialog;
 use crate::ui::themes::platform::structs::ToColor;
 use crate::ui::themes::theme_manager::with_theme;
@@ -61,7 +62,7 @@ impl WantToInstallDialog {
 
         let mut should_close = false;
         let custom_frame = Frame::NONE
-            .fill(current_theme.bg_main.to_color())
+            .fill(current_theme.semantic.bg_main.to_color())
             .corner_radius(CornerRadius::same(10))
             .inner_margin(Margin::same(10));
 
@@ -78,9 +79,9 @@ impl WantToInstallDialog {
 
                 ui.vertical_centered(|ui| {
                     ui.add_space(8.0);
-                    ui.label(i18n.t("want_to_donwload_dialog.message"));
+                    ui.label_ns(i18n.t("want_to_donwload_dialog.message"));
 
-                    ui.label(i18n.t("want_to_donwload_dialog.hint"));
+                    ui.label_ns(i18n.t("want_to_donwload_dialog.hint"));
                 });
 
                 ui.add_space(50.0);

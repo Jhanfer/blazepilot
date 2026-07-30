@@ -18,6 +18,7 @@ use crate::{
         runtime::{bus_structs::FileOperation, event_bus::Dispatcher},
     },
     ui::{
+        custom_components::label::UiExt,
         dialog_manager::manager::ModalDialog,
         themes::{platform::structs::ToColor, theme_manager::with_theme},
     },
@@ -74,7 +75,7 @@ impl SureToMoveToDialog {
         };
 
         let custom_frame = Frame::NONE
-            .fill(current_theme.bg_main.to_color())
+            .fill(current_theme.semantic.bg_main.to_color())
             .corner_radius(CornerRadius::same(10))
             .inner_margin(Margin::same(10));
 
@@ -101,7 +102,9 @@ impl SureToMoveToDialog {
                             .map(|f| f.to_string_lossy().into_owned())
                             .unwrap_or_else(|| i18n.t("move_to_dialog.file").into_string());
 
-                        ui.label(i18n.t_args("move_to_dialog.file_dot", &[("query", &file_name)]));
+                        ui.label_ns(
+                            i18n.t_args("move_to_dialog.file_dot", &[("query", &file_name)]),
+                        );
                     }
                 } else {
                     for source in sources {
@@ -110,14 +113,16 @@ impl SureToMoveToDialog {
                             .map(|f| f.to_string_lossy().into_owned())
                             .unwrap_or_else(|| i18n.t("move_to_dialog.file").into_string());
 
-                        ui.label(i18n.t_args("move_to_dialog.file_dot", &[("query", &file_name)]));
+                        ui.label_ns(
+                            i18n.t_args("move_to_dialog.file_dot", &[("query", &file_name)]),
+                        );
                     }
-                    ui.label(
+                    ui.label_ns(
                         RichText::new(i18n.t_args(
                             "move_to_dialog.and_more",
                             &[("query", &(total - MAX_SHOWN).to_string())],
                         ))
-                        .color(current_theme.text_primary.to_color())
+                        .color(current_theme.semantic.text_primary.to_color())
                         .weak()
                         .italics(),
                     );
@@ -129,7 +134,7 @@ impl SureToMoveToDialog {
                     .unwrap_or_else(|| dest.to_string_lossy().into_owned());
 
                 ui.add_space(8.0);
-                ui.label(i18n.t_args("move_to_dialog.to", &[("query", &dest_name)]));
+                ui.label_ns(i18n.t_args("move_to_dialog.to", &[("query", &dest_name)]));
 
                 ui.add_space(50.0);
 

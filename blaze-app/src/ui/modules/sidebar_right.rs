@@ -20,6 +20,7 @@ use crate::core::bootstrap::configs::platform::linux::conf_structs::{
 use crate::core::files::blaze_motor::motor_structs::FileEntry;
 use crate::core::system::extended_info::extended_info_manager::ExtendedInfo;
 use crate::ui::blaze_ui_state::BlazeUiState;
+use crate::ui::custom_components::label::UiExt;
 use crate::ui::custom_components::text_edit::BlazeTextEdit;
 use crate::ui::icons_cache::icons;
 use crate::ui::icons_cache::thumbnails::thumbnails_manager::Thumbnail;
@@ -28,8 +29,8 @@ use crate::ui::themes::platform::structs::ToColor;
 use crate::ui::themes::theme_manager::with_theme;
 use crate::utils::formating::{format_date, format_size};
 use egui::{
-    Align, Button, Color32, ColorImage, CornerRadius, Frame, Grid, Label, Layout, Margin, Panel,
-    Rect, RichText, Sense, Stroke, TextureOptions, Ui, pos2, vec2,
+    Align, Button, Color32, ColorImage, CornerRadius, Frame, Grid, Id, Label, Layout, Margin,
+    Panel, Rect, RichText, Sense, Stroke, TextureOptions, Ui, pos2, vec2,
 };
 use std::collections::HashMap;
 use std::path::Path;
@@ -70,27 +71,26 @@ pub fn render_ordering_btn<F>(
         callback();
     }
 
-    let mut color = current_theme.tools_secondary.to_color();
+    let mut color = current_theme.components.tools.label_active.to_color();
 
     if resp.hovered() {
         ui.set_cursor_icon(egui::CursorIcon::PointingHand);
-        color = current_theme.tools_primary.to_color();
+        color = current_theme.components.tools.label_hover.to_color();
     }
 
     let rounded_rect = Rect::from_min_max(
         pos2(icon_rect.min.x.round(), icon_rect.min.y.round()),
         pos2(icon_rect.max.x.round(), icon_rect.max.y.round()),
     );
-    let icon =
-        ui_state
-            .icon_cache
-            .get_or_load(ui, &icon_name, icon_bytes, Color32::GRAY, icon_size);
+    let icon = ui_state
+        .icon_cache
+        .get_or_load(ui, &icon_name, icon_bytes, color, icon_size);
 
     ui.painter().image(
         icon.id(),
         rounded_rect,
         Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
-        color,
+        Color32::WHITE,
     );
 }
 
@@ -104,7 +104,7 @@ pub fn sidebar_right_component(
 
     let i18n = with_configs(|c| c.get_i18n());
     let custom_frame = Frame::NONE
-        .fill(current_theme.bg_main.to_color())
+        .fill(current_theme.semantic.bg_main.to_color())
         .inner_margin(Margin {
             left: 0,
             right: 15,
@@ -118,22 +118,35 @@ pub fn sidebar_right_component(
         .show_separator_line(false)
         .show(ui, |ui| {
 
+            let search_id = Id::new("search_bar");
+            let has_focus = ui.memory(|mem| mem.has_focus(search_id));
+
+            let search_color = if has_focus {
+                ensure_min_lightness(
+                    current_theme.components.input.border_focus.to_color()
+                )
+            } else {
+                current_theme.components.panel.border.to_color()
+            };
+
             Frame::NONE
                 .inner_margin(egui::Margin::same(10))
-                .fill(current_theme.bg_panel.to_color())
+                .fill(current_theme.components.panel.bg.to_color())
                 .corner_radius(CornerRadius::same(20))
-                .stroke(Stroke {
-                    width: 0.5,
-                    color: current_theme.accent_glow.to_color(),
-                })
+                .stroke(
+                    Stroke {
+                        width: 0.5,
+                        color: current_theme.components.panel.border.to_color(),
+                    }
+                )
                 .show(ui, |ui| {
 
                     Frame::NONE
-                        .fill(current_theme.bg_main.to_color())
+                        .fill(current_theme.components.input.bg.to_color())
                         .stroke(
                             Stroke::new(
                                 0.5,
-                                current_theme.accent_glow.to_color()
+                                search_color
                             )
                         )
                         .corner_radius(CornerRadius::same(99))
@@ -148,13 +161,27 @@ pub fn sidebar_right_component(
                                     pos2(icon_rect.min.x.round(), icon_rect.min.y.round()),
                                     pos2(icon_rect.max.x.round(), icon_rect.max.y.round()),
                                 );
+
+
+                                let search_color = if has_focus {
+                                    ensure_min_lightness(
+                                        current_theme.components.input.border_focus.to_color()
+                                    )
+                                } else {
+                                    ensure_min_lightness(
+                                        current_theme.components.input.border_idle.to_color()
+                                    )
+                                };
+
+
                                 let icon = ui_state.icon_cache.get_or_load(
                                     ui,
                                     icon_name,
                                     icon_bytes,
-                                    Color32::GRAY,
+                                    search_color,
                                     icon_size,
                                 );
+
 
                                 ui.painter().image(
                                     icon.id(),
@@ -169,7 +196,7 @@ pub fn sidebar_right_component(
                                     BlazeTextEdit::singleline(&mut search)
                                     .hint_text(i18n.t("search.placeholder"))
                                     .desired_width(150.0)
-                                    .id("search_bar".into())
+                                    .id(search_id)
                                 );
 
                                 if response.changed() {
@@ -194,9 +221,12 @@ pub fn sidebar_right_component(
                         Layout::top_down(Align::Center),
                         |ui| {
                             Frame::NONE
-                                .fill(current_theme.border_panel.to_color())
+                                .fill(current_theme.components.sidebar_item.bg_hover.to_color())
                                 .stroke(
-                                    Stroke::new(0.5, current_theme.accent_glow.to_color())
+                                    Stroke::new(
+                                        0.5,
+                                        current_theme.components.panel.border.to_color()
+                                    )
                                 )
                                 .corner_radius(CornerRadius::same(99))
                                 .inner_margin(Margin::symmetric(10, 6))
@@ -365,10 +395,12 @@ pub fn sidebar_right_component(
 
                         let animated_stroke = Stroke::new(
                             (0.5 * anim).clamp(0.0, 0.5),
-                            current_theme.accent_glow.to_color().linear_multiply(anim)
+                            current_theme.components.panel.border.to_color().linear_multiply(anim)
                         );
 
-                        let animated_radius = CornerRadius::same((20.0 * anim) as u8);
+                        let animated_radius = CornerRadius::same(
+                            (20.0 * anim) as u8
+                        );
 
                         if let Some(first_selected_idx) = (0..files.len()).find(|&i| state.is_selected(i)) {
 
@@ -376,7 +408,7 @@ pub fn sidebar_right_component(
                                 .outer_margin(Margin::symmetric(1, 1))
                                 .inner_margin(Margin::same(10))
                                 .stroke(animated_stroke)
-                                .fill(current_theme.bg_main.to_color())
+                                .fill(current_theme.semantic.bg_main.to_color())
                                 .corner_radius(animated_radius)
                                 .show(ui, |ui| {
 
@@ -386,8 +418,8 @@ pub fn sidebar_right_component(
                                         Label::new(
                                             RichText::new(i18n.t("right_sidebar.info"))
                                                 .heading()
-                                                .color(current_theme.text_primary.to_color().linear_multiply(anim))
-                                        )
+                                                .color(current_theme.semantic.text_primary.to_color().linear_multiply(anim))
+                                        ).selectable(false),
                                     );
 
 
@@ -454,21 +486,21 @@ pub fn sidebar_right_component(
                                                 pos2(icon_rect.max.x.round(), icon_rect.max.y.round()),
                                             );
 
+                                            let normalized_color = ensure_min_lightness(color);
+
                                             let icon = ui_state.icon_cache.get_or_load(
                                                 ui,
                                                 &icon_name,
                                                 icon_bytes,
-                                                Color32::GRAY,
+                                                normalized_color,
                                                 icon_size,
                                             );
-
-                                            let normalized_color = ensure_min_lightness(color);
 
                                             ui.painter().image(
                                                 icon.id(),
                                                 rounded_rect,
                                                 Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
-                                                normalized_color.linear_multiply(anim),
+                                                Color32::WHITE,
                                             );
                                         }
 
@@ -479,8 +511,9 @@ pub fn sidebar_right_component(
                                                 ui.add(
                                                     Label::new(
                                                         RichText::new(file.name.clone())
-                                                            .color(current_theme.text_primary.to_color().linear_multiply(anim))
+                                                            .color(current_theme.semantic.text_primary.to_color().linear_multiply(anim))
                                                     ).wrap()
+                                                    .selectable(false),
                                                 );
                                             },
                                         );
@@ -501,9 +534,9 @@ pub fn sidebar_right_component(
                                         .show(ui, |ui| {
 
                                             let row = |ui: &mut Ui, label: &str, value: &str| {
-                                                ui.label(label);
+                                                ui.label_ns(label);
                                                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                                                    ui.label(value);
+                                                    ui.label_ns(value);
                                                 });
                                                 ui.end_row();
                                             };

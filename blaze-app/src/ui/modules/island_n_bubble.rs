@@ -7,6 +7,7 @@ use crate::{
     },
     ui::{
         blaze_ui_state::BlazeUiState,
+        custom_components::label::UiExt,
         icons_cache::icons,
         task_manager::tasks::TaskStatus,
         themes::{platform::structs::ToColor, theme_manager::with_theme},
@@ -14,8 +15,8 @@ use crate::{
     utils::formating::format_size,
 };
 use egui::{
-    Align2, Area, Color32, CornerRadius, FontId, Frame, Margin, Rect, RichText, ScrollArea, Sense,
-    Stroke, TextFormat, Ui, pos2,
+    Align2, Area, Color32, CornerRadius, FontId, Frame, Margin, Order, Rect, RichText, ScrollArea,
+    Sense, Stroke, TextFormat, Ui, pos2,
     text::{LayoutJob, TextWrapping},
     vec2,
 };
@@ -74,8 +75,11 @@ where
         .show(ui, |ui| {
             Frame::NONE
                 .inner_margin(egui::Margin::same(10))
-                .fill(current_theme.bg_panel.to_color())
-                .stroke(Stroke::new(0.8, current_theme.accent_glow.to_color()))
+                .fill(current_theme.components.panel.bg.to_color())
+                .stroke(Stroke::new(
+                    0.5,
+                    current_theme.components.panel.border.to_color(),
+                ))
                 .corner_radius(CornerRadius::same(20))
                 .show(ui, |ui| {
                     ui.set_width(width);
@@ -136,7 +140,7 @@ pub fn render_island_bubble(
             ui.add_space(1.0);
 
             let total = files.len();
-            ui.label(format!("{}", total));
+            ui.label_ns(format!("{}", total));
 
             ui.add_space(5.0);
 
@@ -182,7 +186,7 @@ pub fn render_island_bubble(
                 })
                 .sum();
 
-            ui.label(format!("{}", selected_count));
+            ui.label_ns(format!("{}", selected_count));
 
             ui.add_space(5.0);
 
@@ -209,7 +213,7 @@ pub fn render_island_bubble(
 
             ui.add_space(1.0);
 
-            ui.label(format_size(selected_size));
+            ui.label_ns(format_size(selected_size));
         },
     );
 
@@ -231,16 +235,19 @@ pub fn render_island_bubble(
 
     Area::new("processing_bubble".into())
         .fixed_pos(pivot + vec2(-current_w / 2.0, offset_y))
-        .order(egui::Order::Background)
+        .order(Order::Background)
         .show(ui, |ui| {
             Frame::NONE
-                .inner_margin(egui::Margin::same(10))
-                .fill(current_theme.bg_panel.to_color())
-                .stroke(Stroke::new(0.8, current_theme.accent_glow.to_color()))
+                .inner_margin(Margin::same(10))
+                .fill(current_theme.components.panel.bg.to_color())
+                .stroke(Stroke::new(
+                    0.5,
+                    current_theme.components.panel.border.to_color(),
+                ))
                 .corner_radius(CornerRadius::same(20))
                 .show(ui, |ui| {
-                    let inner_w = (current_w - 20.0).max(0.1);
-                    let inner_h = (current_h - 20.0).max(0.1);
+                    let inner_w = (current_w - 20.0).max(0.05);
+                    let inner_h = (current_h - 20.0).max(0.05);
 
                     ui.set_min_size(vec2(inner_w, inner_h));
                     ui.set_max_size(vec2(inner_w, inner_h));
@@ -259,8 +266,8 @@ pub fn render_island_bubble(
                                             TaskStatus::FinishedSuccess => "✅",
                                             TaskStatus::FinishedError => "❌",
                                         };
-                                        ui.label(icon);
-                                        ui.label(&task.text);
+                                        ui.label_ns(icon);
+                                        ui.label_ns(&task.text);
                                     });
 
                                     let bar_width = (current_w - 40.0).max(0.0);
@@ -308,8 +315,11 @@ pub fn render_island_bubble(
             .show(ui, |ui| {
                 Frame::new()
                     .inner_margin(Margin::symmetric(10, 4))
-                    .fill(current_theme.bg_panel.to_color())
-                    .stroke(Stroke::new(0.8, current_theme.accent_glow.to_color()))
+                    .fill(current_theme.components.panel.bg.to_color())
+                    .stroke(Stroke::new(
+                        0.5,
+                        current_theme.components.panel.border.to_color(),
+                    ))
                     .corner_radius(CornerRadius::same(20))
                     .show(ui, |ui| {
                         ui.set_width(tabs_width);
@@ -413,7 +423,10 @@ pub fn render_island_bubble(
                                             label,
                                             TextFormat {
                                                 font_id: FontId::default(),
-                                                color: current_theme.text_primary.to_color(),
+                                                color: current_theme
+                                                    .semantic
+                                                    .text_primary
+                                                    .to_color(),
                                                 ..Default::default()
                                             },
                                         );
@@ -501,8 +514,11 @@ pub fn render_island_bubble(
             .show(ui, |ui| {
                 Frame::new()
                     .inner_margin(Margin::symmetric(10, 4))
-                    .fill(current_theme.bg_panel.to_color())
-                    .stroke(Stroke::new(0.8, current_theme.accent_glow.to_color()))
+                    .fill(current_theme.components.panel.bg.to_color())
+                    .stroke(Stroke::new(
+                        0.5,
+                        current_theme.components.panel.border.to_color(),
+                    ))
                     .corner_radius(CornerRadius {
                         nw: 10,
                         ne: 10,
@@ -511,9 +527,9 @@ pub fn render_island_bubble(
                     })
                     .show(ui, |ui| {
                         ui.horizontal_centered(|ui| {
-                            ui.label(
+                            ui.label_ns(
                                 RichText::new("Ctrl + 1-5, Ctrl + <-/->, Tab, Shift + Tab")
-                                    .color(current_theme.text_secondary.to_color())
+                                    .color(current_theme.semantic.text_secondary.to_color())
                                     .size(10.0),
                             );
                         });
@@ -618,7 +634,7 @@ pub fn render_tags_island_bubble(
 
             ui.add_space(1.0);
 
-            ui.label(format!("{}", tag_len));
+            ui.label_ns(format!("{}", tag_len));
 
             ui.add_space(5.0);
 
@@ -646,7 +662,7 @@ pub fn render_tags_island_bubble(
 
             ui.add_space(1.0);
 
-            ui.label(format!("{}", items_len));
+            ui.label_ns(format!("{}", items_len));
         },
     );
 }

@@ -53,7 +53,7 @@ pub fn drag_files(
                 first_name.to_string()
             },
             egui::FontId::default(),
-            current_theme.text_primary.to_color(),
+            current_theme.semantic.text_primary.to_color(),
         );
     }
 

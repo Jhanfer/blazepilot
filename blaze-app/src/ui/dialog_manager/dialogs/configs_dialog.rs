@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::ui::custom_components::label::UiExt;
 use crate::ui::dialog_manager::manager::ModalDialog;
 use crate::ui::themes::platform::structs::ToColor;
 use crate::ui::themes::theme_manager::with_theme;
@@ -258,7 +259,8 @@ impl ConfigDialog {
             for tab in &filtered {
                 let is_selected = self.current_config_tab == *tab;
 
-                let label = RichText::new(tab.name()).color(current_theme.text_primary.to_color());
+                let label =
+                    RichText::new(tab.name()).color(current_theme.semantic.text_primary.to_color());
 
                 if ui.selectable_label(is_selected, label).clicked() {
                     self.current_config_tab = *tab;
@@ -268,10 +270,10 @@ impl ConfigDialog {
             if filtered.is_empty() && !query.is_empty() {
                 ui.vertical_centered(|ui| {
                     ui.add_space(20.0);
-                    ui.label(
+                    ui.label_ns(
                         RichText::new("No se encontraron resultados")
                             .weak()
-                            .color(current_theme.text_primary.to_color()),
+                            .color(current_theme.semantic.text_primary.to_color()),
                     );
                 });
             }
@@ -292,7 +294,7 @@ impl ConfigDialog {
                     Label::new(
                         RichText::new("BlazePilot")
                             .strong()
-                            .color(current_theme.text_primary.to_color()),
+                            .color(current_theme.semantic.text_primary.to_color()),
                     )
                     .selectable(false),
                 );
@@ -301,7 +303,7 @@ impl ConfigDialog {
                 ui.add(
                     Label::new(
                         RichText::new(format!("v{}", env!("CARGO_PKG_VERSION")))
-                            .color(current_theme.text_muted.to_color()),
+                            .color(current_theme.semantic.text_muted.to_color()),
                     )
                     .selectable(false),
                 );
@@ -313,7 +315,7 @@ impl ConfigDialog {
                 ui.add(
                     Label::new(
                         RichText::new(i18n.t("configs_general.gratitude"))
-                            .color(current_theme.text_primary.to_color()),
+                            .color(current_theme.semantic.text_primary.to_color()),
                     )
                     .selectable(false),
                 );
@@ -321,7 +323,7 @@ impl ConfigDialog {
                 ui.add(
                     Label::new(
                         RichText::new(i18n.t("configs_general.made_for"))
-                            .color(current_theme.text_primary.to_color()),
+                            .color(current_theme.semantic.text_primary.to_color()),
                     )
                     .selectable(false),
                 );
@@ -335,7 +337,8 @@ impl ConfigDialog {
 
                     ui.add(
                         Label::new(
-                            RichText::new("•").color(current_theme.text_secondary.to_color()),
+                            RichText::new("•")
+                                .color(current_theme.semantic.text_secondary.to_color()),
                         )
                         .selectable(false),
                     );
@@ -353,23 +356,23 @@ impl ConfigDialog {
 
                 ui.collapsing(
                     RichText::new(format!("OS: {}", std::env::consts::OS))
-                        .color(current_theme.text_secondary.to_color()),
+                        .color(current_theme.semantic.text_secondary.to_color()),
                     |ui| {
                         ui.monospace(
                             RichText::new(format!("OS: {}", std::env::consts::OS))
-                                .color(current_theme.text_secondary.to_color()),
+                                .color(current_theme.semantic.text_secondary.to_color()),
                         );
                         ui.monospace(
                             RichText::new(format!("Arch: {}", std::env::consts::ARCH))
-                                .color(current_theme.text_secondary.to_color()),
+                                .color(current_theme.semantic.text_secondary.to_color()),
                         );
                     },
                 );
 
                 ui.add_space(20.0);
-                ui.label(
+                ui.label_ns(
                     RichText::new(i18n.t("configs_general.disclaimer"))
-                        .color(current_theme.text_muted.to_color())
+                        .color(current_theme.semantic.text_muted.to_color())
                         .italics()
                         .weak(),
                 );
@@ -460,7 +463,7 @@ impl ConfigDialog {
                     Label::new(
                         RichText::new(i18n.t("configs_terminal.title"))
                             .strong()
-                            .color(current_theme.text_primary.to_color()),
+                            .color(current_theme.semantic.text_primary.to_color()),
                     )
                     .selectable(false),
                 );
@@ -480,7 +483,7 @@ impl ConfigDialog {
                                         ("query", &self.max_retries.to_string()),
                                     ],
                                 ))
-                                .color(current_theme.text_primary.to_color()),
+                                .color(current_theme.semantic.text_primary.to_color()),
                             )
                             .selectable(false),
                         );
@@ -493,7 +496,7 @@ impl ConfigDialog {
 
                     if self.no_terminals_error {
                         ui.colored_label(
-                            current_theme.error.to_color(),
+                            current_theme.semantic.error.to_color(),
                             i18n.t("configs_terminal.no_terminals_error"),
                         );
 
@@ -505,7 +508,7 @@ impl ConfigDialog {
                             }
                         } else {
                             ui.colored_label(
-                                current_theme.warn.to_color(),
+                                current_theme.semantic.warn.to_color(),
                                 i18n.t("configs_terminal.max_retries_error"),
                             );
 
@@ -514,7 +517,7 @@ impl ConfigDialog {
                                     RichText::new(
                                         i18n.t("configs_terminal.verify_terminals_message"),
                                     )
-                                    .color(current_theme.text_secondary.to_color()),
+                                    .color(current_theme.semantic.text_secondary.to_color()),
                                 )
                                 .selectable(false),
                             );
@@ -523,7 +526,7 @@ impl ConfigDialog {
                         ui.add(
                             Label::new(
                                 RichText::new(i18n.t("configs_terminal.no_terminals_error"))
-                                    .color(current_theme.text_secondary.to_color()),
+                                    .color(current_theme.semantic.text_secondary.to_color()),
                             )
                             .selectable(false),
                         );
@@ -532,7 +535,7 @@ impl ConfigDialog {
                     if show_retry {
                         ui.add_space(8.0);
                         ui.colored_label(
-                            current_theme.warn.to_color(),
+                            current_theme.semantic.warn.to_color(),
                             i18n.t("configs_terminal.suggestion_message"),
                         );
                     }
@@ -542,7 +545,7 @@ impl ConfigDialog {
 
                 ComboBox::from_label(
                     RichText::new(i18n.t("configs_terminal.combo_box_label"))
-                        .color(current_theme.text_primary.to_color()),
+                        .color(current_theme.semantic.text_primary.to_color()),
                 )
                 .selected_text(
                     self.get_selected_terminal_text(&i18n.t("configs_terminal.selection")),
@@ -551,8 +554,8 @@ impl ConfigDialog {
                     for term in &self.available_terminals {
                         let is_selected = self.is_terminal_selected(term);
 
-                        let label =
-                            RichText::new(term).color(current_theme.text_primary.to_color());
+                        let label = RichText::new(term)
+                            .color(current_theme.semantic.text_primary.to_color());
 
                         if ui.selectable_label(is_selected, label).clicked() {
                             with_configs(|c| {
@@ -566,7 +569,7 @@ impl ConfigDialog {
                 ui.add(
                     Label::new(
                         RichText::new(i18n.t("configs_terminal.message"))
-                            .color(current_theme.text_primary.to_color()),
+                            .color(current_theme.semantic.text_primary.to_color()),
                     )
                     .selectable(false),
                 );
@@ -586,7 +589,7 @@ impl ConfigDialog {
                     Label::new(
                         RichText::new(i18n.t("configs_backend.title"))
                             .strong()
-                            .color(current_theme.text_primary.to_color()),
+                            .color(current_theme.semantic.text_primary.to_color()),
                     )
                     .selectable(false),
                 );
@@ -597,7 +600,7 @@ impl ConfigDialog {
 
                 ComboBox::from_label(
                     RichText::new(i18n.t("configs_backend.selection"))
-                        .color(current_theme.text_primary.to_color()),
+                        .color(current_theme.semantic.text_primary.to_color()),
                 )
                 .selected_text(current.name())
                 .show_ui(ui, |ui| {
@@ -606,8 +609,8 @@ impl ConfigDialog {
                         ("Wayland", DisplayBackend::Wayland),
                         ("X11", DisplayBackend::X11),
                     ] {
-                        let label =
-                            RichText::new(name).color(current_theme.text_primary.to_color());
+                        let label = RichText::new(name)
+                            .color(current_theme.semantic.text_primary.to_color());
 
                         if ui.selectable_label(current == backend, label).clicked() {
                             with_configs(|c| {
@@ -623,7 +626,7 @@ impl ConfigDialog {
             ui.add(
                 Label::new(
                     RichText::new(i18n.t("configs_backend.hint"))
-                        .color(current_theme.text_primary.to_color()),
+                        .color(current_theme.semantic.text_primary.to_color()),
                 )
                 .selectable(false),
             );
@@ -631,7 +634,7 @@ impl ConfigDialog {
             ui.add(
                 Label::new(
                     RichText::new(i18n.t("configs_backend.message"))
-                        .color(current_theme.text_secondary.to_color()),
+                        .color(current_theme.semantic.text_secondary.to_color()),
                 )
                 .selectable(false),
             );
@@ -649,7 +652,7 @@ impl ConfigDialog {
                     Label::new(
                         RichText::new(i18n.t("configs_language.title"))
                             .strong()
-                            .color(current_theme.text_primary.to_color()),
+                            .color(current_theme.semantic.text_primary.to_color()),
                     )
                     .selectable(false),
                 );
@@ -662,13 +665,13 @@ impl ConfigDialog {
 
                 ComboBox::from_label(
                     RichText::new(i18n.t("configs_language.selection"))
-                        .color(current_theme.text_primary.to_color()),
+                        .color(current_theme.semantic.text_primary.to_color()),
                 )
                 .selected_text(&current)
                 .show_ui(ui, |ui| {
                     for lang in languages {
-                        let label =
-                            RichText::new(lang).color(current_theme.text_primary.to_color());
+                        let label = RichText::new(lang)
+                            .color(current_theme.semantic.text_primary.to_color());
 
                         if ui.selectable_label(current == lang.into(), label).clicked() {
                             with_configs(|c| {
@@ -682,7 +685,7 @@ impl ConfigDialog {
             ui.add(
                 Label::new(
                     RichText::new(i18n.t("configs_language.message"))
-                        .color(current_theme.text_secondary.to_color()),
+                        .color(current_theme.semantic.text_secondary.to_color()),
                 )
                 .selectable(false),
             );
@@ -703,7 +706,7 @@ impl ConfigDialog {
                     Label::new(
                         RichText::new(i18n.t("configs_appearance.title"))
                             .strong()
-                            .color(current_theme.text_primary.to_color()),
+                            .color(current_theme.semantic.text_primary.to_color()),
                     )
                     .selectable(false),
                 );
@@ -713,7 +716,7 @@ impl ConfigDialog {
                 if ui
                     .button(
                         RichText::new(i18n.t("configs_appearance.reload_theme"))
-                            .color(current_theme.text_primary.to_color()),
+                            .color(current_theme.semantic.text_primary.to_color()),
                     )
                     .clicked()
                 {
@@ -726,13 +729,13 @@ impl ConfigDialog {
                 // Selector de temas
                 ComboBox::from_label(
                     RichText::new(i18n.t("configs_appearance.selection"))
-                        .color(current_theme.text_primary.to_color()),
+                        .color(current_theme.semantic.text_primary.to_color()),
                 )
                 .selected_text(&*current_theme.name)
                 .show_ui(ui, |ui| {
                     for theme in available_themes {
-                        let label =
-                            RichText::new(&*theme).color(current_theme.text_primary.to_color());
+                        let label = RichText::new(&*theme)
+                            .color(current_theme.semantic.text_primary.to_color());
                         if ui
                             .selectable_label(current_theme.name == theme, label)
                             .clicked()
@@ -748,10 +751,10 @@ impl ConfigDialog {
                 ui.add_space(8.0);
 
                 // Editor
-                ui.label(
+                ui.label_ns(
                     RichText::new(i18n.t("configs_appearance.color_editor"))
                         .strong()
-                        .color(current_theme.text_primary.to_color()),
+                        .color(current_theme.semantic.text_primary.to_color()),
                 );
                 ui.add_space(6.0);
 
@@ -763,9 +766,9 @@ impl ConfigDialog {
                                 let mut color = Color32::from_hex(current_hex)
                                     .unwrap_or(Color32::DEBUG_COLOR);
 
-                                ui.label(
+                                ui.label_ns(
                                     RichText::new($label)
-                                        .color(current_theme.text_primary.to_color()),
+                                        .color(current_theme.semantic.text_primary.to_color()),
                                 );
 
                                 if ui.color_edit_button_srgba(&mut color).changed() {
@@ -780,101 +783,176 @@ impl ConfigDialog {
                                             color,
                                         );
                                     });
-
                                 }
                             });
                         }};
                     }
 
                     // --- Estados ---
-                    ui.label(
+                    ui.label_ns(
                         RichText::new(i18n.t("configs_appearance.states"))
                             .strong()
-                            .color(current_theme.text_secondary.to_color()),
+                            .color(current_theme.semantic.text_secondary.to_color()),
                     );
-                    color_field!(i18n.t("configs_appearance.error"), error);
-                    color_field!(i18n.t("configs_appearance.success"), success);
-                    color_field!(i18n.t("configs_appearance.warn"), warn);
+                    color_field!(i18n.t("configs_appearance.error"), semantic.error);
+                    color_field!(i18n.t("configs_appearance.success"), semantic.success);
+                    color_field!(i18n.t("configs_appearance.warn"), semantic.warn);
                     ui.add_space(8.0);
 
                     // --- Fondos ---
-                    ui.label(
+                    ui.label_ns(
                         RichText::new(i18n.t("configs_appearance.background"))
                             .strong()
-                            .color(current_theme.text_secondary.to_color()),
+                            .color(current_theme.semantic.text_secondary.to_color()),
                     );
-                    color_field!(i18n.t("configs_appearance.main_bg"), bg_main);
-                    color_field!(i18n.t("configs_appearance.panel_bg"), bg_panel);
-                    color_field!(i18n.t("configs_appearance.container_bg"), bg_container);
-                    color_field!(i18n.t("configs_appearance.hover_bg"), bg_hover);
-                    ui.add_space(8.0);
-
-                    // --- Bordes y botones ---
-                    ui.label(
-                        RichText::new(i18n.t("configs_appearance.border-buttons"))
-                            .strong()
-                            .color(current_theme.text_secondary.to_color()),
+                    color_field!(i18n.t("configs_appearance.main_bg"), semantic.bg_main);
+                    color_field!(
+                        i18n.t("configs_appearance.container_bg"),
+                        semantic.bg_container
                     );
-                    color_field!(i18n.t("configs_appearance.border_panel"), border_panel);
-                    color_field!(i18n.t("configs_appearance.main_buttons"), main_buttons);
+                    color_field!(i18n.t("configs_appearance.separator"), semantic.separator);
                     ui.add_space(8.0);
 
                     // --- Acentos ---
-                    ui.label(
+                    ui.label_ns(
                         RichText::new(i18n.t("configs_appearance.accent"))
                             .strong()
-                            .color(current_theme.text_secondary.to_color()),
+                            .color(current_theme.semantic.text_secondary.to_color()),
                     );
-                    color_field!(i18n.t("configs_appearance.accent"), accent);
-                    color_field!(i18n.t("configs_appearance.accent_glow"), accent_glow);
-                    color_field!(i18n.t("configs_appearance.rubberband"), rubberband);
-                    color_field!(i18n.t("configs_appearance.selected_item"), item_selected);
+                    color_field!(i18n.t("configs_appearance.accent"), semantic.accent);
+                    color_field!(
+                        i18n.t("configs_appearance.accent_glow"),
+                        semantic.accent_glow
+                    );
+                    color_field!(i18n.t("configs_appearance.rubberband"), semantic.rubberband);
                     ui.add_space(8.0);
 
                     // --- Textos ---
-                    ui.label(
+                    ui.label_ns(
                         RichText::new(i18n.t("configs_appearance.texts"))
                             .strong()
-                            .color(current_theme.text_secondary.to_color()),
+                            .color(current_theme.semantic.text_secondary.to_color()),
                     );
-                    color_field!(i18n.t("configs_appearance.primary_text"), text_primary);
-                    color_field!(i18n.t("configs_appearance.secondary_text"), text_secondary);
-                    color_field!(i18n.t("configs_appearance.muted_text"), text_muted);
+                    color_field!(
+                        i18n.t("configs_appearance.primary_text"),
+                        semantic.text_primary
+                    );
+                    color_field!(
+                        i18n.t("configs_appearance.secondary_text"),
+                        semantic.text_secondary
+                    );
+                    color_field!(i18n.t("configs_appearance.muted_text"), semantic.text_muted);
                     ui.add_space(8.0);
 
-                    // --- Herramientas ---
-                    ui.label(
+                    // --- Paneles ---
+                    ui.label_ns(
+                        RichText::new(i18n.t("configs_appearance.panels"))
+                            .strong()
+                            .color(current_theme.semantic.text_secondary.to_color()),
+                    );
+                    color_field!(i18n.t("configs_appearance.panel_bg"), components.panel.bg);
+                    color_field!(
+                        i18n.t("configs_appearance.panel_border"),
+                        components.panel.border
+                    );
+                    ui.add_space(8.0);
+
+                    // --- Botones ---
+                    ui.label_ns(
+                        RichText::new(i18n.t("configs_appearance.buttons"))
+                            .strong()
+                            .color(current_theme.semantic.text_secondary.to_color()),
+                    );
+                    color_field!(i18n.t("configs_appearance.button_bg"), components.button.bg);
+                    color_field!(
+                        i18n.t("configs_appearance.button_hover"),
+                        components.button.bg_hover
+                    );
+                    color_field!(
+                        i18n.t("configs_appearance.button_label_hover"),
+                        components.button.label_hover
+                    );
+                    color_field!(
+                        i18n.t("configs_appearance.button_label_active"),
+                        components.button.label_active
+                    );
+                    color_field!(
+                        i18n.t("configs_appearance.button_label_inactive"),
+                        components.button.label_inactive
+                    );
+                    ui.add_space(8.0);
+
+                    // --- Barra de búsqueda ---
+                    ui.label_ns(
+                        RichText::new(i18n.t("configs_appearance.input"))
+                            .strong()
+                            .color(current_theme.semantic.text_secondary.to_color()),
+                    );
+                    color_field!(i18n.t("configs_appearance.input_bg"), components.input.bg);
+                    color_field!(
+                        i18n.t("configs_appearance.input_border_idle"),
+                        components.input.border_idle
+                    );
+                    color_field!(
+                        i18n.t("configs_appearance.input_border_focus"),
+                        components.input.border_focus
+                    );
+                    ui.add_space(8.0);
+
+                    // --- Sidebar ---
+                    ui.label_ns(
+                        RichText::new(i18n.t("configs_appearance.sidebar"))
+                            .strong()
+                            .color(current_theme.semantic.text_secondary.to_color()),
+                    );
+                    color_field!(
+                        i18n.t("configs_appearance.sidebar_hover"),
+                        components.sidebar_item.bg_hover
+                    );
+                    ui.add_space(8.0);
+
+                    // --- Lista de archivos ---
+                    ui.label_ns(
+                        RichText::new(i18n.t("configs_appearance.file_list"))
+                            .strong()
+                            .color(current_theme.semantic.text_secondary.to_color()),
+                    );
+                    color_field!(
+                        i18n.t("configs_appearance.list_hover"),
+                        components.list_item.bg_hover
+                    );
+                    color_field!(
+                        i18n.t("configs_appearance.list_selected"),
+                        components.list_item.bg_selected
+                    );
+                    ui.add_space(8.0);
+
+                    // --- Tools View ---
+                    ui.label_ns(
                         RichText::new(i18n.t("configs_appearance.tools"))
                             .strong()
-                            .color(current_theme.text_secondary.to_color()),
+                            .color(current_theme.semantic.text_secondary.to_color()),
+                    );
+                    color_field!(i18n.t("configs_appearance.tools_bg"), components.tools.bg);
+                    color_field!(
+                        i18n.t("configs_appearance.tools_label_hover"),
+                        components.tools.label_hover
                     );
                     color_field!(
-                        i18n.t("configs_appearance.primary-tool-color"),
-                        tools_primary
+                        i18n.t("configs_appearance.tools_label_active"),
+                        components.tools.label_active
                     );
                     color_field!(
-                        i18n.t("configs_appearance.secondary-tool-color"),
-                        tools_secondary
-                    );
-                    color_field!(
-                        i18n.t("configs_appearance.tool-btn-active"),
-                        tool_btn_active
-                    );
-                    color_field!(
-                        i18n.t("configs_appearance.tool-btn-inactive"),
-                        tool_btn_inactive
-                    );
-                    color_field!(
-                        i18n.t("configs_appearance.tool-btn-hovered"),
-                        tool_btn_hovered
+                        i18n.t("configs_appearance.tools_label_inactive"),
+                        components.tools.label_inactive
                     );
                     ui.add_space(8.0);
 
                     // --- Iconos de archivo ---
-                    ui.label(
+                    ui.label_ns(
                         RichText::new(i18n.t("configs_appearance.files"))
                             .strong()
-                            .color(current_theme.text_secondary.to_color()),
+                            .color(current_theme.semantic.text_secondary.to_color()),
                     );
                     color_field!(
                         i18n.t("configs_appearance.folder"),
@@ -892,15 +970,11 @@ impl ConfigDialog {
                     color_field!(i18n.t("configs_appearance.fallback"), file_theme.fallback);
                 });
 
-                ui.add_space(12.0);
-                ui.separator();
-                ui.add_space(8.0);
-
                 // Input para nombre de tema personalizado
                 ui.horizontal(|ui| {
-                    ui.label(
+                    ui.label_ns(
                         RichText::new(i18n.t("configs_appearance.theme-name"))
-                            .color(current_theme.text_primary.to_color()),
+                            .color(current_theme.semantic.text_primary.to_color()),
                     );
 
                     let text_edit = BlazeTextEdit::singleline(&mut self.custom_theme_name)
@@ -911,7 +985,7 @@ impl ConfigDialog {
                     if ui
                         .button(
                             RichText::new(i18n.t("configs_appearance.save-as-custom"))
-                                .color(current_theme.text_primary.to_color()),
+                                .color(current_theme.semantic.text_primary.to_color()),
                         )
                         .clicked()
                     {
@@ -935,7 +1009,7 @@ impl ConfigDialog {
                     if ui
                         .button(
                             RichText::new(i18n.t("configs_appearance.reset-defaults"))
-                                .color(current_theme.error.to_color()),
+                                .color(current_theme.semantic.error.to_color()),
                         )
                         .clicked()
                     {
@@ -947,9 +1021,9 @@ impl ConfigDialog {
                 });
 
                 ui.add_space(8.0);
-                ui.label(
+                ui.label_ns(
                     RichText::new(i18n.t("configs_appearance.message"))
-                        .color(current_theme.text_secondary.to_color()),
+                        .color(current_theme.semantic.text_secondary.to_color()),
                 );
             });
         });
@@ -970,9 +1044,9 @@ impl ConfigDialog {
 
         let custom_frame = Frame::window(ui.style())
             .fill(Color32::from_rgba_unmultiplied(
-                current_theme.bg_main.to_color().r(),
-                current_theme.bg_main.to_color().g(),
-                current_theme.bg_main.to_color().b(),
+                current_theme.semantic.bg_main.to_color().r(),
+                current_theme.semantic.bg_main.to_color().g(),
+                current_theme.semantic.bg_main.to_color().b(),
                 122,
             ))
             .corner_radius(CornerRadius::same(10))
@@ -984,11 +1058,12 @@ impl ConfigDialog {
 
         let frame = Frame::new()
             .corner_radius(CornerRadius::same(10))
-            .fill(current_theme.bg_main.to_color())
+            .fill(current_theme.semantic.bg_main.to_color())
             .outer_margin(Margin::same(5));
 
         Window::new(
-            RichText::new(i18n.t("configs.title")).color(current_theme.text_primary.to_color()),
+            RichText::new(i18n.t("configs.title"))
+                .color(current_theme.semantic.text_primary.to_color()),
         )
         .id(Id::new("config_modal_window"))
         .frame(custom_frame)

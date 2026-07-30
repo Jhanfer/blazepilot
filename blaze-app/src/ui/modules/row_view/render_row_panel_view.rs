@@ -148,7 +148,7 @@ pub fn row_panel_frame(
             top: 0,
             bottom: 10,
         })
-        .fill(current_theme.bg_panel.to_color())
+        .fill(current_theme.components.panel.bg.to_color())
         .corner_radius(CornerRadius {
             nw: 0,
             ne: 0,
@@ -157,7 +157,7 @@ pub fn row_panel_frame(
         })
         .stroke(Stroke {
             width: 0.5,
-            color: current_theme.accent_glow.to_color(),
+            color: current_theme.components.panel.border.to_color(),
         })
         .show(ui, |ui| {
             let original_clip = ui.clip_rect();
