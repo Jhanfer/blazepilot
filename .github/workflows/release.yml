@@ -54,58 +54,10 @@ jobs:
             meson ninja-build libdav1d-dev \
             libasound2-dev \
             libavutil-dev libavcodec-dev libavformat-dev libswscale-dev \
-            libavfilter-dev libavdevice-dev libswresample-dev \
+            libavfilter-dev libswresample-dev \
             yasm nasm pkg-config
 
       - name: Compilar en modo Release
-        env:
-            FFMPEG_EXTRA_FLAGS: >-
-              --disable-indev=jack
-              --disable-indev=openal
-              --disable-indev=sndio
-              --disable-indev=iec61883
-              --disable-indev=dc1394
-              --disable-indev=libcdio
-              --disable-indev=libcaca
-              --disable-indev=sdl2
-              --disable-outdev=sndio
-              --disable-outdev=sdl2
-              --disable-filter=pocketsphinx
-              --disable-libjack
-              --disable-libpulse
-              --disable-libbs2b
-              --disable-liblilv
-              --disable-librubberband
-              --disable-libmysofa
-              --disable-libflite
-              --disable-libzmq
-              --disable-libsrt
-              --disable-libssh
-              --disable-librabbitmq
-              --disable-libgme
-              --disable-libopenmpt
-              --disable-libchromaprint
-              --disable-libbluray
-              --disable-libvidstab
-              --disable-libzimg
-              --disable-libdc1394
-              --disable-libiec61883
-              --disable-libcaca
-              --disable-libcdio
-              --disable-libopenal
-              --disable-libsdl2
-              --disable-libsndio
-              --disable-libxcb-xfixes
-              --disable-libxcb-shape
-              --disable-libraw1394
-              --disable-libavc1394
-              --disable-librom1394
-              --disable-opencl
-              --disable-cuda
-              --disable-cuvid
-              --disable-nvenc
-              --disable-nvdec
-              --disable-ffnvcodec
         run: cargo build --release --target x86_64-unknown-linux-gnu --features build-ci
 
       - name: Verificar binario

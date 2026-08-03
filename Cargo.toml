@@ -11,6 +11,7 @@ path = "blaze-app/src/main.rs"
 default = []
 build-ci = [
     "ffmpeg-next/static",
+    "ffmpeg-next/build",
     "ffmpeg-next/codec",
     "ffmpeg-next/format",
     "ffmpeg-next/filter",
