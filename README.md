@@ -34,9 +34,6 @@ BlazePilot is a modern and customizable file manager. Navigate through your file
   </a>
 </p>
 
-<img src="screenshots/blaze_example1.webp" width="1914" alt="BlazePilot screenshot 1" style="max-width:100%;" />
-<img src="screenshots/blaze_example2.webp" width="1914" alt="BlazePilot screenshot 2" style="max-width:100%;" />
-
 ---
 
 ## Features
