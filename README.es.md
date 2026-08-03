@@ -1,7 +1,16 @@
-# BlazePilot
-🌐 **[English](README.md)** | 🇪🇸 **[Español]**
+<p align="center">
+  <img src="blazeresources/LogoBlazepilot.png" width="180" alt="BlazePilot Logo">
+</p>
 
-Explorador de archivos hecho con egui en Rust.
+<h1 align="center">BlazePilot</h1>
+
+<p align="center">
+  🌐 <a href="README.md"><strong>English</strong></a> • 🇪🇸 <strong>Español</strong>
+</p>
+
+<p align="center">
+  Explorador de archivos hecho con <b>Egui</b> en <b> Rust</b>.
+</p>
 
 *BlazePilot ha nacido como un proyecto personal. Estaba cansado de las limitaciones de los exploradores que utilizaba a diario, así que empecé a desarrollarlo como una forma de practicar Rust mientras iba aprendiendo, adaptándolo a mis propias necesidades.*
 
@@ -10,15 +19,20 @@ BlazePilot es un gestor de archivos moderno y personalizable. Navega por tus arc
 > [!IMPORTANT]
 > Actualmente BlazePilot es compatible con Linux. El soporte para Windows y macOS se encuentra en desarrollo.
 
-![Rust](https://img.shields.io/badge/Rust-000000?logo=rust&logoColor=white)
-![egui](https://img.shields.io/badge/egui-FF9900?logo=egui&logoColor=white)
-![License](https://img.shields.io/badge/License-Apache%202.0-blue)
-[![Latest Release](https://img.shields.io/github/v/release/Jhanfer/blazepilot)](https://github.com/Jhanfer/blazepilot/releases/latest)
-[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/Jhanfer/blazepilot)
-[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/jhanfer)
-
-<img src="screenshots/blaze_example1.webp" width="1914" alt="BlazePilot screenshot 1" style="max-width:100%;" />
-<img src="screenshots/blaze_example2.webp" width="1914" alt="BlazePilot screenshot 2" style="max-width:100%;" />
+<p align="center">
+  <img src="https://img.shields.io/badge/Rust-000000?logo=rust&logoColor=white" alt="Rust">
+  <img src="https://img.shields.io/badge/egui-FF9900?logo=egui&logoColor=white" alt="egui">
+  <img src="https://img.shields.io/badge/License-Apache%202.0-blue" alt="License">
+  <a href="https://github.com/Jhanfer/blazepilot/releases/latest">
+    <img src="https://img.shields.io/github/v/release/Jhanfer/blazepilot" alt="Latest Release">
+  </a>
+  <a href="https://deepwiki.com/Jhanfer/blazepilot">
+    <img src="https://deepwiki.com/badge.svg" alt="Ask DeepWiki">
+  </a>
+  <a href="https://ko-fi.com/jhanfer">
+    <img src="https://ko-fi.com/img/githubbutton_sm.svg" alt="Ko-fi">
+  </a>
+</p>
 
 ---
 
@@ -30,6 +44,10 @@ BlazePilot es un gestor de archivos moderno y personalizable. Navega por tus arc
 - Runtime asíncrono **Tokio** para ejecutar operaciones de archivos sin bloquear la interfaz
 - Asignador de memoria **mimalloc**
 
+<p align="center">
+	<img src="blazeresources/fileload.gif" width="280" alt="BlazePilot Logo">
+</p>
+
 ### Operaciones de archivos
 - Copiar, pegar, cortar gestionadas por un portapapeles global propio
 - Renombrado mantiene el casing original
@@ -38,6 +56,10 @@ BlazePilot es un gestor de archivos moderno y personalizable. Navega por tus arc
 - Mover con drag & drop dentro de la app
 - Deshacer operaciones de archivos con **Ctrl + Z**
 - Soporte básico a extracción de ZIP y otros formatos directamente desde el explorador
+
+<p align="center">
+	<img src="blazeresources/fileops.gif" width="280" alt="BlazePilot Logo">
+</p>
 
 ### Drag & Drop (Wayland)
 - Soporte nativo para drag & drop en Wayland
@@ -50,15 +72,27 @@ BlazePilot es un gestor de archivos moderno y personalizable. Navega por tus arc
  >[!NOTE]
 Cuando se arrastran datos desde otra aplicación, Blaze no depende únicamente del tipo MIME anunciado. Inspecciona los _magic bytes_ del contenido para identificar correctamente imágenes, vídeos, texto, URLs y otros formatos antes de decidir cómo procesarlos.
 
+<p align="center">
+	<img src="blazeresources/dnd.gif" width="280" alt="BlazePilot Logo">
+</p>
+
 ### Navegación y búsqueda
 - Navegación por pestañas **Ctrl + <- / Ctrl + -> / Ctrl + Nums**
 - Búsqueda recursiva con el prefijo **rec:** en el buscador
 - Búsqueda instantánea al escribir para filtrado en el directorio actual
 
+<p align="center">
+	<img src="blazeresources/search.gif" width="280" alt="BlazePilot Logo">
+</p>
+
 ### Sistema de etiquetas / acceso rápido
 - Etiquetas que permiten organización por tipos
 - Toggle de vista etiquetas/normal con **Ctrl+T**
 - Crear etiqueta con **Ctrl + Shift + T**
+
+<p align="center">
+	<img src="blazeresources/tags.gif" width="280" alt="BlazePilot Logo">
+</p>
 
 ### Interfaz y personalización
 - Colores de carpeta personalizables
@@ -67,9 +101,17 @@ Cuando se arrastran datos desde otra aplicación, Blaze no depende únicamente d
 - Paleta de colores centralizada y bordes redondeados
 - Vista previa de imágenes en diálogo dedicado
 
+<p align="center">
+	<img src="blazeresources/theming.gif" width="280" alt="BlazePilot Logo">
+</p>
+
 ### Internacionalización
 - **6 idiomas**: inglés, español, francés, alemán, italiano, ruso
 - Cambio de idioma en runtime sin reiniciar
+
+<p align="center">
+	<img src="blazeresources/lang.gif" width="280" alt="BlazePilot Logo">
+</p>
 
 ### Gestión e Integración con el sistema
 - *Abrir con...* inicializa un selector de aplicaciones basado en tipo MIME
@@ -79,6 +121,10 @@ Cuando se arrastran datos desde otra aplicación, Blaze no depende únicamente d
 - Actualizaciones automáticas con notificación de nueva versión
 - Identificador de archivos con File ID persistente
 - Ofrece instalar en caso de no estar instalado
+
+<p align="center">
+	<img src="blazeresources/fileopen.gif" width="280" alt="BlazePilot Logo">
+</p>
 
 ---
 
@@ -149,13 +195,7 @@ BlazePilot se distribuye como un único binario. Basta con descargarlo y ejecuta
 1. Ve a la página de **[Releases](https://github.com/Jhanfer/blazepilot/releases/latest)**
 2. Descarga el binario para tu sistema (actualmente Blaze es sólo compatible con Linux)
 > [!IMPORTANT]
-> A partir de la versión **0.18.0**, BlazePilot requiere:
->
-> - FFmpeg para decodificación de los archivos multimedia:
->   - Arch Linux / Manjaro: `sudo pacman -S ffmpeg`
->   - Ubuntu / Debian: `sudo apt install ffmpeg`
->   - Fedora: `sudo dnf install ffmpeg`
-> 
+> A partir de la versión **0.18.0**, BlazePilot requiere: 
 > - ALSA para salida de audio:
 >   - Arch Linux / Manjaro: `sudo pacman -S alsa-lib`
 >   - Ubuntu / Debian: `sudo apt install libasound2`
@@ -184,16 +224,25 @@ cargo run --bin blazepilot
 ```
 
 >[!NOTE]
->**Requisitos de compilación**
->- rust nightly
->- cargo
->- make
->- ninja
->- nasm
->- libdav1d
->- pkg-config 
->- libasound2-dev (ALSA)
->- Headers de desarrollo para X11, Wayland y D-Bus
+> **Requisitos de compilación**
+> - Rust nightly
+> - Cargo
+> - Meson
+> - Ninja
+> - NASM
+> - YASM
+> - pkg-config
+> - OpenSSL (`libssl-dev`)
+> - ALSA (`libasound2-dev`)
+> - FFmpeg (libavutil, libavcodec, libavformat, libswscale, libavfilter y libswresample)
+> - dav1d (`libdav1d-dev`)
+> - Bibliotecas de desarrollo para:
+>   - X11 (`libx11-dev`)
+>   - XKB (`libxkbcommon-dev`, `libxkbcommon-x11-dev`)
+>   - Wayland (`libwayland-dev`)
+>   - OpenGL / EGL / GLES (`libgl1-mesa-dev`, `libegl1-mesa-dev`, `libgles2-mesa-dev`)
+>   - Vulkan (`libvulkan-dev`)
+>   - D-Bus (`libdbus-1-dev`)
 
 
 ---

@@ -3,3 +3,6 @@
 comm_escribir.txt
 get_resume.sh
 cambios_totales.txt
+.obsidian
+.vscode
+setup-hooks.sh

@@ -1,7 +1,16 @@
-# BlazePilot
-🌐 **[English]** | 🇪🇸 **[Español](README.es.md)**
+<p align="center">
+  <img src="blazeresources/LogoBlazepilot.png" width="180" alt="BlazePilot Logo">
+</p>
 
-File explorer made with egui in Rust.
+<h1 align="center">BlazePilot</h1>
+
+<p align="center">
+  🌐 <strong>English</strong> • 🇪🇸 <a href="README.es.md"><strong>Español</strong></a>
+</p>
+
+<p align="center">
+  File explorer made with <b>Egui</b> in <b>Rust</b>.
+</p>
 
 *BlazePilot was born as a personal project. I was tired of the limitations of the explorers I used daily, so I started developing it as a way to practice Rust while learning, adapting it to my own needs.*
 
@@ -10,12 +19,20 @@ BlazePilot is a modern and customizable file manager. Navigate through your file
 > [!IMPORTANT]
 > Currently BlazePilot is compatible with Linux. Support for Windows and macOS is under development.
 
-![Rust](https://img.shields.io/badge/Rust-000000?logo=rust&logoColor=white)
-![egui](https://img.shields.io/badge/egui-FF9900?logo=egui&logoColor=white)
-![License](https://img.shields.io/badge/License-Apache%202.0-blue)
-[![Latest Release](https://img.shields.io/github/v/release/Jhanfer/blazepilot)](https://github.com/Jhanfer/blazepilot/releases/latest)
-[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/Jhanfer/blazepilot)
-[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/jhanfer)
+<p align="center">
+  <img src="https://img.shields.io/badge/Rust-000000?logo=rust&logoColor=white" alt="Rust">
+  <img src="https://img.shields.io/badge/egui-FF9900?logo=egui&logoColor=white" alt="egui">
+  <img src="https://img.shields.io/badge/License-Apache%202.0-blue" alt="License">
+  <a href="https://github.com/Jhanfer/blazepilot/releases/latest">
+    <img src="https://img.shields.io/github/v/release/Jhanfer/blazepilot" alt="Latest Release">
+  </a>
+  <a href="https://deepwiki.com/Jhanfer/blazepilot">
+    <img src="https://deepwiki.com/badge.svg" alt="Ask DeepWiki">
+  </a>
+  <a href="https://ko-fi.com/jhanfer">
+    <img src="https://ko-fi.com/img/githubbutton_sm.svg" alt="Ko-fi">
+  </a>
+</p>
 
 <img src="screenshots/blaze_example1.webp" width="1914" alt="BlazePilot screenshot 1" style="max-width:100%;" />
 <img src="screenshots/blaze_example2.webp" width="1914" alt="BlazePilot screenshot 2" style="max-width:100%;" />
@@ -30,6 +47,10 @@ BlazePilot is a modern and customizable file manager. Navigate through your file
 - **Tokio** async runtime to run file operations without blocking the interface
 - **mimalloc** memory allocator
 
+<p align="center">
+	<img src="blazeresources/fileload.gif" width="280" alt="BlazePilot Logo">
+</p>
+
 ### File operations
 - Copy, paste, cut managed by a custom global clipboard
 - Renaming preserves original casing
@@ -38,6 +59,10 @@ BlazePilot is a modern and customizable file manager. Navigate through your file
 - Move with drag & drop within the app
 - Undo file operations with **Ctrl + Z**
 - Basic support for extracting ZIP and other formats directly from the explorer
+
+<p align="center">
+	<img src="blazeresources/fileops.gif" width="280" alt="BlazePilot Logo">
+</p>
 
 ### Drag & Drop (Wayland)
 - Native support for drag & drop on Wayland
@@ -50,15 +75,27 @@ BlazePilot is a modern and customizable file manager. Navigate through your file
  >[!NOTE]
 When dragging data from another application, Blaze does not rely solely on the announced MIME type. It inspects the _magic bytes_ of the content to correctly identify images, videos, text, URLs and other formats before deciding how to process them.
 
+<p align="center">
+	<img src="blazeresources/dnd.gif" width="280" alt="BlazePilot Logo">
+</p>
+
 ### Navigation and search
 - Tab navigation **Ctrl + <- / Ctrl + -> / Ctrl + Nums**
 - Recursive search with the prefix **rec:** in the search box
 - Instant search while typing to filter in the current directory
 
+<p align="center">
+	<img src="blazeresources/search.gif" width="280" alt="BlazePilot Logo">
+</p>
+
 ### Tag / quick access system
 - Tags that allow organization by types
 - Toggle tags/normal view with **Ctrl+T**
 - Create tag with **Ctrl + Shift + T**
+
+<p align="center">
+	<img src="blazeresources/tags.gif" width="280" alt="BlazePilot Logo">
+</p>
 
 ### Interface and customization
 - Customizable folder colors
@@ -67,9 +104,17 @@ When dragging data from another application, Blaze does not rely solely on the a
 - Centralized color palette and rounded borders
 - Image preview in dedicated dialog
 
+<p align="center">
+	<img src="blazeresources/theming.gif" width="280" alt="BlazePilot Logo">
+</p>
+
 ### Internationalization
 - **6 languages**: English, Spanish, French, German, Italian, Russian
 - Runtime language switching without restarting
+
+<p align="center">
+	<img src="blazeresources/lang.gif" width="280" alt="BlazePilot Logo">
+</p>
 
 ### System Management and Integration
 - *Open with...* launches an application picker based on MIME type
@@ -79,6 +124,10 @@ When dragging data from another application, Blaze does not rely solely on the a
 - Automatic updates with new version notification
 - File identifier with persistent File ID
 - Offers to install if not already installed
+
+<p align="center">
+	<img src="blazeresources/fileopen.gif" width="280" alt="BlazePilot Logo">
+</p>
 
 ---
 
@@ -150,12 +199,6 @@ BlazePilot is distributed as a single binary. Just download and run it:
 2. Download the binary for your system (currently Blaze is only compatible with Linux)
  > [!IMPORTANT]
 > Starting with version **0.18.0**, BlazePilot requires:
->
-> - FFmpeg for decoding media files:
->   - Arch Linux / Manjaro: `sudo pacman -S ffmpeg`
->   - Ubuntu / Debian: `sudo apt install ffmpeg`
->   - Fedora: `sudo dnf install ffmpeg`
-> 
 > - ALSA for audio output:
 >   - Arch Linux / Manjaro: `sudo pacman -S alsa-lib`
 >   - Ubuntu / Debian: `sudo apt install libasound2`
@@ -183,17 +226,26 @@ cd blazepilot
 cargo run --bin blazepilot
 ```
 
->[!NOTE]
->**Build requirements**
->- rust nightly
->- cargo
->- make
->- ninja
->- nasm
->- libdav1d
->- pkg-config
->-  libasound2-dev (ALSA)
->- Development headers for X11, Wayland and D-Bus
+> [!NOTE]
+> **Build Requirements**
+> - Rust nightly
+> - Cargo
+> - Meson
+> - Ninja
+> - NASM
+> - YASM
+> - pkg-config
+> - OpenSSL (`libssl-dev`)
+> - ALSA (`libasound2-dev`)
+> - FFmpeg development libraries (`libavutil`, `libavcodec`, `libavformat`, `libswscale`, `libavfilter`, `libswresample`)
+> - dav1d (`libdav1d-dev`)
+> - Development libraries for:
+>   - X11 (`libx11-dev`)
+>   - XKB (`libxkbcommon-dev`, `libxkbcommon-x11-dev`)
+>   - Wayland (`libwayland-dev`)
+>   - OpenGL / EGL / GLES (`libgl1-mesa-dev`, `libegl1-mesa-dev`, `libgles2-mesa-dev`)
+>   - Vulkan (`libvulkan-dev`)
+>   - D-Bus (`libdbus-1-dev`)
 
 
 ---
