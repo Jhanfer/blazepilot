@@ -1,6 +1,6 @@
 [package]
 name = "blazepilot"
-version = "0.19.0"
+version = "0.19.1"
 edition = "2024"
 
 [[bin]]
@@ -8,9 +8,15 @@ name = "blazepilot"
 path = "blaze-app/src/main.rs"
 
 [features]
-#Colocar en el ci el 'run: cargo build --features ci'
 default = []
-build-ci = ["ffmpeg-next/static"]
+build-ci = [
+    "ffmpeg-next/static",
+    "ffmpeg-next/codec",
+    "ffmpeg-next/format",
+    "ffmpeg-next/filter",
+    "ffmpeg-next/software-resampling",
+    "ffmpeg-next/software-scaling",
+]
 
 [dependencies]
 egui = { version = "0.35.0", features = ["serde"] }
@@ -57,8 +63,8 @@ sha2 = "0.11.0"
 dashmap = { version = "6.1.0", features = ["serde"]}
 urlencoding = "2.1.3"
 parking_lot = "0.12.5"
-toml = "1.1.3"
-resvg = "0.47.0"
+toml = "1.1.4"
+resvg = "0.48.1"
 imagesize = "0.15.0"
 stb_image = "0.3"
 image-webp = "0.2"

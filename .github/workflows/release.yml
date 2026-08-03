@@ -40,7 +40,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            libssl-dev pkg-config \
+            libssl-dev \
             libx11-dev \
             libxkbcommon-dev \
             libxkbcommon-x11-dev \
@@ -52,12 +52,13 @@ jobs:
             libvulkan-dev \
             libdbus-1-dev \
             meson ninja-build libdav1d-dev \
-            nasm libasound2-dev \
+            libasound2-dev \
             libavutil-dev libavcodec-dev libavformat-dev libswscale-dev \
-            libavfilter-dev libavdevice-dev libswresample-dev
+            libavfilter-dev libavdevice-dev libswresample-dev \
+            yasm nasm pkg-config
 
       - name: Compilar en modo Release
-        run: cargo build --release --target x86_64-unknown-linux-gnu
+        run: cargo build --release --target x86_64-unknown-linux-gnu --features build-ci
 
       - name: Verificar binario
         run: |
@@ -67,6 +68,12 @@ jobs:
             exit 1
           fi
           echo "$(du -sh $BIN | cut -f1) — $BIN"
+
+      - name: Comprimir binario con UPX
+        run: |
+          sudo apt-get install -y upx-ucl
+          upx --best --lzma target/x86_64-unknown-linux-gnu/release/blazepilot
+          echo "Tamaño post-UPX: $(du -sh target/x86_64-unknown-linux-gnu/release/blazepilot | cut -f1)"
 
       - name: Renombrar binario
         id: rename
