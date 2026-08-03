@@ -1,6 +1,13 @@
 # Changelog
 
 ---
+## [0.19.1](https://github.com/Jhanfer/blazepilot/compare/v0.19.0..v0.19.1) - 2026-08-03
+
+### ✦ Bug fixes
+
+- **(ffmpeg)** Corrige enlace de librerías ligadas al binario, añade compresión UPX y expande features de compilación([`5a491e3`](https://github.com/Jhanfer/blazepilot/commit/5a491e34faa70660af02b23e6bbfb51540d120ba)) - Jhanfer
+
+---
 ## [0.19.0](https://github.com/Jhanfer/blazepilot/compare/v0.18.0..v0.19.0) - 2026-07-30
 
 ### ✦ Bug fixes
