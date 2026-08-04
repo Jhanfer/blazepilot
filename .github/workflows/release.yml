@@ -72,7 +72,7 @@ jobs:
       - name: Comprimir binario con UPX
         run: |
           sudo apt-get install -y upx-ucl
-          upx --best --lzma target/x86_64-unknown-linux-gnu/release/blazepilot
+          upx -1 target/x86_64-unknown-linux-gnu/release/blazepilot
           echo "Tamaño post-UPX: $(du -sh target/x86_64-unknown-linux-gnu/release/blazepilot | cut -f1)"
 
       - name: Renombrar binario
