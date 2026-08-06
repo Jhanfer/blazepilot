@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use eframe::NativeOptions;
+use egui_winit::winit::event_loop::EventLoop;
 use std::{path::Path, sync::Arc, time::Duration};
 use tracing::{debug, error, info, warn};
 use tracing_subscriber::{EnvFilter, fmt};
@@ -21,12 +21,12 @@ mod core;
 mod platform;
 mod ui;
 mod utils;
+mod window_backend;
 
 #[cfg(unix)]
 use std::os::unix::process::ExitStatusExt;
 
 use crate::{
-    app::BlazeAppBuilder,
     core::{
         bootstrap::configs::{
             config_manager::with_configs, platform::linux::conf_structs::DisplayBackend,
@@ -37,6 +37,7 @@ use crate::{
         },
     },
     utils::initial_path_handler::parse_initial_path,
+    window_backend::{BlazeEventLoop, PresentMode, RendererConfig},
 };
 
 use mimalloc::MiMalloc;
@@ -64,7 +65,7 @@ fn main() {
         let initial_path = parse_initial_path();
         let _ = init_dir_trash().map_err(|e| warn!("Error inicializando: {}", e));
 
-        let config = RunConfigs::wgpu_present(backend, present_mode, with_trasnparency);
+        let config = RendererConfig::wgpu_present(backend, present_mode, with_trasnparency);
         if let Err(e) = run_application(config, initial_path) {
             error!("Fallo al arrancar: {}", e);
             std::process::exit(1);
@@ -94,17 +95,17 @@ fn try_run_with_retries() -> anyhow::Result<()> {
     let backend = with_configs(|c| c.get_display_backend());
 
     let configs = [
-        (backend.clone(), "Immediate", true),
-        (backend.clone(), "Immediate", false),
-        (backend.clone(), "Fifo", true),
-        (backend, "Fifo", false),
-        (DisplayBackend::Auto, "Fifo", true),
-        (DisplayBackend::Auto, "Fifo", false),
+        (backend.clone(), PresentMode::Immediate, true),
+        (backend.clone(), PresentMode::Immediate, false),
+        (backend.clone(), PresentMode::Fifo, true),
+        (backend, PresentMode::Fifo, false),
+        (DisplayBackend::Auto, PresentMode::Fifo, true),
+        (DisplayBackend::Auto, PresentMode::Fifo, false),
     ];
 
     for (attempt, (backend, present_mode, with_transparency)) in configs.iter().enumerate() {
         debug!(
-            "Intento {}/{}: Backend={:?}, PresentMode={}, Transparencias={}",
+            "Intento {}/{}: Backend={:?}, PresentMode={:?}, Transparencias={}",
             attempt + 1,
             configs.len(),
             backend,
@@ -114,7 +115,7 @@ fn try_run_with_retries() -> anyhow::Result<()> {
 
         let mut cmd = std::process::Command::new(&exe);
         cmd.args(&args)
-            .env("BLAZE_PRESENT_MODE", present_mode)
+            .env("BLAZE_PRESENT_MODE", format!("{:?}", present_mode))
             .env("BLAZE_BACKEND", format!("{:?}", backend))
             .env("BALZE_TRANSPARENCY", format!("{:?}", with_transparency))
             .env("BLAZE_IS_CHILD", "1");
@@ -161,10 +162,10 @@ fn parse_transparency_from_env() -> bool {
     }
 }
 
-fn parse_present_mode_from_env() -> eframe::wgpu::PresentMode {
+fn parse_present_mode_from_env() -> egui_wgpu::wgpu::PresentMode {
     match std::env::var("BLAZE_PRESENT_MODE").as_deref() {
-        Ok("Immediate") => eframe::wgpu::PresentMode::Immediate,
-        _ => eframe::wgpu::PresentMode::Fifo,
+        Ok("Immediate") => egui_wgpu::wgpu::PresentMode::Immediate,
+        _ => egui_wgpu::wgpu::PresentMode::Fifo,
     }
 }
 
@@ -176,145 +177,36 @@ fn parse_backend_from_env() -> DisplayBackend {
     }
 }
 
-fn run_application(config: RunConfigs, initial_path: Option<Arc<Path>>) -> anyhow::Result<()> {
-    let mut options = create_native_options(&config);
-
+fn run_application(config: RendererConfig, initial_path: Option<Arc<Path>>) -> anyhow::Result<()> {
+    let mut event_loop_builder = EventLoop::with_user_event();
     #[cfg(target_os = "linux")]
     {
-        let backend = config.backend.clone();
-        options.event_loop_builder = Some(Box::new(move |builder| {
-            use egui_winit::winit::platform::{
-                wayland::EventLoopBuilderExtWayland, x11::EventLoopBuilderExtX11,
-            };
+        use egui_winit::winit::platform::wayland::EventLoopBuilderExtWayland;
+        use egui_winit::winit::platform::x11::EventLoopBuilderExtX11;
 
-            match backend {
-                DisplayBackend::X11 => builder.with_x11(),
-                DisplayBackend::Wayland => {
-                    use crate::{
-                        core::system::clipboard_text::text_clipboard::with_text_clipboard,
-                        platform::wayland::clipboard_wayland::WaylandClipboard,
-                    };
-
-                    with_text_clipboard(|c| c.init(WaylandClipboard::new()));
-
-                    builder.with_wayland()
-                }
-                _ => builder,
-            };
-        }));
-    }
-
-    eframe::run_native(
-        "BlazePilot",
-        options,
-        Box::new(|cc| {
-            let display_ptr: Option<*mut std::ffi::c_void> = {
-                #[cfg(target_os = "linux")]
-                {
-                    use egui_winit::winit::raw_window_handle::{
-                        HasDisplayHandle, RawDisplayHandle,
-                    };
-                    match cc.display_handle() {
-                        Ok(handle) => match handle.as_raw() {
-                            RawDisplayHandle::Wayland(h) => {
-                                debug!("Backend Wayland Ok");
-                                Some(h.display.as_ptr())
-                            }
-
-                            other => {
-                                warn!("El backend es: {:?}", other);
-                                None
-                            }
-                        },
-                        Err(e) => {
-                            error!("display_handle() ha fallado: {e}");
-                            None
-                        }
-                    }
-                }
-                #[cfg(not(target_os = "linux"))]
-                {
-                    None
-                }
-            };
-
-            Ok(Box::new(
-                BlazeAppBuilder::default()
-                    .with_start_path(initial_path)
-                    .build(display_ptr),
-            ))
-        }),
-    )
-    .map_err(|e| anyhow::anyhow!("Error al ejecutar: {}", e))
-}
-
-#[derive(Clone, Debug)]
-struct RunConfigs {
-    backend: DisplayBackend,
-    multisampling: u16,
-    power_preference: eframe::wgpu::PowerPreference,
-    present_mode: eframe::wgpu::PresentMode,
-    transparency: bool,
-}
-
-impl RunConfigs {
-    fn wgpu_present(
-        backend: DisplayBackend,
-        present_mode: eframe::wgpu::PresentMode,
-        transparency: bool,
-    ) -> Self {
-        Self {
-            backend,
-            present_mode,
-            multisampling: 0,
-            power_preference: eframe::wgpu::PowerPreference::LowPower,
-            transparency,
+        match config.renderer {
+            DisplayBackend::X11 => {
+                event_loop_builder.with_x11();
+            }
+            DisplayBackend::Wayland => {
+                use crate::{
+                    core::system::clipboard_text::text_clipboard::with_text_clipboard,
+                    platform::wayland::clipboard_wayland::WaylandClipboard,
+                };
+                with_text_clipboard(|c| c.init(WaylandClipboard::new()));
+                event_loop_builder.with_wayland();
+            }
+            _ => {}
         }
     }
-}
 
-fn create_native_options(configs: &RunConfigs) -> NativeOptions {
-    let viewport = egui::ViewportBuilder::default()
-        .with_inner_size([1280.0, 720.0])
-        .with_min_inner_size([800.0, 500.0])
-        .with_title("BlazePilot")
-        .with_decorations(true)
-        .with_transparent(configs.transparency)
-        .with_resizable(true)
-        .with_maximized(false)
-        .with_fullscreen(false)
-        .with_taskbar(true);
-    NativeOptions {
-        viewport,
-        renderer: eframe::Renderer::Wgpu,
-        multisampling: configs.multisampling,
-        depth_buffer: 0,
-        stencil_buffer: 0,
-        dithering: false,
-        wgpu_options: eframe::egui_wgpu::WgpuConfiguration {
-            surface: eframe::SurfaceConfig {
-                present_mode: configs.present_mode,
-                desired_maximum_frame_latency: Some(1),
-            },
-            wgpu_setup: eframe::egui_wgpu::WgpuSetup::CreateNew(
-                eframe::egui_wgpu::WgpuSetupCreateNew {
-                    power_preference: configs.power_preference,
-                    device_descriptor: Arc::new(|adapter| {
-                        let limits = adapter.limits();
-                        eframe::wgpu::DeviceDescriptor {
-                            label: Some("BlazePilot Device"),
-                            required_limits: limits,
-                            required_features: eframe::wgpu::Features::empty(),
-                            memory_hints: eframe::wgpu::MemoryHints::MemoryUsage,
-                            experimental_features: eframe::wgpu::ExperimentalFeatures::disabled(),
-                            trace: eframe::wgpu::Trace::Off,
-                        }
-                    }),
-                    ..eframe::egui_wgpu::WgpuSetupCreateNew::without_display_handle()
-                },
-            ),
-            ..Default::default()
-        },
-        ..Default::default()
-    }
+    let event_loop = event_loop_builder
+        .build()
+        .map_err(|e| anyhow::anyhow!("Error creando event loop: {e}"))?;
+
+    let mut app = BlazeEventLoop::new(config, initial_path);
+
+    event_loop
+        .run_app(&mut app)
+        .map_err(|e| anyhow::anyhow!("Error en event loop: {e}"))
 }

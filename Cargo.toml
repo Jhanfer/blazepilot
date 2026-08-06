@@ -20,8 +20,6 @@ build-ci = [
 ]
 
 [dependencies]
-egui = { version = "0.35.0", features = ["serde"] }
-egui_extras = { version = "0.35.0", default-features = false }
 openssl = { version = "0.10.79", features = ["vendored"] }
 once_cell = "1.19"
 tokio = { version = "1.53.1", features = ["full"] }
@@ -76,19 +74,15 @@ url = "2.5.8"
 reqwest = "0.13.4"
 cpal = "0.18.1"
 ffmpeg-next = "8.1.0"
+egui-wgpu = { git = "https://github.com/Jhanfer/egui-custom.git", branch = "main" }
+egui = { git = "https://github.com/Jhanfer/egui-custom.git", branch = "main", features = ["serde"] }
+egui_extras = { version = "0.35.0", default-features = false }
 
 [target.'cfg(target_os = "linux")'.dependencies]
-eframe = { git = "https://github.com/Jhanfer/egui-custom.git", branch = "main", default-features = false, features = ["wgpu", "x11", "wayland", "wgpu_no_default_features"] }
-egui-winit = { git = "https://github.com/Jhanfer/egui-custom.git", branch = "main", default-features = false, features = ["x11", "wayland"] }
+egui-winit = { git = "https://github.com/Jhanfer/egui-custom.git", branch = "main", features = ["x11", "wayland"] }
 linicon = "2.3.0"
 wayland-client = "0.31.14"
 rustix = "1.1.4"
-
-[target.'cfg(not(target_os = "linux"))'.dependencies]
-eframe = { git = "https://github.com/Jhanfer/egui-custom.git", branch = "main", default-features = false, features = ["wgpu"] }
-
-[target.'cfg(target_os = "macos")'.dependencies]
-eframe = { git = "https://github.com/Jhanfer/egui-custom.git", branch = "main", default-features = false, features = ["wgpu"] }
 
 
 [profile.dev]
@@ -115,6 +109,4 @@ overflow-checks = false
 opt-level = "z"
 
 [patch.crates-io]
-eframe = { git = "https://github.com/Jhanfer/egui-custom.git", branch = "main" }
-egui = { git = "https://github.com/Jhanfer/egui-custom.git", branch = "main" }
 egui-winit = { git = "https://github.com/Jhanfer/egui-custom.git", branch = "main" }
