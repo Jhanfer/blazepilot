@@ -26,7 +26,7 @@ use crate::ui::fonts::fonts_manager::with_fonts;
 use crate::ui::modules::ui_callback::connect_ui_components_callback;
 use crate::ui::themes::platform::structs::ToColor;
 use crate::ui::themes::theme_manager::with_theme;
-use eframe::Frame;
+use crate::window_backend::repaint_signal::RepaintSignal;
 use egui::Ui;
 use std::path::Path;
 use std::sync::Arc;
@@ -72,6 +72,7 @@ impl BlazeAppBuilder {
             state,
             ui_state,
             dnd,
+            repaint_signal: RepaintSignal::new(),
         }
     }
 }
@@ -86,6 +87,7 @@ pub struct BlazeApp {
     pub state: BlazeCoreState,  //motor, archivos, mover
     pub ui_state: BlazeUiState, //visuales
     pub dnd: Option<WaylandDndReceiver>,
+    repaint_signal: RepaintSignal,
 }
 
 impl BlazeApp {
@@ -132,8 +134,106 @@ impl BlazeApp {
     }
 }
 
-impl eframe::App for BlazeApp {
-    fn raw_input_hook(&mut self, ctx: &egui::Context, raw_input: &mut egui::RawInput) {
+// impl eframe::App for BlazeApp {
+//     fn raw_input_hook(&mut self, ctx: &egui::Context, raw_input: &mut egui::RawInput) {
+//         //limpiar keyboard_state
+//         with_keyboard_state(|k| k.clear());
+
+//         if let Some(ref receiver) = self.dnd {
+//             receiver.process_event(self.state.cwd.clone(), self.state.active_id);
+//         } else {
+//             // Por ahora x11 solo detecta dropeo de files pero no de bytes, por lo que esta condición no se cumplirá al soltar imágenes o texto plano
+//             if !ctx.input(|i| i.raw.dropped_files.is_empty()) {
+//                 let dropped_files = ctx.input(|i| i.raw.dropped_files.clone());
+
+//                 process_event_x11(self.state.cwd.clone(), self.state.active_id, &dropped_files);
+//             }
+//         }
+
+//         //simulador de evento ctrl + (c, v, x)
+//         for event in &raw_input.events {
+//             if let egui::Event::Key { key, modifiers, .. } = event {
+//                 if *key == egui::Key::V && modifiers.ctrl {
+//                     if let Some(text) = with_text_clipboard(|c| c.paste()) {
+//                         with_keyboard_state(|k| {
+//                             k.set_action(
+//                                 KeyboardAction::Paste(text.clone()),
+//                                 ctx.cumulative_frame_nr(),
+//                             )
+//                         });
+//                         raw_input.events.push(egui::Event::Paste(text));
+//                     }
+//                     break;
+//                 }
+
+//                 if *key == egui::Key::C && modifiers.ctrl {
+//                     tracing::debug!("Ctrl + C");
+//                     with_keyboard_state(|k| {
+//                         k.set_action(KeyboardAction::Copy, ctx.cumulative_frame_nr())
+//                     });
+//                     break;
+//                 }
+
+//                 if *key == egui::Key::X && modifiers.ctrl {
+//                     tracing::debug!("Ctrl + X");
+//                     with_keyboard_state(|k| {
+//                         k.set_action(KeyboardAction::Cut, ctx.cumulative_frame_nr())
+//                     });
+//                     break;
+//                 }
+//             }
+//         }
+//     }
+
+//     fn ui(&mut self, ui: &mut Ui, _frame: &mut Frame) {
+//         self.set_custom_visuals(ui);
+
+//         //Nuevo cargador de fuentes dinámico
+//         // Recarga las fuentes en caso de necesitarse
+//         with_fonts(|f| {
+//             if f.dirty {
+//                 let defs = f.build_font_definitions();
+//                 ui.set_fonts(defs);
+//                 f.dirty = false;
+//                 ui.request_repaint();
+//             }
+//         });
+
+//         with_configs(|c| match c.tick() {
+//             Ok(_) => {}
+//             Err(e) => error!("Ha ocurrido un error de guardado: {e}."),
+//         });
+
+//         ui.options_mut(|opt| {
+//             opt.reduce_texture_memory = true;
+//         });
+
+//         self.state.process_messages();
+
+//         self.ui_state.dialog_manager.render_area(ui);
+//         self.ui_state.process_events();
+
+//         let files = self.state.get_active_files();
+//         connect_ui_components_callback(ui, &files, &mut self.state, &mut self.ui_state);
+
+//         if self.state.is_loading || self.state.active_tasks > 0 {
+//             ui.request_repaint();
+//         } else {
+//             ui.request_repaint_after(std::time::Duration::from_millis(100));
+//         }
+//     }
+
+//     fn on_exit(&mut self) {
+//         with_configs(|c| match c.force_save() {
+//             Ok(_) => {}
+//             Err(e) => error!("Ha ocurrido un error de guardado: {e}."),
+//         });
+//         self.state.save_caches(true);
+//     }
+// }
+
+impl BlazeApp {
+    pub fn raw_input_hook(&mut self, ctx: &egui::Context, raw_input: &mut egui::RawInput) {
         //limpiar keyboard_state
         with_keyboard_state(|k| k.clear());
 
@@ -183,7 +283,7 @@ impl eframe::App for BlazeApp {
         }
     }
 
-    fn ui(&mut self, ui: &mut Ui, _frame: &mut Frame) {
+    pub fn ui(&mut self, ui: &mut Ui) {
         self.set_custom_visuals(ui);
 
         //Nuevo cargador de fuentes dinámico
@@ -215,17 +315,25 @@ impl eframe::App for BlazeApp {
         connect_ui_components_callback(ui, &files, &mut self.state, &mut self.ui_state);
 
         if self.state.is_loading || self.state.active_tasks > 0 {
+            self.repaint_signal.request_repaint_immediate();
             ui.request_repaint();
         } else {
+            self.repaint_signal.request_repaint_after(100);
             ui.request_repaint_after(std::time::Duration::from_millis(100));
         }
     }
 
-    fn on_exit(&mut self) {
+    pub fn on_exit(&mut self) {
         with_configs(|c| match c.force_save() {
             Ok(_) => {}
             Err(e) => error!("Ha ocurrido un error de guardado: {e}."),
         });
         self.state.save_caches(true);
+    }
+}
+
+impl Drop for BlazeApp {
+    fn drop(&mut self) {
+        tracing::debug!("Dropeo de BlazeApp");
     }
 }
