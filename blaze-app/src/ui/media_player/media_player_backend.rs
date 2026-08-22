@@ -64,10 +64,6 @@ impl MediaPlayer {
         }
     }
 
-    pub fn is_playing(&self) -> bool {
-        self.clock.lock().is_playing()
-    }
-
     pub fn toggle_pause(&mut self) {
         if self.clock.lock().is_playing() {
             self.pause();
@@ -108,10 +104,6 @@ impl MediaPlayer {
 
     pub fn stop(&mut self) {
         debug!("Llamado stop de mediaplayer");
-        if !self.clock.lock().is_playing() {
-            return;
-        }
-
         self.media_path = None;
         if self.audio_enabled {
             match self.audio_player.stop() {
@@ -131,9 +123,6 @@ impl MediaPlayer {
 
     pub fn stop_players(&mut self) {
         debug!("StopPlayers");
-        if !self.clock.lock().is_playing() {
-            return;
-        }
         self.seek_epoch.store(0, Ordering::SeqCst);
     }
 
@@ -171,7 +160,10 @@ impl MediaPlayer {
 
     fn reset(&mut self) {
         if self.audio_enabled {
-            self.audio_player.reset();
+            match self.audio_player.reset() {
+                Ok(()) => {}
+                Err(e) => warn!("Error en audio reset: {e}"),
+            }
         }
         if self.video_enabled {
             self.video_player.reset();

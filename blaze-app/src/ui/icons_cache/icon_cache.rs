@@ -12,18 +12,25 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use egui::{ColorImage, TextureHandle, Ui, vec2};
+use egui::{ColorImage, TextureHandle, TextureOptions, Ui, vec2};
+use lru::LruCache;
 use resvg::usvg::Options;
-use std::collections::HashMap;
+use std::num::NonZeroUsize;
 
 pub struct IconCache {
-    cache: HashMap<String, TextureHandle>,
+    cache: LruCache<String, TextureHandle>,
 }
 
 impl IconCache {
-    pub fn new() -> Self {
+    pub fn new(max_entries: usize) -> Self {
+        let def_cap = match NonZeroUsize::new(500) {
+            Some(cap) => cap,
+            None => unreachable!(),
+        };
+        let cap = NonZeroUsize::new(max_entries).unwrap_or(def_cap);
+
         Self {
-            cache: HashMap::new(),
+            cache: LruCache::new(cap),
         }
     }
 
@@ -34,7 +41,7 @@ impl IconCache {
         svg_bytes: &[u8],
         tint: egui::Color32,
         icon_size: egui::Vec2,
-    ) -> &TextureHandle {
+    ) -> TextureHandle {
         let tint_key = format!("{:02X}{:02X}{:02X}", tint.r(), tint.g(), tint.b());
         let pixels_per_point = ui.pixels_per_point();
         let w = (icon_size.x * pixels_per_point).round() as u32;
@@ -42,10 +49,16 @@ impl IconCache {
         let scale_key = (pixels_per_point * 10.0).round() as u32;
         let full_key = format!("{}-{}-{}x{}-{}ppp", name, tint_key, w, h, scale_key);
 
-        self.cache.entry(full_key).or_insert_with(|| {
-            let image = rasterize_svg(svg_bytes, w, h, tint);
-            ui.load_texture(name, image, egui::TextureOptions::LINEAR)
-        })
+        if let Some(texture) = self.cache.get(&full_key) {
+            return texture.clone();
+        }
+
+        let image = rasterize_svg(svg_bytes, w, h, tint);
+        let texture = ui.load_texture(name, image, TextureOptions::LINEAR);
+
+        self.cache.push(full_key, texture.clone());
+
+        texture
     }
 }
 

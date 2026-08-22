@@ -237,6 +237,7 @@ impl BlazeTabState {
         sizer_manager
             .cache_manager
             .size_cache
+            .lock()
             .get(key.as_ref())
             .map(|c| c.size)
             .unwrap_or(0)
@@ -289,6 +290,7 @@ impl BlazeTabState {
         {
             let mut file_guard = self.files.write().map_err(|_| MotorError::PoisonedLock)?;
             file_guard.clear();
+            file_guard.shrink_to_fit();
         }
         Ok(())
     }
@@ -300,6 +302,7 @@ impl BlazeTabState {
                 .write()
                 .map_err(|_| MotorError::PoisonedLock)?;
             sorted_indices_guard.clear();
+            sorted_indices_guard.shrink_to_fit();
         }
         Ok(())
     }
@@ -309,6 +312,7 @@ impl BlazeTabState {
         self.clear_sorted_indices()?;
         self.clear_recursive_files()?;
         self.lower_names.clear();
+        self.lower_names.shrink_to_fit();
         Ok(())
     }
 

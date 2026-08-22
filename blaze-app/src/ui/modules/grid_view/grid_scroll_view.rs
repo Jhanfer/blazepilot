@@ -28,7 +28,6 @@ use egui::{
     Color32, ColorImage, CursorIcon, FontId, Id, Key, Modifiers, PointerButton, Rect, ScrollArea,
     Sense, Stroke, StrokeKind, TextureOptions, Ui, pos2, scroll_area::ScrollSource, vec2,
 };
-use file_id::FileId;
 use std::{collections::HashMap, path::Path, sync::Arc};
 use tracing::info;
 
@@ -380,20 +379,6 @@ pub fn render_grid_scrollview(
             }
         };
 
-        let color_snapshot: HashMap<FileId, Color32> = {
-            let color_map = &ui_state.folder_color_manager.cache_manager.color_cache;
-
-            file_indices
-                .iter()
-                .filter_map(|&i| {
-                    files[i]
-                        .unique_id
-                        .as_ref()
-                        .and_then(|id| color_map.get(id).map(|c| (*id, c.color)))
-                })
-                .collect()
-        };
-
         let thumbnail_snapshot: HashMap<Arc<Path>, Thumbnail> = {
             let mut guard = ui_state.thumbnail_manager.thumb_map.write();
             file_indices
@@ -616,7 +601,13 @@ pub fn render_grid_scrollview(
                 {
                     should_repaint = true;
                 } else {
-                    let (icon_name, icon_bytes, color) = resolve_icon(file, &color_snapshot);
+                    let snapshot_color = file
+                        .unique_id
+                        .as_ref()
+                        .and_then(|id| ui_state.color_snapshot.get(id))
+                        .copied();
+
+                    let (icon_name, icon_bytes, color) = resolve_icon(file, snapshot_color);
 
                     let rounded_rect = Rect::from_min_max(
                         pos2(icon_rect.min.x.round(), icon_rect.min.y.round()),

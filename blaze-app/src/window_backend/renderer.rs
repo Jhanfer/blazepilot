@@ -53,12 +53,12 @@ impl From<PresentMode> for WgpuPresentMode {
 
 pub struct Renderer {
     surface: Surface<'static>,
-    pending_free: Vec<egui::TextureId>,
     device: egui_wgpu::wgpu::Device,
     queue: Queue,
     config: SurfaceConfiguration,
     egui_renderer: egui_wgpu::Renderer,
     screen_descriptor: egui_wgpu::ScreenDescriptor,
+    staging: egui_wgpu::wgpu::util::StagingBelt,
 }
 
 impl Renderer {
@@ -126,14 +126,16 @@ impl Renderer {
         let egui_renderer =
             egui_wgpu::Renderer::new(&device, format, egui_wgpu::RendererOptions::default());
 
+        let staging = egui_wgpu::wgpu::util::StagingBelt::new(device.clone(), 1024 * 1024);
+
         Ok(Self {
             surface,
-            pending_free: Vec::new(),
             device,
             queue,
             config,
             egui_renderer,
             screen_descriptor,
+            staging,
         })
     }
 
@@ -162,10 +164,6 @@ impl Renderer {
         primitives: &[egui::ClippedPrimitive],
         textures_delta: &egui::TexturesDelta,
     ) {
-        for id in self.pending_free.drain(..) {
-            self.egui_renderer.free_texture(&id);
-        }
-
         let primitives = &primitives[..primitives.len().min(MAX_PRIMITIVES_PER_FRAME)];
 
         let frame = match self.surface.get_current_texture() {
@@ -183,6 +181,8 @@ impl Renderer {
                 .create_command_encoder(&egui_wgpu::wgpu::CommandEncoderDescriptor {
                     label: Some("MainEncoder"),
                 });
+
+        self.staging.recall();
 
         for (id, image_delta) in &textures_delta.set {
             self.egui_renderer
@@ -226,11 +226,15 @@ impl Renderer {
                 .render(&mut render_pass, primitives, &self.screen_descriptor);
         }
 
-        self.queue.submit(Some(encoder.finish()));
-        frame.present();
+        self.staging.finish();
 
-        self.pending_free
-            .extend(textures_delta.free.iter().copied());
+        self.queue.submit(Some(encoder.finish()));
+
+        for id in textures_delta.free.iter() {
+            self.egui_renderer.free_texture(id);
+        }
+
+        frame.present();
     }
 }
 

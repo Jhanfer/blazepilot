@@ -59,7 +59,7 @@ pub fn render_icon(
         pos2(icon_rect.max.x.round(), icon_rect.max.y.round()),
     );
 
-    let icon: &egui::TextureHandle = ui_state
+    let icon: &egui::TextureHandle = &ui_state
         .icon_cache
         .get_or_load(ui, icon_name, icon_bytes, color, icon_size);
 

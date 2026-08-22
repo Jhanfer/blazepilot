@@ -17,29 +17,19 @@ use egui::{
     Align, Align2, Color32, ColorImage, CornerRadius, CursorIcon, Layout, Rect, Sense, Stroke,
     StrokeKind, TextStyle, TextureOptions, Ui, Vec2, lerp, pos2, vec2,
 };
-use file_id::FileId;
 use std::{collections::HashMap, path::Path, sync::Arc};
 
 pub fn resolve_icon(
     file: &Arc<FileEntry>,
-    color_snapshot: &HashMap<FileId, Color32>,
+    snapshot_color: Option<Color32>,
 ) -> (String, &'static [u8], Color32) {
     let current_theme = with_theme(|t| t.current());
     if file.is_dir() {
-        let (color, cache_key) = if let Some(file_id) = &file.unique_id {
-            let color = color_snapshot
-                .get(file_id)
-                .copied()
-                .unwrap_or(current_theme.file_theme.folder_default.to_color());
-            let cache_key = format!("folder-{:?}", file_id);
-            (color, cache_key)
-        } else {
-            (
-                current_theme.file_theme.folder_default.to_color(),
-                "folder-unknown".to_string(),
-            )
-        };
-        (cache_key, ICON_FOLDER_OPEN, color)
+        (
+            "folder".to_string(),
+            ICON_FOLDER_OPEN,
+            snapshot_color.unwrap_or(current_theme.file_theme.folder_default.to_color()),
+        )
     } else {
         match &file.extension {
             FileExtension::Image(_) => (
@@ -216,7 +206,7 @@ pub fn render_quicklink_icon(
         ..Default::default()
     };
 
-    let (icon_name, icon_bytes, color) = resolve_icon(&Arc::from(dummy_entry), &Default::default());
+    let (icon_name, icon_bytes, color) = resolve_icon(&Arc::from(dummy_entry), None);
     let rounded_rect = Rect::from_min_max(
         pos2(icon_rect.min.x.round(), icon_rect.min.y.round()),
         pos2(icon_rect.max.x.round(), icon_rect.max.y.round()),

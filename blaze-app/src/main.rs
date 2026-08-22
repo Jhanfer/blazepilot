@@ -77,6 +77,8 @@ fn main() {
 
     let _ = ffmpeg_next::init().map_err(|e| warn!("Ha ocurrido un error inicializando: {}", e));
 
+    ffmpeg_next::log::set_level(ffmpeg_next::log::Level::Error);
+
     if let Err(e) = try_run_with_retries() {
         error!("Todos los intentos han fallado: {}", e);
         std::process::exit(1);

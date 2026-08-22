@@ -161,7 +161,9 @@ impl BlazeMotor {
             tab.reset_for_new_path()?;
 
             tab.history.clear();
+            tab.history.shrink_to_fit();
             tab.future.clear();
+            tab.future.shrink_to_fit();
         }
 
         self.remove_channels(tab_id);

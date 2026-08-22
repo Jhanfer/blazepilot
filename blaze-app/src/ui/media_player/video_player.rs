@@ -12,12 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crossbeam_channel::{Receiver, Sender};
+use crossbeam_channel::{Receiver, RecvTimeoutError, Sender, TryRecvError};
 use egui::{ColorImage, TextureHandle, TextureOptions, Ui};
 use ffmpeg_next::{
-    Packet,
-    format::{Pixel, input},
+    Dictionary, Packet,
+    format::{Pixel, input_with_interrupt_and_dictionary},
     media::Type,
+    packet::Mut,
     software::scaling::{context::Context as ScalingContext, flag::Flags},
     util::frame::video::Video as VideoFrame,
 };
@@ -55,7 +56,7 @@ impl<T> DebugReceiver<T> {
 
 impl<T> Drop for DebugReceiver<T> {
     fn drop(&mut self) {
-        debug!("⚠️ Receiver {} DROPEADO ⚠️", self.name);
+        debug!("Se ha dropeado el receiver {} ", self.name);
     }
 }
 
@@ -74,8 +75,20 @@ pub enum VideoDecoderCommand {
     Stop,
 }
 
+struct VideoBuffer {
+    data: Vec<u8>,
+    tx: Sender<Vec<u8>>,
+}
+
+impl Drop for VideoBuffer {
+    fn drop(&mut self) {
+        let data = std::mem::take(&mut self.data);
+        let _ = self.tx.send(data);
+    }
+}
+
 pub struct OutputVideoFrame {
-    pub data: Arc<[u8]>,
+    data: VideoBuffer,
     pub width: u32,
     pub height: u32,
     pub timestamp: f32,
@@ -94,7 +107,6 @@ pub struct VideoPlayer {
     seek_epoch: Arc<AtomicU64>,
     video_width: u32,
     video_height: u32,
-    last_texture_name: Option<Box<str>>,
 }
 
 impl VideoPlayer {
@@ -110,7 +122,6 @@ impl VideoPlayer {
             seek_epoch,
             video_width: 0,
             video_height: 0,
-            last_texture_name: None,
         }
     }
 
@@ -122,6 +133,8 @@ impl VideoPlayer {
                 f32::INFINITY
             };
             self.clock.lock().set_duration(duration);
+
+            drop(ictx);
         }
 
         if !video_path.exists() {
@@ -140,11 +153,6 @@ impl VideoPlayer {
         if self.streamer.is_some() {
             self.resume();
             return Ok(());
-        }
-
-        if let Some(old_streamer) = self.streamer.take() {
-            old_streamer.send(VideoDecoderCommand::Stop);
-            std::thread::sleep(Duration::from_millis(50));
         }
 
         if let Some(rx) = self.frame_rx.take() {
@@ -190,6 +198,12 @@ impl VideoPlayer {
         self.pending_frame = None;
         self.video_width = 0;
         self.video_height = 0;
+
+        if let Some(rx) = self.frame_rx.take() {
+            info!("Llamado dropeo de video rx");
+            drop(rx);
+        }
+
         self.seek(0.0);
     }
 
@@ -197,20 +211,30 @@ impl VideoPlayer {
         info!("Llamado stop de VideoPlayer");
         self.generation.fetch_add(1, Ordering::SeqCst);
 
-        if let Some(streamer) = self.streamer.take() {
-            streamer.send(VideoDecoderCommand::Stop);
-        }
-
-        // self.video_path = None;
-        self.streamer = None;
-        self.video_width = 0;
-        self.video_height = 0;
-        self.texture = None;
         self.pending_frame = None;
 
         if let Some(rx) = self.frame_rx.take() {
             info!("Llamado dropeo de video rx");
             drop(rx);
+        }
+
+        if let Some(mut streamer) = self.streamer.take() {
+            streamer.send(VideoDecoderCommand::Stop);
+            if let Some(handle) = streamer.thread.take() {
+                info!("stop() esperando join...");
+                let _ = handle.join();
+                info!("stop() join completado");
+            }
+        }
+
+        self.video_width = 0;
+        self.video_height = 0;
+        self.texture = None;
+
+        info!("stop() fin");
+
+        unsafe {
+            libmimalloc_sys::mi_collect(true);
         }
     }
 
@@ -249,8 +273,11 @@ impl VideoPlayer {
         {
             let current_epoch = self.seek_epoch.load(Ordering::Acquire);
 
+            let mut latest_frame = None;
+
             while let Ok(frame) = rx.try_recv() {
                 if frame.epoch != current_epoch {
+                    drop(frame);
                     continue;
                 }
 
@@ -262,37 +289,43 @@ impl VideoPlayer {
                 }
 
                 if frame.timestamp > elapsed {
+                    latest_frame = Some(frame);
+                    break;
+                } else {
                     self.pending_frame = Some(frame);
                     break;
                 }
-
-                self.pending_frame = Some(frame);
             }
 
-            ui.request_repaint_after(Duration::from_millis(1));
-        }
+            let lf_is_some = latest_frame.is_some();
 
-        let mut frame_updated = false;
+            if lf_is_some {
+                self.pending_frame = latest_frame;
+            }
+
+            if lf_is_some || self.pending_frame.is_some() {
+                ui.request_repaint_after(Duration::from_millis(1));
+            }
+        }
 
         if let Some(frame) = self.pending_frame.take() {
             if frame.timestamp <= elapsed {
                 let color_image = ColorImage::from_rgba_premultiplied(
                     [frame.width as usize, frame.height as usize],
-                    &frame.data,
+                    &frame.data.data,
                 );
 
-                let texture_name = format!("frame_{}", frame.timestamp);
-                self.texture = None;
-                if let Some(old_name) = &self.last_texture_name {
-                    ui.forget_image(old_name);
-                    self.last_texture_name = Some(texture_name.into());
+                drop(frame);
+
+                if let Some(texture) = &mut self.texture {
+                    texture.set_partial([0, 0], color_image, TextureOptions::LINEAR);
+                } else {
+                    self.texture =
+                        Some(ui.load_texture("frame", color_image, TextureOptions::LINEAR));
                 }
 
-                self.texture = Some(ui.load_texture("frame", color_image, TextureOptions::LINEAR));
-
                 self.pending_frame = None;
-                frame_updated = true;
-            } else {
+            } else if self.is_playing() {
                 let wait = Duration::from_secs_f32((frame.timestamp - elapsed).max(0.0));
                 self.pending_frame = Some(frame);
                 ui.request_repaint_after(wait);
@@ -301,10 +334,6 @@ impl VideoPlayer {
 
         if let Some(texture) = &self.texture {
             callback(texture, ui, (self.video_width, self.video_height));
-        }
-
-        if frame_updated {
-            ui.request_repaint_after(Duration::from_millis(1));
         }
     }
 }
@@ -315,6 +344,8 @@ pub struct VideoStreamer {
 }
 
 impl VideoStreamer {
+    const MAX_PACKETS_BUFF: i32 = 4;
+
     pub fn spawn(
         path: Arc<Path>,
         frame_tx: &Sender<OutputVideoFrame>,
@@ -372,13 +403,32 @@ impl VideoStreamer {
         debug!("Se llama decode loop video");
 
         if generation.load(Ordering::Acquire) != my_generation {
-            debug!("Video generation no es igual, saliendo");
+            debug!("Video generation no es igual: saliendo en inicio del decode loop");
             return Ok("Video generation no es igual, saliendo".into());
         } else {
             debug!("Video generation OK, iniciando decodificación");
         }
 
-        let mut ictx = input(path).map_err(VideoError::FfmpegError)?;
+        let gene = generation.clone();
+        let my_gene = my_generation;
+
+        let mut ops = Dictionary::new();
+
+        ops.set("probesize", "5000000");
+        ops.set("analyzeduration", "2000000");
+
+        let mut ictx = input_with_interrupt_and_dictionary(
+            path,
+            move || gene.load(Ordering::Acquire) != my_gene,
+            ops,
+        )
+        .map_err(VideoError::FfmpegError)?;
+
+        unsafe {
+            let ctx = ictx.as_mut_ptr();
+            (*ctx).max_interleave_delta = 100000;
+            (*ctx).flags |= 64;
+        }
 
         let video_stream = ictx
             .streams()
@@ -414,14 +464,64 @@ impl VideoStreamer {
         let mut paused = false;
         let mut did_seek = false;
         let mut seek_target_secs: f32 = 0.0;
-        let mut frame_buffer: Vec<u8> = Vec::new();
 
-        let mut packet = Packet::empty();
+        let (buff_tx, buff_rx) = crossbeam_channel::bounded(2);
+        for _ in 0..2 {
+            buff_tx
+                .send(Vec::with_capacity(width as usize * height as usize * 4))
+                .ok();
+        }
+
+        let mut packects_in_buff = 0;
 
         loop {
             if generation.load(Ordering::Acquire) != my_generation {
+                debug!("Video generation no es igual: saliendo en inicio del loop");
                 return Ok("Video generation no es igual, saliendo".into());
             }
+
+            while packects_in_buff >= Self::MAX_PACKETS_BUFF || tx.len() >= 4 {
+                if generation.load(Ordering::Acquire) != my_generation {
+                    debug!("Video generation no es igual: saliendo en inicio del loop");
+                    return Ok("Video generation no es igual, saliendo".into());
+                }
+
+                match commands.try_recv() {
+                    Ok(VideoDecoderCommand::Stop) => return Ok("Stop".into()),
+
+                    Ok(VideoDecoderCommand::Pause) => paused = true,
+
+                    Ok(VideoDecoderCommand::Resume) => paused = false,
+
+                    Ok(VideoDecoderCommand::SeekTo(secs)) => {
+                        let timestamp = (secs * ffmpeg_next::ffi::AV_TIME_BASE as f32) as i64;
+                        ictx.seek(timestamp, ..timestamp)
+                            .map_err(VideoError::FfmpegError)?;
+                        decoder.flush();
+
+                        seek_target_secs = secs;
+                        did_seek = true;
+                    }
+
+                    Err(TryRecvError::Empty) => {}
+
+                    Err(TryRecvError::Disconnected) => {
+                        return Ok("Command channel cerrado".into());
+                    }
+                }
+
+                if paused {
+                    break;
+                }
+
+                std::thread::sleep(Duration::from_millis(5));
+            }
+
+            if paused {
+                continue;
+            }
+
+            let mut packet = Packet::empty();
 
             match packet.read(&mut ictx) {
                 Ok(()) => {
@@ -447,9 +547,12 @@ impl VideoStreamer {
                     }
 
                     if paused {
-                        match commands.recv() {
+                        match commands.recv_timeout(Duration::from_millis(50)) {
                             Ok(VideoDecoderCommand::Resume) => paused = false,
                             Ok(VideoDecoderCommand::SeekTo(secs)) => {
+                                unsafe {
+                                    ffmpeg_next::ffi::av_packet_unref(packet.as_mut_ptr());
+                                }
                                 let timestamp =
                                     (secs * ffmpeg_next::ffi::AV_TIME_BASE as f32) as i64;
                                 ictx.seek(timestamp, ..timestamp)
@@ -458,7 +561,18 @@ impl VideoStreamer {
                                 seek_target_secs = secs;
                                 did_seek = true;
                             }
-                            Ok(VideoDecoderCommand::Stop) | Err(_) => return Ok("Stop".into()),
+                            Ok(VideoDecoderCommand::Stop) => return Ok("Stop".into()),
+                            Err(RecvTimeoutError::Timeout) => {
+                                if generation.load(Ordering::Acquire) != my_generation {
+                                    debug!(
+                                        "Video generation no es igual: saliendo en if paused del loop"
+                                    );
+                                    return Ok("Video generation no es igual, saliendo".into());
+                                }
+                            }
+                            Err(RecvTimeoutError::Disconnected) => {
+                                return Ok("Command channel cerrado".into());
+                            }
                             _ => {}
                         }
                         continue;
@@ -472,14 +586,27 @@ impl VideoStreamer {
                         .send_packet(&packet)
                         .map_err(VideoError::FfmpegError)?;
 
+                    packects_in_buff += 1;
+
                     let mut decoded = VideoFrame::empty();
 
                     while decoder.receive_frame(&mut decoded).is_ok() {
+                        packects_in_buff = (packects_in_buff - 1).max(0);
+
                         if generation.load(Ordering::Acquire) != my_generation {
+                            debug!(
+                                "Video generation no es igual: saliendo en decoder.receive_frame del loop"
+                            );
+
+                            unsafe {
+                                ffmpeg_next::ffi::av_frame_unref(decoded.as_mut_ptr());
+                            }
+
                             return Ok("Video generation no es igual, saliendo".into());
                         }
 
                         let mut rgba_frame = VideoFrame::empty();
+
                         scaler.run(&decoded, &mut rgba_frame)?;
 
                         let pts = decoded.pts().unwrap_or(0);
@@ -499,15 +626,34 @@ impl VideoStreamer {
                         let raw = rgba_frame.data(0);
                         let row_bytes = width as usize * 4;
 
-                        frame_buffer.clear();
-                        frame_buffer.reserve(row_bytes * height as usize);
+                        let mut write_buff = loop {
+                            match buff_rx.recv_timeout(Duration::from_millis(10)) {
+                                Ok(buff) => break buff,
+                                Err(RecvTimeoutError::Timeout) => match commands.try_recv() {
+                                    Ok(VideoDecoderCommand::Stop) => return Ok("Stop".into()),
+                                    Err(TryRecvError::Disconnected) => {
+                                        return Ok("Command channel cerrado".into());
+                                    }
+                                    _ => {}
+                                },
+
+                                Err(RecvTimeoutError::Disconnected) => {
+                                    return Ok("Buffer pool cerrado".into());
+                                }
+                            }
+                        };
+
+                        write_buff.clear();
                         for row in 0..height as usize {
                             let start = row * stride;
-                            frame_buffer.extend_from_slice(&raw[start..start + row_bytes]);
+                            write_buff.extend_from_slice(&raw[start..start + row_bytes]);
                         }
 
                         let frame = OutputVideoFrame {
-                            data: std::mem::take(&mut frame_buffer).into(),
+                            data: VideoBuffer {
+                                data: write_buff,
+                                tx: buff_tx.clone(),
+                            },
                             width,
                             height,
                             timestamp,
@@ -521,10 +667,18 @@ impl VideoStreamer {
                                 return Ok("Error en el send".into());
                             }
                         }
+
+                        decoded = VideoFrame::empty();
+                        rgba_frame = VideoFrame::empty();
                     }
                 }
                 Err(ffmpeg_next::Error::Eof) => loop {
-                    match commands.recv() {
+                    match commands.recv_timeout(Duration::from_millis(50)) {
+                        Err(RecvTimeoutError::Timeout) => {
+                            if generation.load(Ordering::Acquire) != my_generation {
+                                return Ok("Command timeout".into());
+                            }
+                        }
                         Ok(VideoDecoderCommand::SeekTo(secs)) => {
                             let timestamp = (secs * ffmpeg_next::ffi::AV_TIME_BASE as f32) as i64;
                             ictx.seek(timestamp, ..timestamp)
@@ -533,7 +687,7 @@ impl VideoStreamer {
 
                             seek_target_secs = secs;
                             did_seek = true;
-                            seek_epoch.fetch_add(1, Ordering::Release);
+
                             break;
                         }
                         Ok(VideoDecoderCommand::Pause) => paused = true,
@@ -541,6 +695,10 @@ impl VideoStreamer {
                         Ok(VideoDecoderCommand::Stop) | Err(_) => return Ok("Stop".into()),
                     }
                 },
+
+                Err(ffmpeg_next::Error::Exit) => {
+                    return Ok("Interrumpido por señal".into());
+                }
                 Err(e) => return Err(VideoError::FfmpegError(e)),
             }
         }
@@ -550,9 +708,8 @@ impl VideoStreamer {
 impl Drop for VideoStreamer {
     fn drop(&mut self) {
         self.send(VideoDecoderCommand::Stop);
-
         if let Some(handle) = self.thread.take() {
-            drop(handle);
+            let _ = handle.join();
         }
     }
 }

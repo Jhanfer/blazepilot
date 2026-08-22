@@ -49,7 +49,7 @@ use tokio::sync::Semaphore;
 use tracing::{error, warn};
 use uuid::Uuid;
 
-const DEFAULT_THUMB_CACHE_CAPACITY: usize = 400;
+const DEFAULT_THUMB_CACHE_CAPACITY: usize = 300;
 
 #[derive(Debug, Error)]
 pub enum ThumbError {
@@ -108,7 +108,7 @@ impl ThumbnailManager {
     }
 
     fn with_capacity(cap: usize) -> Self {
-        let def_cap: NonZeroUsize = match NonZeroUsize::new(400) {
+        let def_cap: NonZeroUsize = match NonZeroUsize::new(300) {
             Some(n) => n,
             None => unreachable!(),
         };
@@ -519,6 +519,8 @@ impl ThumbnailManager {
             .best(Type::Video)
             .ok_or(ffmpeg_next::Error::StreamNotFound)?;
 
+        let video_stream_index = video_stream.index();
+
         let context_decoder =
             ffmpeg_next::codec::context::Context::from_parameters(video_stream.parameters())
                 .map_err(ThumbError::FfmpegError)?;
@@ -528,26 +530,30 @@ impl ThumbnailManager {
             .video()
             .map_err(ThumbError::FfmpegError)?;
 
+        let target_width = 64;
+        let target_height = 64;
+
         let mut scaler = ScalingContext::get(
             decoder.format(),
             decoder.width(),
             decoder.height(),
             Pixel::RGBA,
-            decoder.width(),
-            decoder.height(),
+            target_width,
+            target_height,
             Flags::FAST_BILINEAR,
         )
         .map_err(ThumbError::FfmpegError)?;
 
-        let width = decoder.width();
-        let height = decoder.height();
         let mut frame_buffer: Vec<u8> = Vec::new();
-
         let mut packet = Packet::empty();
 
         loop {
             match packet.read(&mut ictx) {
                 Ok(()) => {
+                    if packet.stream() != video_stream_index {
+                        continue;
+                    }
+
                     decoder
                         .send_packet(&packet)
                         .map_err(ThumbError::FfmpegError)?;
@@ -562,19 +568,19 @@ impl ThumbnailManager {
 
                         let stride = rgba_frame.stride(0);
                         let raw = rgba_frame.data(0);
-                        let row_bytes = width as usize * 4;
+                        let row_bytes = target_width as usize * 4;
 
                         frame_buffer.clear();
-                        frame_buffer.reserve(row_bytes * height as usize);
-                        for row in 0..height as usize {
+                        frame_buffer.reserve(row_bytes * target_height as usize);
+                        for row in 0..target_height as usize {
                             let start = row * stride;
                             frame_buffer.extend_from_slice(&raw[start..start + row_bytes]);
                         }
 
                         return Ok(Thumbnail {
                             pixels: Arc::new(frame_buffer),
-                            width,
-                            height,
+                            width: target_width,
+                            height: target_height,
                         });
                     }
                 }
@@ -591,19 +597,19 @@ impl ThumbnailManager {
 
                         let stride = rgba_frame.stride(0);
                         let raw = rgba_frame.data(0);
-                        let row_bytes = width as usize * 4;
+                        let row_bytes = target_width as usize * 4;
 
                         frame_buffer.clear();
-                        frame_buffer.reserve(row_bytes * height as usize);
-                        for row in 0..height as usize {
+                        frame_buffer.reserve(row_bytes * target_height as usize);
+                        for row in 0..target_height as usize {
                             let start = row * stride;
                             frame_buffer.extend_from_slice(&raw[start..start + row_bytes]);
                         }
 
                         return Ok(Thumbnail {
                             pixels: Arc::new(frame_buffer),
-                            width,
-                            height,
+                            width: target_width,
+                            height: target_height,
                         });
                     }
                 }

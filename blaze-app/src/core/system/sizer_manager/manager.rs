@@ -31,7 +31,7 @@ use std::{
     },
     time::{Duration, UNIX_EPOCH},
 };
-use tokio::task::AbortHandle;
+use tokio::{sync::Semaphore, task::AbortHandle};
 use tracing::{info, warn};
 use uuid::Uuid;
 
@@ -54,6 +54,7 @@ type SizerTaskMap = HashMap<Uuid, (AbortHandle, Arc<AtomicBool>)>;
 pub struct SizerManager {
     pub cache_manager: &'static CacheManager,
     active_tasks: Arc<Mutex<SizerTaskMap>>,
+    semaphore: Arc<Semaphore>,
 }
 
 impl SizerManager {
@@ -65,6 +66,7 @@ impl SizerManager {
         Self {
             cache_manager,
             active_tasks: Arc::new(Mutex::new(HashMap::new())),
+            semaphore: Arc::new(Semaphore::new(4)),
         }
     }
 
@@ -118,6 +120,7 @@ impl SizerManager {
                         false
                     } else {
                         cm.size_cache
+                            .lock()
                             .get(key.as_ref())
                             .map(|c| c.modified == current_mtime)
                             .unwrap_or(false)
@@ -143,8 +146,18 @@ impl SizerManager {
                         let path_to_task = path.clone();
                         let active_tasks = self.active_tasks.clone();
 
+                        let semaphore = self.semaphore.clone();
+
                         let abort_handle = TOKIO_RUNTIME
                             .spawn(async move {
+                                let _permit = match semaphore.acquire_owned().await {
+                                    Ok(s) => s,
+                                    Err(e) => {
+                                        warn!("Ha ocurrido un error con el semáforo: {e}");
+                                        return;
+                                    }
+                                };
+
                                 let result = tokio::time::timeout(
                                     Duration::from_secs(300),
                                     Self::get_recursive_size(
@@ -218,7 +231,7 @@ impl SizerManager {
                 .max_depth(50)
                 .skip_hidden(false)
                 .follow_links(false)
-                .parallelism(Parallelism::RayonNewPool(0));
+                .parallelism(Parallelism::Serial);
 
             for entry in walker {
                 if cancel.load(Ordering::Acquire) {
@@ -276,7 +289,7 @@ impl SizerManager {
                 .max_depth(50)
                 .skip_hidden(false)
                 .follow_links(false)
-                .parallelism(Parallelism::RayonNewPool(0));
+                .parallelism(Parallelism::Serial);
 
             for entry in walker {
                 if cancel.load(Ordering::Acquire) {
@@ -289,9 +302,17 @@ impl SizerManager {
                 }
 
                 if let Ok(meta) = entry.metadata() {
-                    let inode = (meta.dev(), meta.ino());
-                    if seen_inodes.lock().insert(inode) {
-                        total.fetch_add(meta.len(), Ordering::Relaxed);
+                    let size = meta.len();
+
+                    let unique = if meta.nlink() > 1 {
+                        let inode = (meta.dev(), meta.ino());
+                        seen_inodes.lock().insert(inode)
+                    } else {
+                        true
+                    };
+
+                    if unique {
+                        total.fetch_add(size, Ordering::Relaxed);
                     }
                 }
             }

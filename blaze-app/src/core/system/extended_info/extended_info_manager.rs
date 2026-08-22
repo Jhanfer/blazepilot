@@ -24,11 +24,12 @@ use crate::core::{
     },
 };
 
+use git2::StatusOptions;
 use lru::LruCache;
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::HashMap,
+    collections::HashSet,
     num::NonZeroUsize,
     time::{Duration, Instant},
 };
@@ -42,6 +43,12 @@ use tokio::sync::Semaphore;
 use tracing::{error, warn};
 use uuid::Uuid;
 use uzers::{get_group_by_gid, get_user_by_uid};
+
+macro_rules! init_usize {
+    ($size:expr) => {
+        NonZeroUsize::new($size as usize).map_or(NonZeroUsize::MIN, |v| v)
+    };
+}
 
 pub enum ExtendedInfoMessages {
     StartScan(Arc<Path>),
@@ -120,19 +127,37 @@ impl GitStatus {
 
 const REPO_CACHE_TTL: Duration = Duration::from_secs(3);
 struct RepoStatusCache {
-    files: HashMap<PathBuf, GitStatus>,
-    dirs: HashMap<PathBuf, GitStatus>,
+    files: Mutex<LruCache<Arc<Path>, GitStatus>>,
+    dirs: Mutex<LruCache<Arc<Path>, GitStatus>>,
+    scanned_dirs: HashSet<Arc<Path>>,
     refreshed_at: Instant,
 }
 
 impl RepoStatusCache {
-    fn build(repo: &git2::Repository) -> Self {
-        let Ok(statuses) = repo.statuses(None) else {
-            return Self::empty();
+    fn build_from_dir(repo: &git2::Repository, dir: &Path, workdir: &Path) -> Self {
+        let mut cache = Self::empty();
+        cache.settle_dir(repo, dir, workdir);
+        cache
+    }
+
+    fn settle_dir(&mut self, repo: &git2::Repository, dir: &Path, workdir: &Path) {
+        let Ok(rel) = dir.strip_prefix(workdir) else {
+            return;
         };
 
-        let mut files: HashMap<PathBuf, GitStatus> = HashMap::new();
-        let mut dirs: HashMap<PathBuf, GitStatus> = HashMap::new();
+        if self.scanned_dirs.contains(rel) {
+            return;
+        }
+
+        let mut ops = StatusOptions::new();
+        ops.include_untracked(true)
+            .recurse_untracked_dirs(false)
+            .include_ignored(false)
+            .pathspec(rel.to_string_lossy().as_ref());
+
+        let Ok(statuses) = repo.statuses(Some(&mut ops)) else {
+            return;
+        };
 
         for entry in statuses.iter() {
             let status = entry.status();
@@ -150,32 +175,39 @@ impl RepoStatusCache {
 
             let git_status = Self::classify(status);
 
-            files.insert(rel.clone(), git_status.clone());
+            self.files
+                .lock()
+                .put(rel.clone().into(), git_status.clone());
 
             let mut current = rel.parent();
             while let Some(dir) = current {
                 if dir == Path::new("") {
                     break;
                 };
-                let entry = dirs.entry(dir.to_path_buf()).or_insert(GitStatus::Clean);
-                if git_status.priority() > entry.priority() {
-                    *entry = git_status.clone();
+
+                let mut dirs_lr = self.dirs.lock();
+
+                if let Some(entry) = dirs_lr.get_mut(dir) {
+                    if git_status.priority() > entry.priority() {
+                        *entry = git_status.clone();
+                    }
+                } else {
+                    dirs_lr.put(dir.into(), git_status.clone());
                 }
                 current = dir.parent();
             }
         }
 
-        Self {
-            files,
-            dirs,
-            refreshed_at: Instant::now(),
-        }
+        self.scanned_dirs.insert(rel.into());
+        self.refreshed_at = Instant::now();
     }
 
     fn empty() -> Self {
+        let cap = init_usize!(5);
         Self {
-            files: HashMap::new(),
-            dirs: HashMap::new(),
+            files: Mutex::new(LruCache::new(cap)),
+            dirs: Mutex::new(LruCache::new(cap)),
+            scanned_dirs: HashSet::new(),
             refreshed_at: Instant::now(),
         }
     }
@@ -203,12 +235,13 @@ impl RepoStatusCache {
     }
 }
 
-const DEFAULT_INFO_CACHE_CAPACITY: usize = 2_000;
+const DEFAULT_INFO_CACHE_CAPACITY: usize = 16;
 pub struct ExtendedInfoManager {
     pub cache_manager: &'static CacheManager,
     pub info_map: Arc<RwLock<LruCache<Arc<Path>, ExtendedInfo>>>,
     pub semaphore: Arc<Semaphore>,
-    repo_cache: Arc<Mutex<HashMap<PathBuf, RepoStatusCache>>>,
+    work_dir_cache: Arc<Mutex<LruCache<Arc<Path>, Arc<Path>>>>,
+    repo_cache: Arc<Mutex<LruCache<Arc<Path>, RepoStatusCache>>>,
 }
 
 impl ExtendedInfoManager {
@@ -222,17 +255,16 @@ impl ExtendedInfoManager {
     }
 
     fn with_capacity(cap: usize, cache_manager: &'static CacheManager) -> Self {
-        let def_cap = match NonZeroUsize::new(2000) {
-            Some(cap) => cap,
-            None => unreachable!(),
-        };
-        let cap = NonZeroUsize::new(cap).unwrap_or(def_cap);
+        let info_map_cap = init_usize!(cap);
+        let repo_cache_cap = init_usize!(16);
+        let work_dir_cache_cap = init_usize!(256);
 
         Self {
             cache_manager,
-            info_map: Arc::new(RwLock::new(LruCache::new(cap))),
+            info_map: Arc::new(RwLock::new(LruCache::new(info_map_cap))),
             semaphore: Arc::new(tokio::sync::Semaphore::new(8)),
-            repo_cache: Arc::new(Mutex::new(HashMap::new())),
+            repo_cache: Arc::new(Mutex::new(LruCache::new(repo_cache_cap))),
+            work_dir_cache: Arc::new(Mutex::new(LruCache::new(work_dir_cache_cap))),
         }
     }
 
@@ -262,6 +294,7 @@ impl ExtendedInfoManager {
     fn requst_scan(&self, path_buf: Arc<Path>, current_mtime: u64, sender: &Dispatcher) {
         let info_map = self.info_map.clone();
         let repo_cache = self.repo_cache.clone();
+        let work_dir_cache = self.work_dir_cache.clone();
         let path_to_task = path_buf.clone();
         let sem = self.semaphore.clone();
         let sender = sender.clone();
@@ -275,7 +308,7 @@ impl ExtendedInfoManager {
                 }
             };
 
-            match Self::scan(path_buf.clone(), repo_cache).await {
+            match Self::scan(path_buf.clone(), repo_cache, work_dir_cache).await {
                 Ok(info) => {
                     match info_map.write() {
                         Ok(mut g) => {
@@ -358,6 +391,7 @@ impl ExtendedInfoManager {
                         false
                     } else {
                         cm.extended_info_cache
+                            .lock()
                             .get(key.as_ref())
                             .map(|c| c.modified == current_mtime)
                             .unwrap_or(false)
@@ -399,7 +433,8 @@ impl ExtendedInfoManager {
 
     async fn scan(
         path: Arc<Path>,
-        repo_cache: Arc<Mutex<HashMap<PathBuf, RepoStatusCache>>>,
+        repo_cache: Arc<Mutex<LruCache<Arc<Path>, RepoStatusCache>>>,
+        work_dir_cache: Arc<Mutex<LruCache<Arc<Path>, Arc<Path>>>>,
     ) -> ExtendedInfoResult<ExtendedInfo> {
         let m = match tokio::fs::symlink_metadata(&path).await {
             Ok(m) => m,
@@ -482,10 +517,12 @@ impl ExtendedInfoManager {
         let git_status = {
             let path_clone = path.clone();
             let cache_clone = repo_cache.clone();
-            let res =
-                tokio::task::spawn_blocking(move || Self::get_git_status(path_clone, &cache_clone))
-                    .await
-                    .map_err(ExtendedInfoError::ThreadError)?;
+            let work_dir_cache_clone = work_dir_cache.clone();
+            let res = tokio::task::spawn_blocking(move || {
+                Self::get_git_status(path_clone, &cache_clone, &work_dir_cache_clone)
+            })
+            .await
+            .map_err(ExtendedInfoError::ThreadError)?;
 
             match res {
                 Ok(status) => Some(status),
@@ -505,7 +542,8 @@ impl ExtendedInfoManager {
 
     fn get_git_status(
         path: Arc<Path>,
-        repo_cache: &Mutex<HashMap<PathBuf, RepoStatusCache>>,
+        repo_cache: &Arc<Mutex<LruCache<Arc<Path>, RepoStatusCache>>>,
+        work_dir_cache: &Arc<Mutex<LruCache<Arc<Path>, Arc<Path>>>>,
     ) -> ExtendedInfoResult<GitStatus> {
         let repo = git2::Repository::discover(&path).map_err(ExtendedInfoError::GitError)?;
 
@@ -513,34 +551,65 @@ impl ExtendedInfoManager {
             return Ok(GitStatus::Clean);
         }
 
-        let workdir = repo.workdir().unwrap_or(Path::new(".")).to_path_buf();
+        let scan_dir = if path.is_dir() {
+            &*path
+        } else {
+            path.parent().unwrap_or(&path)
+        };
+
+        let workdir: Arc<Path> = {
+            let mut wdc = work_dir_cache.lock();
+            if let Some(cached_work_dir) = wdc.get(scan_dir) {
+                cached_work_dir.clone()
+            } else {
+                let repo =
+                    git2::Repository::discover(&path).map_err(ExtendedInfoError::GitError)?;
+
+                let wd: Arc<Path> = repo.workdir().unwrap_or(Path::new("")).into();
+
+                wdc.put(scan_dir.into(), wd.clone());
+                wd
+            }
+        };
 
         let relative = path
             .strip_prefix(&workdir)
-            .map_err(ExtendedInfoError::StripPrefixError)?
-            .to_path_buf();
+            .map_err(ExtendedInfoError::StripPrefixError)?;
 
         let mut cache_guard = repo_cache.lock();
-        let entry = cache_guard
-            .entry(workdir)
-            .or_insert_with(|| RepoStatusCache::build(&repo));
 
-        if entry.is_stale() {
-            *entry = RepoStatusCache::build(&repo);
+        let needs_full_rebuild: bool = cache_guard
+            .get(&workdir)
+            .map(|e| e.is_stale())
+            .unwrap_or(true);
+
+        if needs_full_rebuild {
+            cache_guard.put(
+                workdir.clone(),
+                RepoStatusCache::build_from_dir(&repo, scan_dir, &workdir),
+            );
+        } else if let Some(entry) = cache_guard.get_mut(&workdir) {
+            entry.settle_dir(&repo, scan_dir, &workdir)
         }
 
-        let status = if path.is_dir() {
-            entry
-                .dirs
-                .get(&relative)
-                .cloned()
-                .unwrap_or(GitStatus::Clean)
+        let status = if let Some(entry) = cache_guard.get(&workdir) {
+            if path.is_dir() {
+                entry
+                    .dirs
+                    .lock()
+                    .get(relative)
+                    .cloned()
+                    .unwrap_or(GitStatus::Clean)
+            } else {
+                entry
+                    .files
+                    .lock()
+                    .get(relative)
+                    .cloned()
+                    .unwrap_or(GitStatus::Clean)
+            }
         } else {
-            entry
-                .files
-                .get(&relative)
-                .cloned()
-                .unwrap_or(GitStatus::Clean)
+            GitStatus::Clean
         };
 
         Ok(status)

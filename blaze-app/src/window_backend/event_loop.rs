@@ -196,6 +196,9 @@ fn raw_display_handle(window: &Window) -> Option<*mut std::ffi::c_void> {
 
 impl Drop for BlazeEventLoop {
     fn drop(&mut self) {
-        debug!("Dropeo de BlazeEventLoop");
+        drop(self.renderer.take());
+        drop(self.egui_state.take());
+        drop(self.window.take());
+        debug!("BlazeEventLoop destruido correctamente");
     }
 }

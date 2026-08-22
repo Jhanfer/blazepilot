@@ -66,7 +66,7 @@ impl BlazeUiState {
         let dialog_manager = DialogManager::new();
         Self {
             dialog_manager,
-            icon_cache: IconCache::new(),
+            icon_cache: IconCache::new(500),
             folder_color_manager: FolderColorManager::new(),
             context_menu_state: ContextMenuState::new(),
             thumb_texture_cache: HashMap::new(),
@@ -80,10 +80,28 @@ impl BlazeUiState {
         }
     }
 
+    pub fn cleanup(&mut self) {
+        while self.thumb_texture_cache.len() > 300 {
+            if let Some(key) = self.thumb_texture_cache.keys().next().cloned() {
+                self.thumb_texture_cache.remove(&key);
+            }
+
+            if let Some(mut cache) = self.thumbnail_manager.thumb_map.try_write() {
+                cache.pop_lru();
+            }
+        }
+
+        self.calculated_thumbnails
+            .retain(|p| self.thumb_texture_cache.contains_key(p));
+        self.calculating_thumbnails
+            .retain(|p| self.thumb_texture_cache.contains_key(p));
+    }
+
     pub fn evict_thumbnail_cache_if_dir_changed(&mut self, cwd: &Path) {
         let changed = self.last_thumb_cache_dir.as_deref() != Some(cwd);
 
         if changed {
+            self.thumbnail_manager.thumb_map.write().clear();
             self.thumb_texture_cache.clear();
             self.calculating_thumbnails.clear();
             self.calculated_thumbnails.clear();
