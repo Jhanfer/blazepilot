@@ -277,9 +277,12 @@ pub fn grid_panel_frame(
 
                 let file_name = file.name.clone();
                 let dir = state.cwd.clone();
+
+                let token = with_fonts(|f| f.cancellation_token.clone());
+
                 TOKIO_RUNTIME.spawn_blocking(move || {
                     with_fonts(|f| {
-                        if !f.cancellation_token.is_cancelled() {
+                        if !token.is_cancelled() {
                             f.process_file(&file_name, dir);
                         }
                     });
