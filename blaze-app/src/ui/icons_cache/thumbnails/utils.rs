@@ -11,7 +11,7 @@ pub fn resolve_tiff_data(
                 data
             } else if data.len() == (w * h * 3) as usize {
                 let mut rgba = Vec::with_capacity((w * h * 4) as usize);
-                for chunk in data.chunks_exact(3) {
+                for chunk in data.as_chunks::<3>().0 {
                     rgba.extend_from_slice(&[chunk[0], chunk[1], chunk[2], 255]);
                 }
                 rgba
