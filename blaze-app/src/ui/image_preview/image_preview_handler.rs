@@ -375,7 +375,7 @@ impl ImagePreviewState {
         let rgba_buf = if !has_alpha {
             let mut converted = Vec::with_capacity((w * h * 4) as usize);
 
-            for chunk in raw_buf.chunks_exact(3) {
+            for chunk in raw_buf.as_chunks::<3>().0 {
                 converted.extend_from_slice(&[chunk[0], chunk[1], chunk[2], 255]);
             }
             converted
