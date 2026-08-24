@@ -14,12 +14,14 @@ pub fn resolve_tiff_data(
                 for chunk in data.as_chunks::<3>().0 {
                     rgba.extend_from_slice(&[chunk[0], chunk[1], chunk[2], 255]);
                 }
+                drop(data);
                 rgba
             } else if data.len() == (w * h) as usize {
                 let mut rgba = Vec::with_capacity((w * h * 4) as usize);
                 for &pixel in &data {
                     rgba.extend_from_slice(&[pixel, pixel, pixel, 255]);
                 }
+                drop(data);
                 rgba
             } else {
                 return Err(ThumbError::ImageError);
@@ -31,6 +33,7 @@ pub fn resolve_tiff_data(
                 let p = (pixel >> 8) as u8;
                 rgba.extend_from_slice(&[p, p, p, 255]);
             }
+            drop(data);
             rgba
         }
         tiff::decoder::DecodingResult::U32(data) => {
@@ -39,6 +42,7 @@ pub fn resolve_tiff_data(
                 let p = (pixel / 16843009) as u8;
                 rgba.extend_from_slice(&[p, p, p, 255]);
             }
+            drop(data);
             rgba
         }
         tiff::decoder::DecodingResult::U64(data) => {
@@ -47,6 +51,7 @@ pub fn resolve_tiff_data(
                 let p = (pixel / 72340172838076673) as u8;
                 rgba.extend_from_slice(&[p, p, p, 255]);
             }
+            drop(data);
             rgba
         }
         tiff::decoder::DecodingResult::F32(data) => {
@@ -55,6 +60,7 @@ pub fn resolve_tiff_data(
                 let p = (pixel * 255.0) as u8;
                 rgba.extend_from_slice(&[p, p, p, 255]);
             }
+            drop(data);
             rgba
         }
         tiff::decoder::DecodingResult::F64(data) => {
@@ -63,6 +69,7 @@ pub fn resolve_tiff_data(
                 let p = (pixel * 255.0) as u8;
                 rgba.extend_from_slice(&[p, p, p, 255]);
             }
+            drop(data);
             rgba
         }
         tiff::decoder::DecodingResult::I8(data) => {
@@ -71,6 +78,7 @@ pub fn resolve_tiff_data(
                 let p = (pixel as i16 + 128) as u8;
                 rgba.extend_from_slice(&[p, p, p, 255]);
             }
+            drop(data);
             rgba
         }
         tiff::decoder::DecodingResult::I16(data) => {
@@ -79,6 +87,7 @@ pub fn resolve_tiff_data(
                 let p = ((pixel as i32 + 32768) / 257) as u8;
                 rgba.extend_from_slice(&[p, p, p, 255]);
             }
+            drop(data);
             rgba
         }
         tiff::decoder::DecodingResult::I32(data) => {
@@ -87,6 +96,7 @@ pub fn resolve_tiff_data(
                 let p = ((pixel as i64 + 2147483648) / 16843009) as u8;
                 rgba.extend_from_slice(&[p, p, p, 255]);
             }
+            drop(data);
             rgba
         }
         tiff::decoder::DecodingResult::I64(data) => {
@@ -95,6 +105,7 @@ pub fn resolve_tiff_data(
                 let p = ((pixel as i128 + 9223372036854775808) / 72340172838076673) as u8;
                 rgba.extend_from_slice(&[p, p, p, 255]);
             }
+            drop(data);
             rgba
         }
         tiff::decoder::DecodingResult::F16(data) => {
@@ -105,6 +116,8 @@ pub fn resolve_tiff_data(
                 let p = (clamped * 255.0) as u8;
                 rgba.extend_from_slice(&[p, p, p, 255]);
             }
+
+            drop(data);
             rgba
         }
     };
