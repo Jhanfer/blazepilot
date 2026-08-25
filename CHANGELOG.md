@@ -1,6 +1,37 @@
 # Changelog
 
 ---
+## [0.20.0](https://github.com/Jhanfer/blazepilot/compare/v0.19.1..v0.20.0) - 2026-08-25
+
+### ✦ Bug fixes
+
+- **(fonts)** Corrige condición de carrera en token de cancelación([`5028ad3`](https://github.com/Jhanfer/blazepilot/commit/5028ad363e0c7670ff97d6fc1052e87c928106ce)) - Jhanfer
+- **(wayland_dnd)** Espera al hilo DnD antes de destruir wl_display([`f90a4d6`](https://github.com/Jhanfer/blazepilot/commit/f90a4d6abf974d8c1a9119bad8168fa9a37aadf3)) - Jhanfer
+
+### ✦ Docs
+
+- **(readme)** Rediseña documentación con gifs, añade logo y elimina recursos obsoletos([`18516b9`](https://github.com/Jhanfer/blazepilot/commit/18516b92e330283cdd2be38131e334a9717d9848)) - Jhanfer
+- **(readme)** Actualiza README.md por limpieza([`d81e67b`](https://github.com/Jhanfer/blazepilot/commit/d81e67b3d7524e4d08705bfa660fe62f8b4722f6)) - Jhanfer
+
+### ✦ Miscelánea
+
+-  Cambia a un nivel más bajo de compresión en UPX([`eafdf8d`](https://github.com/Jhanfer/blazepilot/commit/eafdf8de1c6197cbdcb5b7d8c0d2d11c74db0868)) - Jhanfer
+-  Arregla avisos clippy chunks_exact([`f1fec2c`](https://github.com/Jhanfer/blazepilot/commit/f1fec2c0e88a956277e9a05bcaf01a619d268c92)) - Jhanfer
+-  Arregla aviso clippy chunks_exact en thumbnails/utils.rs([`62e3536`](https://github.com/Jhanfer/blazepilot/commit/62e3536dc3fbedc78a567a667e72b99bffb5e55f)) - Jhanfer
+
+### ✦ Performance
+
+- **(core)** Optimiza cachés con LruCache, refactoriza reproductor multimedia y mejora gestión de fuentes por directorio([`88f165e`](https://github.com/Jhanfer/blazepilot/commit/88f165e373d19f56e33fd11ff4f3937699344e6b)) - Jhanfer
+- **(memory)** Configura mimalloc con purga agresiva, libera memoria por frame y mejora gestión de texturas([`9bb8c0a`](https://github.com/Jhanfer/blazepilot/commit/9bb8c0a9a1c2f7dc59a69e31345dfce1a6203de2)) - Jhanfer
+- **(memory)** Corrige constantes mimalloc, mueve free_mi a limpieza periódica y optimiza concurrencia con Arc y peek([`bac47b8`](https://github.com/Jhanfer/blazepilot/commit/bac47b83612fdd620220ded4d876492a12f11c8b)) - Jhanfer
+- **(sizer)** Optimiza uso de memoria y actualizaciones de sizes([`d2c03d4`](https://github.com/Jhanfer/blazepilot/commit/d2c03d4929759f0bb9c36b87db2efbbb23568994)) - Jhanfer
+- **(thumbnails)** Añade límites de tamaño, optimiza memoria con BufReader y mejora seek en video([`40158a4`](https://github.com/Jhanfer/blazepilot/commit/40158a4b01960dfcf2981f05fc010a0c3155bd30)) - Jhanfer
+
+### ✦ Refactor
+
+- **(window)** Migra de eframe a winit y wgpu, añade backend propio y mejora control de renderizado([`c310f6c`](https://github.com/Jhanfer/blazepilot/commit/c310f6c4db6c75b474f06d79f59a10c4c87ffc45)) - Jhanfer
+
+---
 ## [0.19.1](https://github.com/Jhanfer/blazepilot/compare/v0.19.0..v0.19.1) - 2026-08-03
 
 ### ✦ Bug fixes
