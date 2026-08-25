@@ -97,7 +97,7 @@ impl AppSelectorDialog {
         let path_clone = path.clone();
         let slot_clone = slot.clone();
 
-        let manager = opener.lock();
+        let mut manager = opener.lock();
         match manager.get_all_apps(path_clone) {
             Ok(apps) => {
                 let mut guard = slot_clone.lock();
@@ -287,7 +287,7 @@ impl AppSelectorDialog {
                     let opener_clone = opener.clone();
 
                     TOKIO_RUNTIME.spawn_blocking(move || {
-                        let opener = opener_clone.lock();
+                        let mut opener = opener_clone.lock();
                         // save_to_system = false: solo guarda en BlazePilot,
                         // no toca mimeapps.list del sistema
                         if let Err(e) = opener.set_default_app(path_owned.clone(), &app_id, false) {

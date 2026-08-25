@@ -301,13 +301,13 @@ pub fn tag_views(
 
                                 ui.add_space(10.0);
 
-                                let thumb_snapshot: HashMap<Arc<Path>, Thumbnail> = {
-                                    let mut guard = ui_state.thumbnail_manager.thumb_map.write();
+                                let thumb_snapshot: HashMap<Arc<Path>, Arc<Thumbnail>> = {
+                                    let guard = ui_state.thumbnail_manager.thumb_map.read();
                                     tags.iter()
                                         .flat_map(|t| &t.items)
                                         .filter_map(|item| {
                                             guard
-                                                .get(&item.path)
+                                                .peek(&item.path)
                                                 .cloned()
                                                 .map(|t| (item.path.clone(), t))
                                         })

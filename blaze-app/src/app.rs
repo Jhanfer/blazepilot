@@ -26,10 +26,13 @@ use crate::ui::fonts::fonts_manager::with_fonts;
 use crate::ui::modules::ui_callback::connect_ui_components_callback;
 use crate::ui::themes::platform::structs::ToColor;
 use crate::ui::themes::theme_manager::with_theme;
-use eframe::Frame;
+use crate::utils::mimalloc_fn::free_mi;
+use crate::window_backend::repaint_signal::RepaintSignal;
 use egui::Ui;
 use std::path::Path;
 use std::sync::Arc;
+use std::sync::atomic::Ordering;
+use std::time::{Duration, Instant};
 use tracing::error;
 
 #[must_use = "llama .build() para construir la aap"]
@@ -72,6 +75,8 @@ impl BlazeAppBuilder {
             state,
             ui_state,
             dnd,
+            repaint_signal: RepaintSignal::new(),
+            past_cleanup: Instant::now(),
         }
     }
 }
@@ -86,6 +91,8 @@ pub struct BlazeApp {
     pub state: BlazeCoreState,  //motor, archivos, mover
     pub ui_state: BlazeUiState, //visuales
     pub dnd: Option<WaylandDndReceiver>,
+    repaint_signal: RepaintSignal,
+    past_cleanup: Instant,
 }
 
 impl BlazeApp {
@@ -132,8 +139,8 @@ impl BlazeApp {
     }
 }
 
-impl eframe::App for BlazeApp {
-    fn raw_input_hook(&mut self, ctx: &egui::Context, raw_input: &mut egui::RawInput) {
+impl BlazeApp {
+    pub fn raw_input_hook(&mut self, ctx: &egui::Context, raw_input: &mut egui::RawInput) {
         //limpiar keyboard_state
         with_keyboard_state(|k| k.clear());
 
@@ -183,8 +190,14 @@ impl eframe::App for BlazeApp {
         }
     }
 
-    fn ui(&mut self, ui: &mut Ui, _frame: &mut Frame) {
+    pub fn ui(&mut self, ui: &mut Ui) {
         self.set_custom_visuals(ui);
+
+        if self.past_cleanup.elapsed() > Duration::from_secs(1) {
+            self.ui_state.cleanup();
+            self.past_cleanup = Instant::now();
+            unsafe { free_mi() };
+        }
 
         //Nuevo cargador de fuentes dinámico
         // Recarga las fuentes en caso de necesitarse
@@ -192,7 +205,15 @@ impl eframe::App for BlazeApp {
             if f.dirty {
                 let defs = f.build_font_definitions();
                 ui.set_fonts(defs);
+                ui.request_repaint();
                 f.dirty = false;
+            }
+
+            if f.needs_rebuild && f.pending_tasks.load(Ordering::Relaxed) == 0 {
+                f.needs_rebuild = false;
+
+                let defs = f.build_font_definitions();
+                ui.set_fonts(defs);
                 ui.request_repaint();
             }
         });
@@ -215,17 +236,25 @@ impl eframe::App for BlazeApp {
         connect_ui_components_callback(ui, &files, &mut self.state, &mut self.ui_state);
 
         if self.state.is_loading || self.state.active_tasks > 0 {
+            self.repaint_signal.request_repaint_immediate();
             ui.request_repaint();
         } else {
+            self.repaint_signal.request_repaint_after(100);
             ui.request_repaint_after(std::time::Duration::from_millis(100));
         }
     }
 
-    fn on_exit(&mut self) {
+    pub fn on_exit(&mut self) {
         with_configs(|c| match c.force_save() {
             Ok(_) => {}
             Err(e) => error!("Ha ocurrido un error de guardado: {e}."),
         });
         self.state.save_caches(true);
+    }
+}
+
+impl Drop for BlazeApp {
+    fn drop(&mut self) {
+        tracing::debug!("Dropeo de BlazeApp");
     }
 }

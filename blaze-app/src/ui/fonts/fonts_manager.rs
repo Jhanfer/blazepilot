@@ -13,19 +13,17 @@
 // limitations under the License.
 
 use egui::{FontData, FontDefinitions, FontFamily};
-use lru::LruCache;
 use parking_lot::Mutex;
-use std::num::NonZeroUsize;
+use std::collections::{HashMap, HashSet};
+use std::path::Path;
+use std::sync::atomic::AtomicUsize;
 use std::sync::{Arc, LazyLock};
+use tokio_util::sync::CancellationToken;
 
 pub static GLOBAL_FONT_MANAGER: LazyLock<Mutex<FontManager>> =
     LazyLock::new(|| Mutex::new(FontManager::new()));
 
 pub fn with_fonts<F>(f: impl FnOnce(&mut FontManager) -> F) -> F {
-    //Caregar fuente estática
-    {
-        GLOBAL_FONT_MANAGER.lock().load_custom_font();
-    }
     f(&mut GLOBAL_FONT_MANAGER.lock())
 }
 
@@ -71,53 +69,72 @@ enum FontScripts {
     Pa = 1 << 27,
 }
 
-pub struct CustomFontData {
-    data: Vec<u8>,
-}
-
 pub struct FontManager {
-    cache: Mutex<LruCache<String, Arc<CustomFontData>>>,
-    pub loaded_scripts: u32,
+    pub fonts_cache: HashMap<Box<str>, Arc<FontData>>,
+    pub active_fonts: Vec<Box<str>>,
+    current_dir: Option<Arc<Path>>,
+    fonts_dir: HashMap<Arc<Path>, HashSet<Box<str>>>,
     pub dirty: bool,
-    pub fonts: FontDefinitions,
+    pub needs_rebuild: bool,
+    pub pending_tasks: Arc<AtomicUsize>,
+    pub cancellation_token: CancellationToken,
 }
 
 impl FontManager {
     pub fn new() -> Self {
-        let def_cap: NonZeroUsize = match NonZeroUsize::new(10) {
-            Some(n) => n,
-            None => unreachable!(),
-        };
-        let cap = NonZeroUsize::new(10).unwrap_or(def_cap);
         Self {
-            cache: Mutex::new(LruCache::new(cap)),
-            loaded_scripts: 0,
-            dirty: true,
-            fonts: FontDefinitions::empty(),
+            fonts_cache: HashMap::new(),
+            active_fonts: Vec::new(),
+            fonts_dir: HashMap::new(),
+            current_dir: None,
+            dirty: false,
+            needs_rebuild: false,
+            pending_tasks: Arc::new(AtomicUsize::new(0)),
+            cancellation_token: CancellationToken::new(),
         }
     }
 
-    pub fn load_custom_font(&mut self) {
-        //cargado de la fuente estática
-        self.fonts.font_data.insert(
-            "NotoSans".to_owned(),
-            FontData::from_static(include_bytes!(
-                "../.././ui/assets/noto/NotoSans-Regular.ttf"
-            ))
-            .into(),
-        );
+    pub fn enter_dir(&mut self, path: &Arc<Path>) {
+        let new_dir = path.clone();
 
-        self.fonts
-            .families
-            .entry(FontFamily::Proportional)
-            .or_default()
-            .insert(0, "NotoSans".to_owned());
+        if let Some(ref old_dir) = self.current_dir {
+            if *old_dir == new_dir {
+                return;
+            }
+            self.cancellation_token.cancel();
+            self.cancellation_token = CancellationToken::new();
+            self.leave_directory(&old_dir.clone());
+        }
 
-        self.fonts
-            .families
-            .entry(FontFamily::Monospace)
-            .or_default()
-            .insert(0, "NotoSans".to_owned());
+        self.current_dir = Some(new_dir);
+        self.dirty = true;
+    }
+
+    pub fn leave_directory(&mut self, path: &Arc<Path>) {
+        let keys_to_remove = self.fonts_dir.remove(path).unwrap_or_default();
+
+        let still_need: HashSet<Box<str>> = self
+            .fonts_dir
+            .values()
+            .flat_map(|set| set.iter().cloned())
+            .collect();
+
+        for k in &keys_to_remove {
+            if !still_need.contains(k) {
+                self.fonts_cache.remove(k);
+            }
+        }
+
+        self.active_fonts
+            .retain(|key| self.fonts_cache.contains_key(key));
+
+        if !keys_to_remove.is_empty() {
+            self.needs_rebuild = true;
+        }
+
+        if self.current_dir.as_ref() == Some(path) {
+            self.current_dir = None;
+        }
     }
 
     fn load_system_fonts<'a>(
@@ -142,33 +159,106 @@ impl FontManager {
         Some(result)
     }
 
-    pub fn process_file(&mut self, text: &str) {
+    pub fn process_file(&mut self, text: &str, dir: Arc<Path>) {
         //procesa cada nobre de archivo buscando la fuentes correspondioentes por caracteres
         let required = self.detect_scripts(text);
+        let candidates = self.get_required_fonts(required);
 
-        if (required & !self.loaded_scripts) == 0 {
+        let missing: Vec<_> = candidates
+            .into_iter()
+            .filter(|(_, key)| !self.fonts_cache.contains_key(*key))
+            .collect();
+
+        if missing.is_empty() {
             return;
         }
 
-        let missing = required & !self.loaded_scripts;
+        if let Some(sys_fonts) = self.load_system_fonts(&missing) {
+            for (key, bytes) in sys_fonts {
+                let key: Box<str> = key.into();
 
-        self.loaded_scripts |= missing;
+                if self.fonts_cache.contains_key(&key) {
+                    continue;
+                }
 
-        let candidates = self.get_required_fonts(missing);
+                let font_data = Arc::new(FontData::from_owned(bytes));
 
-        match self.load_system_fonts(&candidates) {
-            Some(sys_fonts) => {
-                let mut cache = self.cache.lock();
+                self.fonts_cache.insert(key.clone(), font_data);
 
-                for (key, bytes) in sys_fonts {
-                    //asignación de bytes al caché
-                    cache.put(key.to_string(), Arc::new(CustomFontData { data: bytes }));
+                self.fonts_dir
+                    .entry(dir.clone())
+                    .or_default()
+                    .insert(key.clone());
+
+                if !self.active_fonts.iter().any(|k| k == &key) {
+                    self.active_fonts.push(key);
                 }
             }
-            None => return,
         }
 
         self.dirty = true;
+    }
+
+    pub fn build_font_definitions(&mut self) -> FontDefinitions {
+        //uso de default para las fuentes de emojis
+        let mut fonts = FontDefinitions::default();
+
+        //se elimina todas las fuentes default que no se vayan a usar
+        fonts.font_data.retain(|name, _| {
+            let lower = name.to_lowercase();
+            lower.contains("emoji")
+        });
+
+        for family_vec in fonts.families.values_mut() {
+            family_vec.retain(|name| {
+                let lower = name.to_lowercase();
+                lower.contains("emoji")
+            });
+        }
+
+        //cargado de la fuente estática
+        fonts.font_data.insert(
+            "NotoSans".to_owned(),
+            FontData::from_static(include_bytes!(
+                "../.././ui/assets/noto/NotoSans-Regular.ttf"
+            ))
+            .into(),
+        );
+        fonts
+            .families
+            .entry(FontFamily::Proportional)
+            .or_default()
+            .insert(0, "NotoSans".to_owned());
+        fonts
+            .families
+            .entry(FontFamily::Monospace)
+            .or_default()
+            .insert(0, "NotoSans".to_owned());
+
+        for keys in &self.active_fonts {
+            let key_str: String = keys.to_string();
+            if key_str == "NotoSans" {
+                continue;
+            };
+
+            let Some(font_data_arc) = self.fonts_cache.get(keys) else {
+                continue;
+            };
+
+            fonts
+                .font_data
+                .insert(key_str.clone(), font_data_arc.clone());
+
+            fonts
+                .families
+                .entry(FontFamily::Proportional)
+                .or_default()
+                .push(key_str);
+        }
+
+        self.dirty = false;
+
+        fonts
     }
 
     pub fn detect_scripts(&self, text: &str) -> u32 {
@@ -348,35 +438,21 @@ impl FontManager {
 
         fonts
     }
-
-    pub fn build_font_definitions(&mut self) -> FontDefinitions {
-        //construye las fuentes para egui usando la caché generada
-        let cache = self.cache.lock();
-
-        for (key, bytes) in cache.iter() {
-            self.fonts.font_data.insert(
-                key.to_owned(),
-                FontData::from_owned(bytes.data.clone()).into(),
-            );
-
-            self.fonts
-                .families
-                .entry(FontFamily::Proportional)
-                .or_default()
-                .push(key.clone());
-        }
-
-        self.fonts.clone()
-    }
 }
 
 #[cfg(test)]
 mod test {
     use crate::ui::fonts::fonts_manager::FontManager;
+    use std::path::Path;
 
     fn test_text(text: &str) {
         let mut fm = FontManager::new();
-        fm.process_file(text);
+
+        let counter = fm.pending_tasks.clone();
+        counter.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        fm.process_file(text, Path::new("").into());
+        counter.fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
+
         let font_defs = fm.build_font_definitions();
 
         assert!(

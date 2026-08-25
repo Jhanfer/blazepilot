@@ -26,7 +26,7 @@ use egui::{
     Align2, Color32, CornerRadius, Frame, Key, Margin, Order, Rect, Sense, Slider, SliderClamping,
     Stroke, Ui, Vec2, Window, pos2, vec2,
 };
-use tracing::warn;
+use tracing::{debug, warn};
 
 pub struct MediaPlayerDialog {
     pub show_modal: bool,
@@ -71,21 +71,40 @@ impl MediaPlayerDialog {
 
     pub fn close(&mut self) {
         self.show_modal = false;
-        if self.is_playing() {
-            self.media_player.stop();
-        }
+        self.media_player.stop();
         self.has_started = false;
     }
 
     pub fn open(&mut self, media_path: Arc<Path>, media_name: Box<str>, is_audio_only: bool) {
+        let mut buf = [0u8; 32];
+        match File::open(&media_path) {
+            Ok(mut file) => match file.read(&mut buf) {
+                Ok(_) => {
+                    let file_ext = sniff_magic_bytes(&buf).unwrap_or(FileExtension::Unknown);
+
+                    if !file_ext.is_audio() && !file_ext.is_video() {
+                        warn!("No es un media file");
+                        self.close();
+                        return;
+                    }
+                }
+                Err(e) => {
+                    warn!("Ha ocurrido un error al intentear leer el file: {e}");
+                    self.close();
+                    return;
+                }
+            },
+            Err(e) => {
+                warn!("Ha ocurrido un error al intentear abrir el file: {e}");
+                self.close();
+                return;
+            }
+        }
+
         self.show_modal = true;
         self.media_path = Some(media_path);
         self.media_name = Some(media_name);
         self.is_audio_only = is_audio_only;
-    }
-
-    fn is_playing(&self) -> bool {
-        self.media_player.is_playing()
     }
 
     fn render_preview(&mut self, ui: &mut Ui, path: Arc<Path>, should_close: &mut bool) {
@@ -152,13 +171,13 @@ impl MediaPlayerDialog {
                 );
 
                 if response.drag_started() {
-                    eprintln!("DragStarted");
+                    debug!("DragStarted");
                     self.timeline_dragging = true;
                 }
 
                 if response.drag_stopped() {
                     self.timeline_dragging = false;
-                    eprintln!("DragStopped: {}", self.timeline);
+                    debug!("DragStopped: {}", self.timeline);
                     self.media_player.seek(self.timeline);
                 }
 
@@ -188,18 +207,19 @@ impl MediaPlayerDialog {
 
                 self.media_player.volume(self.current_volume);
 
-                ui.request_repaint();
+                if (self.current_volume - self.target_volume).abs() > 0.001 {
+                    ui.request_repaint();
+                }
             });
         }
 
-        let input = ui.input(|i| i.clone());
-        if input.key_pressed(Key::ArrowRight) {
+        if ui.input(|i| i.key_pressed(Key::ArrowRight)) {
             self.media_player.seek_5s_forward();
         }
-        if input.key_pressed(Key::ArrowLeft) {
+        if ui.input(|i| i.key_pressed(Key::ArrowLeft)) {
             self.media_player.seek_5s_back();
         }
-        if input.key_pressed(Key::Escape) {
+        if ui.input(|i| i.key_pressed(Key::Escape)) {
             self.close();
             *should_close = true;
         }
@@ -212,31 +232,6 @@ impl MediaPlayerDialog {
         else {
             return false;
         };
-
-        let mut buf = [0u8; 32];
-        match File::open(path) {
-            Ok(mut file) => match file.read(&mut buf) {
-                Ok(_) => {
-                    let file_ext = sniff_magic_bytes(&buf).unwrap_or(FileExtension::Unknown);
-
-                    if !file_ext.is_audio() && !file_ext.is_video() {
-                        warn!("No es un media file");
-                        self.close();
-                        return false;
-                    }
-                }
-                Err(e) => {
-                    warn!("Ha ocurrido un error al intentear leer el file: {e}");
-                    self.close();
-                    return false;
-                }
-            },
-            Err(e) => {
-                warn!("Ha ocurrido un error al intentear abrir el file: {e}");
-                self.close();
-                return false;
-            }
-        }
 
         let custom_frame = Frame::NONE
             .fill(Color32::TRANSPARENT)

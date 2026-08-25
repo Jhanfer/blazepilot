@@ -23,9 +23,11 @@ use crate::core::system::{
     knowndirs::knowndirs_manager::KnownDirsManager,
 };
 use linicon::IconPath;
-use parking_lot::RwLock;
+use lru::LruCache;
+use parking_lot::Mutex;
 use std::{
     collections::{HashMap, HashSet},
+    num::NonZeroUsize,
     path::{Path, PathBuf},
     process::Command,
     sync::Arc,
@@ -150,20 +152,22 @@ impl DesktopApp {
     }
 }
 
+const MIME_CACHE_LIMIT: usize = 512;
+
 pub struct LinuxOpener {
     apps: HashMap<String, Arc<DesktopApp>>,
     mime_defaults: HashMap<String, String>, // Mime - AppID
     mime_associations: HashMap<String, Vec<String>>, // Mime - [apps recomendadas]
     mime_removed: HashMap<String, Vec<String>>,
-    mime_cache: RwLock<HashMap<PathBuf, String>>,
+    mime_cache: Mutex<LruCache<PathBuf, String>>,
 }
 
 impl FileOpener for LinuxOpener {
-    fn get_mime(&self, path: Arc<Path>) -> String {
+    fn get_mime(&mut self, path: Arc<Path>) -> String {
         self.resolve_mime(path)
     }
 
-    fn open_file(&self, path: Arc<Path>) -> OpenerResult<()> {
+    fn open_file(&mut self, path: Arc<Path>) -> OpenerResult<()> {
         let file_kind = OpenerFileKind::detect(&path);
 
         if file_kind.is_directly_executable() {
@@ -194,7 +198,7 @@ impl FileOpener for LinuxOpener {
         self.launch_app(app, path)
     }
 
-    fn get_default_app(&self, path: Arc<Path>) -> OpenerResult<Option<AppInfo>> {
+    fn get_default_app(&mut self, path: Arc<Path>) -> OpenerResult<Option<AppInfo>> {
         let mime = self.resolve_mime(path);
         Ok(self.resolve_default_app(&mime).map(|app| {
             let mut info: AppInfo = (app.as_ref()).into();
@@ -203,7 +207,7 @@ impl FileOpener for LinuxOpener {
         }))
     }
 
-    fn get_available_apps(&self, path: Arc<Path>) -> OpenerResult<Vec<AppInfo>> {
+    fn get_available_apps(&mut self, path: Arc<Path>) -> OpenerResult<Vec<AppInfo>> {
         let mime = self.resolve_mime(path);
         let default_app = self.resolve_default_app(&mime);
 
@@ -253,7 +257,7 @@ impl FileOpener for LinuxOpener {
         Ok(result)
     }
 
-    fn get_all_apps(&self, path: Arc<Path>) -> OpenerResult<Vec<AppInfo>> {
+    fn get_all_apps(&mut self, path: Arc<Path>) -> OpenerResult<Vec<AppInfo>> {
         // Primero las recomendadas
         let recommended_apps = self.get_available_apps(path)?;
         let recommended_ids: HashSet<_> = recommended_apps.iter().map(|r| &r.id).collect();
@@ -271,7 +275,7 @@ impl FileOpener for LinuxOpener {
         Ok(all_apps)
     }
 
-    fn set_system_default(&self, path: Arc<Path>, app_id: &str) -> OpenerResult<()> {
+    fn set_system_default(&mut self, path: Arc<Path>, app_id: &str) -> OpenerResult<()> {
         let mime = self.resolve_mime(path);
 
         let status = Command::new("xdg-mime")
@@ -294,12 +298,20 @@ impl LinuxOpener {
     pub fn init() -> Self {
         let apps = Self::load_all_apps();
         let (mime_defaults, mime_associations, mime_removed) = Self::load_mimeapps(&apps);
+
+        let def_cap: NonZeroUsize = match NonZeroUsize::new(MIME_CACHE_LIMIT) {
+            Some(n) => n,
+            None => unreachable!(),
+        };
+
+        let cap = NonZeroUsize::new(512).unwrap_or(def_cap);
+
         Self {
             apps,
             mime_defaults,
             mime_associations,
             mime_removed,
-            mime_cache: RwLock::new(HashMap::new()),
+            mime_cache: Mutex::new(LruCache::new(cap)),
         }
     }
 
@@ -556,9 +568,9 @@ impl LinuxOpener {
         Some((final_name, exec?, icon, mimes))
     }
 
-    pub fn resolve_mime(&self, path: Arc<Path>) -> String {
+    pub fn resolve_mime(&mut self, path: Arc<Path>) -> String {
         {
-            let cache = self.mime_cache.read();
+            let cache = self.mime_cache.get_mut();
             let path = path.to_path_buf();
             if let Some(mime) = cache.get(&path) {
                 return mime.clone();
@@ -572,8 +584,8 @@ impl LinuxOpener {
             .unwrap_or_else(|_| "application/octet-stream".into());
 
         self.mime_cache
-            .write()
-            .insert(path.to_path_buf(), mime.clone());
+            .get_mut()
+            .put(path.to_path_buf(), mime.clone());
         mime
     }
 

@@ -36,6 +36,7 @@ use tracing::{debug, info, warn};
 pub static TOKIO_RUNTIME: Lazy<Runtime> = Lazy::new(|| {
     tokio::runtime::Builder::new_multi_thread()
         .enable_all()
+        .max_blocking_threads(16)
         .build()
         .expect("Failed to create Tokio runtime")
 });

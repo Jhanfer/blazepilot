@@ -27,13 +27,16 @@ use std::{
     path::Path,
     sync::{
         Arc,
-        atomic::{AtomicBool, AtomicU64, Ordering},
+        atomic::{AtomicBool, Ordering},
     },
-    time::{Duration, UNIX_EPOCH},
+    time::{Duration, Instant, UNIX_EPOCH},
 };
-use tokio::task::AbortHandle;
+use tokio::{sync::Semaphore, task::AbortHandle};
 use tracing::{info, warn};
 use uuid::Uuid;
+
+const REPORT_THRESHOLD: u64 = 50 * 1024 * 1024;
+const REPORT_TIME_INTERVAL: Duration = Duration::from_secs(1);
 
 #[derive(Debug, thiserror::Error)]
 #[error("Operación Cancelada")]
@@ -54,6 +57,7 @@ type SizerTaskMap = HashMap<Uuid, (AbortHandle, Arc<AtomicBool>)>;
 pub struct SizerManager {
     pub cache_manager: &'static CacheManager,
     active_tasks: Arc<Mutex<SizerTaskMap>>,
+    semaphore: Arc<Semaphore>,
 }
 
 impl SizerManager {
@@ -65,6 +69,7 @@ impl SizerManager {
         Self {
             cache_manager,
             active_tasks: Arc::new(Mutex::new(HashMap::new())),
+            semaphore: Arc::new(Semaphore::new(4)),
         }
     }
 
@@ -118,6 +123,7 @@ impl SizerManager {
                         false
                     } else {
                         cm.size_cache
+                            .lock()
                             .get(key.as_ref())
                             .map(|c| c.modified == current_mtime)
                             .unwrap_or(false)
@@ -143,8 +149,18 @@ impl SizerManager {
                         let path_to_task = path.clone();
                         let active_tasks = self.active_tasks.clone();
 
+                        let semaphore = self.semaphore.clone();
+
                         let abort_handle = TOKIO_RUNTIME
                             .spawn(async move {
+                                let _permit = match semaphore.acquire_owned().await {
+                                    Ok(s) => s,
+                                    Err(e) => {
+                                        warn!("Ha ocurrido un error con el semáforo: {e}");
+                                        return;
+                                    }
+                                };
+
                                 let result = tokio::time::timeout(
                                     Duration::from_secs(300),
                                     Self::get_recursive_size(
@@ -209,16 +225,16 @@ impl SizerManager {
         cancel: Arc<AtomicBool>,
     ) -> Result<u64, CancelledError> {
         tokio::task::spawn_blocking(move || {
-            let total = Arc::new(AtomicU64::new(0));
-            let seen_inodes = Arc::new(Mutex::new(HashSet::new()));
-            let last_reported = Arc::new(AtomicU64::new(0));
-            const REPORT_THRESHOLD: u64 = 10 * 1024 * 1024;
+            let mut total: u64 = 0;
+            let mut last_reported: u64 = 0;
+            let mut seen_inodes: HashSet<(u64, u64)> = HashSet::with_capacity(64);
+            let mut last_time = Instant::now();
 
             let walker = WalkDir::new(root)
                 .max_depth(50)
                 .skip_hidden(false)
                 .follow_links(false)
-                .parallelism(Parallelism::RayonNewPool(0));
+                .parallelism(Parallelism::RayonNewPool(4));
 
             for entry in walker {
                 if cancel.load(Ordering::Acquire) {
@@ -230,35 +246,44 @@ impl SizerManager {
                     continue;
                 }
 
-                if let Ok(meta) = entry.metadata() {
-                    let inode = (meta.dev(), meta.ino());
-                    if seen_inodes.lock().insert(inode) {
-                        let new_total = total.fetch_add(meta.len(), Ordering::Relaxed) + meta.len();
-                        let last = last_reported.load(Ordering::Relaxed);
+                let meta = match entry.metadata() {
+                    Ok(m) => m,
+                    Err(_) => continue,
+                };
 
-                        if new_total - last >= REPORT_THRESHOLD
-                            && last_reported
-                                .compare_exchange(
-                                    last,
-                                    new_total,
-                                    Ordering::Relaxed,
-                                    Ordering::Relaxed,
-                                )
-                                .is_ok()
-                        {
-                            sender
-                                .send(FileOperation::UpdateDirSize {
-                                    full_path: path_buf.to_owned(),
-                                    size: new_total,
-                                    tab_id,
-                                })
-                                .ok();
-                        }
+                let size = if meta.nlink() > 1 {
+                    let inode = (meta.dev(), meta.ino());
+                    if seen_inodes.insert(inode) {
+                        meta.len()
+                    } else {
+                        0
                     }
+                } else {
+                    meta.len()
+                };
+
+                total += size;
+
+                let current_time = Instant::now();
+
+                if current_time.duration_since(last_time) >= REPORT_TIME_INTERVAL
+                    || total - last_reported >= REPORT_THRESHOLD
+                {
+                    last_reported = total;
+                    last_time = current_time;
+                    sender
+                        .send(FileOperation::UpdateDirSize {
+                            full_path: path_buf.to_owned(),
+                            size: total,
+                            tab_id,
+                        })
+                        .ok();
                 }
             }
 
-            Ok(total.load(Ordering::Relaxed))
+            drop(seen_inodes);
+
+            Ok(total)
         })
         .await
         .map_err(|_| CancelledError)?
@@ -269,14 +294,16 @@ impl SizerManager {
         cancel: Arc<AtomicBool>,
     ) -> Result<u64, CancelledError> {
         tokio::task::spawn_blocking(move || {
-            let total = Arc::new(AtomicU64::new(0));
-            let seen_inodes = Arc::new(Mutex::new(HashSet::new()));
+            let mut total: u64 = 0;
+            let mut last_reported: u64 = 0;
+            let mut seen_inodes: HashSet<(u64, u64)> = HashSet::with_capacity(64);
+            let mut last_time = Instant::now();
 
             let walker = WalkDir::new(root)
                 .max_depth(50)
                 .skip_hidden(false)
                 .follow_links(false)
-                .parallelism(Parallelism::RayonNewPool(0));
+                .parallelism(Parallelism::RayonNewPool(4));
 
             for entry in walker {
                 if cancel.load(Ordering::Acquire) {
@@ -288,15 +315,37 @@ impl SizerManager {
                     continue;
                 }
 
-                if let Ok(meta) = entry.metadata() {
+                let meta = match entry.metadata() {
+                    Ok(m) => m,
+                    Err(_) => continue,
+                };
+
+                let size = if meta.nlink() > 1 {
                     let inode = (meta.dev(), meta.ino());
-                    if seen_inodes.lock().insert(inode) {
-                        total.fetch_add(meta.len(), Ordering::Relaxed);
+                    if seen_inodes.insert(inode) {
+                        meta.len()
+                    } else {
+                        0
                     }
+                } else {
+                    meta.len()
+                };
+
+                total += size;
+
+                let current_time = Instant::now();
+
+                if current_time.duration_since(last_time) >= REPORT_TIME_INTERVAL
+                    || total - last_reported >= REPORT_THRESHOLD
+                {
+                    last_reported = total;
+                    last_time = current_time;
                 }
             }
 
-            Ok(total.load(Ordering::Relaxed))
+            drop(seen_inodes);
+
+            Ok(total)
         })
         .await
         .map_err(|_| CancelledError)?

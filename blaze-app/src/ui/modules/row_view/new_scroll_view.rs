@@ -481,18 +481,18 @@ pub fn new_render_scrollview(
                     files[i]
                         .unique_id
                         .as_ref()
-                        .and_then(|id| color_map.get(id).map(|c| (*id, c.color)))
+                        .and_then(|id| color_map.lock().get(id).map(|c| (*id, c.color)))
                 })
                 .collect()
         };
 
-        let thumbnail_snapshot: HashMap<Arc<Path>, Thumbnail> = {
-            let mut guard = ui_state.thumbnail_manager.thumb_map.write();
+        let thumbnail_snapshot: HashMap<Arc<Path>, Arc<Thumbnail>> = {
+            let guard = ui_state.thumbnail_manager.thumb_map.read();
             row_range
                 .clone()
                 .filter_map(|i| {
                     let p = &files[i].full_path;
-                    guard.get(p).cloned().map(|t| (p.clone(), t))
+                    guard.peek(p).cloned().map(|t| (p.clone(), t))
                 })
                 .collect()
         };
@@ -691,7 +691,13 @@ pub fn new_render_scrollview(
             {
                 should_repaint = true;
             } else {
-                let (icon_name, icon_bytes, color) = resolve_icon(file, &ui_state.color_snapshot);
+                let snapshot_color = file
+                    .unique_id
+                    .as_ref()
+                    .and_then(|id| ui_state.color_snapshot.get(id))
+                    .copied();
+
+                let (icon_name, icon_bytes, color) = resolve_icon(file, snapshot_color);
                 let rounded_rect = Rect::from_min_max(
                     pos2(icon_rect.min.x.round(), icon_rect.min.y.round()),
                     pos2(icon_rect.max.x.round(), icon_rect.max.y.round()),

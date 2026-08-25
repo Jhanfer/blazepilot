@@ -268,12 +268,28 @@ pub fn row_panel_frame(
                     }
                 }
 
+                //skip si las fuentes están cargadas
+                if state.fonts_requested.contains(&file.name) {
+                    continue;
+                }
+                state.fonts_requested.insert(file.name.clone());
+
                 //Procesa nombres de los files para encontrar las fuentes necesarias
+                let counter = with_fonts(|f| f.pending_tasks.clone());
+                counter.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+
                 let file_name = file.name.clone();
+                let dir = state.cwd.clone();
+
+                let token = with_fonts(|f| f.cancellation_token.clone());
+
                 TOKIO_RUNTIME.spawn_blocking(move || {
                     with_fonts(|f| {
-                        f.process_file(&file_name);
-                    })
+                        if !token.is_cancelled() {
+                            f.process_file(&file_name, dir);
+                        }
+                    });
+                    counter.fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
                 });
             }
 

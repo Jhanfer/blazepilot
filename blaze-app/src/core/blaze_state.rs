@@ -39,7 +39,7 @@ use crate::{
             zip_manager::manager::ZipManager,
         },
     },
-    ui::task_manager::tasks::TaskManager,
+    ui::{fonts::fonts_manager::with_fonts, task_manager::tasks::TaskManager},
 };
 use bitvec::vec::BitVec;
 use egui::{Pos2, pos2};
@@ -253,6 +253,7 @@ impl BlazeCoreBuilder {
             view_mode,
             tag_filter: TagViewFilter::All { all_items_len: 0 },
             files_just_loaded: false,
+            fonts_requested: HashSet::new(),
         };
 
         let dispatcher = with_event_bus(|e| e.dispatcher(active_id));
@@ -341,6 +342,7 @@ pub struct BlazeCoreState {
     pub view_mode: ViewMode,
     pub tag_filter: TagViewFilter,
     pub files_just_loaded: bool,
+    pub fonts_requested: HashSet<Box<str>>,
 }
 
 impl BlazeCoreState {
@@ -477,26 +479,40 @@ impl BlazeCoreState {
     }
 
     pub fn navigate_to(&mut self, path: Arc<Path>) {
-        let dispatcher = with_event_bus(|e| e.dispatcher(self.active_id));
         let prev_dir = self.cwd.clone();
 
+        with_fonts(|f| f.leave_directory(&prev_dir));
+
+        let dispatcher = with_event_bus(|e| e.dispatcher(self.active_id));
         dispatcher.send(SizerMessages::CancelAll).ok();
         self.calculating_dir_sizes.clear();
-
         self.extended_info_manager.clear_directory(&prev_dir);
-        self.motor.borrow_mut().active_tab_mut().navigate_to(path);
+
+        self.motor
+            .borrow_mut()
+            .active_tab_mut()
+            .navigate_to(path.clone());
         self.save_caches(false);
         self.last_navigation_time = Some(Instant::now());
+
+        with_fonts(|f| f.enter_dir(&path));
 
         self.refresh();
     }
 
     pub fn up(&mut self) {
-        let dispatcher = with_event_bus(|e| e.dispatcher(self.active_id));
         let prev_dir = self.cwd.clone();
+
+        with_fonts(|f| f.leave_directory(&prev_dir));
+
+        let dispatcher = with_event_bus(|e| e.dispatcher(self.active_id));
+
         self.motor.borrow_mut().active_tab_mut().up();
         self.extended_info_manager.clear_directory(&prev_dir);
         dispatcher.send(SizerMessages::CancelAll).ok();
+
+        with_fonts(|f| f.enter_dir(&self.cwd));
+
         self.refresh();
         self.save_caches(false);
     }
@@ -506,11 +522,18 @@ impl BlazeCoreState {
     }
 
     pub fn back(&mut self) {
-        let dispatcher = with_event_bus(|e| e.dispatcher(self.active_id));
         let prev_dir = self.cwd.clone();
+
+        with_fonts(|f| f.leave_directory(&prev_dir));
+
+        let dispatcher = with_event_bus(|e| e.dispatcher(self.active_id));
+
         self.motor.borrow_mut().active_tab_mut().back();
         self.extended_info_manager.clear_directory(&prev_dir);
         dispatcher.send(SizerMessages::CancelAll).ok();
+
+        with_fonts(|f| f.enter_dir(&self.cwd));
+
         self.refresh();
         self.save_caches(false);
     }
@@ -520,11 +543,18 @@ impl BlazeCoreState {
     }
 
     pub fn forward(&mut self) {
-        let dispatcher = with_event_bus(|e| e.dispatcher(self.active_id));
         let prev_dir = self.cwd.clone();
+
+        with_fonts(|f| f.leave_directory(&prev_dir));
+
+        let dispatcher = with_event_bus(|e| e.dispatcher(self.active_id));
+
         self.motor.borrow_mut().active_tab_mut().forward();
         self.extended_info_manager.clear_directory(&prev_dir);
         dispatcher.send(SizerMessages::CancelAll).ok();
+
+        with_fonts(|f| f.enter_dir(&self.cwd));
+
         self.refresh();
         self.save_caches(false);
     }
@@ -548,9 +578,20 @@ impl BlazeCoreState {
         };
 
         self.calculating_dir_sizes.clear();
+        self.calculating_dir_sizes.shrink_to_fit();
+
         self.calculated_dir_sizes.clear();
+        self.calculated_dir_sizes.shrink_to_fit();
+
         self.calculating_extended_info.clear();
+        self.calculating_extended_info.shrink_to_fit();
+
         self.calculated_extended_info.clear();
+        self.calculated_extended_info.shrink_to_fit();
+
+        self.fonts_requested.clear();
+        self.fonts_requested.shrink_to_fit();
+
         self.deselect_all();
         self.cwd = new_cwd;
     }

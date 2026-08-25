@@ -16,6 +16,8 @@ use wayland_client::{
 };
 
 use std::os::fd::FromRawFd;
+use std::thread::JoinHandle;
+use std::time::Duration;
 use std::{
     path::PathBuf,
     sync::{
@@ -365,11 +367,15 @@ pub struct WaylandDndReceiver {
     shutdown: Arc<AtomicBool>,
     pub copy_tx: Sender<String>,
     pub clipboard_text: Arc<Mutex<Option<String>>>,
+    thread_handle: Option<JoinHandle<()>>,
 }
 
 impl Drop for WaylandDndReceiver {
     fn drop(&mut self) {
         self.shutdown.store(true, Ordering::Relaxed);
+        if let Some(handle) = self.thread_handle.take() {
+            let _ = handle.join();
+        }
     }
 }
 
@@ -455,21 +461,36 @@ impl WaylandDndReceiver {
                 }
             }
 
+            if shutdown.load(Ordering::Relaxed) {
+                break Ok(());
+            }
+
             event_queue.dispatch_pending(&mut state)?;
 
+            if shutdown.load(Ordering::Relaxed) {
+                break Ok(());
+            }
+
             if let Err(e) = conn.flush() {
+                if shutdown.load(Ordering::Relaxed) {
+                    break Ok(());
+                }
                 warn!("El flush ha fallado: {e}");
             }
 
-            match event_queue.prepare_read() {
-                Some(guard) => match guard.read() {
+            if let Some(guard) = event_queue.prepare_read() {
+                match guard.read() {
                     Ok(_) => {}
-                    Err(e) => warn!("Error al leer eventos Wayland (no fatal, se reintenta): {e}"),
-                },
-                None => info!("prepare_read devolvió None, otro hilo tiene el guard"),
+                    Err(e) => {
+                        if shutdown.load(Ordering::Relaxed) {
+                            break Ok(());
+                        }
+                        warn!("Error al leer eventos Wayland: {e}")
+                    }
+                }
             }
 
-            std::thread::yield_now();
+            std::thread::sleep(Duration::from_millis(3));
         }
     }
 
@@ -486,7 +507,7 @@ impl WaylandDndReceiver {
         let shutdown_clone = Arc::clone(&shutdown);
         let ptr = SendPtr(display_ptr);
 
-        std::thread::spawn(move || {
+        let thread_handle = std::thread::spawn(move || {
             if let Err(e) =
                 Self::run_dnd_loop(sender, shutdown_clone, ptr, copy_rx, clipboard_text_clone)
             {
@@ -499,6 +520,7 @@ impl WaylandDndReceiver {
             shutdown,
             copy_tx,
             clipboard_text,
+            thread_handle: Some(thread_handle),
         })
     }
 }

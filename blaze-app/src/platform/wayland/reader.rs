@@ -95,7 +95,9 @@ pub fn decode_text(raw: Vec<u8>) -> String {
     // UTF-16LE con BOM
     if raw.starts_with(&[0xFF, 0xFE]) {
         let u16s: Vec<u16> = raw[2..]
-            .chunks_exact(2)
+            .as_chunks::<2>()
+            .0
+            .iter()
             .map(|c| u16::from_le_bytes([c[0], c[1]]))
             .collect();
         return String::from_utf16_lossy(&u16s);
@@ -104,7 +106,9 @@ pub fn decode_text(raw: Vec<u8>) -> String {
     // UTF-16BE con BOM
     if raw.starts_with(&[0xFE, 0xFF]) {
         let u16s: Vec<u16> = raw[2..]
-            .chunks_exact(2)
+            .as_chunks::<2>()
+            .0
+            .iter()
             .map(|c| u16::from_be_bytes([c[0], c[1]]))
             .collect();
         return String::from_utf16_lossy(&u16s);
@@ -113,7 +117,9 @@ pub fn decode_text(raw: Vec<u8>) -> String {
     // UTF-16LE sin BOM
     if raw.len().is_multiple_of(2) {
         let u16s: Vec<u16> = raw
-            .chunks_exact(2)
+            .as_chunks::<2>()
+            .0
+            .iter()
             .map(|c| u16::from_le_bytes([c[0], c[1]]))
             .collect();
         let decoded = String::from_utf16_lossy(&u16s);

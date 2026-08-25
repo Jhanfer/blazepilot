@@ -16,22 +16,23 @@ use cpal::{
     Device, Stream, SupportedStreamConfig,
     traits::{DeviceTrait, HostTrait, StreamTrait},
 };
-use crossbeam_channel::{Receiver, Sender};
+use crossbeam_channel::{Receiver, RecvTimeoutError, Sender, TryRecvError};
 use ffmpeg_next::{
-    ChannelLayout, Packet,
-    format::{Sample, input},
+    ChannelLayout, Dictionary, Packet,
+    format::{Sample, input_with_interrupt_and_dictionary},
     media::Type,
     util::frame::audio::Audio as AudioFrame,
 };
 use parking_lot::Mutex;
 use std::{
+    collections::VecDeque,
     path::Path,
     sync::{
         Arc,
         atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering},
     },
     thread::JoinHandle,
-    time::{Duration, Instant},
+    time::Duration,
 };
 use tracing::{debug, error, info, warn};
 
@@ -61,14 +62,14 @@ pub struct AudioPlayer {
     pub audio_rx: Option<Receiver<OutputAudioFrame>>,
     pub clock: Arc<Mutex<PlaybackClock>>,
     pub device_stream: Option<Stream>,
-    pub buffer: Arc<Mutex<Vec<f32>>>,
+    pub buffer: Arc<Mutex<VecDeque<f32>>>,
     pub volume_bits: Arc<AtomicU32>,
     pub volume: f32,
     pub audio_path: Option<Arc<Path>>,
     pub generation: Arc<AtomicU64>,
     pub seek_epoch: Arc<AtomicU64>,
     pub buffer_fill_handle: Option<JoinHandle<()>>,
-    pub should_run: Arc<AtomicBool>,
+    pub should_run: Option<Arc<AtomicBool>>,
 }
 
 impl AudioPlayer {
@@ -78,16 +79,18 @@ impl AudioPlayer {
             audio_rx: None,
             clock,
             device_stream: None,
-            buffer: Arc::new(Mutex::new(Vec::new())),
+            buffer: Arc::new(Mutex::new(VecDeque::new())),
             volume_bits: Arc::new(AtomicU32::new(f32::to_bits(1.0))),
             volume: 1.0,
             audio_path: None,
             generation: Arc::new(AtomicU64::new(0)),
             seek_epoch,
             buffer_fill_handle: None,
-            should_run: Arc::new(AtomicBool::new(true)),
+            should_run: None,
         }
     }
+
+    const MAX_BUFF_SAMPLES: usize = 48_000 * 2 * 2;
 
     pub fn load_path(&mut self, path: Arc<Path>) {
         if let Ok(ictx) = ffmpeg_next::format::input(&path) {
@@ -111,8 +114,12 @@ impl AudioPlayer {
             .unwrap_or(false);
 
         if has_active_streamer {
-            self.resume()?;
-            return Ok(());
+            if self.clock.lock().is_paused() {
+                self.stop()?;
+            } else {
+                self.resume()?;
+                return Ok(());
+            }
         }
 
         if self.streamer.is_some() {
@@ -161,46 +168,65 @@ impl AudioPlayer {
         Ok(())
     }
 
-    pub fn reset(&mut self) {
+    pub fn reset(&mut self) -> AudioResult<()> {
         self.streamer = None;
+        self.audio_path = None;
         self.seek(0.0);
         self.buffer.lock().clear();
+
+        if let Some(rx) = self.audio_rx.take() {
+            info!("Llamado dropeo de audio rx");
+            drop(rx);
+        }
+
+        Ok(())
     }
 
     pub fn stop(&mut self) -> AudioResult<()> {
         info!("Llamado stop de AudioPlayer");
         self.generation.fetch_add(1, Ordering::SeqCst);
-        self.pause()?;
 
-        if let Some(streamer) = self.streamer.take() {
-            streamer.send(AudioDecoderCommand::Stop);
-
-            if let Some(thread) = &streamer.thread {
-                let start = Instant::now();
-                while !thread.is_finished() && start.elapsed() < Duration::from_millis(100) {
-                    std::thread::sleep(Duration::from_millis(5));
-                }
-            }
+        if let Some(run) = self.should_run.as_ref() {
+            run.store(false, Ordering::Release);
         }
-
-        if let Some(stream) = self.device_stream.take() {
-            drop(stream);
-        }
-
-        self.buffer.lock().clear();
 
         if let Some(rx) = self.audio_rx.take() {
             tracing::info!("Llamado dropeo de audio rx");
             drop(rx);
         }
 
-        if let Some(handle) = self.buffer_fill_handle.take() {
-            drop(handle);
+        if let Some(mut streamer) = self.streamer.take() {
+            streamer.send(AudioDecoderCommand::Stop);
+            if let Some(handle) = streamer.thread.take() {
+                info!("stop() esperando join...");
+                let _ = handle.join();
+                info!("stop() join completado");
+            }
         }
 
+        if let Some(handle) = self.buffer_fill_handle.take() {
+            info!("Esperando buffer_fill...");
+            let _ = handle.join();
+            info!("buffer_fill terminado");
+        }
+
+        if let Some(stream) = self.device_stream.take() {
+            info!("Dropping device stream");
+            drop(stream);
+        }
+
+        let mut buf = self.buffer.lock();
+        buf.clear();
+        buf.shrink_to_fit();
         self.streamer = None;
         self.audio_rx = None;
         self.device_stream = None;
+
+        unsafe {
+            libmimalloc_sys::mi_collect(true);
+        }
+
+        info!("stop() fin");
 
         Ok(())
     }
@@ -266,8 +292,17 @@ impl AudioPlayer {
                 move |data: &mut [f32], _: &cpal::OutputCallbackInfo| {
                     let mut buf = buffer.lock();
                     let len = data.len().min(buf.len());
-                    data[..len].copy_from_slice(&buf[..len]);
+
+                    let (s1, s2) = buf.as_slices();
+                    let from_s1 = len.min(s1.len());
+                    data[..from_s1].copy_from_slice(&s1[..from_s1]);
+
+                    if from_s1 < len {
+                        let from_s2 = len - from_s1;
+                        data[from_s1..len].copy_from_slice(&s2[..from_s2]);
+                    }
                     buf.drain(..len);
+                    data[len..].fill(0.0);
 
                     let vol = f32::from_bits(volume_bits.load(Ordering::Relaxed));
                     for sample in &mut data[..len] {
@@ -287,26 +322,39 @@ impl AudioPlayer {
 
     pub fn start_buffer_filler(&mut self) {
         debug!("Se inicia el filler de audio");
-        if let Some(_old_handle) = self.buffer_fill_handle.take() {}
+        let run = Arc::new(AtomicBool::new(true));
+        let should_run = run.clone();
+
+        self.should_run = Some(run);
 
         let buffer = self.buffer.clone();
-        let should_run = self.should_run.clone();
-        let audio_rx = self.audio_rx.clone();
+        let audio_rx = self.audio_rx.take();
         let seek_epoch = self.seek_epoch.clone();
 
         self.buffer_fill_handle = Some(std::thread::spawn(move || {
             while should_run.load(Ordering::Relaxed) {
                 if let Some(rx) = &audio_rx {
                     let current_epoch = seek_epoch.load(Ordering::Acquire);
+
+                    let buff_len = buffer.lock().len();
+                    if buff_len >= Self::MAX_BUFF_SAMPLES {
+                        std::thread::sleep(Duration::from_millis(5));
+                        continue;
+                    }
+
                     let mut received_any = false;
 
                     while let Ok(frame) = rx.try_recv() {
                         if frame.epoch == current_epoch {
-                            let mut buf = buffer.lock();
-                            buf.extend_from_slice(&frame.data);
-                            //break;
+                            let mut buff = buffer.lock();
+                            buff.extend(frame.data.iter());
                         }
+
                         received_any = true;
+
+                        if buffer.lock().len() >= Self::MAX_BUFF_SAMPLES {
+                            break;
+                        }
                     }
 
                     if !received_any {
@@ -326,6 +374,8 @@ pub struct AudioStreamer {
 }
 
 impl AudioStreamer {
+    const MAX_PACKETS_BUFF: i32 = 4;
+
     pub fn spawn(
         path: Arc<Path>,
         audio_tx: Sender<OutputAudioFrame>,
@@ -346,7 +396,14 @@ impl AudioStreamer {
                 seek_epoch,
                 sample_rate,
             ) {
-                error!("Ha ocurrido un error decodificando el audio: {e}.");
+                error!(
+                    "Error decodificando audio: {:?} | raw: {}",
+                    e,
+                    match &e {
+                        AudioError::FfmpegError(fe) => fe.to_string(),
+                        _ => "no ffmpeg".to_string(),
+                    }
+                );
             }
         });
 
@@ -368,8 +425,33 @@ impl AudioStreamer {
         my_generation: u64,
         seek_epoch: Arc<AtomicU64>,
         sample_rate: u32,
-    ) -> AudioResult<()> {
-        let mut ictx = input(path).map_err(AudioError::FfmpegError)?;
+    ) -> AudioResult<String> {
+        if generation.load(Ordering::Acquire) != my_generation {
+            return Ok("Audio generation no es igual, saliendo".into());
+        } else {
+            debug!("Audio generation OK, iniciando decodificación");
+        }
+
+        let gene = generation.clone();
+        let my_gene = my_generation;
+
+        let mut ops = Dictionary::new();
+
+        ops.set("probesize", "5000000");
+        ops.set("analyzeduration", "2000000");
+
+        let mut ictx = input_with_interrupt_and_dictionary(
+            path,
+            move || gene.load(Ordering::Acquire) != my_gene,
+            ops,
+        )
+        .map_err(AudioError::FfmpegError)?;
+
+        unsafe {
+            let ctx = ictx.as_mut_ptr();
+            (*ctx).max_interleave_delta = 100000;
+            (*ctx).flags |= 64;
+        }
 
         let audio_stream = ictx
             .streams()
@@ -390,9 +472,21 @@ impl AudioStreamer {
         let target_format = Sample::F32(ffmpeg_next::format::sample::Type::Packed);
         let target_channel_layout = ChannelLayout::STEREO;
 
+        let source_layout =
+            if decoder.channel_layout().bits() == 0 || decoder.channel_layout().is_empty() {
+                match decoder.channels() {
+                    1 => ChannelLayout::MONO,
+                    2 => ChannelLayout::STEREO,
+                    6 => ChannelLayout::_5POINT1,
+                    _ => ChannelLayout::STEREO,
+                }
+            } else {
+                decoder.channel_layout()
+            };
+
         let mut resampler = ffmpeg_next::software::resampling::Context::get(
             decoder.format(),
-            decoder.channel_layout(),
+            source_layout,
             decoder.rate(),
             target_format,
             target_channel_layout,
@@ -404,12 +498,67 @@ impl AudioStreamer {
         let mut did_seek = false;
         let mut seek_target_secs: f32 = 0.0;
 
-        let mut packet = Packet::empty();
+        let mut packects_in_buff = 0;
 
         loop {
             if generation.load(Ordering::Acquire) != my_generation {
-                return Ok(());
+                return Ok("Audio generation no es igual, saliendo".into());
             }
+
+            while packects_in_buff >= Self::MAX_PACKETS_BUFF || tx.len() >= 4 {
+                if generation.load(Ordering::Acquire) != my_generation {
+                    return Ok("Audio generation no es igual, saliendo".into());
+                }
+
+                match commands.try_recv() {
+                    Ok(AudioDecoderCommand::Stop) => return Ok("Stop".into()),
+
+                    Ok(AudioDecoderCommand::Pause) => paused = true,
+
+                    Ok(AudioDecoderCommand::Resume) => paused = false,
+
+                    Ok(AudioDecoderCommand::SeekTo(secs)) => {
+                        let timestamp = (secs * ffmpeg_next::ffi::AV_TIME_BASE as f32) as i64;
+                        ictx.seek(timestamp, ..timestamp)
+                            .map_err(AudioError::FfmpegError)?;
+                        decoder.flush();
+
+                        resampler = ffmpeg_next::software::resampling::Context::get(
+                            decoder.format(),
+                            source_layout,
+                            decoder.rate(),
+                            target_format,
+                            target_channel_layout,
+                            sample_rate,
+                        )
+                        .map_err(AudioError::FfmpegError)?;
+                        seek_target_secs = secs;
+                        did_seek = true;
+                        seek_epoch.fetch_add(1, Ordering::Release);
+                    }
+
+                    Err(TryRecvError::Empty) => {}
+
+                    Err(TryRecvError::Disconnected) => {
+                        return Ok("Command channel cerrado".into());
+                    }
+                }
+
+                if paused {
+                    break;
+                }
+
+                std::thread::sleep(Duration::from_millis(5));
+            }
+
+            if paused {
+                continue;
+            }
+
+            let mut packet = Packet::empty();
+
+            debug!("Leyendo paquete... packects_in_buff={}", packects_in_buff);
+
             match packet.read(&mut ictx) {
                 Ok(()) => {
                     let stream = packet.stream();
@@ -431,27 +580,26 @@ impl AudioStreamer {
 
                                 resampler = ffmpeg_next::software::resampling::Context::get(
                                     decoder.format(),
-                                    decoder.channel_layout(),
+                                    source_layout,
                                     decoder.rate(),
                                     target_format,
                                     target_channel_layout,
                                     sample_rate,
                                 )
                                 .map_err(AudioError::FfmpegError)?;
-
                                 seek_target_secs = secs;
                                 did_seek = true;
                                 seek_epoch.fetch_add(1, Ordering::Release);
                                 break;
                             }
-                            AudioDecoderCommand::Stop => return Ok(()),
+                            AudioDecoderCommand::Stop => return Ok("Stop".into()),
                         }
                     }
 
                     if paused {
-                        match commands.recv() {
+                        match commands.recv_timeout(Duration::from_millis(50)) {
                             Ok(AudioDecoderCommand::Resume) => paused = false,
-                            Ok(AudioDecoderCommand::Stop) | Err(_) => return Ok(()),
+                            Ok(AudioDecoderCommand::Stop) | Err(_) => return Ok("Stop".into()),
                             _ => continue,
                         }
                     }
@@ -460,11 +608,32 @@ impl AudioStreamer {
                         .send_packet(&packet)
                         .map_err(AudioError::FfmpegError)?;
 
+                    packects_in_buff += 1;
+
                     let mut decoded = AudioFrame::empty();
 
                     while decoder.receive_frame(&mut decoded).is_ok() {
+                        packects_in_buff = (packects_in_buff - 1).max(0);
+
                         if generation.load(Ordering::Acquire) != my_generation {
-                            return Ok(());
+                            return Ok("Audio generation no es igual, saliendo".into());
+                        }
+
+                        if decoded.channel_layout().bits() == 0 {
+                            unsafe {
+                                use ffmpeg_next::ffi::{
+                                    AVChannelLayout, AVChannelLayout__bindgen_ty_1, AVChannelOrder,
+                                };
+                                let frame = &mut *decoded.as_mut_ptr();
+                                frame.ch_layout = AVChannelLayout {
+                                    order: AVChannelOrder::AV_CHANNEL_ORDER_NATIVE,
+                                    nb_channels: decoded.channels() as i32,
+                                    u: AVChannelLayout__bindgen_ty_1 {
+                                        mask: ChannelLayout::STEREO.bits(),
+                                    },
+                                    opaque: std::ptr::null_mut(),
+                                };
+                            }
                         }
 
                         let mut resampled = AudioFrame::empty();
@@ -492,29 +661,38 @@ impl AudioStreamer {
                             )
                         };
 
-                        let mut data = Vec::with_capacity(sample_count * channels as usize);
-                        for i in 0..sample_count {
-                            for ch in 0..channels as usize {
-                                let idx = i * channels as usize + ch;
-                                data.push(data_f32[idx]);
-                            }
-                        }
+                        let frame_data: Arc<[f32]> = Arc::from(data_f32);
 
                         let frame = OutputAudioFrame {
-                            data: Arc::from(data_f32.to_vec().into_boxed_slice()),
+                            data: frame_data,
                             channels,
                             timestamp,
                             epoch: seek_epoch.load(Ordering::Acquire),
                         };
 
+                        debug!(
+                            "Frame enviado: timestamp={:.2}s epoch={}",
+                            timestamp, frame.epoch
+                        );
+
                         if tx.send(frame).is_err() {
-                            return Ok(());
+                            return Ok("Error al enviar el frame de audio".into());
                         }
+
+                        decoded = AudioFrame::empty();
+                        resampled = AudioFrame::empty();
                     }
                 }
 
                 Err(ffmpeg_next::Error::Eof) => loop {
-                    match commands.recv() {
+                    debug!("EOF alcanzado, esperando comandos...");
+                    match commands.recv_timeout(Duration::from_millis(50)) {
+                        Err(RecvTimeoutError::Timeout) => {
+                            if generation.load(Ordering::Acquire) != my_generation {
+                                return Ok("Audio generation no es igual, saliendo".into());
+                            }
+                        }
+
                         Ok(AudioDecoderCommand::SeekTo(secs)) => {
                             let timestamp = (secs * ffmpeg_next::ffi::AV_TIME_BASE as f32) as i64;
                             ictx.seek(timestamp, ..timestamp)
@@ -530,7 +708,6 @@ impl AudioStreamer {
                                 sample_rate,
                             )
                             .map_err(AudioError::FfmpegError)?;
-
                             seek_target_secs = secs;
                             did_seek = true;
                             seek_epoch.fetch_add(1, Ordering::Release);
@@ -538,9 +715,13 @@ impl AudioStreamer {
                         }
                         Ok(AudioDecoderCommand::Pause) => paused = true,
                         Ok(AudioDecoderCommand::Resume) => paused = false,
-                        Ok(AudioDecoderCommand::Stop) | Err(_) => return Ok(()),
+                        Ok(AudioDecoderCommand::Stop) | Err(_) => return Ok("Stop".into()),
                     }
                 },
+
+                Err(ffmpeg_next::Error::Exit) => {
+                    return Ok("Interrumpido por señal".into());
+                }
 
                 Err(e) => return Err(AudioError::FfmpegError(e)),
             }
@@ -551,8 +732,11 @@ impl AudioStreamer {
 impl Drop for AudioStreamer {
     fn drop(&mut self) {
         self.send(AudioDecoderCommand::Stop);
+        info!("Se inicia drop");
         if let Some(handle) = self.thread.take() {
-            drop(handle);
+            info!("Antes del join");
+            let _ = handle.join();
+            info!("Join terminado");
         }
     }
 }

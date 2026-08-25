@@ -26,7 +26,7 @@ use crate::{
 use fast_image_resize as fr;
 use ffmpeg_next::{
     Packet,
-    format::{Pixel, input},
+    format::{Pixel, input_with_dictionary},
     media::Type,
     software::scaling::{context::Context as ScalingContext, flag::Flags},
     util::frame::video::Video as VideoFrame,
@@ -36,6 +36,7 @@ use parking_lot::RwLock;
 use std::{
     collections::HashSet,
     hash::{DefaultHasher, Hasher},
+    io::BufReader,
     num::NonZeroUsize,
 };
 use std::{
@@ -49,7 +50,7 @@ use tokio::sync::Semaphore;
 use tracing::{error, warn};
 use uuid::Uuid;
 
-const DEFAULT_THUMB_CACHE_CAPACITY: usize = 400;
+const DEFAULT_THUMB_CACHE_CAPACITY: usize = 300;
 
 #[derive(Debug, Error)]
 pub enum ThumbError {
@@ -76,6 +77,12 @@ pub enum ThumbError {
 
     #[error("FfmpegError: {0}")]
     FfmpegError(#[from] ffmpeg_next::Error),
+
+    #[error("La imagen es demasiado grande")]
+    ImageTooLarge,
+
+    #[error("Error al ver el tamaño de la imagen: {0}")]
+    ImageSizeError(#[from] imagesize::ImageError),
 }
 #[derive(Debug)]
 pub enum ThumbnailMessages {
@@ -90,7 +97,7 @@ pub struct Thumbnail {
 }
 
 pub struct ThumbnailManager {
-    pub thumb_map: Arc<RwLock<LruCache<Arc<Path>, Thumbnail>>>,
+    pub thumb_map: Arc<RwLock<LruCache<Arc<Path>, Arc<Thumbnail>>>>,
     pub semaphore: Arc<Semaphore>,
 }
 
@@ -108,7 +115,7 @@ impl ThumbnailManager {
     }
 
     fn with_capacity(cap: usize) -> Self {
-        let def_cap: NonZeroUsize = match NonZeroUsize::new(400) {
+        let def_cap: NonZeroUsize = match NonZeroUsize::new(300) {
             Some(n) => n,
             None => unreachable!(),
         };
@@ -271,7 +278,7 @@ impl ThumbnailManager {
 
                     //lee la imagen en cache
                     if let Ok(thumb) = Self::load_from_cache(&cache_path).await {
-                        thumb_map.write().put(path.clone(), thumb);
+                        thumb_map.write().put(path.clone(), Arc::new(thumb));
                         sender_clone
                             .send(UiEvent::ThumbnailReady { full_path: path })
                             .ok();
@@ -302,7 +309,7 @@ impl ThumbnailManager {
                             sender_clone.send(UiEvent::ShowError(err.into())).ok();
                         }
 
-                        thumb_map.write().put(path.clone(), thumb);
+                        thumb_map.write().put(path.clone(), Arc::new(thumb));
                         sender_clone
                             .send(UiEvent::ThumbnailReady { full_path: path })
                             .ok();
@@ -377,16 +384,20 @@ impl ThumbnailManager {
         tokio::task::spawn_blocking(move || -> Result<Thumbnail, ThumbError> {
             let mut file = std::fs::File::open(path.clone()).map_err(ThumbError::Io)?;
 
+            let file_size = file.metadata().map_err(ThumbError::Io)?.len();
+
+            if file_size > 100 * 1024 * 1024 {
+                return Err(ThumbError::ImageTooLarge);
+            }
+
             let mut header = [0u8; 54];
 
             let n = file.read(&mut header).map_err(ThumbError::Io)?;
 
+            drop(file);
+
             let img_type =
                 imagesize::image_type(&header[..n]).map_err(|_| ThumbError::UnsuportedFormat)?;
-
-            let mut buffer = Vec::new();
-            let mut full_file = std::fs::File::open(path.clone()).map_err(ThumbError::Io)?;
-            full_file.read_to_end(&mut buffer).map_err(ThumbError::Io)?;
 
             let is_avif = path
                 .extension()
@@ -394,24 +405,43 @@ impl ThumbnailManager {
                 .map(|ext| ext.eq_ignore_ascii_case("avif"))
                 .unwrap_or(false);
 
+            let file_path = path.clone();
+
             let (src_pixels, src_w, src_h) = if is_avif {
+                let mut buffer = Vec::new();
+                let _ = std::fs::File::open(&file_path)
+                    .map_err(ThumbError::Io)?
+                    .read_to_end(&mut buffer)
+                    .map_err(ThumbError::Io)?;
+
                 let dynamic_image =
                     libavif_image::read(&buffer).map_err(|_| ThumbError::ImageError)?;
 
                 let w = dynamic_image.width();
                 let h = dynamic_image.height();
 
+                if w * h > 50_000_000 {
+                    return Err(ThumbError::ImageTooLarge);
+                }
+
                 let rgba_buf = dynamic_image.to_rgba8().into_raw();
+
+                drop(buffer);
                 (rgba_buf, w, h)
             } else {
                 match img_type {
                     imagesize::ImageType::Webp => {
-                        let cursor = std::io::Cursor::new(&buffer);
+                        let file = std::fs::File::open(&file_path).map_err(ThumbError::Io)?;
+                        let buffered = BufReader::new(file);
 
-                        let mut decoder = image_webp::WebPDecoder::new(cursor)
+                        let mut decoder = image_webp::WebPDecoder::new(buffered)
                             .map_err(|_| ThumbError::ImageError)?;
 
                         let (w, h) = decoder.dimensions();
+
+                        if w * h > 50_000_000 {
+                            return Err(ThumbError::ImageTooLarge);
+                        }
 
                         let has_alpha = decoder.has_alpha();
                         let bytes_per_pixel = if has_alpha { 4 } else { 3 };
@@ -424,9 +454,11 @@ impl ThumbnailManager {
                         let rgba_buf = if !has_alpha {
                             let mut converted = Vec::with_capacity((w * h * 4) as usize);
 
-                            for chunk in raw_buf.chunks_exact(3) {
+                            for chunk in raw_buf.as_chunks::<3>().0 {
                                 converted.extend_from_slice(&[chunk[0], chunk[1], chunk[2], 255]);
                             }
+
+                            drop(raw_buf);
                             converted
                         } else {
                             raw_buf
@@ -436,12 +468,17 @@ impl ThumbnailManager {
                     }
 
                     imagesize::ImageType::Tiff => {
-                        let cursor = std::io::Cursor::new(&buffer);
+                        let file = std::fs::File::open(&file_path).map_err(ThumbError::Io)?;
+                        let buffered = BufReader::new(file);
 
-                        let mut decoder = tiff::decoder::Decoder::new(cursor)
+                        let mut decoder = tiff::decoder::Decoder::new(buffered)
                             .map_err(|_| ThumbError::ImageError)?;
 
                         let (w, h) = decoder.dimensions().map_err(|_| ThumbError::ImageError)?;
+
+                        if w * h > 50_000_000 {
+                            return Err(ThumbError::ImageTooLarge);
+                        }
 
                         let rgba_buf = decoder.read_image().map_err(|_| ThumbError::ImageError)?;
 
@@ -450,12 +487,30 @@ impl ThumbnailManager {
                         (rgb_data, w, h)
                     }
 
-                    _ => match stb_image::image::load_from_memory_with_depth(&buffer, 4, false) {
-                        stb_image::image::LoadResult::ImageU8(image) => {
-                            (image.data, image.width as u32, image.height as u32)
+                    _ => {
+                        let image_size =
+                            imagesize::size(&file_path).map_err(ThumbError::ImageSizeError)?;
+
+                        let pixel_count = image_size.height as u64 * image_size.width as u64;
+
+                        if pixel_count > 50_000_000 {
+                            return Err(ThumbError::ImageTooLarge);
                         }
-                        _ => return Err(ThumbError::ImageError),
-                    },
+
+                        let mut buffer = Vec::new();
+                        let mut file = std::fs::File::open(&file_path).map_err(ThumbError::Io)?;
+
+                        file.read_to_end(&mut buffer).map_err(ThumbError::Io)?;
+
+                        match stb_image::image::load_from_memory_with_depth(&buffer, 4, false) {
+                            stb_image::image::LoadResult::ImageU8(image) => {
+                                let result = (image.data, image.width as u32, image.height as u32);
+                                drop(buffer);
+                                result
+                            }
+                            _ => return Err(ThumbError::ImageError),
+                        }
+                    }
                 }
             };
 
@@ -471,6 +526,7 @@ impl ThumbnailManager {
                 .resize(&src_image, &mut dst_image, &fr::ResizeOptions::new())
                 .unwrap();
 
+            drop(src_image);
             let rgba_scaled = dst_image.into_vec();
 
             Ok(Thumbnail {
@@ -486,12 +542,20 @@ impl ThumbnailManager {
     async fn generate_svg_thumb(path: &Path) -> Result<Thumbnail, ThumbError> {
         let path = path.to_path_buf();
         tokio::task::spawn_blocking(move || {
+            let file_size = std::fs::metadata(&path).map_err(ThumbError::Io)?.len();
+
+            if file_size > 10 * 1024 * 1024 {
+                return Err(ThumbError::ImageTooLarge);
+            }
+
             let data = std::fs::read(&path).map_err(ThumbError::Io)?;
 
             let opt = resvg::usvg::Options::default();
 
             let tree =
                 resvg::usvg::Tree::from_data(&data, &opt).map_err(|_| ThumbError::ImageError)?;
+
+            drop(data);
 
             let mut pixmap = resvg::tiny_skia::Pixmap::new(64, 64).ok_or(ThumbError::SvgError)?;
 
@@ -512,12 +576,25 @@ impl ThumbnailManager {
     }
 
     async fn generate_video_thumb(path: &Path) -> Result<Thumbnail, ThumbError> {
-        let mut ictx = input(path).map_err(ThumbError::FfmpegError)?;
+        let mut ops = ffmpeg_next::Dictionary::new();
+
+        ops.set("probesize", "5000000");
+        ops.set("analyzeduration", "2000000");
+
+        let mut ictx = input_with_dictionary(path, ops).map_err(ThumbError::FfmpegError)?;
+
+        unsafe {
+            let ctx = ictx.as_mut_ptr();
+            (*ctx).max_interleave_delta = 100000;
+            (*ctx).flags |= 8;
+        }
 
         let video_stream = ictx
             .streams()
             .best(Type::Video)
             .ok_or(ffmpeg_next::Error::StreamNotFound)?;
+
+        let video_stream_index = video_stream.index();
 
         let context_decoder =
             ffmpeg_next::codec::context::Context::from_parameters(video_stream.parameters())
@@ -528,26 +605,38 @@ impl ThumbnailManager {
             .video()
             .map_err(ThumbError::FfmpegError)?;
 
+        let target_width = 64;
+        let target_height = 64;
+
         let mut scaler = ScalingContext::get(
             decoder.format(),
             decoder.width(),
             decoder.height(),
             Pixel::RGBA,
-            decoder.width(),
-            decoder.height(),
+            target_width,
+            target_height,
             Flags::FAST_BILINEAR,
         )
         .map_err(ThumbError::FfmpegError)?;
 
-        let width = decoder.width();
-        let height = decoder.height();
-        let mut frame_buffer: Vec<u8> = Vec::new();
+        let target_time = 1.0;
+        let time_base = video_stream.time_base();
+        let target_pts =
+            (target_time / time_base.denominator() as f64 * time_base.numerator() as f64) as i64;
 
+        ictx.seek(target_pts, ..).map_err(ThumbError::FfmpegError)?;
+        decoder.flush();
+
+        let mut frame_buffer: Vec<u8> = Vec::new();
         let mut packet = Packet::empty();
 
         loop {
             match packet.read(&mut ictx) {
                 Ok(()) => {
+                    if packet.stream() != video_stream_index {
+                        continue;
+                    }
+
                     decoder
                         .send_packet(&packet)
                         .map_err(ThumbError::FfmpegError)?;
@@ -562,19 +651,19 @@ impl ThumbnailManager {
 
                         let stride = rgba_frame.stride(0);
                         let raw = rgba_frame.data(0);
-                        let row_bytes = width as usize * 4;
+                        let row_bytes = target_width as usize * 4;
 
                         frame_buffer.clear();
-                        frame_buffer.reserve(row_bytes * height as usize);
-                        for row in 0..height as usize {
+                        frame_buffer.reserve(row_bytes * target_height as usize);
+                        for row in 0..target_height as usize {
                             let start = row * stride;
                             frame_buffer.extend_from_slice(&raw[start..start + row_bytes]);
                         }
 
                         return Ok(Thumbnail {
                             pixels: Arc::new(frame_buffer),
-                            width,
-                            height,
+                            width: target_width,
+                            height: target_height,
                         });
                     }
                 }
@@ -591,19 +680,19 @@ impl ThumbnailManager {
 
                         let stride = rgba_frame.stride(0);
                         let raw = rgba_frame.data(0);
-                        let row_bytes = width as usize * 4;
+                        let row_bytes = target_width as usize * 4;
 
                         frame_buffer.clear();
-                        frame_buffer.reserve(row_bytes * height as usize);
-                        for row in 0..height as usize {
+                        frame_buffer.reserve(row_bytes * target_height as usize);
+                        for row in 0..target_height as usize {
                             let start = row * stride;
                             frame_buffer.extend_from_slice(&raw[start..start + row_bytes]);
                         }
 
                         return Ok(Thumbnail {
                             pixels: Arc::new(frame_buffer),
-                            width,
-                            height,
+                            width: target_width,
+                            height: target_height,
                         });
                     }
                 }

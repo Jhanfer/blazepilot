@@ -20,9 +20,12 @@ use crate::core::system::{
 use egui::Color32;
 use file_id::FileId;
 
+use lru::LruCache;
+use parking_lot::Mutex;
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use std::{
     hash::Hash,
+    num::NonZeroUsize,
     path::Path,
     sync::{
         Arc, OnceLock,
@@ -40,12 +43,15 @@ pub struct SizeCache {
 }
 
 static CACHE_MANAGER: OnceLock<CacheManager> = OnceLock::new();
+
+const CACHE_MANAGER_LIMIT: usize = 50;
+
 pub struct CacheManager {
     pub cache_dir: Arc<Path>,
-    pub size_cache: DashMap<String, SizeCache>,
-    pub invalidated: DashMap<String, ()>,
-    pub extended_info_cache: DashMap<String, ExtendedInfoCache>,
-    pub color_cache: DashMap<FileId, ColorCache>,
+    pub size_cache: Mutex<LruCache<String, SizeCache>>,
+    pub invalidated: Mutex<LruCache<String, ()>>,
+    pub extended_info_cache: Mutex<LruCache<String, ExtendedInfoCache>>,
+    pub color_cache: Mutex<LruCache<FileId, ColorCache>>,
     pub size_cache_loaded: AtomicBool,
     pub color_cache_loaded: AtomicBool,
     pub extended_info_loaded: AtomicBool,
@@ -56,12 +62,19 @@ impl CacheManager {
         let app_cache = &KnownDirsManager::get().app_cache;
         let cache_dir = app_cache.clone();
 
+        let def_cap: NonZeroUsize = match NonZeroUsize::new(CACHE_MANAGER_LIMIT) {
+            Some(n) => n,
+            None => unreachable!(),
+        };
+
+        let cap = NonZeroUsize::new(50).unwrap_or(def_cap);
+
         CACHE_MANAGER.get_or_init(|| Self {
             cache_dir,
-            invalidated: DashMap::new(),
-            size_cache: DashMap::new(),
-            color_cache: DashMap::new(),
-            extended_info_cache: DashMap::new(),
+            invalidated: Mutex::new(LruCache::new(cap)),
+            size_cache: Mutex::new(LruCache::new(cap)),
+            color_cache: Mutex::new(LruCache::new(cap)),
+            extended_info_cache: Mutex::new(LruCache::new(cap)),
             size_cache_loaded: AtomicBool::new(false),
             color_cache_loaded: AtomicBool::new(false),
             extended_info_loaded: AtomicBool::new(false),
@@ -70,17 +83,17 @@ impl CacheManager {
 
     pub fn invalidate(&self, path: &Path) {
         let key = path.to_string_lossy().into_owned();
-        self.invalidated.insert(key, ());
+        self.invalidated.lock().put(key, ());
     }
 
     pub fn is_invalidated(&self, path: &Path) -> bool {
-        let key = path.to_string_lossy();
-        self.invalidated.contains_key(key.as_ref())
+        let key = path.to_string_lossy().into_owned();
+        self.invalidated.lock().get(&key).is_some()
     }
 
     pub fn clear_invalidated(&self, path: &Path) {
         let key = path.to_string_lossy().into_owned();
-        self.invalidated.remove(&key);
+        self.invalidated.lock().pop(&key);
     }
 
     async fn load_cache<K, T>(&self, filename: &str) -> Option<DashMap<K, T>>
@@ -107,10 +120,10 @@ impl CacheManager {
         }
     }
 
-    pub async fn save_cache<K, T>(&self, filename: &str, data: &DashMap<K, T>)
+    pub async fn save_cache<K, T>(&self, filename: &str, data: &Mutex<LruCache<K, T>>)
     where
-        K: Serialize + Eq + Hash,
-        T: Serialize,
+        K: Serialize + Eq + Hash + Clone,
+        T: Serialize + Clone,
     {
         let cache_path = self.cache_dir.join(filename);
 
@@ -121,7 +134,15 @@ impl CacheManager {
             return;
         }
 
-        let bytes = match postcard::to_allocvec(data) {
+        let entries: Vec<(K, T)> = {
+            let lock = data.lock();
+            lock.iter()
+                .take(CACHE_MANAGER_LIMIT)
+                .map(|(k, v)| (k.clone(), v.clone()))
+                .collect()
+        };
+
+        let bytes = match postcard::to_allocvec(&entries) {
             Ok(b) => b,
             Err(e) => {
                 error!("Error al serializar {}: {}", filename, e);
@@ -141,7 +162,7 @@ impl CacheManager {
             .await
         {
             for (key, value) in cache {
-                self.size_cache.insert(key, value);
+                self.size_cache.lock().put(key, value);
             }
         }
         self.size_cache_loaded.store(true, Ordering::SeqCst);
@@ -151,12 +172,13 @@ impl CacheManager {
         while !self.size_cache_loaded.load(Ordering::SeqCst) {
             tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
         }
-        let data_to_save = self.size_cache.clone();
-        self.save_cache("cache_sizes.bin", &data_to_save).await;
+        self.save_cache("cache_sizes.bin", &self.size_cache).await;
     }
 
     pub fn update_cache_size(&self, path: String, size: u64, modified: u64) {
-        self.size_cache.insert(path, SizeCache { size, modified });
+        self.size_cache
+            .lock()
+            .put(path, SizeCache { size, modified });
     }
 
     pub fn get_cached_size(&self, path: &Path) -> Option<u64> {
@@ -165,7 +187,7 @@ impl CacheManager {
         }
 
         let key = path.to_string_lossy();
-        self.size_cache.get(key.as_ref()).map(|c| c.size)
+        self.size_cache.lock().get(key.as_ref()).map(|c| c.size)
     }
 
     ///------ Colores ----    
@@ -175,7 +197,7 @@ impl CacheManager {
             .await
         {
             for (key, value) in cache {
-                self.color_cache.insert(key, value);
+                self.color_cache.lock().put(key, value);
             }
         }
         self.color_cache_loaded.store(true, Ordering::SeqCst);
@@ -185,13 +207,13 @@ impl CacheManager {
         while !self.color_cache_loaded.load(Ordering::SeqCst) {
             tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
         }
-        let data_to_save = self.color_cache.clone();
-        self.save_cache("color_cache.bin", &data_to_save).await;
+        self.save_cache("color_cache.bin", &self.color_cache).await;
     }
 
     pub async fn update_color_cache(&self, file_id: FileId, new_color: Color32) {
         self.color_cache
-            .insert(file_id, ColorCache { color: new_color });
+            .lock()
+            .put(file_id, ColorCache { color: new_color });
     }
 
     pub fn get_cached_color(&self, file_id: &FileId) -> Color32 {
@@ -200,6 +222,7 @@ impl CacheManager {
         }
 
         self.color_cache
+            .lock()
             .get(file_id)
             .map(|c| c.color)
             .unwrap_or(Color32::YELLOW)
@@ -212,7 +235,7 @@ impl CacheManager {
             .await
         {
             for (key, value) in cache {
-                self.extended_info_cache.insert(key, value);
+                self.extended_info_cache.lock().put(key, value);
             }
         }
         self.extended_info_loaded.store(true, Ordering::SeqCst);
@@ -222,13 +245,12 @@ impl CacheManager {
         while !self.extended_info_loaded.load(Ordering::SeqCst) {
             tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
         }
-        let data_to_save = self.extended_info_cache.clone();
-        self.save_cache("cache_extended_info.bin", &data_to_save)
+        self.save_cache("cache_extended_info.bin", &self.extended_info_cache)
             .await;
     }
 
     pub async fn update_extended_info_cache(&self, path: String, info: ExtendedInfoCache) {
-        self.extended_info_cache.insert(path, info);
+        self.extended_info_cache.lock().put(path, info);
     }
 
     pub fn get_cached_extended_info(&self, path: &Path) -> Option<ExtendedInfoCache> {
@@ -236,8 +258,6 @@ impl CacheManager {
             return None;
         }
         let key = path.to_string_lossy();
-        self.extended_info_cache
-            .get(key.as_ref())
-            .map(|r| r.clone())
+        self.extended_info_cache.lock().get(key.as_ref()).cloned()
     }
 }

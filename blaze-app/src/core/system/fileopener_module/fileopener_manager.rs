@@ -94,7 +94,7 @@ impl FileOpenerManager {
     }
 
     #[allow(unused)]
-    pub fn get_mime(&self, path: Arc<Path>) -> String {
+    pub fn get_mime(&mut self, path: Arc<Path>) -> String {
         self.opener.get_mime(path)
     }
 
@@ -113,7 +113,7 @@ impl FileOpenerManager {
     }
 
     #[allow(unused)]
-    pub fn get_available_apps(&self, path: Arc<Path>) -> OpenerResult<Vec<AppInfo>> {
+    pub fn get_available_apps(&mut self, path: Arc<Path>) -> OpenerResult<Vec<AppInfo>> {
         let mime = self.opener.get_mime(path.clone());
         let mut apps = self.opener.get_available_apps(path)?;
 
@@ -127,7 +127,7 @@ impl FileOpenerManager {
     }
 
     #[allow(unused)]
-    pub fn get_default_app(&self, path: Arc<Path>) -> OpenerResult<Option<AppInfo>> {
+    pub fn get_default_app(&mut self, path: Arc<Path>) -> OpenerResult<Option<AppInfo>> {
         let mime = self.opener.get_mime(path.clone());
 
         if let Some(app_id) = self.local.read().associations.get(&mime).cloned() {
@@ -142,12 +142,12 @@ impl FileOpenerManager {
         self.opener.get_default_app(path)
     }
 
-    pub fn get_all_apps(&self, path: Arc<Path>) -> OpenerResult<Vec<AppInfo>> {
+    pub fn get_all_apps(&mut self, path: Arc<Path>) -> OpenerResult<Vec<AppInfo>> {
         self.opener.get_all_apps(path)
     }
 
     pub fn set_default_app(
-        &self,
+        &mut self,
         path: Arc<Path>,
         app_id: &str,
         save_to_system: bool,
@@ -167,7 +167,7 @@ impl FileOpenerManager {
     }
 
     #[allow(unused)]
-    pub fn clear_local_default(&self, path: Arc<Path>) -> OpenerResult<()> {
+    pub fn clear_local_default(&mut self, path: Arc<Path>) -> OpenerResult<()> {
         let mime = self.opener.get_mime(path);
         let mut local = self.local.write();
         local.associations.remove(&mime);
