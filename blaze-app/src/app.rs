@@ -196,6 +196,7 @@ impl BlazeApp {
         if self.past_cleanup.elapsed() > Duration::from_secs(1) {
             self.ui_state.cleanup();
             self.past_cleanup = Instant::now();
+            unsafe { free_mi() };
         }
 
         //Nuevo cargador de fuentes dinámico
@@ -237,11 +238,9 @@ impl BlazeApp {
         if self.state.is_loading || self.state.active_tasks > 0 {
             self.repaint_signal.request_repaint_immediate();
             ui.request_repaint();
-            unsafe { free_mi() };
         } else {
             self.repaint_signal.request_repaint_after(100);
             ui.request_repaint_after(std::time::Duration::from_millis(100));
-            unsafe { free_mi() };
         }
     }
 

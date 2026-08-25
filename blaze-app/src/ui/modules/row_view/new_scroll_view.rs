@@ -486,13 +486,13 @@ pub fn new_render_scrollview(
                 .collect()
         };
 
-        let thumbnail_snapshot: HashMap<Arc<Path>, Thumbnail> = {
-            let mut guard = ui_state.thumbnail_manager.thumb_map.write();
+        let thumbnail_snapshot: HashMap<Arc<Path>, Arc<Thumbnail>> = {
+            let guard = ui_state.thumbnail_manager.thumb_map.read();
             row_range
                 .clone()
                 .filter_map(|i| {
                     let p = &files[i].full_path;
-                    guard.get(p).cloned().map(|t| (p.clone(), t))
+                    guard.peek(p).cloned().map(|t| (p.clone(), t))
                 })
                 .collect()
         };

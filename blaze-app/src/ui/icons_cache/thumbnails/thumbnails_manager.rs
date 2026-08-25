@@ -97,7 +97,7 @@ pub struct Thumbnail {
 }
 
 pub struct ThumbnailManager {
-    pub thumb_map: Arc<RwLock<LruCache<Arc<Path>, Thumbnail>>>,
+    pub thumb_map: Arc<RwLock<LruCache<Arc<Path>, Arc<Thumbnail>>>>,
     pub semaphore: Arc<Semaphore>,
 }
 
@@ -278,7 +278,7 @@ impl ThumbnailManager {
 
                     //lee la imagen en cache
                     if let Ok(thumb) = Self::load_from_cache(&cache_path).await {
-                        thumb_map.write().put(path.clone(), thumb);
+                        thumb_map.write().put(path.clone(), Arc::new(thumb));
                         sender_clone
                             .send(UiEvent::ThumbnailReady { full_path: path })
                             .ok();
@@ -309,7 +309,7 @@ impl ThumbnailManager {
                             sender_clone.send(UiEvent::ShowError(err.into())).ok();
                         }
 
-                        thumb_map.write().put(path.clone(), thumb);
+                        thumb_map.write().put(path.clone(), Arc::new(thumb));
                         sender_clone
                             .send(UiEvent::ThumbnailReady { full_path: path })
                             .ok();

@@ -168,7 +168,7 @@ pub fn ensure_min_lightness(color: Color32) -> Color32 {
 pub fn render_quicklink_icon(
     ui: &mut Ui,
     item: &QuickLinks,
-    thumb_snapshot: &HashMap<Arc<Path>, Thumbnail>,
+    thumb_snapshot: &HashMap<Arc<Path>, Arc<Thumbnail>>,
     ui_state: &mut BlazeUiState,
     icon_rect: Rect,
     icon_size: Vec2,

@@ -439,10 +439,12 @@ pub fn sidebar_right_component(
 
                                         let (icon_rect, _) = ui.allocate_exact_size(icon_size, Sense::click());
 
-                                        let thumbnail_snapshot: HashMap<Arc<Path>, Thumbnail> = {
-                                            let mut guard = ui_state.thumbnail_manager.thumb_map.write();
+                                        let thumbnail_snapshot: HashMap<Arc<Path>, Arc<Thumbnail>> = {
+                                            let guard = ui_state.thumbnail_manager.thumb_map.read();
                                             let mut map = HashMap::new();
-                                            if let Some(thumb) = guard.get(&file.full_path).cloned() {
+                                            if let Some(thumb) = guard
+                                                .peek(&file.full_path)
+                                                .cloned() {
                                                 map.insert(file.full_path.clone(), thumb);
                                             }
                                             map
