@@ -26,6 +26,7 @@ use crate::ui::fonts::fonts_manager::with_fonts;
 use crate::ui::modules::ui_callback::connect_ui_components_callback;
 use crate::ui::themes::platform::structs::ToColor;
 use crate::ui::themes::theme_manager::with_theme;
+use crate::utils::mimalloc_fn::free_mi;
 use crate::window_backend::repaint_signal::RepaintSignal;
 use egui::Ui;
 use std::path::Path;
@@ -236,9 +237,11 @@ impl BlazeApp {
         if self.state.is_loading || self.state.active_tasks > 0 {
             self.repaint_signal.request_repaint_immediate();
             ui.request_repaint();
+            unsafe { free_mi() };
         } else {
             self.repaint_signal.request_repaint_after(100);
             ui.request_repaint_after(std::time::Duration::from_millis(100));
+            unsafe { free_mi() };
         }
     }
 

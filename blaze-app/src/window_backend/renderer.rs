@@ -164,6 +164,15 @@ impl Renderer {
         primitives: &[egui::ClippedPrimitive],
         textures_delta: &egui::TexturesDelta,
     ) {
+        for id in &textures_delta.free {
+            self.egui_renderer.free_texture(id);
+        }
+
+        for (id, image_delta) in &textures_delta.set {
+            self.egui_renderer
+                .update_texture(&self.device, &self.queue, *id, image_delta);
+        }
+
         let primitives = &primitives[..primitives.len().min(MAX_PRIMITIVES_PER_FRAME)];
 
         let frame = match self.surface.get_current_texture() {

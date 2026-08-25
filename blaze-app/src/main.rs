@@ -37,6 +37,7 @@ use crate::{
         },
     },
     utils::initial_path_handler::parse_initial_path,
+    utils::mimalloc_fn::set_mi_option,
     window_backend::{BlazeEventLoop, PresentMode, RendererConfig},
 };
 
@@ -51,6 +52,10 @@ fn init_dir_trash() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn main() {
+    //setea la opción de mimalloc para liberar memoria
+    unsafe {
+        set_mi_option();
+    }
     fmt()
         .with_env_filter(EnvFilter::from_default_env())
         .with_file(true)
@@ -59,6 +64,9 @@ fn main() {
         .init();
 
     if std::env::var("BLAZE_IS_CHILD").is_ok() {
+        unsafe {
+            set_mi_option();
+        }
         let present_mode = parse_present_mode_from_env();
         let with_trasnparency = parse_transparency_from_env();
         let backend = parse_backend_from_env();
@@ -120,7 +128,9 @@ fn try_run_with_retries() -> anyhow::Result<()> {
             .env("BLAZE_PRESENT_MODE", format!("{:?}", present_mode))
             .env("BLAZE_BACKEND", format!("{:?}", backend))
             .env("BALZE_TRANSPARENCY", format!("{:?}", with_transparency))
-            .env("BLAZE_IS_CHILD", "1");
+            .env("BLAZE_IS_CHILD", "1")
+            .stdout(std::process::Stdio::inherit())
+            .stderr(std::process::Stdio::inherit());
 
         let status = cmd.status()?;
 
