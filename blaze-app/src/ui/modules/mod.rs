@@ -7,7 +7,7 @@ pub mod island_n_bubble;
 pub mod render_tags_view;
 pub mod row_view;
 pub mod sidebar_left_component;
-pub mod sidebar_right;
+pub mod sidebar_right_component;
 pub mod toolbar;
 pub mod tools_view;
 pub mod ui_callback;

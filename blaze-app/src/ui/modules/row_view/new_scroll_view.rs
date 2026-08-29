@@ -309,10 +309,12 @@ pub fn new_render_scrollview(
                 (OrderingKind::Name, OrderingDirection::Asc) => OrderingMode {
                     kind: OrderingKind::Name,
                     direction: OrderingDirection::Desc,
+                    ..current_order
                 },
                 _ => OrderingMode {
                     kind: OrderingKind::Name,
                     direction: OrderingDirection::Asc,
+                    ..current_order
                 },
             });
         });
@@ -349,10 +351,12 @@ pub fn new_render_scrollview(
                 (OrderingKind::Date, OrderingDirection::Asc) => OrderingMode {
                     kind: OrderingKind::Date,
                     direction: OrderingDirection::Desc,
+                    ..current_order
                 },
                 _ => OrderingMode {
                     kind: OrderingKind::Date,
                     direction: OrderingDirection::Asc,
+                    ..current_order
                 },
             });
         });
@@ -389,10 +393,12 @@ pub fn new_render_scrollview(
                 (OrderingKind::Size, OrderingDirection::Asc) => OrderingMode {
                     kind: OrderingKind::Size,
                     direction: OrderingDirection::Desc,
+                    ..current_order
                 },
                 _ => OrderingMode {
                     kind: OrderingKind::Size,
                     direction: OrderingDirection::Asc,
+                    ..current_order
                 },
             });
         });
