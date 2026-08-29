@@ -9,7 +9,8 @@ use crate::{
         modules::{
             file_view_callback::render_views,
             sidebar_left_component::sidebar_callback::sidebar_left_component,
-            sidebar_right::sidebar_right_component, toolbar::toolbar_component,
+            sidebar_right_component::sidebar_right::sidebar_right_component,
+            toolbar::toolbar_component,
         },
     },
 };

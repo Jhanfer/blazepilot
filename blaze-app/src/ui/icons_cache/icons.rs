@@ -77,3 +77,7 @@ pub const ICON_SORT_LETTERS_DOWN: &[u8] =
     include_bytes!("../assets/icons/sort-descending-letters.svg");
 pub const ICON_SORT_SHAPES_UP: &[u8] = include_bytes!("../assets/icons/sort-ascending-2.svg");
 pub const ICON_SORT_SHAPES_DOWN: &[u8] = include_bytes!("../assets/icons/sort-descending-2.svg");
+pub const ICON_SIDEBAR_RIGHT: &[u8] =
+    include_bytes!("../assets/icons/layout-sidebar-right-expand.svg");
+pub const ICON_SIDEBAR_LEFT: &[u8] =
+    include_bytes!("../assets/icons/layout-sidebar-left-expand.svg");
