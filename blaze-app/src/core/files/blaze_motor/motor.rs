@@ -270,16 +270,29 @@ mod tests {
         Ok(())
     }
 
+    fn two_distinct_dirs() -> (Arc<Path>, Arc<Path>) {
+        let base = std::env::temp_dir();
+        let unique = format!("blaze_test_{}", Uuid::new_v4());
+        let a = base.join(&unique).join("a");
+        let b = base.join(&unique).join("b");
+        std::fs::create_dir_all(&a).ok();
+        std::fs::create_dir_all(&b).ok();
+        (a.into(), b.into())
+    }
+
     fn make_tab(path: Arc<Path>) -> BlazeTabState {
         if let Err(e) = init_dir_trash() {
             println!("El backend de la papelera ya se encuentra activo: {}", e);
         }
 
         let id = Uuid::new_v4();
-        BlazeTabBuilder::default()
-            .with_start_path(path)
+        let mut tab = BlazeTabBuilder::default()
+            .with_start_path(path.clone())
             .with_uuid(id)
-            .build()
+            .build();
+
+        tab.ensure_source(path);
+        tab
     }
 
     #[test]
@@ -348,6 +361,7 @@ mod tests {
         {
             let tab = &mut motor.tabs[0];
             let path = tab.focused.clone();
+            tab.ensure_source(path.clone());
             let source = tab
                 .sources
                 .iter_mut()
@@ -441,15 +455,6 @@ mod tests {
 
         // El handle fue abortado/tomado por stop_watching
         assert!(source.watcher.watching_handle.is_none());
-    }
-
-    fn two_distinct_dirs() -> (Arc<Path>, Arc<Path>) {
-        let base = std::env::temp_dir();
-        let a = base.join("blaze_test_a");
-        let b = base.join("blaze_test_b");
-        std::fs::create_dir_all(&a).ok();
-        std::fs::create_dir_all(&b).ok();
-        (a.into(), b.into())
     }
 
     #[test]
