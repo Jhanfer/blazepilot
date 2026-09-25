@@ -20,16 +20,28 @@ pub fn process_event_x11(cwd: Arc<Path>, active_id: Uuid, dropped_files: &[Dropp
 
     for dropped in dropped_files {
         if let Some(path) = &dropped.path {
-            paths.push(path.clone().into());
+            let arc_path: Arc<Path> = Arc::from(path.as_path());
+            paths.push(arc_path);
         }
     }
 
     if !paths.is_empty() {
         let dispatcher = with_event_bus(|e| e.dispatcher(active_id));
 
+        let items: Vec<(Box<str>, Arc<Path>)> = paths
+            .into_iter()
+            .map(|p| {
+                let name: Box<str> = p
+                    .file_name()
+                    .map(|n| n.to_string_lossy().into())
+                    .unwrap_or_else(|| "?".into());
+                (name, p)
+            })
+            .collect();
+
         dispatcher
             .send(UiEvent::SureTo(SureTo::SureToMove {
-                files: paths,
+                files: items,
                 dest: cwd.clone(),
             }))
             .ok();

@@ -24,7 +24,7 @@ use egui::{CornerRadius, Frame, Margin, Order, RichText, Ui, Window};
 use uuid::Uuid;
 
 pub struct SureToDeleteDialog {
-    pub sources: Option<Vec<Arc<Path>>>,
+    pub sources: Option<Vec<(Box<str>, Arc<Path>)>>,
     pub tab_id: Option<Uuid>,
     pub show_modal: bool,
 }
@@ -54,7 +54,7 @@ impl SureToDeleteDialog {
         self.show_modal = false;
     }
 
-    pub fn open(&mut self, sources: Vec<Arc<Path>>, tab_id: Uuid) {
+    pub fn open(&mut self, sources: Vec<(Box<str>, Arc<Path>)>, tab_id: Uuid) {
         self.sources = Some(sources);
         self.tab_id = Some(tab_id);
         self.show_modal = true;
@@ -62,9 +62,7 @@ impl SureToDeleteDialog {
 
     pub fn render_dialog(&mut self, ui: &mut Ui) -> bool {
         let i18n = with_configs(|c| c.get_i18n());
-
         let current_theme = with_theme(|t| t.current());
-
         let mut should_close = false;
 
         let (Some(sources), Some(_)) = (self.sources.as_ref(), self.tab_id.as_ref()) else {
@@ -92,14 +90,9 @@ impl SureToDeleteDialog {
                 const MAX_SHOWN: usize = 5;
                 let total = sources.len();
 
-                for source in sources.iter().take(MAX_SHOWN) {
-                    let file_name = source
-                        .file_name()
-                        .map(|f| f.to_string_lossy().into_owned())
-                        .unwrap_or_else(|| i18n.t("sure_to_delete_dialog.file").into_string());
-
+                for (file_name, _) in sources.iter().take(MAX_SHOWN) {
                     ui.label_ns(
-                        i18n.t_args("sure_to_delete_dialog.file_dot", &[("query", &file_name)]),
+                        i18n.t_args("sure_to_delete_dialog.file_dot", &[("query", file_name)]),
                     );
                 }
 

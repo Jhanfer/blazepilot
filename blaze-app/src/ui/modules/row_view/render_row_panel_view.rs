@@ -34,7 +34,7 @@ use uuid::Uuid;
 fn background_response_logic(
     state: &mut BlazeCoreState,
     ui_state: &mut BlazeUiState,
-    files: &[Arc<FileEntry>],
+    files_len: usize,
     ui: &mut Ui,
     panel_top: f32,
     total_rows: usize,
@@ -96,23 +96,25 @@ fn background_response_logic(
         state.rubber_band.rubber_band_current = None;
     }
 
-    let cwd = state.cwd.clone();
+    let cwd = state.cwd();
     let is_in_trash = get_backend().etched_in_trash_path(&cwd);
 
     if is_in_trash {
-        let tab_id = state.active_id;
+        let tab_id = state.active_id();
         let dispatcher = with_event_bus(|e| e.dispatcher(tab_id));
         if bg_response.secondary_clicked() {
             ui_state.context_menu_state.handle_response(&bg_response);
             ui_state.context_menu_state.kind = ContextMenuKind::BackgroundTrash;
             ui_state.context_menu_state.target_sender = Some(dispatcher);
+            ui_state.context_menu_state.source_path = Some(cwd);
         }
     } else {
         if bg_response.secondary_clicked() {
             state.deselect_all();
-            state.resize_selection(files.len());
+            state.resize_selection(files_len);
             ui_state.context_menu_state.handle_response(&bg_response);
             ui_state.context_menu_state.kind = ContextMenuKind::BackgroundNormal;
+            ui_state.context_menu_state.source_path = Some(cwd);
         }
     }
 
@@ -120,7 +122,7 @@ fn background_response_logic(
     match ctx_menu.kind {
         ContextMenuKind::BackgroundNormal => ctx_menu.background_context_menu(ui, state, ui_state),
         ContextMenuKind::BackgroundTrash => {
-            ctx_menu.background_context_menu_in_trash(ui, state, ui_state, files)
+            ctx_menu.background_context_menu_in_trash(ui, state, ui_state)
         }
         _ => {}
     }
@@ -133,12 +135,15 @@ fn background_response_logic(
 
 pub fn row_panel_frame(
     ui: &mut Ui,
-    files: &[Arc<FileEntry>],
     state: &mut BlazeCoreState,
     ui_state: &mut BlazeUiState,
     bottom_padding: i8,
     tabs_height: i8,
 ) {
+    let path = state.cwd();
+    let files: &[Arc<FileEntry>] = &state.get_files_for(&path);
+    state.resize_selection(files.len());
+
     let current_theme = with_theme(|t| t.current());
 
     Frame::NONE
@@ -198,7 +203,7 @@ pub fn row_panel_frame(
             background_response_logic(
                 state,
                 ui_state,
-                files,
+                files.len(),
                 ui,
                 panel_top,
                 total_rows,
@@ -206,52 +211,37 @@ pub fn row_panel_frame(
                 content_rect,
             );
 
-            let tab_id = state.active_id;
+            let tab_id = state.active_id();
             let dispatcher = with_event_bus(|e| e.dispatcher(tab_id));
 
-            //Disparador de sizer
-            if state.files_just_loaded {
-                tracing::info!("Ya cargado {}", state.files_just_loaded);
-                for file in files.iter() {
-                    if file.is_dir()
-                        && !state.calculating_dir_sizes.contains(&file.full_path)
-                        && !state.calculated_dir_sizes.contains(&file.full_path)
-                    {
-                        state.calculating_dir_sizes.insert(file.full_path.clone());
-                        if let Err(e) = dispatcher.send(SizerMessages::StartCal(
-                            file.full_path.to_owned(),
-                            Uuid::new_v4(),
-                        )) {
-                            warn!("Error enviando Sizer: {}", e);
-                        }
+            // rescatar el rango de visibles
+            let (first, last) = (state.row_view.first_visible, state.row_view.last_visible);
+
+            let just_loaded = state.filesource_just_loaded(&state.cwd());
+
+            for file in files.get(first..last.min(files.len())).unwrap_or(&[]) {
+                //Disparador de sizer
+                if just_loaded && file.is_dir() && state.dir_sizes.is_done(&file.full_path) {
+                    state.dir_sizes.start(file.full_path.clone());
+                    if let Err(e) = dispatcher.send(SizerMessages::StartCal(
+                        file.full_path.to_owned(),
+                        Uuid::new_v4(),
+                    )) {
+                        warn!("Error enviando Sizer: {}", e);
                     }
                 }
 
                 //Disparador de Info extendida
-                for file in files.iter() {
-                    if !state.calculating_extended_info.contains(&file.full_path)
-                        && !state.calculated_extended_info.contains(&file.full_path)
+                if just_loaded && !state.extended_info.is_done(&file.full_path) {
+                    state.extended_info.start(file.full_path.clone());
+                    if let Err(e) =
+                        dispatcher.send(ExtendedInfoMessages::StartScan(file.full_path.to_owned()))
                     {
-                        state
-                            .calculating_extended_info
-                            .insert(file.full_path.clone());
-                        if let Err(e) = dispatcher
-                            .send(ExtendedInfoMessages::StartScan(file.full_path.to_owned()))
-                        {
-                            warn!("Error enviando Sizer: {}", e);
-                        }
+                        warn!("Error enviando Sizer: {}", e);
                     }
                 }
 
-                state.files_just_loaded = false;
-            }
-
-            //disparador de thumbnails
-            for file in files
-                .iter()
-                .take(state.row_view.last_visible.min(files.len()))
-                .skip(state.row_view.first_visible)
-            {
+                //disparador de thumbnails
                 let img_vid = file.extension.is_image() || file.extension.is_video();
 
                 if !ui_state.calculating_thumbnails.contains(&file.full_path)
@@ -269,17 +259,17 @@ pub fn row_panel_frame(
                 }
 
                 //skip si las fuentes están cargadas
-                if state.fonts_requested.contains(&file.name) {
+                if state.fonts.is_requested(&file.name) {
                     continue;
                 }
-                state.fonts_requested.insert(file.name.clone());
+                state.fonts.start(file.name.clone());
 
                 //Procesa nombres de los files para encontrar las fuentes necesarias
                 let counter = with_fonts(|f| f.pending_tasks.clone());
                 counter.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
 
                 let file_name = file.name.clone();
-                let dir = state.cwd.clone();
+                let dir = state.cwd();
 
                 let token = with_fonts(|f| f.cancellation_token.clone());
 

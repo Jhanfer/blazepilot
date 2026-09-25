@@ -1,6 +1,7 @@
 use crate::{
     core::{
-        blaze_state::{BlazeCoreState, LayoutMode, NewItemType, ViewMode},
+        blaze_state::BlazeCoreState,
+        blaze_state::state_structs::{LayoutMode, NewItemType, ViewMode},
         bootstrap::configs::config_manager::with_configs,
         files::blaze_motor::motor_structs::FileEntry,
         runtime::{
@@ -33,7 +34,7 @@ pub fn hot_keys_logic(
     let input = ui.input(|i| i.clone());
     let disable_keys = state.renaming_file.is_none() && state.creating_new.is_none();
 
-    let dispatcher = with_event_bus(|e| e.dispatcher(state.active_id));
+    let dispatcher = with_event_bus(|e| e.dispatcher(state.active_id()));
 
     let has_clipboard = match state.clipboard.clipboard_has_files() {
         Ok(has_files) => has_files,
@@ -54,7 +55,7 @@ pub fn hot_keys_logic(
     if !text_edit_focused {
         //tecla de arriba
         if input.key_pressed(Key::ArrowUp) && disable_keys {
-            let prev = if let Some(i) = state.last_selected_index {
+            let prev = if let Some(i) = state.last_selected_index() {
                 if i == 0 { 0 } else { i - 1 }
             } else {
                 state
@@ -67,20 +68,20 @@ pub fn hot_keys_logic(
             state.resize_selection(files.len());
 
             if files.is_empty() {
-                state.last_selected_index = None;
-                state.selection_anchor = None;
+                state.set_last_selected_index(None);
+                state.set_selection_anchor(None);
             } else {
                 let safe_prev = prev.min(files.len() - 1);
-                state.selection.set(safe_prev, true);
-                state.selection_anchor = Some(safe_prev);
-                state.last_selected_index = Some(safe_prev);
+                state.set_selection(safe_prev, true);
+                state.set_selection_anchor(Some(safe_prev));
+                state.set_last_selected_index(Some(safe_prev));
                 state.pending_scroll_to = Some(safe_prev);
             }
         }
 
         //tecla de abajo
         if input.key_pressed(Key::ArrowDown) && disable_keys {
-            let next = if let Some(i) = state.last_selected_index {
+            let next = if let Some(i) = state.last_selected_index() {
                 (i + 1).min(files.len().saturating_sub(1))
             } else {
                 state
@@ -93,20 +94,20 @@ pub fn hot_keys_logic(
             state.resize_selection(files.len());
 
             if files.is_empty() {
-                state.last_selected_index = None;
-                state.selection_anchor = None;
+                state.set_last_selected_index(None);
+                state.set_selection_anchor(None);
             } else {
                 let safe_next = next.min(files.len() - 1);
-                state.selection.set(safe_next, true);
-                state.selection_anchor = Some(safe_next);
-                state.last_selected_index = Some(safe_next);
+                state.set_selection(safe_next, true);
+                state.set_selection_anchor(Some(safe_next));
+                state.set_last_selected_index(Some(safe_next));
                 state.pending_scroll_to = Some(safe_next);
             }
         }
 
         //tecla enter
         if ui.input(|i| i.key_pressed(Key::Enter)) && disable_keys {
-            if let Some(idx) = state.last_selected_index
+            if let Some(idx) = state.last_selected_index()
                 && idx < files.len()
             {
                 let file = &files[idx];
@@ -116,7 +117,7 @@ pub fn hot_keys_logic(
                     state.open_file(file);
                 }
             } else {
-                state.last_selected_index = None;
+                state.set_last_selected_index(None);
             }
         }
 
@@ -130,19 +131,24 @@ pub fn hot_keys_logic(
             && disable_keys
         {
             {
-                let motor = state.motor.borrow();
-                let tab = motor.active_tab();
+                let mut motor = state.motor.borrow_mut();
 
-                let file_guard = tab.files.read().unwrap();
+                let tab = motor.active_tab_mut();
+                let focused = tab.focused.clone();
+                let Some(source) = tab.sources.iter_mut().find(|s| s.cwd == focused) else {
+                    warn!("no hay source con cwd: {focused:?} en la tab activa");
+                    return;
+                };
+
+                let file_guard = source.files.read();
 
                 for file in file_guard.iter().filter(|f| f.is_dir()) {
-                    state.calculated_dir_sizes.remove(&file.full_path);
-                    state.calculating_dir_sizes.remove(&file.full_path);
+                    state.dir_sizes.remove_one(&file.full_path);
                     CacheManager::global().invalidate(&file.full_path);
                 }
             }
-            ui.ctx().request_repaint();
-            state.refresh();
+            ui.request_repaint();
+            state.reload_all();
         }
 
         //Botones del ratón
@@ -157,11 +163,11 @@ pub fn hot_keys_logic(
         //eliminar
         if input.key_pressed(Key::Delete) && disable_keys {
             let sources = state.get_selected_paths(files);
-            let cwd = state.cwd.clone();
+            let cwd = state.cwd();
             let is_in_trash = get_backend().etched_in_trash_path(&cwd);
 
             if is_in_trash && !sources.is_empty() {
-                let tab_id = state.active_id;
+                let tab_id = state.active_id();
                 let dispatcher = with_event_bus(|e| e.dispatcher(tab_id));
                 let tab_id = state.motor.borrow_mut().active_tab().id;
                 dispatcher
@@ -175,7 +181,7 @@ pub fn hot_keys_logic(
                     .iter()
                     .enumerate()
                     .filter(|(index, _)| state.is_selected(*index))
-                    .map(|(_, f)| (Arc::from(f.name.to_owned()), f.full_path.to_owned()))
+                    .map(|(_, f)| (f.name.clone(), f.full_path.to_owned()))
                     .collect();
                 state.move_to_trash(items);
             }
@@ -218,7 +224,7 @@ pub fn hot_keys_logic(
         //pegar
         if do_paste && disable_keys && has_clipboard {
             tracing::info!("Se manda comando pega");
-            let cwd = state.cwd.clone();
+            let cwd = state.cwd();
             state.paste(cwd);
         }
 
@@ -239,15 +245,15 @@ pub fn hot_keys_logic(
         }
 
         //búsqueda recursiva
-        if input.modifiers.alt
-            && input.key_pressed(Key::R)
-            && (state.search_filter.is_empty() || !ui.memory(|m| m.has_focus("search_bar".into())))
-        {
-            state.set_search("rec:".to_owned());
+        if input.modifiers.alt && input.key_pressed(Key::R) {
+            let filter_empty = state.is_filter_empty();
 
-            ui.ctx().memory_mut(|mem| {
-                mem.request_focus("search_bar".into());
-            });
+            if filter_empty || !ui.memory(|m| m.has_focus("search_bar".into())) {
+                state.set_search("rec:".to_owned());
+                ui.ctx().memory_mut(|mem| {
+                    mem.request_focus("search_bar".into());
+                });
+            }
         }
 
         //Tags
@@ -261,7 +267,7 @@ pub fn hot_keys_logic(
         if input.modifiers.ctrl && input.key_pressed(Key::L) && !input.modifiers.shift {
             state.view_mode = match &state.view_mode {
                 ViewMode::Normal(LayoutMode::Row) => {
-                    state.grid_view.icon_size = 56.0;
+                    state.grid_view.base.icon_size = 56.0;
                     with_configs(|c| c.set_grid_icon_size(56.0));
                     ViewMode::Normal(LayoutMode::Grid)
                 }
@@ -385,16 +391,16 @@ pub fn hot_keys_logic(
 
                             let context_menu_open = ui_state.context_menu_state.open;
 
-                            if !config_search_has_focus
-                                && !context_menu_open
-                                && (state.search_filter.is_empty()
-                                    || !ui.memory(|m| m.has_focus("search_bar".into())))
-                            {
-                                state.set_search(key.name().to_lowercase());
+                            if !config_search_has_focus && !context_menu_open {
+                                let filter_empty = state.is_filter_empty();
 
-                                ui.memory_mut(|mem| {
-                                    mem.request_focus("search_bar".into());
-                                });
+                                if filter_empty || !ui.memory(|m| m.has_focus("search_bar".into()))
+                                {
+                                    state.set_search(key.name().to_lowercase());
+                                    ui.memory_mut(|mem| {
+                                        mem.request_focus("search_bar".into());
+                                    });
+                                }
                             }
                         }
                         _ => {}

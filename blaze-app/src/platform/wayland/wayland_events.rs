@@ -73,9 +73,20 @@ impl EventTrait for WaylandDndReceiver {
                         let dispatcher = with_event_bus(|e| e.dispatcher(active_id));
                         let cwd = cwd.clone();
 
+                        let items: Vec<(Box<str>, Arc<Path>)> = path_bufs
+                            .into_iter()
+                            .map(|p| {
+                                let name: Box<str> = p
+                                    .file_name()
+                                    .map(|n| n.to_string_lossy().into())
+                                    .unwrap_or_else(|| "?".into());
+                                (name, p)
+                            })
+                            .collect();
+
                         dispatcher
                             .send(UiEvent::SureTo(SureTo::SureToMove {
-                                files: path_bufs,
+                                files: items,
                                 dest: cwd.clone(),
                             }))
                             .ok();

@@ -85,14 +85,15 @@ pub fn render_grid_rubberband(
                 Rect::from_min_size(pos2(cell_x_min, cell_y_min), vec2(cell_size, row_height));
 
             if rect.intersects(file_rect) {
-                state.selection.set(i, true);
+                state.set_selection(i, true);
             }
         }
 
-        state.last_selected_index = if state.selected_count(files.len()) > 0 {
+        let last_selected_index = if state.selected_count(files.len()) > 0 {
             Some(files.len().saturating_sub(1))
         } else {
             None
         };
+        state.set_last_selected_index(last_selected_index)
     }
 }

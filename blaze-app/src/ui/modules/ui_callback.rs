@@ -1,9 +1,5 @@
-use std::sync::Arc;
-
-use egui::Ui;
-
 use crate::{
-    core::{blaze_state::BlazeCoreState, files::blaze_motor::motor_structs::FileEntry},
+    core::blaze_state::BlazeCoreState,
     ui::{
         blaze_ui_state::BlazeUiState,
         modules::{
@@ -14,10 +10,10 @@ use crate::{
         },
     },
 };
+use egui::Ui;
 
 pub fn connect_ui_components_callback(
     ui: &mut Ui,
-    files: &[Arc<FileEntry>],
     state: &mut BlazeCoreState,
     ui_state: &mut BlazeUiState,
 ) {
@@ -34,10 +30,10 @@ pub fn connect_ui_components_callback(
     // -------------------------------
     //  sidebar right
     // -------------------------------
-    sidebar_right_component(ui, state, ui_state, files);
+    sidebar_right_component(ui, state, ui_state);
 
     // -------------------------------
     //  file view
     // -------------------------------
-    render_views(ui, files, state, ui_state);
+    render_views(ui, state, ui_state);
 }

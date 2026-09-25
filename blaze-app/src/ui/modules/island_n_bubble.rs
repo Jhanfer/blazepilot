@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use crate::{
     core::{
-        blaze_state::{BlazeCoreState, TagViewFilter},
+        blaze_state::BlazeCoreState, blaze_state::state_structs::TagViewFilter,
         files::blaze_motor::motor_structs::FileEntry,
     },
     ui::{
@@ -192,7 +192,7 @@ pub fn render_island_bubble(
 
             let (icon_rect, _) = ui.allocate_exact_size(icon_size, Sense::hover());
             let (icon_name, icon_bytes) = ("database", icons::ICON_DATABASE);
-            let rounded_rect = Rect::from_min_max(
+            let _rect = Rect::from_min_max(
                 pos2(icon_rect.min.x.round(), icon_rect.min.y.round()),
                 pos2(icon_rect.max.x.round(), icon_rect.max.y.round()),
             );
@@ -206,7 +206,7 @@ pub fn render_island_bubble(
 
             ui.painter().image(
                 icon.id(),
-                rounded_rect,
+                _rect,
                 Rect::from_min_max(egui::pos2(0.0, 0.0), pos2(1.0, 1.0)),
                 Color32::WHITE,
             );

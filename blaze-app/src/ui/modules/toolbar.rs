@@ -112,7 +112,7 @@ pub fn toolbar_component(ui: &mut Ui, state: &mut BlazeCoreState, ui_state: &mut
             ui.horizontal_centered(|ui| {
                 ui.spacing_mut().item_spacing.x = spacing;
 
-                let cwd = state.cwd.clone();
+                let cwd = state.cwd();
 
                 Frame::new()
                     .corner_radius(20)
@@ -166,7 +166,7 @@ pub fn toolbar_component(ui: &mut Ui, state: &mut BlazeCoreState, ui_state: &mut
                             ui_state,
                             true,
                             || {
-                                let tab_id = state.active_id;
+                                let tab_id = state.active_id();
                                 let dispatcher = with_event_bus(|e| e.dispatcher(tab_id));
                                 dispatcher.send(UiEvent::OpenConfigs).ok();
                             },
@@ -223,7 +223,13 @@ pub fn toolbar_component(ui: &mut Ui, state: &mut BlazeCoreState, ui_state: &mut
                                         let response = ui.add(button);
 
                                         if response.clicked() && !is_last {
-                                            state.navigate_to(current_path.to_owned().into());
+                                            if !state.is_miller() {
+                                                state.navigate_to(current_path.to_owned().into());
+                                            } else {
+                                                state.miller_reset_to(
+                                                    current_path.to_owned().into(),
+                                                );
+                                            }
                                         }
 
                                         // Separador ">"

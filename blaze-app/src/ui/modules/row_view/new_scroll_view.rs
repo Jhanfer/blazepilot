@@ -32,7 +32,7 @@ use egui::{
     RichText, ScrollArea, Sense, Stroke, StrokeKind, TextureOptions, Ui, pos2,
     scroll_area::ScrollSource, vec2,
 };
-use std::{collections::HashMap, path::Path, sync::Arc};
+use std::{borrow::Cow, collections::HashMap, path::Path, sync::Arc};
 use tracing::info;
 
 fn new_ff_logic(state: &mut BlazeCoreState, ui: &mut Ui) {
@@ -89,8 +89,8 @@ fn handle_row_interactions(
     if middle_clicked {
         state.resize_selection(files.len());
         let currently = state.is_selected(i);
-        state.selection.set(i, !currently);
-        state.last_selected_index = Some(i);
+        state.set_selection(i, !currently);
+        state.set_last_selected_index(Some(i));
 
         if file.is_dir() {
             state.add_tab_from_file(&file.full_path);
@@ -101,9 +101,9 @@ fn handle_row_interactions(
         if !state.is_selected(i) {
             state.deselect_all();
             state.resize_selection(files.len());
-            state.selection.set(i, true);
-            state.last_selected_index = Some(i);
-            state.selection_anchor = Some(i);
+            state.set_selection(i, true);
+            state.set_last_selected_index(Some(i));
+            state.set_selection_anchor(Some(i));
         }
         state.row_view.is_dragging_files = true;
     }
@@ -125,7 +125,7 @@ fn handle_row_interactions(
         }
 
         if drop_in_file_area {
-            let tab_id = state.active_id;
+            let tab_id = state.active_id();
             let dispatcher = with_event_bus(|e| e.dispatcher(tab_id));
 
             if let Some(target) = state.row_view.drop_target.take() {
@@ -138,10 +138,10 @@ fn handle_row_interactions(
                     }))
                     .ok();
             } else {
-                let cwd = state.cwd.clone();
+                let cwd = state.cwd();
                 let sources = state.get_selected_paths(files);
 
-                if sources.iter().all(|p| p.parent() == Some(&cwd)) {
+                if sources.iter().all(|(_, p)| p.parent() == Some(&cwd)) {
                     return;
                 }
 
@@ -162,35 +162,37 @@ fn handle_row_interactions(
 
         if ui.input(|i| i.modifiers.ctrl) {
             let currently = state.is_selected(i);
-            state.selection.set(i, !currently);
-            state.last_selected_index = Some(i);
+            state.set_selection(i, !currently);
+            state.set_last_selected_index(Some(i));
         } else if !state.is_selected(i) {
             state.deselect_all();
             state.resize_selection(files.len());
-            state.selection.set(i, true);
-            state.last_selected_index = Some(i);
+            state.set_selection(i, true);
+            state.set_last_selected_index(Some(i));
         }
     }
 
-    let cwd = state.cwd.clone();
+    let cwd = state.cwd();
     let is_in_trash = get_backend().etched_in_trash_path(&cwd);
 
     if is_in_trash {
-        let tab_id = state.active_id;
+        let tab_id = state.active_id();
         let dispatcher = with_event_bus(|e| e.dispatcher(tab_id));
         if response.secondary_clicked() {
             ui_state.context_menu_state.handle_response(response);
             ui_state.context_menu_state.target_sender = Some(dispatcher);
             ui_state.context_menu_state.kind = ContextMenuKind::FileTrash;
+            ui_state.context_menu_state.source_path = Some(cwd);
         }
     } else {
-        let tab_id = state.active_id;
+        let tab_id = state.active_id();
         let dispatcher = with_event_bus(|e| e.dispatcher(tab_id));
         if response.secondary_clicked() {
             ui_state.context_menu_state.handle_response(response);
             ui_state.context_menu_state.target_file = Some(file.clone());
             ui_state.context_menu_state.target_sender = Some(dispatcher);
             ui_state.context_menu_state.kind = ContextMenuKind::FileNormal;
+            ui_state.context_menu_state.source_path = Some(cwd);
         }
     }
 }
@@ -252,7 +254,7 @@ pub fn new_render_scrollview(
 
     let i18n = with_configs(|c| c.get_i18n());
 
-    ui_state.evict_thumbnail_cache_if_dir_changed(&state.cwd);
+    ui_state.evict_thumbnail_cache_if_dir_changed(&state.cwd());
     ui_state.enforce_texture_cache_limit(500);
 
     let current_order = with_configs(|c| c.get_ordering_mode());
@@ -457,411 +459,423 @@ pub fn new_render_scrollview(
         .auto_shrink([false, false])
         .vertical_scroll_offset(state.scroll_offset);
 
-    let scroll_output = scroll_area.show_rows(ui, row_height, total_rows, |ui, row_range| {
-        let mut should_repaint = false;
+    let scroll_output =
+        scroll_area.show_rows(ui, row_height, total_rows, |ui: &mut Ui, row_range| {
+            let mut should_repaint = false;
 
-        ui.spacing_mut().item_spacing.y = 0.0;
+            let is_recursive = {
+                let motor = state.motor();
+                let tab = motor.active_tab();
+                tab.sources
+                    .iter()
+                    .find(|s| s.cwd == state.cwd())
+                    .map(|s| s.is_recursive_active)
+                    .unwrap_or(false)
+            };
 
-        state.row_view.first_visible = row_range.start;
-        state.row_view.last_visible = row_range.end;
+            ui.spacing_mut().item_spacing.y = 0.0;
 
-        let info_snapshot: HashMap<Arc<Path>, ExtendedInfo> = {
-            match state.extended_info_manager.info_map.write() {
-                Ok(mut map) => row_range
+            state.row_view.first_visible = row_range.start;
+            state.row_view.last_visible = row_range.end;
+
+            let info_snapshot: HashMap<Arc<Path>, ExtendedInfo> = {
+                match state.extended_info_manager.info_map.read() {
+                    Ok(map) => row_range
+                        .clone()
+                        .filter_map(|i| {
+                            let path = &files[i].full_path;
+                            map.peek(path).map(|v| (path.clone(), v.clone()))
+                        })
+                        .collect::<HashMap<Arc<Path>, ExtendedInfo>>(),
+                    Err(_) => HashMap::new(),
+                }
+            };
+
+            ui_state.color_snapshot = {
+                let color_map = &ui_state.folder_color_manager.cache_manager.color_cache;
+
+                row_range
                     .clone()
                     .filter_map(|i| {
-                        let path = &files[i].full_path;
-                        map.get(path).map(|v| (path.clone(), v.clone()))
+                        files[i]
+                            .unique_id
+                            .as_ref()
+                            .and_then(|id| color_map.lock().get(id).map(|c| (*id, c.color)))
                     })
-                    .collect::<HashMap<Arc<Path>, ExtendedInfo>>(),
-                Err(_) => HashMap::new(),
-            }
-        };
+                    .collect()
+            };
 
-        ui_state.color_snapshot = {
-            let color_map = &ui_state.folder_color_manager.cache_manager.color_cache;
+            let thumbnail_snapshot: HashMap<Arc<Path>, Arc<Thumbnail>> = {
+                let guard = ui_state.thumbnail_manager.thumb_map.read();
+                row_range
+                    .clone()
+                    .filter_map(|i| {
+                        let p = &files[i].full_path;
+                        guard.peek(p).cloned().map(|t| (p.clone(), t))
+                    })
+                    .collect()
+            };
 
-            row_range
-                .clone()
-                .filter_map(|i| {
-                    files[i]
-                        .unique_id
-                        .as_ref()
-                        .and_then(|id| color_map.lock().get(id).map(|c| (*id, c.color)))
-                })
-                .collect()
-        };
+            for i in row_range.clone() {
+                let file = &files[i];
+                let is_renaming = state.renaming_file.as_deref() == Some(&file.full_path);
 
-        let thumbnail_snapshot: HashMap<Arc<Path>, Arc<Thumbnail>> = {
-            let guard = ui_state.thumbnail_manager.thumb_map.read();
-            row_range
-                .clone()
-                .filter_map(|i| {
-                    let p = &files[i].full_path;
-                    guard.peek(p).cloned().map(|t| (p.clone(), t))
-                })
-                .collect()
-        };
+                if is_renaming {
+                    let (rect, _) =
+                        ui.allocate_exact_size(vec2(available, row_height), Sense::hover());
 
-        for i in row_range.clone() {
-            let file = &files[i];
-            let is_renaming = state.renaming_file.as_deref() == Some(&file.full_path);
+                    if i == row_range.start {
+                        state.row_view.scroll_area_origin_y =
+                            rect.min.y + state.scroll_offset - (i as f32 * row_height);
+                    }
 
-            if is_renaming {
-                let (rect, _) = ui.allocate_exact_size(vec2(available, row_height), Sense::hover());
+                    render_rename_field(ui, file, state, rect, is_renaming);
+                    continue;
+                }
 
+                let (rect, response) =
+                    ui.allocate_exact_size(vec2(available, row_height), Sense::click_and_drag());
+
+                // --- Corrección de la rubberband ---
                 if i == row_range.start {
                     state.row_view.scroll_area_origin_y =
                         rect.min.y + state.scroll_offset - (i as f32 * row_height);
                 }
 
-                render_rename_field(ui, file, state, rect, is_renaming);
-                continue;
-            }
+                // --- Selección y hover ---
+                if response.hovered() {
+                    ui.set_cursor_icon(CursorIcon::PointingHand);
+                    ui.painter().rect_filled(
+                        rect,
+                        5.0,
+                        current_theme.components.list_item.bg_hover.to_color(),
+                    );
+                }
 
-            let (rect, response) =
-                ui.allocate_exact_size(vec2(available, row_height), Sense::click_and_drag());
+                if state.is_selected(i) {
+                    ui.painter().rect_filled(
+                        rect,
+                        5.0,
+                        Color32::from_rgba_unmultiplied(
+                            current_theme
+                                .components
+                                .list_item
+                                .bg_selected
+                                .to_color()
+                                .r(),
+                            current_theme
+                                .components
+                                .list_item
+                                .bg_selected
+                                .to_color()
+                                .g(),
+                            current_theme
+                                .components
+                                .list_item
+                                .bg_selected
+                                .to_color()
+                                .b(),
+                            60,
+                        ),
+                    );
+                }
 
-            // --- Corrección de la rubberband ---
-            if i == row_range.start {
-                state.row_view.scroll_area_origin_y =
-                    rect.min.y + state.scroll_offset - (i as f32 * row_height);
-            }
-
-            // --- Selección y hover ---
-            if response.hovered() {
-                ui.set_cursor_icon(CursorIcon::PointingHand);
-                ui.painter().rect_filled(
-                    rect,
-                    5.0,
-                    current_theme.components.list_item.bg_hover.to_color(),
-                );
-            }
-
-            if state.is_selected(i) {
-                ui.painter().rect_filled(
-                    rect,
-                    5.0,
-                    Color32::from_rgba_unmultiplied(
-                        current_theme
-                            .components
-                            .list_item
-                            .bg_selected
-                            .to_color()
-                            .r(),
-                        current_theme
-                            .components
-                            .list_item
-                            .bg_selected
-                            .to_color()
-                            .g(),
-                        current_theme
-                            .components
-                            .list_item
-                            .bg_selected
-                            .to_color()
-                            .b(),
-                        60,
-                    ),
-                );
-            }
-
-            // Drop target highlight
-            if let Some(ref target) = state.row_view.drop_target.clone() {
-                if *file.full_path == **target {
+                // Drop target highlight
+                if let Some(ref target) = state.row_view.drop_target.clone() {
+                    if *file.full_path == **target {
+                        ui.painter().rect_stroke(
+                            rect,
+                            5.0,
+                            Stroke::new(2.0, Color32::from_rgb(150, 150, 255)),
+                            StrokeKind::Outside,
+                        );
+                    }
+                } else if let Some(ref target_invalid) = state.row_view.drop_invalid_target.clone()
+                    && *file.full_path == **target_invalid
+                {
                     ui.painter().rect_stroke(
                         rect,
                         5.0,
-                        Stroke::new(2.0, Color32::from_rgb(150, 150, 255)),
+                        Stroke::new(2.0, Color32::from_rgb(255, 150, 150)),
                         StrokeKind::Outside,
                     );
                 }
-            } else if let Some(ref target_invalid) = state.row_view.drop_invalid_target.clone()
-                && *file.full_path == **target_invalid
-            {
-                ui.painter().rect_stroke(
+
+                // --- Toda la lógica de interacción original ---
+                handle_row_interactions(
+                    ui,
+                    &response,
+                    i,
+                    file,
+                    state,
+                    ui_state,
+                    files,
+                    content_rect,
                     rect,
-                    5.0,
-                    Stroke::new(2.0, Color32::from_rgb(255, 150, 150)),
-                    StrokeKind::Outside,
                 );
-            }
 
-            // --- Toda la lógica de interacción original ---
-            handle_row_interactions(
-                ui,
-                &response,
-                i,
-                file,
-                state,
-                ui_state,
-                files,
-                content_rect,
-                rect,
-            );
-
-            // clicks y selección
-            if response.double_clicked_by(PointerButton::Primary) {
-                if file.is_dir() {
-                    state.navigate_to(file.full_path.to_owned());
-                    state.deselect_all();
-                    state.resize_selection(files.len());
-                } else {
-                    state.open_file(file);
-                }
-            }
-
-            if response.clicked_by(PointerButton::Primary) {
-                if state.im_navigating() {
-                    return;
+                // clicks y selección
+                if response.double_clicked_by(PointerButton::Primary) {
+                    if file.is_dir() {
+                        state.navigate_to(file.full_path.to_owned());
+                        state.deselect_all();
+                        state.resize_selection(files.len());
+                    } else {
+                        state.open_file(file);
+                    }
                 }
 
-                let modifiers = ui.input(|i| i.modifiers);
-                if modifiers.shift {
-                    if let Some(anchor) = state.selection_anchor {
-                        let start = anchor.min(i);
-                        let end = anchor.max(i);
-                        state.select_range(start, end);
+                if response.clicked_by(PointerButton::Primary) {
+                    if state.im_navigating() {
+                        return;
+                    }
+
+                    let modifiers = ui.input(|i| i.modifiers);
+                    if modifiers.shift {
+                        if let Some(anchor) = state.selection_anchor() {
+                            let start = anchor.min(i);
+                            let end = anchor.max(i);
+                            state.select_range(start, end);
+                        } else {
+                            state.deselect_all();
+                            state.resize_selection(files.len());
+                            state.set_selection(i, true);
+                            state.set_selection_anchor(Some(i));
+                        }
+
+                        state.set_last_selected_index(Some(i));
+                    } else if modifiers.ctrl {
+                        let currently = state.is_selected(i);
+                        state.resize_selection(files.len());
+                        state.set_selection(i, !currently);
+                        state.set_selection_anchor(Some(i));
+                        state.set_last_selected_index(Some(i));
                     } else {
                         state.deselect_all();
                         state.resize_selection(files.len());
-                        state.selection.set(i, true);
-                        state.selection_anchor = Some(i);
+                        state.set_selection(i, true);
+                        state.set_selection_anchor(Some(i));
+                        state.set_last_selected_index(Some(i));
                     }
-
-                    state.last_selected_index = Some(i);
-                } else if modifiers.ctrl {
-                    let currently = state.is_selected(i);
-                    state.resize_selection(files.len());
-                    state.selection.set(i, !currently);
-                    state.selection_anchor = Some(i);
-                    state.last_selected_index = Some(i);
-                } else {
-                    state.deselect_all();
-                    state.resize_selection(files.len());
-                    state.selection.set(i, true);
-                    state.selection_anchor = Some(i);
-                    state.last_selected_index = Some(i);
                 }
-            }
 
-            // --- Contenido de la fila ---
-            let extended = info_snapshot.get(&file.full_path);
-            let git = extended.and_then(|e| e.git_status.as_ref());
-            let name_color = text_color_for_git(git);
-            let dot_color = git_dot_color(git);
+                // --- Contenido de la fila ---
+                let extended = info_snapshot.get(&file.full_path);
+                let git = extended.and_then(|e| e.git_status.as_ref());
+                let name_color = text_color_for_git(git);
+                let dot_color = git_dot_color(git);
 
-            // Columna Filename
+                // Columna Filename
 
-            let dot_size = icon_size / 8.0;
+                let dot_size = icon_size / 8.0;
 
-            let icon_spacing = icon_size / 4.0;
-            let left_padding = icon_size / 6.0;
-            let name_start_x =
-                rect.min.x + left_padding + icon_size + dot_size + icon_spacing * 2.0;
-            let name_end_x = rect.min.x + name_w;
+                let icon_spacing = icon_size / 4.0;
+                let left_padding = icon_size / 6.0;
+                let name_start_x =
+                    rect.min.x + left_padding + icon_size + dot_size + icon_spacing * 2.0;
+                let name_end_x = rect.min.x + name_w;
 
-            let icon_rect = Rect::from_min_size(
-                pos2(rect.min.x + left_padding, rect.center().y - icon_size / 2.0),
-                vec2(icon_size, icon_size),
-            );
-
-            if let Some(thumb) = thumbnail_snapshot.get(&file.full_path) {
-                let tex = ui_state
-                    .thumb_texture_cache
-                    .entry(file.full_path.to_owned())
-                    .or_insert_with_key(|path| {
-                        let color_image = ColorImage::from_rgba_unmultiplied(
-                            [thumb.width as usize, thumb.height as usize],
-                            &thumb.pixels,
-                        );
-
-                        should_repaint = true;
-
-                        ui.load_texture(
-                            format!("thumb:{}", path.to_string_lossy()),
-                            color_image,
-                            TextureOptions::LINEAR,
-                        )
-                    });
-
-                ui.painter().image(
-                    tex.id(),
-                    icon_rect,
-                    Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
-                    Color32::WHITE,
-                );
-            } else if ui_state
-                .newly_calculated_thumbnails
-                .contains(&file.full_path)
-            {
-                should_repaint = true;
-            } else {
-                let snapshot_color = file
-                    .unique_id
-                    .as_ref()
-                    .and_then(|id| ui_state.color_snapshot.get(id))
-                    .copied();
-
-                let (icon_name, icon_bytes, color) = resolve_icon(file, snapshot_color);
-                let rounded_rect = Rect::from_min_max(
-                    pos2(icon_rect.min.x.round(), icon_rect.min.y.round()),
-                    pos2(icon_rect.max.x.round(), icon_rect.max.y.round()),
-                );
-
-                let normalized_color = ensure_min_lightness(color);
-
-                let icon = ui_state.icon_cache.get_or_load(
-                    ui,
-                    &icon_name,
-                    icon_bytes,
-                    normalized_color,
+                let icon_rect = Rect::from_min_size(
+                    pos2(rect.min.x + left_padding, rect.center().y - icon_size / 2.0),
                     vec2(icon_size, icon_size),
                 );
 
-                ui.painter().image(
-                    icon.id(),
-                    rounded_rect,
-                    Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
+                if let Some(thumb) = thumbnail_snapshot.get(&file.full_path) {
+                    let tex = ui_state
+                        .thumb_texture_cache
+                        .entry(file.full_path.to_owned())
+                        .or_insert_with_key(|path| {
+                            let color_image = ColorImage::from_rgba_unmultiplied(
+                                [thumb.width as usize, thumb.height as usize],
+                                &thumb.pixels,
+                            );
+
+                            should_repaint = true;
+
+                            ui.load_texture(
+                                format!("thumb:{}", path.to_string_lossy()),
+                                color_image,
+                                TextureOptions::LINEAR,
+                            )
+                        });
+
+                    ui.painter().image(
+                        tex.id(),
+                        icon_rect,
+                        Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
+                        Color32::WHITE,
+                    );
+                } else if ui_state
+                    .newly_calculated_thumbnails
+                    .contains(&file.full_path)
+                {
+                    should_repaint = true;
+                } else {
+                    let snapshot_color = file
+                        .unique_id
+                        .as_ref()
+                        .and_then(|id| ui_state.color_snapshot.get(id))
+                        .copied();
+
+                    let (icon_name, icon_bytes, color) = resolve_icon(file, snapshot_color);
+                    let rounded_rect = Rect::from_min_max(
+                        pos2(icon_rect.min.x.round(), icon_rect.min.y.round()),
+                        pos2(icon_rect.max.x.round(), icon_rect.max.y.round()),
+                    );
+
+                    let normalized_color = ensure_min_lightness(color);
+
+                    let icon = ui_state.icon_cache.get_or_load(
+                        ui,
+                        &icon_name,
+                        icon_bytes,
+                        normalized_color,
+                        vec2(icon_size, icon_size),
+                    );
+
+                    ui.painter().image(
+                        icon.id(),
+                        rounded_rect,
+                        Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
+                        Color32::WHITE,
+                    );
+                }
+
+                // Dot git
+                let dot_center = pos2(
+                    rect.min.x + left_padding + icon_size + icon_spacing + dot_size / 2.0,
+                    rect.center().y,
+                );
+                if let Some(dot) = dot_color {
+                    ui.painter().circle_filled(dot_center, 3.5, dot);
+                    let dot_rect = Rect::from_center_size(dot_center, vec2(dot_size, dot_size));
+                    if let Some(git_status) = git {
+                        let label = match git_status {
+                            GitStatus::Modified => i18n.t("git_status.modified"),
+                            GitStatus::Staged => i18n.t("git_status.staged"),
+                            GitStatus::Untracked => i18n.t("git_status.untracked"),
+                            GitStatus::Ignored => i18n.t("git_status.ignored"),
+                            GitStatus::Conflict => i18n.t("git_status.conflict"),
+                            GitStatus::Deleted => i18n.t("git_status.deleted"),
+                            GitStatus::Clean => i18n.t("git_status.clean"),
+                        };
+                        ui.interact(dot_rect, ui.id().with(("dot", i)), Sense::hover())
+                            .on_hover_text(label);
+                    }
+                }
+
+                // Nombre
+                let name_font_size = (icon_size / 2.0 * 1.2).clamp(13.0, 25.0);
+
+                let display_name: Cow<str> = if is_recursive {
+                    file.full_path
+                        .strip_prefix(state.cwd())
+                        .unwrap_or(&file.full_path)
+                        .to_string_lossy()
+                } else {
+                    Cow::Borrowed(&file.name)
+                };
+
+                let name_rect = Rect::from_min_max(
+                    pos2(name_start_x, rect.min.y),
+                    pos2(name_end_x, rect.max.y),
+                );
+                let name_galley = ui.fonts_mut(|f| {
+                    f.layout_no_wrap(
+                        display_name.to_string(),
+                        FontId::proportional(name_font_size),
+                        name_color,
+                    )
+                });
+                let name_painter = ui.painter().with_clip_rect(name_rect);
+                name_painter.galley(
+                    pos2(name_start_x, rect.center().y - name_galley.size().y / 2.0),
+                    name_galley,
+                    ensure_min_lightness(name_color),
+                );
+
+                // Columna Modified
+                let date_font_size = (icon_size / 2.0 * 1.2).clamp(12.0, 25.0);
+                let date_rect = Rect::from_min_max(
+                    pos2(rect.min.x + name_w, rect.min.y),
+                    pos2(rect.min.x + name_w + date_w, rect.max.y),
+                );
+                let date_galley = ui.fonts_mut(|f| {
+                    f.layout_no_wrap(
+                        format_date(file.modified).to_string(),
+                        FontId::proportional(date_font_size),
+                        current_theme.semantic.text_primary.to_color(),
+                    )
+                });
+                ui.painter().with_clip_rect(date_rect).galley(
+                    pos2(
+                        date_rect.min.x + 4.0,
+                        rect.center().y - date_galley.size().y / 2.0,
+                    ),
+                    date_galley,
+                    Color32::WHITE,
+                );
+
+                // Columna Size
+                let size_font_size = (icon_size / 2.0 * 1.2).clamp(12.0, 25.0);
+                let size_rect = Rect::from_min_max(
+                    pos2(rect.min.x + name_w + date_w, rect.min.y),
+                    pos2(rect.max.x, rect.max.y),
+                );
+                let display_size = if file.is_dir() {
+                    if state.dir_sizes.is_calculated(&file.full_path) {
+                        Some(file.size)
+                    } else {
+                        state
+                            .sizer_manager
+                            .cache_manager
+                            .get_cached_size(&file.full_path)
+                    }
+                } else {
+                    Some(file.size)
+                };
+                let size_text = match display_size {
+                    None => "...".to_string(),
+                    Some(0) if file.is_dir() => "-".to_string(),
+                    Some(size) => format_size(size),
+                };
+                let size_galley = ui.fonts_mut(|f| {
+                    f.layout_no_wrap(
+                        size_text,
+                        FontId::proportional(size_font_size),
+                        current_theme.semantic.text_primary.to_color(),
+                    )
+                });
+                ui.painter().with_clip_rect(size_rect).galley(
+                    pos2(
+                        size_rect.min.x + 4.0,
+                        rect.center().y - size_galley.size().y / 2.0,
+                    ),
+                    size_galley,
                     Color32::WHITE,
                 );
             }
 
-            // Dot git
-            let dot_center = pos2(
-                rect.min.x + left_padding + icon_size + icon_spacing + dot_size / 2.0,
-                rect.center().y,
-            );
-            if let Some(dot) = dot_color {
-                ui.painter().circle_filled(dot_center, 3.5, dot);
-                let dot_rect = Rect::from_center_size(dot_center, vec2(dot_size, dot_size));
-                if let Some(git_status) = git {
-                    let label = match git_status {
-                        GitStatus::Modified => i18n.t("git_status.modified"),
-                        GitStatus::Staged => i18n.t("git_status.staged"),
-                        GitStatus::Untracked => i18n.t("git_status.untracked"),
-                        GitStatus::Ignored => i18n.t("git_status.ignored"),
-                        GitStatus::Conflict => i18n.t("git_status.conflict"),
-                        GitStatus::Deleted => i18n.t("git_status.deleted"),
-                        GitStatus::Clean => i18n.t("git_status.clean"),
-                    };
-                    ui.interact(dot_rect, ui.id().with(("dot", i)), Sense::hover())
-                        .on_hover_text(label);
+            // Context menu
+            let mut ctx_menu = std::mem::take(&mut ui_state.context_menu_state);
+            match ctx_menu.kind {
+                ContextMenuKind::FileNormal => ctx_menu.file_context_menu(ui, state, ui_state),
+                ContextMenuKind::FileTrash => {
+                    ctx_menu.file_context_menu_in_trash(ui, state, ui_state)
                 }
+                _ => {}
+            }
+            ui_state.context_menu_state = ctx_menu;
+
+            if ui_state.needs_repaint || should_repaint {
+                ui.request_repaint();
+                ui_state.needs_repaint = false;
             }
 
-            // Nombre
-            let name_font_size = (icon_size / 2.0 * 1.2).clamp(13.0, 25.0);
-            let motor = state.motor.borrow_mut();
-            let display_name = if motor.active_tab().is_recursive_active {
-                file.full_path
-                    .strip_prefix(&motor.active_tab().cwd)
-                    .unwrap_or(&file.full_path)
-                    .to_string_lossy()
-                    .to_string()
-            } else {
-                file.name.to_string()
-            };
-            drop(motor);
-
-            let name_rect =
-                Rect::from_min_max(pos2(name_start_x, rect.min.y), pos2(name_end_x, rect.max.y));
-            let name_galley = ui.fonts_mut(|f| {
-                f.layout_no_wrap(
-                    display_name,
-                    FontId::proportional(name_font_size),
-                    name_color,
-                )
-            });
-            let name_painter = ui.painter().with_clip_rect(name_rect);
-            name_painter.galley(
-                pos2(name_start_x, rect.center().y - name_galley.size().y / 2.0),
-                name_galley,
-                ensure_min_lightness(name_color),
-            );
-
-            // Columna Modified
-            let date_font_size = (icon_size / 2.0 * 1.2).clamp(12.0, 25.0);
-            let date_rect = Rect::from_min_max(
-                pos2(rect.min.x + name_w, rect.min.y),
-                pos2(rect.min.x + name_w + date_w, rect.max.y),
-            );
-            let date_galley = ui.fonts_mut(|f| {
-                f.layout_no_wrap(
-                    format_date(file.modified).to_string(),
-                    FontId::proportional(date_font_size),
-                    current_theme.semantic.text_primary.to_color(),
-                )
-            });
-            ui.painter().with_clip_rect(date_rect).galley(
-                pos2(
-                    date_rect.min.x + 4.0,
-                    rect.center().y - date_galley.size().y / 2.0,
-                ),
-                date_galley,
-                Color32::WHITE,
-            );
-
-            // Columna Size
-            let size_font_size = (icon_size / 2.0 * 1.2).clamp(12.0, 25.0);
-            let size_rect = Rect::from_min_max(
-                pos2(rect.min.x + name_w + date_w, rect.min.y),
-                pos2(rect.max.x, rect.max.y),
-            );
-            let display_size = if file.is_dir() {
-                if state.calculated_dir_sizes.contains(&file.full_path) {
-                    Some(file.size)
-                } else {
-                    state
-                        .sizer_manager
-                        .cache_manager
-                        .get_cached_size(&file.full_path)
-                }
-            } else {
-                Some(file.size)
-            };
-            let size_text = match display_size {
-                None => "...".to_string(),
-                Some(0) if file.is_dir() => "-".to_string(),
-                Some(size) => format_size(size),
-            };
-            let size_galley = ui.fonts_mut(|f| {
-                f.layout_no_wrap(
-                    size_text,
-                    FontId::proportional(size_font_size),
-                    current_theme.semantic.text_primary.to_color(),
-                )
-            });
-            ui.painter().with_clip_rect(size_rect).galley(
-                pos2(
-                    size_rect.min.x + 4.0,
-                    rect.center().y - size_galley.size().y / 2.0,
-                ),
-                size_galley,
-                Color32::WHITE,
-            );
-        }
-
-        // Context menu
-        let mut ctx_menu = std::mem::take(&mut ui_state.context_menu_state);
-        match ctx_menu.kind {
-            ContextMenuKind::FileNormal => ctx_menu.file_context_menu(ui, state, ui_state, files),
-            ContextMenuKind::FileTrash => {
-                ctx_menu.file_context_menu_in_trash(ui, state, ui_state, files)
+            if !ui_state.newly_calculated_thumbnails.is_empty() {
+                ui_state.newly_calculated_thumbnails.clear();
             }
-            _ => {}
-        }
-        ui_state.context_menu_state = ctx_menu;
-
-        if ui_state.needs_repaint || should_repaint {
-            ui.request_repaint();
-            ui_state.needs_repaint = false;
-        }
-
-        if !ui_state.newly_calculated_thumbnails.is_empty() {
-            ui_state.newly_calculated_thumbnails.clear();
-        }
-    });
+        });
 
     if !state.rubber_band.is_rubber_banding {
         state.scroll_offset = scroll_output.state.offset.y;

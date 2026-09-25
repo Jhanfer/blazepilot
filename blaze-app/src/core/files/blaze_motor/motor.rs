@@ -22,6 +22,7 @@ use tracing::error;
 use uuid::Uuid;
 
 use crate::core::files::blaze_motor::error::MotorResult;
+use crate::core::files::blaze_motor::motor_structs::FileSource;
 use crate::core::files::blaze_motor::tab_state::{BlazeTabBuilder, BlazeTabState};
 use crate::core::runtime::event_bus::with_event_bus;
 use crate::core::system::disk_reader::disk_manager::DiskManager;
@@ -156,9 +157,12 @@ impl BlazeMotor {
 
         {
             let tab = &mut self.tabs[index];
-            tab.watcher.stop_watching();
 
-            tab.reset_for_new_path()?;
+            for mut source in tab.sources.drain(..) {
+                source.watcher.stop_watching();
+                source.reset_for_new_path()?;
+                source.loader.cancel();
+            }
 
             tab.history.clear();
             tab.history.shrink_to_fit();
@@ -177,10 +181,20 @@ impl BlazeMotor {
     }
 
     fn start_tab_load(&mut self, index: usize) {
-        let tab = &self.tabs[index];
+        let tab = &mut self.tabs[index];
         let tab_id = tab.id;
         let sender = with_event_bus(|pool| pool.dispatcher(tab_id));
-        self.tabs[index].load_path(false, sender).ok();
+        let path = tab.focused.clone();
+
+        let sources = &mut tab.sources;
+
+        if let Some(source) = sources.iter_mut().find(|s| s.cwd == path) {
+            source.load_path(sender).ok();
+        } else {
+            let mut new_source = FileSource::new(path.clone());
+            new_source.load_path(sender).ok();
+            sources.push(new_source);
+        }
     }
 
     pub fn add_tab(&mut self, tab_path: &Path) -> Option<Uuid> {
@@ -228,7 +242,7 @@ impl BlazeMotor {
     pub fn tab_title(&self, index: usize) -> String {
         self.tabs
             .get(index)
-            .and_then(|tab| tab.cwd.file_name())
+            .and_then(|tab| tab.focused.file_name())
             .and_then(|name| name.to_str())
             .unwrap_or("Home")
             .to_owned()
@@ -239,10 +253,7 @@ impl BlazeMotor {
 mod tests {
     use crate::core::{
         files::{
-            blaze_motor::{
-                error::MotorError,
-                motor_structs::{FileEntry, FileKind},
-            },
+            blaze_motor::motor_structs::{FileEntry, FileKind},
             file_extension::FileExtension,
         },
         system::{
@@ -273,43 +284,50 @@ mod tests {
 
     #[test]
     fn test_stop_watching_does_not_leave_handle() {
-        let mut tab = make_tab(std::env::temp_dir().into());
+        let path: Arc<Path> = std::env::temp_dir().into();
+        let mut tab = make_tab(path.clone());
+        let source = tab.sources.iter_mut().find(|s| s.cwd == path).unwrap();
+
         // Simular que tenía un handle activo
         let handle =
             TOKIO_RUNTIME.spawn(async { tokio::time::sleep(Duration::from_secs(60)).await });
-        tab.watcher.watching_handle = Some(handle);
-        tab.watcher.watching.store(true, Ordering::Relaxed);
 
-        tab.watcher.stop_watching();
+        source.watcher.watching_handle = Some(handle);
+        source.watcher.watching.store(true, Ordering::Relaxed);
+
+        source.watcher.stop_watching();
 
         assert!(
-            !tab.watcher.watching.load(Ordering::Relaxed),
+            !source.watcher.watching.load(Ordering::Relaxed),
             "watching debe ser false"
         );
         assert!(
-            tab.watcher.watching_handle.is_none(),
+            source.watcher.watching_handle.is_none(),
             "handle debe haberse consumido"
         );
-        assert!(tab.watcher.watcher.is_none(), "watcher debe ser None");
+        assert!(source.watcher.watcher.is_none(), "watcher debe ser None");
     }
 
     #[test]
     fn test_cancel_loading_drains_handles() {
-        let mut tab = make_tab(std::env::temp_dir().into());
+        let path: Arc<Path> = std::env::temp_dir().into();
+        let mut tab = make_tab(path.clone());
+        let source = tab.sources.iter_mut().find(|s| s.cwd == path).unwrap();
+
         let h1 = TOKIO_RUNTIME.spawn(async { tokio::time::sleep(Duration::from_secs(60)).await });
         let h2 = TOKIO_RUNTIME.spawn(async { tokio::time::sleep(Duration::from_secs(60)).await });
-        tab.loader.handles.push(h1);
-        tab.loader.handles.push(h2);
-        tab.loading_flag.store(false, Ordering::Relaxed);
+        source.loader.handles.push(h1);
+        source.loader.handles.push(h2);
+        source.loading_flag.store(false, Ordering::Relaxed);
 
-        tab.loader.cancel();
+        source.loader.cancel();
 
         assert!(
-            tab.loader.handles.is_empty(),
+            source.loader.handles.is_empty(),
             "handles deben haberse drenado"
         );
         assert!(
-            !tab.loading_flag.load(Ordering::Relaxed),
+            !source.loading_flag.load(Ordering::Relaxed),
             "flag debe ser false"
         );
     }
@@ -328,10 +346,15 @@ mod tests {
         // Llenar datos en tab 0
 
         {
-            let mut file_guard = motor.tabs[0]
-                .files
-                .write()
-                .map_err(|_| MotorError::PoisonedLock)?;
+            let tab = &mut motor.tabs[0];
+            let path = tab.focused.clone();
+            let source = tab
+                .sources
+                .iter_mut()
+                .find(|s| s.cwd == path)
+                .expect("el tab debe tener una fuente para focused");
+
+            let mut file_guard = source.files.write();
             // simular con vec vacío, basta para el test
             file_guard.push(Arc::new(FileEntry {
                 name: "".into(),
@@ -400,21 +423,24 @@ mod tests {
     #[test]
     fn test_watcher_task_exits_on_watcher_drop() {
         // Verificar que la task del watcher termina sola cuando se dropea el watcher
-        let mut tab = make_tab(std::env::temp_dir().into());
-        let cwd = tab.cwd;
+        let path: Arc<Path> = std::env::temp_dir().into();
+        let mut tab = make_tab(path.clone());
+        let source = tab.sources.iter_mut().find(|s| s.cwd == path).unwrap();
+
+        let cwd = tab.focused;
         let sender = with_event_bus(|pool| pool.dispatcher(tab.id));
 
-        tab.watcher.start_watching(cwd, sender).ok();
-        assert!(tab.watcher.watching_handle.is_some());
+        source.watcher.start_watching(cwd, sender).ok();
+        assert!(source.watcher.watching_handle.is_some());
 
         // stop_watching dropea el watcher → fs_tx se cierra → task termina
-        tab.watcher.stop_watching();
+        source.watcher.stop_watching();
 
         // Dar tiempo a la task para terminar (Disconnected break)
         std::thread::sleep(Duration::from_millis(200));
 
         // El handle fue abortado/tomado por stop_watching
-        assert!(tab.watcher.watching_handle.is_none());
+        assert!(source.watcher.watching_handle.is_none());
     }
 
     fn two_distinct_dirs() -> (Arc<Path>, Arc<Path>) {
@@ -431,9 +457,11 @@ mod tests {
         let (start, other) = two_distinct_dirs();
         let mut tab = make_tab(start.to_owned());
 
-        tab.navigate_to(other.to_owned());
+        let dispatcher = with_event_bus(|e| e.dispatcher(tab.id));
 
-        assert_eq!(tab.cwd, other);
+        assert!(tab.navigate_to(other.to_owned(), dispatcher).is_ok());
+
+        assert_eq!(tab.focused, other);
         assert!(tab.history.contains(&start));
         assert!(tab.future.is_empty());
 
@@ -450,14 +478,19 @@ mod tests {
         let (start, other) = two_distinct_dirs();
         let mut tab = make_tab(start.to_owned());
 
-        tab.navigate_to(other.to_owned());
-        tab.back();
+        let dispatcher = with_event_bus(|e| e.dispatcher(tab.id));
 
-        assert_eq!(tab.cwd, start);
+        assert!(
+            tab.navigate_to(other.to_owned(), dispatcher.clone())
+                .is_ok()
+        );
+        tab.back(dispatcher.clone());
+
+        assert_eq!(tab.focused, start);
         assert!(!tab.future.is_empty());
 
-        tab.forward();
-        assert_eq!(tab.cwd, other);
+        tab.forward(dispatcher);
+        assert_eq!(tab.focused, other);
 
         if start.exists() {
             let _ = std::fs::remove_dir(start);

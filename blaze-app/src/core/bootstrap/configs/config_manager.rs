@@ -13,13 +13,13 @@
 // limitations under the License.
 
 use crate::core::{
-    blaze_state::ViewMode,
+    blaze_state::state_structs::ViewMode,
     bootstrap::{
         configs::{
             error::ConfigResult,
             platform::{
                 PlatformConfigTrait, PlatformConfigs,
-                linux::conf_structs::{DisplayBackend, OrderingMode},
+                linux::conf_structs::{DetailedViewConfig, DisplayBackend, OrderingMode},
             },
         },
         i18n::I18n,
@@ -118,6 +118,10 @@ impl ConfigManager {
         self.platform.theme.clone()
     }
 
+    pub fn get_detailed_view_config(&self) -> DetailedViewConfig {
+        self.platform.detailed_columns_config.clone()
+    }
+
     //--__--__--__--__ Setters  __--__--__--__--__--__--__
 
     pub fn set_ordering_mode(&mut self, mode: OrderingMode) {
@@ -161,6 +165,18 @@ impl ConfigManager {
         self.save();
     }
 
+    pub fn set_compact_icon_size(&mut self, size: f32) {
+        self.set_row_icon_size(size);
+    }
+
+    pub fn set_detailed_icon_size(&mut self, size: f32) {
+        self.set_row_icon_size(size);
+    }
+
+    pub fn set_miller_icon_size(&mut self, size: f32) {
+        self.set_row_icon_size(size);
+    }
+
     pub fn set_view_mode(&mut self, view_mode: ViewMode) {
         self.platform.view_mode = view_mode;
         self.save();
@@ -168,6 +184,13 @@ impl ConfigManager {
 
     pub fn set_current_theme_name(&mut self, theme_name: &str) {
         self.platform.theme = theme_name.into();
+        self.save();
+    }
+
+    // Futura feature: función para cambiar campos de la vista detallada
+    #[allow(unused)]
+    pub fn set_detailed_view_config(&mut self, new_detailed_config: DetailedViewConfig) {
+        self.platform.detailed_columns_config = new_detailed_config;
         self.save();
     }
 

@@ -45,10 +45,12 @@ fn render_expanded_panel(
     ui: &mut Ui,
     state: &mut BlazeCoreState,
     ui_state: &mut BlazeUiState,
-    files: &[Arc<FileEntry>],
     current_theme: Arc<crate::ui::themes::platform::structs::NewTheme>,
     current_order: OrderingMode,
 ) {
+    let path = state.cwd();
+    let files: &[Arc<FileEntry>] = &state.get_files_for(&path);
+
     let i18n = with_configs(|c| c.get_i18n());
     let custom_frame = Frame::NONE
         .fill(current_theme.semantic.bg_main.to_color())
@@ -146,7 +148,7 @@ fn render_expanded_panel(
                                 Color32::WHITE,
                             );
 
-                            let mut search = state.search_filter.clone();
+                            let mut search = state.current_search_filter().to_string();
 
                             let response = ui.add(
                                 BlazeTextEdit::singleline(&mut search)
@@ -161,7 +163,7 @@ fn render_expanded_panel(
                             }
 
                             if ui
-                                .add_enabled(!state.search_filter.is_empty(), Button::new("X"))
+                                .add_enabled(!state.is_filter_empty(), Button::new("X"))
                                 .clicked()
                             {
                                 state.clean_search();
@@ -527,9 +529,9 @@ fn render_expanded_panel(
 
 
                                         let extended_info =
-                                            if state.calculating_extended_info.contains(&file.full_path) {
+                                            if state.extended_info.is_calculating(&file.full_path) {
                                                 None
-                                            } else if state.calculated_extended_info.contains(&file.full_path) {
+                                            } else if state.extended_info.is_calculated(&file.full_path) {
                                                 match state.extended_info_manager.info_map.write() {
                                                     Ok(mut map) => map.get(&file.full_path).cloned(),
                                                     Err(e) => {
@@ -694,7 +696,6 @@ pub fn sidebar_right_component(
     ui: &mut Ui,
     state: &mut BlazeCoreState,
     ui_state: &mut BlazeUiState,
-    files: &[Arc<FileEntry>],
 ) {
     let current_theme = with_theme(|t| t.current());
     let current_order = with_configs(|c| c.get_ordering_mode());
@@ -702,6 +703,6 @@ pub fn sidebar_right_component(
     if current_order.rightpanel_state.collapsed {
         render_collapsed_tab(ui, ui_state, current_theme);
     } else {
-        render_expanded_panel(ui, state, ui_state, files, current_theme, current_order);
+        render_expanded_panel(ui, state, ui_state, current_theme, current_order);
     }
 }

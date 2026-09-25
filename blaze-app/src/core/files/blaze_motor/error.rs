@@ -22,8 +22,18 @@ pub enum MotorError {
     #[error("Directorio no existe: {0}")]
     InvalidPath(Arc<Path>),
 
-    #[error("Error de lock envenenado")]
-    PoisonedLock,
+    #[error("No se ha encontrado FileSource para esta ruta: {0}")]
+    NotFileSourceFound(Arc<Path>),
+
+    #[error("{0}")]
+    Error(String),
+}
+
+impl From<&str> for MotorError {
+    fn from(value: &str) -> Self {
+        let message = value.to_owned();
+        self::MotorError::Error(message)
+    }
 }
 
 pub type MotorResult<T> = Result<T, MotorError>;

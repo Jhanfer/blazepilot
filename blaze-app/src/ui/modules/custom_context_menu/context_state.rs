@@ -1,14 +1,18 @@
-use std::{cell::Cell, path::PathBuf, sync::Arc};
+use std::{
+    cell::Cell,
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 
 use egui::{
     Align2, Area, Color32, CursorIcon, FontId, Frame, Id, Key, Order, Pos2, Rect, Response, Sense,
     Stroke, Ui, UiBuilder, pos2, vec2,
 };
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
 
 use crate::{
     core::{
-        blaze_state::{BlazeCoreState, NewItemType},
+        blaze_state::{BlazeCoreState, state_structs::NewItemType},
         bootstrap::{
             configs::config_manager::with_configs,
             quick_access_manager::platform::structs::QuickLinks,
@@ -46,10 +50,13 @@ pub struct ContextMenuState {
     pub open: bool,
     pub position: Pos2,
     pub kind: ContextMenuKind,
+    pub source_path: Option<Arc<Path>>,
     pub target_file: Option<Arc<FileEntry>>,
     pub target_sender: Option<Dispatcher>,
     pub target_drive: Option<Disk>,
     just_opened: bool,
+    pub target_col: Option<usize>,
+    pub target_row_col: Option<usize>,
 }
 
 impl ContextMenuState {
@@ -57,11 +64,14 @@ impl ContextMenuState {
         Self {
             open: false,
             position: pos2(0.0, 0.0),
+            kind: ContextMenuKind::None,
+            source_path: None,
             target_file: None,
             target_sender: None,
-            kind: ContextMenuKind::None,
             target_drive: None,
             just_opened: false,
+            target_col: None,
+            target_row_col: None,
         }
     }
 
@@ -403,7 +413,15 @@ impl ContextMenuState {
                     } else {
                         let path_string = drive.mountpoint.clone().unwrap_or_default();
                         let path = PathBuf::from(path_string).into();
-                        state.navigate_to(path);
+
+                        if state.miller_view.columns.is_empty() {
+                            state.navigate_to(path);
+                        } else {
+                            // state.miller_view.truncate_to(0);
+
+                            // state.miller_view.push_column(path.clone());
+                            state.navigate_to(path.clone());
+                        }
                     }
                     should_close = true;
                 }
@@ -492,16 +510,19 @@ impl ContextMenuState {
         ui: &mut Ui,
         state: &mut BlazeCoreState,
         ui_state: &mut BlazeUiState,
-        files: &[Arc<FileEntry>],
     ) {
         let i18n = with_configs(|c| c.get_i18n());
 
         if !self.open {
             return;
         }
-        let Some(sender) = self.target_sender.clone() else {
+        let (Some(sender), Some(source_path)) =
+            (self.target_sender.clone(), self.source_path.clone())
+        else {
             return;
         };
+
+        let files: &[Arc<FileEntry>] = &state.get_files_for(&source_path);
 
         let mut should_close = false;
 
@@ -509,7 +530,7 @@ impl ContextMenuState {
             let sources = state.get_selected_paths(files);
             let file_names: Vec<String> = sources
                 .iter()
-                .map(|p| {
+                .map(|(_, p)| {
                     PathBuf::from(p.as_ref())
                         .file_name()
                         .unwrap_or_default()
@@ -729,7 +750,7 @@ impl ContextMenuState {
                 );
 
                 if let Some(0) = action.get() {
-                    let cwd = state.cwd.clone();
+                    let cwd = state.cwd();
                     state.paste(cwd);
                     should_close = true;
                 }
@@ -835,16 +856,19 @@ impl ContextMenuState {
         ui: &mut Ui,
         state: &mut BlazeCoreState,
         ui_state: &mut BlazeUiState,
-        files: &[Arc<FileEntry>],
     ) {
         let i18n = with_configs(|c| c.get_i18n());
 
         if !self.open {
             return;
         }
-        let Some(sender) = self.target_sender.clone() else {
+        let (Some(sender), Some(source_path)) =
+            (self.target_sender.clone(), self.source_path.clone())
+        else {
             return;
         };
+
+        let files: &[Arc<FileEntry>] = &state.get_files_for(&source_path);
 
         let mut should_close = false;
 
@@ -852,7 +876,7 @@ impl ContextMenuState {
             let sources = state.get_selected_paths(files);
             let file_names: Vec<String> = sources
                 .iter()
-                .map(|p| {
+                .map(|(_, p)| {
                     PathBuf::from(p.as_ref())
                         .file_name()
                         .unwrap_or_default()
@@ -947,17 +971,23 @@ impl ContextMenuState {
         ui: &mut Ui,
         state: &mut BlazeCoreState,
         ui_state: &mut BlazeUiState,
-        files: &[Arc<FileEntry>],
     ) {
         let i18n = with_configs(|c| c.get_i18n());
 
         if !self.open {
             return;
         }
-        let (Some(file), Some(sender)) = (self.target_file.clone(), self.target_sender.clone())
-        else {
+        let (Some(file), Some(sender), Some(source_path)) = (
+            self.target_file.clone(),
+            self.target_sender.clone(),
+            self.source_path.clone(),
+        ) else {
             return;
         };
+
+        let files: &[Arc<FileEntry>] = &state.get_files_for(&source_path);
+
+        let (col_index_opt, row_col_opt) = (self.target_col, self.target_row_col);
 
         let mut should_close = false;
         let is_media = file.extension.is_video() || file.extension.is_audio();
@@ -991,6 +1021,8 @@ impl ContextMenuState {
                             .filter(|f| f.extension.is_image())
                             .map(|f| f.full_path.to_path_buf())
                             .collect();
+
+                        debug!("Coso de mielda: {}", file.full_path.display());
 
                         let pvw = ImagePreviewState::new(file.full_path.to_path_buf(), all_images);
 
@@ -1092,13 +1124,27 @@ impl ContextMenuState {
 
                     match action.get() {
                         Some(0) => {
-                            if file.is_dir() {
-                                state.navigate_to(file.full_path.to_owned());
-                                state.deselect_all();
-                                state.resize_selection(files.len());
+                            if state.miller_view.columns.is_empty() {
+                                if file.is_dir() {
+                                    state.navigate_to(file.full_path.to_owned());
+                                    state.deselect_all();
+                                    state.resize_selection(files.len());
+                                } else {
+                                    state.open_file(&file);
+                                }
                             } else {
-                                state.open_file(&file);
+                                let (Some(col_index), Some(i)) = (col_index_opt, row_col_opt)
+                                else {
+                                    return;
+                                };
+
+                                state.miller_view.set_opened(col_index, i);
+
+                                if file.is_dir() {
+                                    state.navigate_to(file.full_path.clone());
+                                }
                             }
+
                             should_close = true;
                         }
                         Some(1) => {
@@ -1146,9 +1192,26 @@ impl ContextMenuState {
 
                     match action.get() {
                         Some(0) => {
-                            state.navigate_to(file.full_path.to_owned());
-                            state.deselect_all();
-                            state.resize_selection(files.len());
+                            if state.miller_view.columns.is_empty() {
+                                if file.is_dir() {
+                                    state.navigate_to(file.full_path.to_owned());
+                                    state.deselect_all();
+                                    state.resize_selection(files.len());
+                                } else {
+                                    state.open_file(&file);
+                                }
+                            } else {
+                                let (Some(col_index), Some(i)) = (col_index_opt, row_col_opt)
+                                else {
+                                    return;
+                                };
+
+                                state.miller_view.set_opened(col_index, i);
+
+                                if file.is_dir() {
+                                    state.navigate_to(file.full_path.clone());
+                                }
+                            }
                             should_close = true;
                         }
                         Some(1) => {
@@ -1285,7 +1348,7 @@ impl ContextMenuState {
                     );
 
                     if let Some(0) = action.get() {
-                        let cwd = state.cwd.clone();
+                        let cwd = state.cwd();
                         sender
                             .send(FileOperation::ExtractHere {
                                 entry: file.clone(),
@@ -1323,7 +1386,7 @@ impl ContextMenuState {
                     );
 
                     if let Some(0) = action.get() {
-                        let tab_id = state.active_id;
+                        let tab_id = state.active_id();
                         let dispatcher = with_event_bus(|e| e.dispatcher(tab_id));
                         let Some(folder_id) = file.unique_id else {
                             return;
@@ -1408,7 +1471,7 @@ impl ContextMenuState {
                         .iter()
                         .enumerate()
                         .filter(|(index, _)| state.is_selected(*index))
-                        .map(|(_, f)| (Arc::from(f.name.to_owned()), f.full_path.to_owned()))
+                        .map(|(_, f)| (f.name.clone(), f.full_path.to_owned()))
                         .collect();
                     state.move_to_trash(items);
                     should_close = true;
