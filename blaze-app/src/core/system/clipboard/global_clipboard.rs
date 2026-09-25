@@ -133,7 +133,7 @@ impl GlobalClipboard {
 
     pub fn move_to_trash(
         &self,
-        items: Vec<(Arc<str>, Arc<Path>)>,
+        items: Vec<(Box<str>, Arc<Path>)>,
         sender: &Dispatcher,
     ) -> ClipBoardResult<()> {
         Self::inner().move_to_trash(items, sender)
@@ -875,13 +875,13 @@ impl Clipboard {
 
     fn move_to_trash(
         &self,
-        items: Vec<(Arc<str>, Arc<Path>)>,
+        items: Vec<(Box<str>, Arc<Path>)>,
         sender: &Dispatcher,
     ) -> ClipBoardResult<()> {
         let task_id = new_task_id();
         let backend = get_backend();
 
-        let mut resolved: Vec<(Arc<str>, Arc<Path>, TrashDestination)> = Vec::new();
+        let mut resolved: Vec<(Box<str>, Arc<Path>, TrashDestination)> = Vec::new();
 
         for (name, full_path) in &items {
             let destination = backend
@@ -909,7 +909,7 @@ impl Clipboard {
 
     fn process_trash_operations(
         task_id: u64,
-        resolved: Vec<(Arc<str>, Arc<Path>, TrashDestination)>,
+        resolved: Vec<(Box<str>, Arc<Path>, TrashDestination)>,
         backend: &dyn TrashBackend,
         sender: &Dispatcher,
     ) {
@@ -1059,7 +1059,7 @@ impl Clipboard {
             ));
         }
 
-        let cwd = with_motor(|m| m.active_tab_mut().cwd.clone());
+        let cwd = with_motor(|m| m.active_tab_mut().focused.clone());
         let file_path = cwd.join(file_name);
         let new_file_path = cwd.join(new_file_name);
 

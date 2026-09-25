@@ -1,6 +1,7 @@
 use crate::{
     core::{
-        blaze_state::{BlazeCoreState, TagViewFilter, ViewMode},
+        blaze_state::BlazeCoreState,
+        blaze_state::state_structs::{TagViewFilter, ViewMode},
         bootstrap::{
             configs::config_manager::with_configs, quick_access_manager::manager::with_quick_tags,
         },
@@ -75,7 +76,7 @@ pub fn tag_views(
                     ui.memory_mut(|m| m.request_focus(ui.id()));
                 }
 
-                let tab_id = state.active_id;
+                let tab_id = state.active_id();
                 let dispatcher = with_event_bus(|e| e.dispatcher(tab_id));
 
                 let tags = with_quick_tags(|qtm| qtm.get_tags());

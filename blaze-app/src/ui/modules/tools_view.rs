@@ -1,6 +1,7 @@
 use crate::{
     core::{
-        blaze_state::{BlazeCoreState, LayoutMode, NewItemType, ViewMode},
+        blaze_state::BlazeCoreState,
+        blaze_state::state_structs::{LayoutMode, NewItemType, ViewMode},
         bootstrap::configs::config_manager::with_configs,
         files::blaze_motor::motor_structs::FileEntry,
         runtime::{
@@ -11,7 +12,7 @@ use crate::{
     },
     ui::{
         blaze_ui_state::BlazeUiState,
-        icons_cache::icons::{self, ICON_LAYOUT_GRID, ICON_LAYOUT_LIST, ICON_TAG},
+        icons_cache::icons::*,
         modules::utilities::ensure_min_lightness,
         themes::{platform::structs::ToColor, theme_manager::with_theme},
     },
@@ -29,10 +30,12 @@ fn render_tag_button(ui: &mut Ui, state: &mut BlazeCoreState, ui_state: &mut Bla
     let (container_rect, resp_toggle) = ui.allocate_exact_size(vec2(50.0, 25.0), Sense::click());
 
     if resp_toggle.clicked() {
-        state.view_mode = match &state.view_mode {
+        let new_mode = match &state.view_mode {
             ViewMode::Normal(layout) => ViewMode::Tags(layout.to_owned()),
             ViewMode::Tags(layout) => ViewMode::Normal(layout.to_owned()),
         };
+
+        state.set_view_mode(new_mode);
     }
 
     if resp_toggle.hovered() {
@@ -42,12 +45,30 @@ fn render_tag_button(ui: &mut Ui, state: &mut BlazeCoreState, ui_state: &mut Bla
     ui.painter()
         .rect_filled(container_rect, 20.0, Color32::TRANSPARENT);
 
-    let is_tags = matches!(
-        state.view_mode,
-        ViewMode::Tags(LayoutMode::Row) | ViewMode::Tags(LayoutMode::Grid)
-    );
+    let view_mode_id = ui.make_persistent_id("view_mode_toggle_state");
+    let animation_id = ui.make_persistent_id("view_mode_toggle_animation");
 
-    let anim = ui.animate_bool_with_time("view_mode_toggle".into(), is_tags, 0.2);
+    let is_tags = matches!(state.view_mode, ViewMode::Tags(_));
+
+    let previous_is_tags = ui.memory(|memory| memory.data.get_temp::<bool>(view_mode_id));
+
+    if let Some(previous_is_tags) = previous_is_tags
+        && previous_is_tags != is_tags
+    {
+        ui.memory_mut(|mem| {
+            let current = mem.data.get_temp::<bool>(animation_id).unwrap_or(false);
+            mem.data.insert_temp(animation_id, !current);
+        });
+    }
+
+    ui.memory_mut(|memory| {
+        memory.data.insert_temp(view_mode_id, is_tags);
+    });
+
+    let animation_target =
+        ui.memory(|mem| mem.data.get_temp::<bool>(animation_id).unwrap_or(false));
+
+    let anim = ui.animate_bool_with_time(animation_id, animation_target, 0.2);
 
     let padding = 3.0;
     let radius = (container_rect.height() / 2.0) - padding;
@@ -92,9 +113,19 @@ fn render_tag_button(ui: &mut Ui, state: &mut BlazeCoreState, ui_state: &mut Bla
 
     let icon1_name = match (&state.view_mode, is_tags) {
         (ViewMode::Normal(LayoutMode::Row), _) => ("layout-list", ICON_LAYOUT_LIST),
+        (ViewMode::Normal(LayoutMode::RowDetailed), _) => {
+            ("layout-detailed", ICON_LAYOUT_LIST_DETAILED)
+        }
         (ViewMode::Normal(LayoutMode::Grid), _) => ("layout-grid", ICON_LAYOUT_GRID),
+        (ViewMode::Normal(LayoutMode::Miller), _) => ("layout-miller", ICON_LAYOUT_MILLER),
+        (ViewMode::Normal(LayoutMode::Compact), _) => ("layout-compact", ICON_LAYOUT_LIST_COMPACT),
         (ViewMode::Tags(LayoutMode::Row), _) => ("layout-row", ICON_LAYOUT_LIST),
+        (ViewMode::Tags(LayoutMode::RowDetailed), _) => {
+            ("layout-detailed", ICON_LAYOUT_LIST_DETAILED)
+        }
         (ViewMode::Tags(LayoutMode::Grid), _) => ("layout-grid", ICON_LAYOUT_GRID),
+        (ViewMode::Tags(LayoutMode::Miller), _) => ("layout-miller", ICON_LAYOUT_MILLER),
+        (ViewMode::Tags(LayoutMode::Compact), _) => ("layout-compact", ICON_LAYOUT_LIST_COMPACT),
     };
 
     let icons = [
@@ -124,12 +155,118 @@ fn render_tag_button(ui: &mut Ui, state: &mut BlazeCoreState, ui_state: &mut Bla
     }
 }
 
-pub fn tools(
-    state: &mut BlazeCoreState,
-    ui_state: &mut BlazeUiState,
-    files: &[Arc<FileEntry>],
-    ui: &mut Ui,
-) {
+fn render_views_mode(ui: &mut Ui, state: &mut BlazeCoreState, ui_state: &mut BlazeUiState) {
+    let current_theme = with_theme(|t| t.current());
+
+    let layouts: &[(&str, &[u8], LayoutMode)] = &[
+        ("layout-list", ICON_LAYOUT_LIST, LayoutMode::Row),
+        ("layout-grid", ICON_LAYOUT_GRID, LayoutMode::Grid),
+        ("layout-miller", ICON_LAYOUT_MILLER, LayoutMode::Miller),
+    ];
+
+    let current_layout = match &state.view_mode {
+        ViewMode::Normal(l) | ViewMode::Tags(l) => l.clone(),
+    };
+
+    ui.horizontal(|ui| {
+        for (name, bytes, layout) in layouts {
+            let is_list_button = *layout == LayoutMode::Row;
+            let is_active = if is_list_button {
+                matches!(
+                    current_layout,
+                    LayoutMode::Row | LayoutMode::Compact | LayoutMode::RowDetailed
+                )
+            } else {
+                current_layout == *layout
+            };
+            let icon_size = vec2(18.0, 18.0);
+
+            let base_color = if is_active {
+                current_theme.components.button.label_active.to_color()
+            } else {
+                current_theme.components.button.label_inactive.to_color()
+            };
+
+            let (new_name, new_bytes) = if is_list_button {
+                match current_layout {
+                    LayoutMode::Compact => ("layout-compact", ICON_LAYOUT_LIST_COMPACT),
+                    LayoutMode::RowDetailed => ("layout-detailed", ICON_LAYOUT_LIST_DETAILED),
+                    _ => ("layout-list", ICON_LAYOUT_LIST),
+                }
+            } else {
+                (*name, *bytes)
+            };
+
+            let icon = ui_state.icon_cache.get_or_load(
+                ui,
+                new_name,
+                new_bytes,
+                ensure_min_lightness(base_color),
+                icon_size,
+            );
+
+            let (rect, response) =
+                ui.allocate_exact_size(icon_size + vec2(6.0, 6.0), Sense::click());
+
+            if response.hovered() {
+                ui.set_cursor_icon(CursorIcon::PointingHand);
+                ui.painter()
+                    .rect_filled(rect, 4.0, current_theme.semantic.bg_container.to_color());
+            }
+
+            if is_active {
+                ui.painter().rect_filled(
+                    rect,
+                    4.0,
+                    current_theme
+                        .semantic
+                        .accent
+                        .to_color()
+                        .linear_multiply(0.2),
+                );
+            }
+
+            let icon_rect = Rect::from_center_size(rect.center(), icon_size);
+
+            let rounded_rect = Rect::from_min_max(
+                pos2(icon_rect.min.x.round(), icon_rect.min.y.round()),
+                pos2(icon_rect.max.x.round(), icon_rect.max.y.round()),
+            );
+
+            ui.painter().image(
+                icon.id(),
+                rounded_rect,
+                Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
+                Color32::WHITE,
+            );
+
+            if response.clicked() {
+                let new_layout = if is_list_button {
+                    match current_layout {
+                        LayoutMode::Row => LayoutMode::Compact,
+                        LayoutMode::Compact => LayoutMode::RowDetailed,
+                        LayoutMode::RowDetailed => LayoutMode::Row,
+                        _ => LayoutMode::Row,
+                    }
+                } else {
+                    layout.to_owned()
+                };
+
+                let new_mode = match &state.view_mode {
+                    ViewMode::Normal(_) => ViewMode::Normal(new_layout),
+                    ViewMode::Tags(_) => ViewMode::Tags(new_layout),
+                };
+
+                state.set_view_mode(new_mode);
+            }
+        }
+    });
+}
+
+pub fn tools(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, ui: &mut Ui) {
+    let path = state.cwd();
+    let files: &[Arc<FileEntry>] = &state.get_files_for(&path);
+
     let current_theme = with_theme(|t| t.current());
 
     Frame::new()
@@ -161,8 +298,7 @@ pub fn tools(
                 ui.with_layout(Layout::left_to_right(Align::Center), |ui| {
                     ui.visuals_mut().button_frame = false;
 
-                    let (icon_plus_fol, icon_bytes_plus_fol) =
-                        ("plus-folder", icons::ICON_PLUS_FOLDER);
+                    let (icon_plus_fol, icon_bytes_plus_fol) = ("plus-folder", ICON_PLUS_FOLDER);
 
                     let icon_size = vec2(18.0, 18.0);
                     let (icon_rect, new_fol) = ui.allocate_exact_size(icon_size, Sense::click());
@@ -197,8 +333,7 @@ pub fn tools(
                         state.new_item_buffer = "nueva carpeta".to_string();
                     }
 
-                    let (icon_plus_file, icon_bytes_plus_file) =
-                        ("plus-file", icons::ICON_PLUS_FILE);
+                    let (icon_plus_file, icon_bytes_plus_file) = ("plus-file", ICON_PLUS_FILE);
 
                     let icon_size = vec2(18.0, 18.0);
                     let (icon_rect, new_file) = ui.allocate_exact_size(icon_size, Sense::click());
@@ -251,9 +386,9 @@ pub fn tools(
                 };
 
                 let (icon_cut, icon_bytes_cut) = if has_selection {
-                    ("scissors", icons::ICON_SCISSORS)
+                    ("scissors", ICON_SCISSORS)
                 } else {
-                    ("scissors-disable", icons::ICON_SCISSORS_DISABLE)
+                    ("scissors-disable", ICON_SCISSORS_DISABLE)
                 };
 
                 let icon_size = vec2(18.0, 18.0);
@@ -289,9 +424,9 @@ pub fn tools(
                 }
 
                 let (icon_copy, icon_bytes_copy) = if has_selection {
-                    ("copy", icons::ICON_COPY)
+                    ("copy", ICON_COPY)
                 } else {
-                    ("copy-disable", icons::ICON_COPY_DISABLE)
+                    ("copy-disable", ICON_COPY_DISABLE)
                 };
 
                 let icon_size = vec2(18.0, 18.0);
@@ -327,9 +462,9 @@ pub fn tools(
                 }
 
                 let (icon_paste, icon_bytes_paste) = if has_clipboard {
-                    ("clipboard", icons::ICON_CLIPBOARD)
+                    ("clipboard", ICON_CLIPBOARD)
                 } else {
-                    ("clipboard-disable", icons::ICON_CLIPBOARD_DISABLE)
+                    ("clipboard-disable", ICON_CLIPBOARD_DISABLE)
                 };
 
                 let icon_size = vec2(18.0, 18.0);
@@ -361,14 +496,14 @@ pub fn tools(
                 );
 
                 if pas_resp.clicked() && has_clipboard {
-                    let cwd = state.cwd.clone();
+                    let cwd = state.cwd();
                     state.paste(cwd);
                 }
 
                 let (icon_trash, icon_bytes_trash) = if has_selection {
-                    ("trash", icons::ICON_TRASH)
+                    ("trash", ICON_TRASH)
                 } else {
-                    ("trash-disable", icons::ICON_TRASH_DISABLED)
+                    ("trash-disable", ICON_TRASH_DISABLED)
                 };
 
                 let icon_size = vec2(18.0, 18.0);
@@ -400,11 +535,11 @@ pub fn tools(
                 );
 
                 if del_resp.clicked() && has_selection {
-                    let cwd = state.cwd.clone();
+                    let cwd = state.cwd();
                     let is_in_trash = get_backend().etched_in_trash_path(&cwd);
 
                     if is_in_trash {
-                        let tab_id = state.active_id;
+                        let tab_id = state.active_id();
                         let dispatcher = with_event_bus(|e| e.dispatcher(tab_id));
 
                         let sources = state.get_selected_paths(files);
@@ -420,7 +555,7 @@ pub fn tools(
                             .iter()
                             .enumerate()
                             .filter(|(index, _)| state.is_selected(*index))
-                            .map(|(_, f)| (Arc::from(f.name.to_owned()), f.full_path.to_owned()))
+                            .map(|(_, f)| (f.name.clone(), f.full_path.to_owned()))
                             .collect();
                         state.move_to_trash(items);
                     }
@@ -428,10 +563,10 @@ pub fn tools(
 
                 ui.add_space(8.0);
 
-                let (icon_name, icon_bytes) = if state.select_all_mode {
-                    ("deselect", icons::ICON_DESELECT)
+                let (icon_name, icon_bytes) = if state.select_all_mode() {
+                    ("deselect", ICON_DESELECT)
                 } else {
-                    ("select-all", icons::ICON_SELECTALL)
+                    ("select-all", ICON_SELECTALL)
                 };
 
                 let icon_size = vec2(18.0, 18.0);
@@ -468,7 +603,7 @@ pub fn tools(
 
                 ui.separator();
 
-                let (icon_refresh, icon_bytes_refresh) = ("refresh", icons::ICON_REFRESH);
+                let (icon_refresh, icon_bytes_refresh) = ("refresh", ICON_REFRESH);
 
                 let icon_size = vec2(18.0, 18.0);
                 let (icon_rect, refresh_resp) = ui.allocate_exact_size(icon_size, Sense::click());
@@ -510,15 +645,21 @@ pub fn tools(
 
                 ui.separator();
 
+                ui.vertical(|ui| {
+                    render_views_mode(ui, state, ui_state);
+                });
+
+                ui.separator();
+
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                     ui.visuals_mut().button_frame = false;
 
                     let is_hidden = with_configs(|c| c.get_show_hidden_files());
 
                     let (icon_refresh, icon_bytes_refresh) = if is_hidden {
-                        ("eye", icons::ICON_EYE)
+                        ("eye", ICON_EYE)
                     } else {
-                        ("eye-closed", icons::ICON_EYE_CLOSED)
+                        ("eye-closed", ICON_EYE_CLOSED)
                     };
 
                     let icon_size = vec2(18.0, 18.0);

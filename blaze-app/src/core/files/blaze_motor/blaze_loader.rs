@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use crate::core::files::blaze_motor::error::{MotorError, MotorResult};
-use crate::core::files::blaze_motor::motor_structs::{FileEntry, FileLoadingMessage};
+use crate::core::files::blaze_motor::motor_structs::{FileEntry, FileLoadingMessage, FileSourceId};
 use crate::core::files::blaze_motor::utilities::build_entry;
 use crate::core::runtime::event_bus::Dispatcher;
 use crate::core::system::clipboard::global_clipboard::TOKIO_RUNTIME;
@@ -107,6 +107,7 @@ impl BlazeLoader {
         &mut self,
         path: Arc<Path>,
         sender: Dispatcher,
+        source_id: FileSourceId,
         generation: u64,
     ) -> MotorResult<()> {
         //cancelar la carga anterior
@@ -138,7 +139,7 @@ impl BlazeLoader {
         //Tarea B:
         let disp_cancel = cancel.clone();
         let handle2 = TOKIO_RUNTIME.spawn(async move {
-            if Self::dispatcher(buffer, sender, generation, disp_cancel, done_rx)
+            if Self::dispatcher(buffer, sender, generation, source_id, disp_cancel, done_rx)
                 .await
                 .is_err()
             {
@@ -199,6 +200,7 @@ impl BlazeLoader {
         buffer: Arc<Mutex<EventBuffer>>,
         sender: Dispatcher,
         generation: u64,
+        source_id: FileSourceId,
         cancel: Arc<AtomicBool>,
         mut done_rx: tokio::sync::oneshot::Receiver<MotorResult<()>>,
     ) -> MotorResult<()> {
@@ -210,14 +212,17 @@ impl BlazeLoader {
                     if cancel.load(Ordering::Acquire) {
                         break;
                     }
-                    Self::flush_buffer(&buffer, &sender, generation).await?;
+                    Self::flush_buffer(&buffer, &sender, generation, source_id.clone()).await?;
                 }
 
                 _ = &mut done_rx => {
-                    Self::flush_buffer(&buffer, &sender, generation).await?;
+                    Self::flush_buffer(&buffer, &sender, generation, source_id.clone()).await?;
 
-                    sender.send(FileLoadingMessage::Finished(generation))
-                        .map_err(MotorError::SendFileBatchError)?;
+                    sender.send(FileLoadingMessage::Finished(
+                        source_id,
+                        generation
+                        )
+                    ).map_err(MotorError::SendFileBatchError)?;
                     break;
                 }
             }
@@ -230,6 +235,7 @@ impl BlazeLoader {
         buffer: &Arc<Mutex<EventBuffer>>,
         sender: &Dispatcher,
         generation: u64,
+        source_id: FileSourceId,
     ) -> MotorResult<()> {
         let batch = {
             let mut buf = buffer.lock().await;
@@ -269,7 +275,7 @@ impl BlazeLoader {
 
         if !adds.is_empty() {
             sender
-                .send(FileLoadingMessage::Batch(generation, adds))
+                .send(FileLoadingMessage::Batch(source_id, generation, adds))
                 .map_err(MotorError::SendFileBatchError)?;
         }
 

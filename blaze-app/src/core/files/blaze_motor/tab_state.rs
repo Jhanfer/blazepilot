@@ -12,86 +12,32 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use file_id::get_file_id;
-use fuzzy_matcher::FuzzyMatcher;
-use fuzzy_matcher::skim::SkimMatcherV2;
-use jwalk::{Parallelism, WalkDir};
-use std::path::Path;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::{Arc, RwLock};
-use tracing::{debug, warn};
-use uuid::Uuid;
-
-use crate::core::bootstrap::configs::config_manager::with_configs;
-use crate::core::bootstrap::configs::platform::linux::conf_structs::{
-    OrderingDirection, OrderingKind,
-};
-use crate::core::files::blaze_motor::blaze_loader::BlazeLoader;
 use crate::core::files::blaze_motor::error::{MotorError, MotorResult};
 use crate::core::files::blaze_motor::motor_structs::{
-    FileEntry, FileLoadingMessage, RecursiveMessages,
+    FileEntry, FileSource, MillerSnapshot, MillerSourceSnapshot,
 };
-use crate::core::files::blaze_motor::utilities::build_entry;
-use crate::core::files::blaze_motor::watcher::FileWatcher;
-use crate::core::runtime::bus_structs::UiEvent;
 use crate::core::runtime::event_bus::{Dispatcher, with_event_bus};
-use crate::core::system::clipboard::global_clipboard::TOKIO_RUNTIME;
 use crate::core::system::knowndirs::knowndirs_manager::KnownDirsManager;
 use crate::core::system::sizer_manager::manager::SizerManager;
+use std::path::Path;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
+use tracing::warn;
+use uuid::Uuid;
 
 static NEXT_TASK: AtomicU64 = AtomicU64::new(1);
 pub fn new_task_id() -> u64 {
     NEXT_TASK.fetch_add(1, Ordering::Relaxed)
 }
 
-#[must_use = "llama .build() para construir la tab"]
+/// Constructor para crear y configurar una nueva pestaña
+///
+/// Permite establecer la ruta inicial y el identificador
+/// de la pestaña antes de construir su [`BlazeTabState`]
+#[must_use = "llama .build() para construir la pestaña"]
 pub struct BlazeTabBuilder {
     start_path: Arc<Path>,
     tab_id: Uuid,
-}
-
-impl BlazeTabBuilder {
-    pub fn new() -> Self {
-        Self {
-            start_path: KnownDirsManager::get().home.clone(),
-            tab_id: Uuid::new_v4(),
-        }
-    }
-
-    pub fn with_start_path(mut self, path: Arc<Path>) -> Self {
-        self.start_path = path;
-        self
-    }
-
-    pub fn with_uuid(mut self, id: Uuid) -> Self {
-        self.tab_id = id;
-        self
-    }
-
-    #[must_use]
-    pub fn build(self) -> BlazeTabState {
-        // Crear dispatcher para la tab
-        with_event_bus(|bus| {
-            bus.create_tab(self.tab_id);
-        });
-
-        BlazeTabState {
-            id: self.tab_id,
-            cwd: self.start_path,
-            history: Vec::new(),
-            future: Vec::new(),
-            files: Arc::new(RwLock::new(Vec::new())),
-            loading_flag: Arc::new(AtomicBool::new(false)),
-            lower_names: Vec::new(),
-            loading_generation: 0,
-            active_generation: 0,
-            sorted_indices: Arc::new(RwLock::new(Vec::new())),
-            recursive_entries: Arc::new(RwLock::new(Vec::new())),
-            is_recursive_active: false,
-            watcher: FileWatcher::start(),
-            loader: BlazeLoader::default(),
-        }
-    }
 }
 
 impl Default for BlazeTabBuilder {
@@ -100,414 +46,151 @@ impl Default for BlazeTabBuilder {
     }
 }
 
+impl BlazeTabBuilder {
+    /// Crea un builder con el directorio home como ruta inicial
+    /// y genera un identificador único por pestaña
+    pub fn new() -> Self {
+        Self {
+            start_path: KnownDirsManager::get().home.clone(),
+            tab_id: Uuid::new_v4(),
+        }
+    }
+
+    /// Establece una ruta inicial custumizada para la pestaña
+    pub fn with_start_path(mut self, path: Arc<Path>) -> Self {
+        self.start_path = path;
+        self
+    }
+
+    /// Establece el identificador de la pestaña
+    pub fn with_uuid(mut self, id: Uuid) -> Self {
+        self.tab_id = id;
+        self
+    }
+
+    /// Construye el estado de la pestaña y registra
+    /// su identificador en el event bus
+    #[must_use = "el valor construido debe utilizarse"]
+    pub fn build(self) -> BlazeTabState {
+        // reistra la pestaña en el event bus antes de devolver su estado
+        with_event_bus(|bus| {
+            bus.create_tab(self.tab_id);
+        });
+
+        BlazeTabState {
+            id: self.tab_id,
+            focused: self.start_path,
+            history: Vec::new(),
+            future: Vec::new(),
+            sources: Vec::new(),
+            miller_future: Vec::new(),
+            miller_history: Vec::new(),
+        }
+    }
+}
+
+/// Mantiene el estado de una pestaña y su navegación
+///
+/// Gestiona el historial de navegación de las vistas normales
+/// y de las columnas miller
 pub struct BlazeTabState {
+    /// Identificador único de la pestaña
     pub id: Uuid,
-    pub cwd: Arc<Path>,
+
+    /// Ruta actualmente enfocada de la pestaña
+    /// Importante para el request de entradas [`FileEntry`]
+    pub focused: Arc<Path>,
+
+    /// Historial de navegación utilizado para retroceder
     pub history: Vec<Arc<Path>>,
+
+    /// Historial de navegación utilizado para avanzar
     pub future: Vec<Arc<Path>>,
-    pub loading_flag: Arc<AtomicBool>,
 
-    pub lower_names: Vec<(usize, Box<str>)>,
-    pub loading_generation: u64,
-    pub active_generation: u64,
+    /// Fuente de [`FileSource`] asociadas a las columnas de las vistas miller
+    pub sources: Vec<FileSource>,
 
-    pub files: Arc<RwLock<Vec<Arc<FileEntry>>>>,
-    pub sorted_indices: Arc<RwLock<Vec<usize>>>,
+    /// Historial de navegación utilizado por las vistas miller para retroceder
+    pub(crate) miller_history: Vec<Arc<Path>>,
 
-    pub recursive_entries: Arc<RwLock<Vec<Arc<FileEntry>>>>,
-    pub is_recursive_active: bool,
-
-    pub watcher: FileWatcher,
-    pub loader: BlazeLoader,
+    /// Historial de navegación utilizado por las vistas miller para avanzar
+    pub(crate) miller_future: Vec<MillerSnapshot>,
 }
 
 impl BlazeTabState {
-    pub fn get_active_files(
-        &self,
+    /// Obtiene los archivos [`FileEntry`] asociados a `path` desde su [`FileSource`]
+    ///
+    /// Devuelve [`MotorError::NotFileSourceFound`] si no existe una fuente
+    /// asociada a la ruta
+    pub fn get_files_for(
+        &mut self,
+        path: &Arc<Path>,
         search_filter: &str,
         needs_sort: bool,
         sizer_manager: &SizerManager,
     ) -> MotorResult<Vec<Arc<FileEntry>>> {
-        let show_hidden = with_configs(|c| c.get_show_hidden_files());
-        let query_lower = search_filter.to_lowercase();
-        let matcher = SkimMatcherV2::default();
-
-        if self.is_recursive_active {
-            let recursive_guard = self
-                .recursive_entries
-                .read()
-                .map_err(|_| MotorError::PoisonedLock)?;
-
-            let result = recursive_guard
-                .iter()
-                .filter(|f| {
-                    if !show_hidden && f.is_hidden {
-                        return false;
-                    }
-                    true
-                })
-                .cloned()
-                .collect();
-
-            return Ok(result);
-        }
-
-        self.ensure_sorted(needs_sort, sizer_manager)?;
-
-        let file_guard = self.files.read().map_err(|_| MotorError::PoisonedLock)?;
-
-        let indices_guard = self
-            .sorted_indices
-            .read()
-            .map_err(|_| MotorError::PoisonedLock)?;
-
-        let sorted = indices_guard
-            .iter()
-            .map(|&i| file_guard[i].clone())
-            .filter(|f| {
-                if !show_hidden && f.is_hidden {
-                    return false;
-                }
-                if search_filter.is_empty() {
-                    return true;
-                }
-                matcher
-                    .fuzzy_match(&f.name.to_lowercase(), &query_lower)
-                    .is_some()
-            })
-            .collect();
-
-        Ok(sorted)
-    }
-
-    fn ensure_sorted(&self, needs_sort: bool, sizer_manager: &SizerManager) -> MotorResult<()> {
-        if !needs_sort {
-            return Ok(());
-        }
-
-        let mode = with_configs(|c| c.get_ordering_mode());
-
-        let file_guard = self.files.write().map_err(|_| MotorError::PoisonedLock)?;
-        let mut indices_guard = self
-            .sorted_indices
-            .write()
-            .map_err(|_| MotorError::PoisonedLock)?;
-
-        let mut indices: Vec<usize> = (0..file_guard.len()).collect();
-
-        indices.sort_by(|&a, &b| {
-            let (ea, eb) = (&file_guard[a], &file_guard[b]);
-
-            // Carpetas primero
-            match (ea.is_dir(), eb.is_dir()) {
-                (true, false) => return std::cmp::Ordering::Less,
-                (false, true) => return std::cmp::Ordering::Greater,
-                _ => {}
-            }
-
-            let ord = match mode.kind {
-                OrderingKind::Size => {
-                    let (sa, sb) = (
-                        self.get_effective_size(ea, sizer_manager),
-                        self.get_effective_size(eb, sizer_manager),
-                    );
-                    sa.cmp(&sb)
-                }
-                OrderingKind::Name => ea.name.to_lowercase().cmp(&eb.name.to_lowercase()),
-                OrderingKind::Date => ea.modified.cmp(&eb.modified),
-            };
-
-            // Invertir si es descendente
-            if mode.direction == OrderingDirection::Desc {
-                ord.reverse()
-            } else {
-                ord
-            }
-        });
-
-        *indices_guard = indices;
-        Ok(())
-    }
-
-    fn get_effective_size(&self, entry: &FileEntry, sizer_manager: &SizerManager) -> u64 {
-        if !entry.is_dir() {
-            return entry.size;
-        }
-        let key = entry.full_path.to_string_lossy();
-        sizer_manager
-            .cache_manager
-            .size_cache
-            .lock()
-            .get(key.as_ref())
-            .map(|c| c.size)
-            .unwrap_or(0)
-    }
-
-    pub fn get_item_to_delete(
-        &self,
-        files: Vec<Arc<Path>>,
-    ) -> MotorResult<Vec<(Arc<str>, Arc<Path>)>> {
-        let file_guard = self.files.read().map_err(|_| MotorError::PoisonedLock)?;
-
-        let ftd = file_guard
-            .iter()
-            .filter(|f| files.contains(&f.full_path))
-            .map(|f| (Arc::from(f.name.to_owned()), f.full_path.to_owned()))
-            .collect();
-
-        Ok(ftd)
-    }
-
-    pub fn update_dir_size(&self, full_path: Arc<Path>, new_size: u64) -> MotorResult<bool> {
-        let mut guard = self.files.write().map_err(|_| MotorError::PoisonedLock)?;
-
-        if let Some(entry) = guard
+        let sources = self
+            .sources
             .iter_mut()
-            .find(|f| *f.full_path.as_ref() == *full_path)
-        {
-            let mut new_entry = (**entry).clone();
-            new_entry.size = new_size;
-            *entry = Arc::new(new_entry);
-        } else {
-            return Ok(false);
-        }
-        Ok(true)
+            .find(|s| s.cwd == *path)
+            .ok_or(MotorError::NotFileSourceFound(path.clone()))?;
+
+        sources.get_active_files(search_filter, needs_sort, sizer_manager)
     }
 
-    pub fn clear_recursive_files(&self) -> MotorResult<()> {
-        {
-            let mut recursive_entries_guard = self
-                .recursive_entries
-                .write()
-                .map_err(|_| MotorError::PoisonedLock)?;
-            recursive_entries_guard.clear();
-            recursive_entries_guard.shrink_to_fit();
-        }
+    pub fn set_focus(&mut self, path: Arc<Path>) {
+        self.focused = path;
+    }
+
+    /// Solicita la carga de una nueva ruta utilizando el primer [`FileSource`]
+    ///
+    /// Actualiza el directorio de trabajo (`cwd`) y delega la carga de los archivos
+    /// al [`FileSource`]. Devuelve [`MotorError`] si no existe ninguna fuente activa
+    pub fn request_load_path(&mut self, path: Arc<Path>, sender: Dispatcher) -> MotorResult<()> {
+        let source = self
+            .sources
+            .first_mut()
+            .ok_or_else(|| MotorError::from("No hay FileSource activo"))?;
+
+        source.cwd = path.clone();
+        source.load_path(sender)?;
         Ok(())
     }
 
-    pub fn clear_files(&self) -> MotorResult<()> {
-        {
-            let mut file_guard = self.files.write().map_err(|_| MotorError::PoisonedLock)?;
-            file_guard.clear();
-            file_guard.shrink_to_fit();
-        }
-        Ok(())
-    }
-
-    pub fn clear_sorted_indices(&self) -> MotorResult<()> {
-        {
-            let mut sorted_indices_guard = self
-                .sorted_indices
-                .write()
-                .map_err(|_| MotorError::PoisonedLock)?;
-            sorted_indices_guard.clear();
-            sorted_indices_guard.shrink_to_fit();
-        }
-        Ok(())
-    }
-
-    pub fn reset_for_new_path(&mut self) -> MotorResult<()> {
-        self.clear_files()?;
-        self.clear_sorted_indices()?;
-        self.clear_recursive_files()?;
-        self.lower_names.clear();
-        self.lower_names.shrink_to_fit();
-        Ok(())
-    }
-
-    pub fn load_path(&mut self, _skip_cache: bool, sender: Dispatcher) -> MotorResult<()> {
-        let path = self.cwd.clone();
-
-        if !path.exists() || !path.is_dir() {
-            return Err(MotorError::InvalidPath(path));
-        }
-
-        self.loading_generation += 1;
-
-        self.reset_for_new_path()?;
-
-        self.active_generation = 0;
-        self.loader
-            .load_path(path.clone(), sender.clone(), self.loading_generation)?;
-
-        self.watcher.start_watching(path, sender)
-    }
-
-    fn recursive_search(
-        cwd: Arc<Path>,
-        query: String,
-        max_depth: usize,
-        sender: Dispatcher,
-        show_hidden: bool,
-        loading_generation: u64,
-        flag: Arc<AtomicBool>,
-    ) {
-        TOKIO_RUNTIME.spawn(async move {
-            let query_lower = query.to_lowercase().trim().to_string();
-            let mut total_files = 0usize;
-            let mut batch: Vec<Arc<FileEntry>> = Vec::with_capacity(150);
-
-            sender
-                .send(RecursiveMessages::Started {
-                    task_id: loading_generation,
-                    text: format!("Buscando \"{}\"...", query),
-                })
-                .ok();
-
-            let cwd_clone = cwd.clone();
-            let flag_clone = flag.clone();
-            let sender_clone = sender.clone();
-
-            let walk_result = tokio::task::spawn_blocking(move || {
-                let walker = WalkDir::new(&cwd_clone)
-                    .max_depth(max_depth)
-                    .follow_links(false)
-                    .skip_hidden(!show_hidden)
-                    .parallelism(Parallelism::RayonNewPool(0));
-
-                for entry in walker {
-                    if !flag_clone.load(Ordering::Relaxed) {
-                        return (vec![], total_files);
-                    }
-
-                    let entry = match entry {
-                        Ok(e) => e,
-                        Err(e) => {
-                            warn!("Error caminando: {}", e);
-                            continue;
-                        }
-                    };
-
-                    let path = entry.path();
-
-                    if entry.file_type().is_dir() {
-                        continue;
-                    }
-
-                    if !show_hidden
-                        && let Some(name) = path.file_name()
-                        && name.to_string_lossy().starts_with('.')
-                    {
-                        continue;
-                    }
-
-                    let name = entry.file_name().to_string_lossy().to_string();
-                    let name_lower = name.to_lowercase();
-
-                    let is_match = query_lower.is_empty() || name_lower.contains(&query_lower) || {
-                        let name_norm = name_lower.replace(['-', '_', ' ', '.'], "");
-                        let query_norm = query_lower.replace(['-', '_', ' ', '.'], "");
-                        name_norm.contains(&query_norm)
-                    };
-
-                    if is_match && let Ok(metadata) = entry.metadata() {
-                        let entry_path = path.to_path_buf();
-                        let unique_id = get_file_id(&entry_path).ok();
-
-                        let file_entry = build_entry(&entry_path, metadata, unique_id);
-
-                        let arc_entry = Arc::from(file_entry);
-
-                        batch.push(arc_entry);
-                        total_files += 1;
-
-                        if batch.len() >= 150 {
-                            let send_batch = std::mem::take(&mut batch);
-                            sender_clone
-                                .send(FileLoadingMessage::RecursiveBatch {
-                                    generation: loading_generation,
-                                    batch: send_batch,
-                                    source_dir: cwd_clone.clone(),
-                                })
-                                .ok();
-                        }
-                    }
-                }
-                (batch, total_files)
-            })
-            .await;
-
-            match walk_result {
-                Ok((remaining_batch, found_total)) => {
-                    total_files = found_total;
-
-                    if !remaining_batch.is_empty() {
-                        sender
-                            .send(FileLoadingMessage::RecursiveBatch {
-                                generation: loading_generation,
-                                batch: remaining_batch,
-                                source_dir: cwd,
-                            })
-                            .ok();
-                    }
-
-                    sender
-                        .send(RecursiveMessages::Finished {
-                            task_id: loading_generation,
-                            success: true,
-                            text: format!("Completado: {} archivos encontrados", total_files),
-                        })
-                        .ok();
-
-                    debug!("Búsqueda recursiva completada: {} archivos", total_files);
-                }
-                Err(e) => {
-                    sender
-                        .send(UiEvent::ShowError(
-                            format!("Error buscando archivos: {}", e).into(),
-                        ))
-                        .ok();
-                }
-            }
-
-            flag.store(false, std::sync::atomic::Ordering::Relaxed);
-            debug!("Búsqueda recursiva completada: {} archivos", total_files);
-        });
-    }
-
-    pub fn start_recursive_search(
+    /// Solicita la carga de una nueva ruta
+    ///
+    /// Asegura que exista [`FileSource`]
+    /// para esa ruta específica y delega la carga
+    pub fn request_load_from_path(
         &mut self,
-        query: String,
-        max_depth: usize,
+        path: Arc<Path>,
         sender: Dispatcher,
     ) -> MotorResult<()> {
-        {
-            let mut recursive_entries_guard = self
-                .recursive_entries
-                .write()
-                .map_err(|_| MotorError::PoisonedLock)?;
-            recursive_entries_guard.clear();
-            recursive_entries_guard.shrink_to_fit();
-        }
-
-        self.is_recursive_active = true;
-
-        self.loading_generation += 1;
-        let current_generation = self.loading_generation;
-        self.loading_flag.store(true, Ordering::Relaxed);
-
-        let path = self.cwd.clone();
-        let flag = self.loading_flag.clone();
-
-        let show_hidden = with_configs(|c| c.get_show_hidden_files());
-
-        Self::recursive_search(
-            path,
-            query,
-            max_depth,
-            sender,
-            show_hidden,
-            current_generation,
-            flag,
-        );
-
+        let source = self.ensure_source(path);
+        source.load_path(sender)?;
         Ok(())
     }
 
-    pub fn navigate_to(&mut self, new_path: Arc<Path>) {
-        if new_path.is_dir() && new_path != self.cwd {
-            let old_path = self.cwd.clone();
+    /// Devuelve el [`FileSource`] asociado a una ruta, creandolo si no existe
+    pub fn ensure_source(&mut self, path: Arc<Path>) -> &mut FileSource {
+        if let Some(idx) = self.sources.iter().position(|s| s.cwd == path) {
+            return &mut self.sources[idx];
+        }
+
+        self.sources.push(FileSource::new(path));
+        let idx = self.sources.len() - 1;
+        &mut self.sources[idx]
+    }
+
+    /// Cambia el directorio enfocado y delega las cargas a [`Self::request_load_path`]
+    ///
+    /// Este método se utiliza para la navegación del modo de vista normal
+    ///
+    /// Actualiza el [`Self::history`] y [`Self::future`] para reflejar
+    /// la nueva navegación y limita el historial a 100 rutas
+    pub fn navigate_to(&mut self, new_path: Arc<Path>, sender: Dispatcher) -> MotorResult<()> {
+        if new_path.is_dir() && new_path != self.focused {
+            let old_path = self.focused.clone();
             if self.history.last() != Some(&old_path) {
                 self.history.push(old_path);
             }
@@ -518,20 +201,58 @@ impl BlazeTabState {
                 self.history.remove(0);
             }
 
-            self.cwd = new_path;
+            self.request_load_path(new_path.clone(), sender)?;
+            self.set_focus(new_path);
         }
+
+        Ok(())
     }
 
-    pub fn up(&mut self) {
-        if let Some(new_path) = self.cwd.parent() {
-            let old_path = self.cwd.clone();
+    /// Navega a una ruta dentro de la vista de columnas Miller
+    /// Trunca los [`FileSource`] posteriores a `col_index`,
+    /// actualiza el directorio enfocado y delega las cargas a [`FileSource::load_path`]
+    ///
+    /// Actualiza el [`Self::miller_history`] y [`Self::miller_future`] para reflejar
+    /// la nueva navegación y limita el historial a 100 rutas
+    ///
+    /// Obtiene o crea el [`FileSource`] correspondiente
+    /// mediante [`Self::ensure_source`]
+    pub fn miller_navigate_to(
+        &mut self,
+        new_path: Arc<Path>,
+        col_index: usize,
+        sender: Dispatcher,
+    ) -> MotorResult<()> {
+        self.sources.truncate(col_index + 1);
+
+        self.miller_future.clear();
+        if self.miller_history.last() != Some(&self.focused) {
+            self.miller_history.push(self.focused.clone());
+        }
+
+        if self.miller_history.len() > 100 {
+            self.miller_history.remove(0);
+        }
+
+        let source = self.ensure_source(new_path);
+        source.load_path(sender)?;
+
+        Ok(())
+    }
+
+    /// Navega al directorio padre de la ruta enfocada
+    ///
+    /// Añade la ruta actual al historial, limpia el [`Self::future`]
+    /// y carga el directorio padre mediante [`Self::request_load_path`]
+    pub fn up(&mut self, sender: Dispatcher) {
+        if let Some(new_path) = self.focused.parent() {
+            let old_path = self.focused.clone();
 
             if *new_path == *old_path {
                 return;
             }
 
             self.history.push(old_path.clone());
-
             self.future.clear();
             self.future.push(old_path);
 
@@ -539,35 +260,169 @@ impl BlazeTabState {
                 self.history.remove(0);
             }
 
-            self.cwd = new_path.into();
+            let new_path_arc: Arc<Path> = new_path.into();
+            match self.request_load_path(new_path_arc.clone(), sender) {
+                Ok(()) => self.set_focus(new_path_arc),
+                Err(e) => warn!("Ha ocurrido un error al cargar el directorio: {e}"),
+            }
         }
     }
 
-    pub fn back(&mut self) {
+    /// Navega a la ruta anterior del historial [`Self::history`]
+    ///
+    /// Añade la ruta actual al historial y carga
+    /// la siguente ruta mediante [`Self::request_load_path`]
+    pub fn back(&mut self, sender: Dispatcher) {
         if let Some(prev) = self.history.pop() {
-            self.future.push(self.cwd.clone());
-            self.cwd = prev;
+            self.future.push(self.focused.clone());
+            match self.request_load_path(prev.clone(), sender) {
+                Ok(()) => self.set_focus(prev),
+                Err(e) => warn!("Ha ocurrido un error al cargar el directorio: {e}"),
+            }
         }
     }
 
-    pub fn forward(&mut self) {
+    /// Navega a la siguiente ruta del historial [`Self::history`]
+    ///
+    /// Mueve la ruta actual al historial y carga
+    /// la siguente ruta mediante [`Self::request_load_path`]
+    pub fn forward(&mut self, sender: Dispatcher) {
         if let Some(next) = self.future.pop() {
-            self.history.push(self.cwd.clone());
-            self.cwd = next;
+            self.history.push(self.focused.clone());
+            match self.request_load_path(next.clone(), sender) {
+                Ok(()) => self.set_focus(next),
+                Err(e) => warn!("Ha ocurrido un error al cargar el directorio: {e}"),
+            }
         }
     }
 
+    /// Indica si existe una ruta disponible en el historial de retroceso
     pub fn can_go_back(&self) -> bool {
         !self.history.is_empty()
     }
 
+    /// Indica si existe una ruta disponible en el historial de avance
     pub fn can_go_forward(&self) -> bool {
         !self.future.is_empty()
     }
 
+    /// Indica si la ruta enfocada tiene un directorio padre para navegar
     pub fn can_go_up(&self) -> bool {
-        match self.cwd.parent() {
-            Some(parent) => parent != self.cwd.iter().as_path(),
+        match self.focused.parent() {
+            Some(parent) => parent != self.focused.iter().as_path(),
+            None => false,
+        }
+    }
+
+    /// Retrocede una columna en la vista miller
+    ///
+    /// Elimina el [`FileSource`] actual y guarda su ruta en [`Self::miller_future`]
+    /// para poder restaurarla mediante [`Self::miller_forward`]
+    ///
+    /// La columna anterior pasa a ser la enfocada
+    pub fn miller_back(&mut self) {
+        if self.sources.len() < 2 {
+            return;
+        }
+
+        let removed = Arc::clone(&self.sources.last().unwrap().cwd);
+
+        self.miller_future.clear();
+        self.miller_future
+            .push(MillerSnapshot::Back { path: removed });
+
+        self.sources.pop();
+    }
+
+    /// Avanza a la siguente ruta en la vista miller
+    ///
+    /// Restaura el estado almacenado en [`Self::miller_future`], ya sea
+    /// reconstruyendo una columna eliminada o restaurando las fuentes guardadas
+    /// antes de una navegación hacia el directorio padre
+    pub fn miller_forward(&mut self, sender: Dispatcher) {
+        match self.miller_future.pop() {
+            Some(MillerSnapshot::Back { path }) => {
+                self.sources.push(FileSource::new(path.clone()));
+                let _ = self.request_load_from_path(path, sender);
+            }
+
+            Some(MillerSnapshot::Up { previous_sources }) => {
+                self.sources.clear();
+                for snapshot in previous_sources {
+                    let mut source = FileSource::new(snapshot.cwd.clone());
+                    source.id = snapshot.id;
+                    source.files = snapshot.files;
+                    source.sorted_indices = snapshot.sorted_indices;
+
+                    self.sources.push(source);
+                }
+
+                for s in &self.sources {
+                    tracing::debug!("  - {}", s.cwd.display());
+                }
+            }
+
+            None => {}
+        }
+    }
+
+    /// Navega al directorio padre de la ruta enfocada en la vista miller
+    ///
+    /// Guarda el estado actual de [`Self::sources`] en [`Self::miller_future`]
+    /// para poder restaurarlo mediante [`Self::miller_forward`]
+    ///
+    /// Desplaza las columnas existentes una posición,
+    /// reutiliza sus files y carga el directorio padre en la primera columna
+    pub fn miller_up(&mut self, sender: Dispatcher) {
+        let first_cwd = self.sources.first().map(|s| s.cwd.clone());
+
+        if let Some(first) = first_cwd
+            && let Some(parent) = first.parent()
+        {
+            let parent_arc: Arc<Path> = parent.into();
+
+            let previous_sources: Vec<MillerSourceSnapshot> = self
+                .sources
+                .iter()
+                .map(|s| MillerSourceSnapshot {
+                    id: s.id.clone(),
+                    cwd: s.cwd.clone(),
+                    files: Arc::clone(&s.files),
+                    sorted_indices: Arc::clone(&s.sorted_indices),
+                })
+                .collect();
+
+            self.miller_future
+                .push(MillerSnapshot::Up { previous_sources });
+
+            for i in (1..self.sources.len()).rev() {
+                let files = self.sources[i - 1].files.clone();
+                self.sources[i].cwd = self.sources[i - 1].cwd.clone();
+                self.sources[i].files = files;
+            }
+
+            self.sources[0].cwd = parent_arc.clone();
+            self.sources[0].files = Arc::new(vec![].into());
+            let _ = self.request_load_from_path(parent_arc, sender);
+        }
+    }
+
+    /// Indica si existe una columna anterior a la que retroceder en la vista miller
+    pub fn miller_can_go_back(&self) -> bool {
+        self.sources.len() > 1
+    }
+
+    /// Indica si existe un estado de navegación que pueda restaurarse mediante
+    /// [`Self::miller_forward`]
+    pub fn miller_can_go_forward(&self) -> bool {
+        !self.miller_future.is_empty()
+    }
+
+    /// Indica si la ruta enfocada tiene un directorio padre para navegar en
+    /// la vista miller
+    pub fn miller_can_go_up(&self) -> bool {
+        match self.sources.first() {
+            Some(source) => source.cwd.parent().is_some(),
             None => false,
         }
     }

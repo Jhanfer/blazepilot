@@ -145,13 +145,13 @@ impl BlazeApp {
         with_keyboard_state(|k| k.clear());
 
         if let Some(ref receiver) = self.dnd {
-            receiver.process_event(self.state.cwd.clone(), self.state.active_id);
+            receiver.process_event(self.state.cwd(), self.state.active_id());
         } else {
             // Por ahora x11 solo detecta dropeo de files pero no de bytes, por lo que esta condición no se cumplirá al soltar imágenes o texto plano
             if !ctx.input(|i| i.raw.dropped_files.is_empty()) {
                 let dropped_files = ctx.input(|i| i.raw.dropped_files.clone());
 
-                process_event_x11(self.state.cwd.clone(), self.state.active_id, &dropped_files);
+                process_event_x11(self.state.cwd(), self.state.active_id(), &dropped_files);
             }
         }
 
@@ -232,8 +232,7 @@ impl BlazeApp {
         self.ui_state.dialog_manager.render_area(ui);
         self.ui_state.process_events();
 
-        let files = self.state.get_active_files();
-        connect_ui_components_callback(ui, &files, &mut self.state, &mut self.ui_state);
+        connect_ui_components_callback(ui, &mut self.state, &mut self.ui_state);
 
         if self.state.is_loading || self.state.active_tasks > 0 {
             self.repaint_signal.request_repaint_immediate();

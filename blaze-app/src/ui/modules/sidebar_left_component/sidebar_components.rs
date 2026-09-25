@@ -165,7 +165,11 @@ pub fn render_local_buttons(
     }
 
     if response.clicked() {
-        state.navigate_to(path);
+        if !state.is_miller() {
+            state.navigate_to(path);
+        } else {
+            state.miller_reset_to(path);
+        }
     }
 
     let (icon_name, icon_bytes) = get_folder_icon(icon_key);

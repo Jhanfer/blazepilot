@@ -23,13 +23,13 @@ use serde::{Deserialize, Serialize};
 use tracing::debug;
 
 use crate::core::{
-    blaze_state::{LayoutMode, ViewMode},
+    blaze_state::state_structs::{LayoutMode, ViewMode},
     bootstrap::{
         configs::{
             error::{ConfigError, ConfigResult},
             platform::{
                 PlatformConfigTrait,
-                linux::conf_structs::{DisplayBackend, OrderingMode},
+                linux::conf_structs::{DetailedViewConfig, DisplayBackend, OrderingMode},
             },
         },
         i18n::I18n,
@@ -88,6 +88,9 @@ pub struct LinuxConfigs {
 
     #[serde(default)]
     pub grid_icon_size: f32,
+
+    #[serde(default)]
+    pub detailed_columns_config: DetailedViewConfig,
 }
 
 impl LinuxConfigs {
@@ -135,6 +138,7 @@ impl Default for LinuxConfigs {
             view_mode: ViewMode::Normal(LayoutMode::Row),
             row_icon_size: 20.0,
             grid_icon_size: 56.0,
+            detailed_columns_config: Default::default(),
         }
     }
 }

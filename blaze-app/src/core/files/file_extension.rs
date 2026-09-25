@@ -22,6 +22,28 @@ pub enum DocType {
     Odp,
 }
 
+impl StrExtension for DocType {
+    fn extension(&self) -> &'static str {
+        match self {
+            DocType::Pdf => "pdf",
+            DocType::Doc => "doc",
+            DocType::Docx => "docx",
+            DocType::Xls => "xls",
+            DocType::Xlsx => "xlsx",
+            DocType::Ppt => "ppt",
+            DocType::Pptx => "pptx",
+            DocType::Txt => "txt",
+            DocType::Md => "md",
+            DocType::Rtf => "rtf",
+            DocType::Csv => "csv",
+            DocType::Log => "log",
+            DocType::Odt => "odt",
+            DocType::Ods => "ods",
+            DocType::Odp => "odp",
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum ImageType {
     Png,
@@ -123,6 +145,24 @@ pub enum ArchiveType {
     Zst,
 }
 
+impl StrExtension for ArchiveType {
+    fn extension(&self) -> &'static str {
+        match self {
+            ArchiveType::Zip => "zip",
+            ArchiveType::Tar => "tar",
+            ArchiveType::TarGz => "targz",
+            ArchiveType::TarXz => "tarxz",
+            ArchiveType::TarBz2 => "tarbz2",
+            ArchiveType::Gz => "gz",
+            ArchiveType::Bz2 => "bz2",
+            ArchiveType::Xz => "xz",
+            ArchiveType::Rar => "rar",
+            ArchiveType::SevenZ => "sevenz",
+            ArchiveType::Zst => "zst",
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum CodeType {
     Rs,
@@ -156,12 +196,59 @@ pub enum CodeType {
     Dart,
 }
 
+impl StrExtension for CodeType {
+    fn extension(&self) -> &'static str {
+        match self {
+            CodeType::Rs => "rs",
+            CodeType::Py => "py",
+            CodeType::Js => "js",
+            CodeType::Ts => "ts",
+            CodeType::C => "c",
+            CodeType::Cpp => "cpp",
+            CodeType::H => "h",
+            CodeType::Hpp => "hpp",
+            CodeType::Go => "go",
+            CodeType::Java => "java",
+            CodeType::Kt => "kt",
+            CodeType::Swift => "swift",
+            CodeType::Rb => "rb",
+            CodeType::Php => "php",
+            CodeType::Html => "html",
+            CodeType::Css => "css",
+            CodeType::Scss => "scss",
+            CodeType::Json => "json",
+            CodeType::Toml => "toml",
+            CodeType::Yaml => "yaml",
+            CodeType::Xml => "xml",
+            CodeType::Sh => "sh",
+            CodeType::Bash => "bash",
+            CodeType::Fish => "fish",
+            CodeType::Zsh => "zsh",
+            CodeType::Sql => "sql",
+            CodeType::R => "r",
+            CodeType::Lua => "lua",
+            CodeType::Dart => "dart",
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum FontType {
     Ttf,
     Otf,
     Woff,
     Woff2,
+}
+
+impl StrExtension for FontType {
+    fn extension(&self) -> &'static str {
+        match self {
+            FontType::Ttf => "ttf",
+            FontType::Otf => "otf",
+            FontType::Woff => "woff",
+            FontType::Woff2 => "woff2",
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -178,6 +265,20 @@ pub enum ExecutableType {
     App,
 }
 
+impl StrExtension for ExecutableType {
+    fn extension(&self) -> &'static str {
+        match self {
+            ExecutableType::AppImage => "appimage",
+            ExecutableType::Deb => "deb",
+            ExecutableType::Rpm => "rpm",
+            ExecutableType::Exe => "exe",
+            ExecutableType::Msi => "msi",
+            ExecutableType::Dmg => "dmg",
+            ExecutableType::App => "app",
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Default)]
 pub enum FileExtension {
     Document(DocType),
@@ -191,6 +292,22 @@ pub enum FileExtension {
 
     #[default]
     Unknown,
+}
+
+impl StrExtension for FileExtension {
+    fn extension(&self) -> &'static str {
+        match self {
+            Self::Document(doc_type) => doc_type.extension(),
+            Self::Image(image_type) => image_type.extension(),
+            Self::Video(video_type) => video_type.extension(),
+            Self::Audio(audio_type) => audio_type.extension(),
+            Self::Archive(archive_type) => archive_type.extension(),
+            Self::Code(code_type) => code_type.extension(),
+            Self::Font(font_type) => font_type.extension(),
+            Self::Executable(executable_type) => executable_type.extension(),
+            Self::Unknown => "-",
+        }
+    }
 }
 
 impl FileExtension {

@@ -1,6 +1,7 @@
 use crate::{
     core::{
         blaze_state::BlazeCoreState,
+        blaze_state::state_structs::NewItemType,
         bootstrap::configs::config_manager::with_configs,
         files::blaze_motor::motor_structs::FileEntry,
         runtime::{
@@ -28,7 +29,7 @@ use egui::{
     Color32, ColorImage, CursorIcon, FontId, Id, Key, Modifiers, PointerButton, Rect, ScrollArea,
     Sense, Stroke, StrokeKind, TextureOptions, Ui, pos2, scroll_area::ScrollSource, vec2,
 };
-use std::{collections::HashMap, path::Path, sync::Arc};
+use std::{borrow::Cow, collections::HashMap, path::Path, sync::Arc};
 use tracing::info;
 
 fn grid_file_creation(
@@ -38,18 +39,18 @@ fn grid_file_creation(
     ui_state: &mut BlazeUiState,
 ) {
     if let Some(item_type) = state.creating_new.clone() {
-        let icon_size = state.grid_view.icon_size;
+        let icon_size = state.grid_view.base.icon_size;
         let cell_size = state.grid_view.cell_size;
         let row_height = state.grid_view.row_height;
         let cell_padding = 8.0_f32;
 
         let (icon_name, icon_bytes, color) = match item_type {
-            crate::core::blaze_state::NewItemType::Folder => (
+            NewItemType::Folder => (
                 "folder".to_string(),
                 crate::ui::icons_cache::icons::ICON_FOLDER,
                 Color32::YELLOW,
             ),
-            crate::core::blaze_state::NewItemType::File => (
+            NewItemType::File => (
                 "file".to_string(),
                 crate::ui::icons_cache::icons::ICON_FILE,
                 Color32::WHITE,
@@ -141,8 +142,8 @@ fn handle_grid_interactions(
     if middle_clicked {
         state.resize_selection(files.len());
         let currently = state.is_selected(i);
-        state.selection.set(i, !currently);
-        state.last_selected_index = Some(i);
+        state.set_selection(i, !currently);
+        state.set_last_selected_index(Some(i));
 
         if file.is_dir() {
             state.add_tab_from_file(&file.full_path);
@@ -153,34 +154,34 @@ fn handle_grid_interactions(
         if !state.is_selected(i) {
             state.deselect_all();
             state.resize_selection(files.len());
-            state.selection.set(i, true);
-            state.last_selected_index = Some(i);
-            state.selection_anchor = Some(i);
+            state.set_selection(i, true);
+            state.set_last_selected_index(Some(i));
+            state.set_selection_anchor(Some(i));
         }
-        state.grid_view.is_dragging_files = true;
+        state.grid_view.base.is_dragging_files = true;
     }
 
     if response.dragged_by(PointerButton::Primary) {
-        state.grid_view.drag_ghost_pos = ui.input(|i| i.pointer.interact_pos());
+        state.grid_view.base.drag_ghost_pos = ui.input(|i| i.pointer.interact_pos());
     }
 
-    if response.drag_stopped() && state.grid_view.is_dragging_files {
-        state.grid_view.drag_ghost_pos = None;
+    if response.drag_stopped() && state.grid_view.base.is_dragging_files {
+        state.grid_view.base.drag_ghost_pos = None;
 
         let drop_in_file_area = ui
             .input(|i| i.pointer.interact_pos())
             .map(|p| p.x <= content_rect.min.x + content_rect.width() * 0.80)
             .unwrap_or(false);
 
-        if let Some(invalid_target) = state.grid_view.drop_invalid_target.take() {
+        if let Some(invalid_target) = state.grid_view.base.drop_invalid_target.take() {
             info!("No es posible mover a {:?}", invalid_target);
         }
 
         if drop_in_file_area {
-            let tab_id = state.active_id;
+            let tab_id = state.active_id();
             let dispatcher = with_event_bus(|e| e.dispatcher(tab_id));
 
-            if let Some(target) = state.grid_view.drop_target.take() {
+            if let Some(target) = state.grid_view.base.drop_target.take() {
                 let sources = state.get_selected_paths(files);
 
                 dispatcher
@@ -190,10 +191,10 @@ fn handle_grid_interactions(
                     }))
                     .ok();
             } else {
-                let cwd = state.cwd.clone();
+                let cwd = state.cwd();
                 let sources = state.get_selected_paths(files);
 
-                if sources.iter().all(|p| p.parent() == Some(&cwd)) {
+                if sources.iter().all(|(_, p)| p.parent() == Some(&cwd)) {
                     return;
                 }
 
@@ -206,7 +207,7 @@ fn handle_grid_interactions(
             }
         }
 
-        state.grid_view.is_dragging_files = false;
+        state.grid_view.base.is_dragging_files = false;
     }
 
     if response.secondary_clicked() {
@@ -214,21 +215,21 @@ fn handle_grid_interactions(
 
         if ui.input(|i| i.modifiers.ctrl) {
             let currently = state.is_selected(i);
-            state.selection.set(i, !currently);
-            state.last_selected_index = Some(i);
+            state.set_selection(i, !currently);
+            state.set_last_selected_index(Some(i));
         } else if !state.is_selected(i) {
             state.deselect_all();
             state.resize_selection(files.len());
-            state.selection.set(i, true);
-            state.last_selected_index = Some(i);
+            state.set_selection(i, true);
+            state.set_last_selected_index(Some(i));
         }
     }
 
-    let cwd = state.cwd.clone();
+    let cwd = state.cwd();
     let is_in_trash = get_backend().etched_in_trash_path(&cwd);
 
     if is_in_trash {
-        let tab_id = state.active_id;
+        let tab_id = state.active_id();
         let dispatcher = with_event_bus(|e| e.dispatcher(tab_id));
         if response.secondary_clicked() {
             ui_state.context_menu_state.handle_response(response);
@@ -236,7 +237,7 @@ fn handle_grid_interactions(
             ui_state.context_menu_state.kind = ContextMenuKind::FileTrash;
         }
     } else {
-        let tab_id = state.active_id;
+        let tab_id = state.active_id();
         let dispatcher = with_event_bus(|e| e.dispatcher(tab_id));
         if response.secondary_clicked() {
             ui_state.context_menu_state.handle_response(response);
@@ -300,12 +301,12 @@ pub fn render_grid_scrollview(
 
     let i18n = with_configs(|c| c.get_i18n());
 
-    ui_state.evict_thumbnail_cache_if_dir_changed(&state.cwd);
+    ui_state.evict_thumbnail_cache_if_dir_changed(&state.cwd());
     ui_state.enforce_texture_cache_limit(500);
 
     let cell_padding = 8.0_f32;
 
-    let icon_size = state.grid_view.icon_size;
+    let icon_size = state.grid_view.base.icon_size;
     let cell_size = icon_size + 40.0;
 
     let row_height = cell_size + 28.0;
@@ -331,12 +332,12 @@ pub fn render_grid_scrollview(
         let row_bottom = row_top + row_height;
 
         let viewport_top = state.scroll_offset;
-        let viewport_bottom = state.scroll_offset + state.grid_view.viewport_height;
+        let viewport_bottom = state.scroll_offset + state.grid_view.base.viewport_height;
 
         if row_top < viewport_top {
             state.scroll_offset = row_top;
         } else if row_bottom > viewport_bottom {
-            state.scroll_offset = row_bottom - state.grid_view.viewport_height;
+            state.scroll_offset = row_bottom - state.grid_view.base.viewport_height;
         }
     }
 
@@ -351,10 +352,20 @@ pub fn render_grid_scrollview(
 
         let mut should_repaint = false;
 
+        let is_recursive = {
+            let motor = state.motor();
+            let tab = motor.active_tab();
+            tab.sources
+                .iter()
+                .find(|s| s.cwd == state.cwd())
+                .map(|s| s.is_recursive_active)
+                .unwrap_or(false)
+        };
+
         ui.spacing_mut().item_spacing = vec2(0.0, 0.0);
 
-        state.grid_view.first_visible = row_range.start * cols;
-        state.grid_view.last_visible = (row_range.end * cols).min(files.len());
+        state.grid_view.base.first_visible = row_range.start * cols;
+        state.grid_view.base.last_visible = (row_range.end * cols).min(files.len());
 
         // --- Snapshots de datos externos ---
         let file_indices: Vec<usize> = row_range
@@ -367,14 +378,14 @@ pub fn render_grid_scrollview(
             .collect();
 
         let info_snapshot: HashMap<Arc<Path>, ExtendedInfo> = {
-            match state.extended_info_manager.info_map.write() {
-                Ok(mut map) => file_indices
-                    .iter()
-                    .filter_map(|&i| {
+            match state.extended_info_manager.info_map.read() {
+                Ok(map) => row_range
+                    .clone()
+                    .filter_map(|i| {
                         let path = &files[i].full_path;
-                        map.get(path).map(|v| (path.clone(), v.clone()))
+                        map.peek(path).map(|v| (path.clone(), v.clone()))
                     })
-                    .collect(),
+                    .collect::<HashMap<Arc<Path>, ExtendedInfo>>(),
                 Err(_) => HashMap::new(),
             }
         };
@@ -400,7 +411,7 @@ pub fn render_grid_scrollview(
             }
 
             if row == row_range.start {
-                state.grid_view.scroll_area_origin_y =
+                state.grid_view.base.scroll_area_origin_y =
                     row_rect.min.y + state.scroll_offset - (row as f32 * row_height);
             }
 
@@ -480,7 +491,7 @@ pub fn render_grid_scrollview(
                 }
 
                 // Drop target highlight
-                if let Some(ref target) = state.grid_view.drop_target.clone() {
+                if let Some(ref target) = state.grid_view.base.drop_target.clone() {
                     if *file.full_path == **target {
                         ui.painter().rect_stroke(
                             rect,
@@ -489,7 +500,8 @@ pub fn render_grid_scrollview(
                             StrokeKind::Outside,
                         );
                     }
-                } else if let Some(ref target_invalid) = state.grid_view.drop_invalid_target.clone()
+                } else if let Some(ref target_invalid) =
+                    state.grid_view.base.drop_invalid_target.clone()
                     && *file.full_path == **target_invalid
                 {
                     ui.painter().rect_stroke(
@@ -531,29 +543,30 @@ pub fn render_grid_scrollview(
 
                     let modifiers = ui.input(|i| i.modifiers);
                     if modifiers.shift {
-                        if let Some(anchor) = state.selection_anchor {
+                        if let Some(anchor) = state.selection_anchor() {
                             let start = anchor.min(i);
                             let end = anchor.max(i);
                             state.select_range(start, end);
                         } else {
                             state.deselect_all();
                             state.resize_selection(files.len());
-                            state.selection.set(i, true);
-                            state.selection_anchor = Some(i);
+                            state.set_selection(i, true);
+                            state.set_selection_anchor(Some(i));
                         }
-                        state.last_selected_index = Some(i);
+
+                        state.set_last_selected_index(Some(i));
                     } else if modifiers.ctrl {
                         let currently = state.is_selected(i);
                         state.resize_selection(files.len());
-                        state.selection.set(i, !currently);
-                        state.selection_anchor = Some(i);
-                        state.last_selected_index = Some(i);
+                        state.set_selection(i, !currently);
+                        state.set_selection_anchor(Some(i));
+                        state.set_last_selected_index(Some(i));
                     } else {
                         state.deselect_all();
                         state.resize_selection(files.len());
-                        state.selection.set(i, true);
-                        state.selection_anchor = Some(i);
-                        state.last_selected_index = Some(i);
+                        state.set_selection(i, true);
+                        state.set_selection_anchor(Some(i));
+                        state.set_last_selected_index(Some(i));
                     }
                 }
 
@@ -652,17 +665,16 @@ pub fn render_grid_scrollview(
                 }
 
                 if !is_renaming {
-                    let motor = state.motor.borrow_mut();
-                    let display_name = if motor.active_tab().is_recursive_active {
+                    let cow_display_name: Cow<str> = if is_recursive {
                         file.full_path
-                            .strip_prefix(&motor.active_tab().cwd)
+                            .strip_prefix(state.cwd())
                             .unwrap_or(&file.full_path)
                             .to_string_lossy()
-                            .to_string()
                     } else {
-                        file.name.to_string()
+                        Cow::Borrowed(&file.name)
                     };
-                    drop(motor);
+
+                    let display_name = cow_display_name.to_string();
 
                     let name_top = icon_rect.max.y + 4.0;
                     let name_padding = 3.0;
@@ -744,9 +756,9 @@ pub fn render_grid_scrollview(
 
                 if response.hovered() {
                     let display_size = if file.is_dir() {
-                        if state.calculating_dir_sizes.contains(&file.full_path) {
+                        if state.dir_sizes.is_calculating(&file.full_path) {
                             None
-                        } else if state.calculated_dir_sizes.contains(&file.full_path) {
+                        } else if state.dir_sizes.is_calculated(&file.full_path) {
                             Some(file.size)
                         } else {
                             state
@@ -783,10 +795,8 @@ pub fn render_grid_scrollview(
 
         let mut ctx_menu = std::mem::take(&mut ui_state.context_menu_state);
         match ctx_menu.kind {
-            ContextMenuKind::FileNormal => ctx_menu.file_context_menu(ui, state, ui_state, files),
-            ContextMenuKind::FileTrash => {
-                ctx_menu.file_context_menu_in_trash(ui, state, ui_state, files)
-            }
+            ContextMenuKind::FileNormal => ctx_menu.file_context_menu(ui, state, ui_state),
+            ContextMenuKind::FileTrash => ctx_menu.file_context_menu_in_trash(ui, state, ui_state),
             _ => {}
         }
         ui_state.context_menu_state = ctx_menu;
@@ -805,5 +815,5 @@ pub fn render_grid_scrollview(
         state.scroll_offset = scroll_output.state.offset.y;
     }
 
-    state.grid_view.viewport_height = scroll_output.inner_rect.height();
+    state.grid_view.base.viewport_height = scroll_output.inner_rect.height();
 }

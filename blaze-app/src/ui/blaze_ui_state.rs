@@ -152,6 +152,7 @@ impl BlazeUiState {
                 UiEvent::SureTo(sureto) => match sureto {
                     SureTo::SureToMove { files, dest } => {
                         debug!("Mover {:?} → {:?}", files, dest);
+                        let files: Vec<Arc<Path>> = files.into_iter().map(|(_, p)| p).collect();
                         self.dialog_manager.open_sure_move_dialog(files, dest);
                     }
                     SureTo::SureToDelete { files, tab_id } => {

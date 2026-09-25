@@ -69,7 +69,7 @@ impl DialogManager {
         self.sure_to_dialog.open(sources, dest);
     }
 
-    pub fn open_sure_to_delete(&mut self, sources: Vec<Arc<Path>>, tab_id: Uuid) {
+    pub fn open_sure_to_delete(&mut self, sources: Vec<(Box<str>, Arc<Path>)>, tab_id: Uuid) {
         self.sure_to_delete_dialog.open(sources, tab_id);
     }
 

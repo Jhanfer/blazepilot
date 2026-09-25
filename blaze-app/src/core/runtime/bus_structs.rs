@@ -30,7 +30,7 @@ pub enum FileOperation {
     },
 
     Trash {
-        files: Vec<Arc<Path>>,
+        files: Vec<(Box<str>, Arc<Path>)>,
     },
 
     CreateDir {
@@ -66,11 +66,11 @@ pub enum FileOperation {
 #[derive(Debug)]
 pub enum SureTo {
     SureToMove {
-        files: Vec<Arc<Path>>,
+        files: Vec<(Box<str>, Arc<Path>)>,
         dest: Arc<Path>,
     },
     SureToDelete {
-        files: Vec<Arc<Path>>,
+        files: Vec<(Box<str>, Arc<Path>)>,
         tab_id: Uuid,
     },
 }
