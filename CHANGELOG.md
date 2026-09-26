@@ -1,6 +1,18 @@
 # Changelog
 
 ---
+## [0.21.0](https://github.com/Jhanfer/blazepilot/compare/v0.20.0..v0.21.0) - 2026-09-25
+
+### ✦ Features
+
+- **(sidebar)** Refactoriza los paneles laterales, añade estado colapsable y redimensionable([`b754325`](https://github.com/Jhanfer/blazepilot/commit/b754325abf5de434a93e6b896a94887fed007064)) - Jhanfer
+- **(views)** Añade modos Compact, RowDetailed y Miller, refactoriza blaze_state y motor con FileSource([`69ebd01`](https://github.com/Jhanfer/blazepilot/commit/69ebd010a6661eebca08d131814b18c88e2845cb)) - Jhanfer
+
+### ✦ Tests
+
+- **(blaze_motor)** Asegurar FileSource inicial en los tests de motor([`cd81d50`](https://github.com/Jhanfer/blazepilot/commit/cd81d50662a5a5f0fca91f5f0f8df251cde11176)) - Jhanfer
+
+---
 ## [0.20.0](https://github.com/Jhanfer/blazepilot/compare/v0.19.1..v0.20.0) - 2026-08-25
 
 ### ✦ Bug fixes
