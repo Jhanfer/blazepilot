@@ -447,12 +447,6 @@ impl AudioStreamer {
         )
         .map_err(AudioError::FfmpegError)?;
 
-        unsafe {
-            let ctx = ictx.as_mut_ptr();
-            (*ctx).max_interleave_delta = 100000;
-            (*ctx).flags |= 64;
-        }
-
         let audio_stream = ictx
             .streams()
             .best(Type::Audio)
@@ -556,8 +550,6 @@ impl AudioStreamer {
             }
 
             let mut packet = Packet::empty();
-
-            debug!("Leyendo paquete... packects_in_buff={}", packects_in_buff);
 
             match packet.read(&mut ictx) {
                 Ok(()) => {
@@ -669,11 +661,6 @@ impl AudioStreamer {
                             timestamp,
                             epoch: seek_epoch.load(Ordering::Acquire),
                         };
-
-                        debug!(
-                            "Frame enviado: timestamp={:.2}s epoch={}",
-                            timestamp, frame.epoch
-                        );
 
                         if tx.send(frame).is_err() {
                             return Ok("Error al enviar el frame de audio".into());

@@ -317,12 +317,7 @@ impl VideoPlayer {
 
                 drop(frame);
 
-                if let Some(texture) = &mut self.texture {
-                    texture.set_partial([0, 0], color_image, TextureOptions::LINEAR);
-                } else {
-                    self.texture =
-                        Some(ui.load_texture("frame", color_image, TextureOptions::LINEAR));
-                }
+                self.texture = Some(ui.load_texture("frame", color_image, TextureOptions::LINEAR));
 
                 self.pending_frame = None;
             } else if self.is_playing() {
@@ -423,12 +418,6 @@ impl VideoStreamer {
             ops,
         )
         .map_err(VideoError::FfmpegError)?;
-
-        unsafe {
-            let ctx = ictx.as_mut_ptr();
-            (*ctx).max_interleave_delta = 100000;
-            (*ctx).flags |= 64;
-        }
 
         let video_stream = ictx
             .streams()
