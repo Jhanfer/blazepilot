@@ -244,6 +244,15 @@ cargo run --bin blazepilot
 >   - Vulkan (`libvulkan-dev`)
 >   - D-Bus (`libdbus-1-dev`)
 
+### Alternative method with Docker
+
+```bash
+git clone https://github.com/Jhanfer/blazepilot.git
+cd blazepilot
+docker build --no-cache --target builder --output type=local,dest=./target/docker .
+```
+
+The binary is in `./target/docker/artifact/release/blazepilot`.
 
 ---
 
