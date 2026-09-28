@@ -246,7 +246,7 @@ cargo run --bin blazepilot
 
 
 ---
-### Método alternativo con Pocket
+### Método alternativo con Docker
 
 ```bash
 git clone https://github.com/Jhanfer/blazepilot.git
