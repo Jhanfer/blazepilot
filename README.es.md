@@ -246,6 +246,17 @@ cargo run --bin blazepilot
 
 
 ---
+### Método alternativo con Pocket
+
+```bash
+git clone https://github.com/Jhanfer/blazepilot.git
+cd blazepilot
+docker build --no-cache --target builder --output type=local,dest=./target/docker .
+```
+
+El binario queda en `./target/docker/artifact/release/blazepilot`.
+
+---
 
 ## Estado del proyecto
 
