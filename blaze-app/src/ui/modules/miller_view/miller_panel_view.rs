@@ -226,7 +226,7 @@ pub fn miller_panel_frame(
                                 //Disparador de sizer
                                 if just_loaded
                                     && file.is_dir()
-                                    && state.dir_sizes.is_done(&file.full_path)
+                                    && state.dir_sizes.needs_calc(&file.full_path)
                                 {
                                     state.dir_sizes.start(file.full_path.clone());
                                     if let Err(e) = dispatcher.send(SizerMessages::StartCal(
@@ -238,7 +238,7 @@ pub fn miller_panel_frame(
                                 }
 
                                 //Disparador de Info extendida
-                                if just_loaded && !state.extended_info.is_done(&file.full_path) {
+                                if just_loaded && state.extended_info.needs_calc(&file.full_path) {
                                     state.extended_info.start(file.full_path.clone());
                                     if let Err(e) = dispatcher.send(
                                         ExtendedInfoMessages::StartScan(file.full_path.to_owned()),

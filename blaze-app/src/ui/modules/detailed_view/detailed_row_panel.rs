@@ -209,6 +209,17 @@ pub fn detailed_row_panel_frame(
                 content_rect,
             );
 
+            //Scrollview
+            render_detailed_row_scrollview(
+                ui,
+                files,
+                state,
+                ui_state,
+                row_height,
+                total_rows,
+                content_rect,
+            );
+
             let tab_id = state.active_id();
             let dispatcher = with_event_bus(|e| e.dispatcher(tab_id));
 
@@ -219,7 +230,7 @@ pub fn detailed_row_panel_frame(
 
             for file in files.get(first..last.min(files.len())).unwrap_or(&[]) {
                 //Disparador de sizer
-                if just_loaded && file.is_dir() && state.dir_sizes.is_done(&file.full_path) {
+                if just_loaded && file.is_dir() && state.dir_sizes.needs_calc(&file.full_path) {
                     state.dir_sizes.start(file.full_path.clone());
                     if let Err(e) = dispatcher.send(SizerMessages::StartCal(
                         file.full_path.to_owned(),
@@ -230,7 +241,7 @@ pub fn detailed_row_panel_frame(
                 }
 
                 //Disparador de Info extendida
-                if just_loaded && !state.extended_info.is_done(&file.full_path) {
+                if just_loaded && state.extended_info.needs_calc(&file.full_path) {
                     state.extended_info.start(file.full_path.clone());
                     if let Err(e) =
                         dispatcher.send(ExtendedInfoMessages::StartScan(file.full_path.to_owned()))
@@ -280,17 +291,6 @@ pub fn detailed_row_panel_frame(
                     counter.fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
                 });
             }
-
-            //Scrollview
-            render_detailed_row_scrollview(
-                ui,
-                files,
-                state,
-                ui_state,
-                row_height,
-                total_rows,
-                content_rect,
-            );
 
             if state.row_view.is_dragging_files && !ui.input(|i| i.pointer.any_down()) {
                 state.row_view.is_dragging_files = false;

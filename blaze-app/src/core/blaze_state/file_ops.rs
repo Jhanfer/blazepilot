@@ -62,7 +62,7 @@ impl BlazeCoreState {
             return false;
         };
 
-        source.files_just_loaded.swap(false, Ordering::Relaxed)
+        source.files_just_loaded.load(Ordering::Relaxed)
     }
 
     #[allow(unused)]

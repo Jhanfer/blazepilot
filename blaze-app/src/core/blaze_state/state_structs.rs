@@ -221,8 +221,9 @@ impl<K: Eq + Hash> CalcSet<K> {
         self.calculated.contains(k)
     }
 
-    pub fn is_done(&self, k: &K) -> bool {
-        self.calculated.contains(k)
+    /// `true` si el elemento NO está calculado ni en cálculo
+    pub fn needs_calc(&self, k: &K) -> bool {
+        !self.calculating.contains(k) && !self.calculated.contains(k)
     }
 
     /// Elimina el elemento de cualquier estado de cálculo
