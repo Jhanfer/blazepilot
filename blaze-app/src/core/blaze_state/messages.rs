@@ -147,6 +147,8 @@ impl BlazeCoreState {
                     if self.is_miller() {
                         self.sync_columns_from_sources();
                     }
+
+                    self.cwd_input = self.cwd().display().to_string();
                 }
 
                 FileLoadingMessage::FileRemoved { name } => {

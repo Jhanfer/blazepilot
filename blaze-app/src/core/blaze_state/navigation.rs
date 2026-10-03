@@ -92,6 +92,8 @@ impl BlazeCoreState {
         self.save_caches(false);
         self.last_navigation_time = Some(Instant::now());
 
+        self.cwd_input = self.cwd().display().to_string();
+
         with_fonts(|f| f.enter_dir(&path));
     }
 

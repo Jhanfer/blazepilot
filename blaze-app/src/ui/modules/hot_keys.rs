@@ -50,7 +50,8 @@ pub fn hot_keys_logic(
         || get_focus(ui, "creating_new")
         || get_focus(ui, "rename_space")
         || get_focus(ui, "quick_tag_name")
-        || get_focus(ui, "save_theme_placeholder");
+        || get_focus(ui, "save_theme_placeholder")
+        || get_focus(ui, "route_bar");
 
     if !text_edit_focused {
         //tecla de arriba

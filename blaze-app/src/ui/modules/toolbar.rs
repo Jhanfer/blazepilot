@@ -15,22 +15,26 @@
 use crate::{
     core::{
         blaze_state::BlazeCoreState,
+        bootstrap::configs::config_manager::with_configs,
         runtime::{bus_structs::UiEvent, event_bus::with_event_bus},
         system::clipboard_text::text_clipboard::with_text_clipboard,
     },
     ui::{
         blaze_ui_state::BlazeUiState,
-        custom_components::label::UiExt,
+        custom_components::{label::UiExt, text_edit::BlazeTextEdit},
         icons_cache::icons::{self},
         modules::utilities::ensure_min_lightness,
         themes::{platform::structs::ToColor, theme_manager::with_theme},
     },
 };
 use egui::{
-    Button, Color32, CornerRadius, Frame, Margin, Panel, Rect, RichText, Sense, Stroke, Ui, pos2,
-    vec2,
+    Button, Color32, CornerRadius, CursorIcon, Frame, Id, Key, Margin, Panel, Rect, RichText,
+    Sense, Stroke, Ui, pos2, vec2,
 };
-use std::path::PathBuf;
+use std::{
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 
 fn render_bar_button<F>(
     ui: &mut Ui,
@@ -96,6 +100,7 @@ fn render_bar_button<F>(
 
 pub fn toolbar_component(ui: &mut Ui, state: &mut BlazeCoreState, ui_state: &mut BlazeUiState) {
     let current_theme = with_theme(|t| t.current());
+    let i18n = with_configs(|c| c.get_i18n());
 
     Panel::top("toolbar")
         .frame(
@@ -183,73 +188,142 @@ pub fn toolbar_component(ui: &mut Ui, state: &mut BlazeCoreState, ui_state: &mut
                                 ui.set_width(ui.available_width());
                                 ui.set_height(total_height);
 
-                                ui.horizontal_centered(|ui| {
-                                    ui.add_space(15.0);
+                                if state.editing_cwd {
+                                    ui.horizontal_centered(|ui| {
+                                        ui.add_space(15.0);
 
-                                    let components: Vec<_> = cwd.components().collect();
+                                        let available = ui.available_width();
 
-                                    let mut current_path = PathBuf::new();
+                                        let route_id = Id::new("route_bar");
+                                        let has_focus = ui.memory(|mem| mem.has_focus(route_id));
 
-                                    for (i, component) in components.iter().enumerate() {
-                                        let name =
-                                            component.as_os_str().to_string_lossy().to_string();
-                                        if name.is_empty() {
-                                            continue;
+                                        let mut route = state.cwd_input.clone();
+
+                                        let response = ui.add(
+                                            BlazeTextEdit::singleline(&mut route)
+                                                .hint_text(i18n.t("route.placeholder"))
+                                                .desired_width(available - 40.0)
+                                                .id(route_id),
+                                        );
+
+                                        if !has_focus {
+                                            response.request_focus();
                                         }
 
-                                        current_path.push(component);
+                                        if response.changed() {
+                                            state.cwd_input = route.clone();
+                                        }
 
-                                        let is_last = i == components.len() - 1;
+                                        let enter_pressed = ui.input(|i| i.key_pressed(Key::Enter));
+                                        let escape_pressed =
+                                            ui.input(|i| i.key_pressed(Key::Escape));
 
-                                        let button = Button::new(
-                                            RichText::new(name)
-                                                .color(if is_last {
-                                                    current_theme.semantic.text_primary.to_color()
-                                                } else {
-                                                    current_theme.semantic.text_secondary.to_color()
-                                                })
-                                                .strong(),
-                                        )
-                                        .frame(true)
-                                        .fill(if is_last {
-                                            current_theme.semantic.accent_glow.to_color()
-                                        } else {
-                                            Color32::TRANSPARENT
-                                        })
-                                        .stroke(Stroke::NONE)
-                                        .corner_radius(CornerRadius::same(6.0 as u8))
-                                        .min_size(egui::vec2(0.0, 28.0));
-
-                                        let response = ui.add(button);
-
-                                        if response.clicked() && !is_last {
+                                        if escape_pressed {
+                                            // Cancela la edicion y restaura el path original
+                                            state.cwd_input = state.cwd().display().to_string();
+                                            state.editing_cwd = false;
+                                        } else if enter_pressed || response.lost_focus() {
+                                            let new_path = PathBuf::from(&route);
+                                            let path: Arc<Path> = new_path.into();
                                             if !state.is_miller() {
-                                                state.navigate_to(current_path.to_owned().into());
+                                                state.navigate_to(path);
                                             } else {
-                                                state.miller_reset_to(
-                                                    current_path.to_owned().into(),
-                                                );
+                                                state.miller_reset_to(path);
                                             }
+                                            state.editing_cwd = false;
                                         }
+                                    });
+                                } else {
+                                    ui.horizontal_centered(|ui| {
+                                        ui.add_space(15.0);
 
-                                        // Separador ">"
-                                        if !is_last {
-                                            ui.label_ns(
-                                                RichText::new("›")
-                                                    .color(
+                                        let components: Vec<_> = cwd.components().collect();
+
+                                        let mut current_path = PathBuf::new();
+
+                                        for (i, component) in components.iter().enumerate() {
+                                            let name =
+                                                component.as_os_str().to_string_lossy().to_string();
+                                            if name.is_empty() {
+                                                continue;
+                                            }
+
+                                            current_path.push(component);
+
+                                            let is_last = i == components.len() - 1;
+
+                                            let button = Button::new(
+                                                RichText::new(name)
+                                                    .color(if is_last {
+                                                        current_theme
+                                                            .semantic
+                                                            .text_primary
+                                                            .to_color()
+                                                    } else {
                                                         current_theme
                                                             .semantic
                                                             .text_secondary
-                                                            .to_color(),
-                                                    )
-                                                    .size(16.0),
-                                            );
-                                        }
-                                    }
-                                });
+                                                            .to_color()
+                                                    })
+                                                    .strong(),
+                                            )
+                                            .frame(true)
+                                            .fill(if is_last {
+                                                current_theme.semantic.accent_glow.to_color()
+                                            } else {
+                                                Color32::TRANSPARENT
+                                            })
+                                            .stroke(Stroke::NONE)
+                                            .corner_radius(CornerRadius::same(6.0 as u8))
+                                            .min_size(egui::vec2(0.0, 28.0));
 
-                                let remaining = ui.available_width();
-                                ui.add_space(remaining - 36.0);
+                                            let response = ui.add(button);
+
+                                            if response.double_clicked() {
+                                                state.editing_cwd = true;
+                                            } else if response.clicked() && !is_last {
+                                                if !state.is_miller() {
+                                                    state.navigate_to(
+                                                        current_path.to_owned().into(),
+                                                    );
+                                                } else {
+                                                    state.miller_reset_to(
+                                                        current_path.to_owned().into(),
+                                                    );
+                                                }
+                                            }
+
+                                            // Separador ">"
+                                            if !is_last {
+                                                ui.label_ns(
+                                                    RichText::new("›")
+                                                        .color(
+                                                            current_theme
+                                                                .semantic
+                                                                .text_secondary
+                                                                .to_color(),
+                                                        )
+                                                        .size(16.0),
+                                                );
+                                            }
+                                        }
+                                    });
+                                }
+
+                                let remaining = ui.available_width() - 40.0;
+                                if remaining > 0.0 {
+                                    let empty_space = ui.allocate_response(
+                                        vec2(remaining, total_height),
+                                        Sense::click(),
+                                    );
+                                    if empty_space.hovered() {
+                                        ui.set_cursor_icon(CursorIcon::Text);
+                                    }
+                                    if empty_space.clicked() || empty_space.double_clicked() {
+                                        state.editing_cwd = true;
+                                    }
+                                }
+
                                 if ui.small_button("📋").clicked() {
                                     with_text_clipboard(|c| {
                                         c.copy(cwd.to_string_lossy().to_string());
