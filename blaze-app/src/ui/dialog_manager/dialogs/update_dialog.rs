@@ -27,8 +27,8 @@ use egui::{CornerRadius, Frame, Margin, Order, Ui, Window};
 use uuid::Uuid;
 
 pub struct UpdateDialog {
-    pub current_version: Option<String>,
-    pub new_version: Option<String>,
+    pub current_version: Option<Box<str>>,
+    pub new_version: Option<Box<str>>,
     pub tab_id: Option<Uuid>,
     pub show_modal: bool,
 }
@@ -59,7 +59,7 @@ impl UpdateDialog {
         self.show_modal = false;
     }
 
-    pub fn open(&mut self, current_version: String, new_version: String, tab_id: Uuid) {
+    pub fn open(&mut self, current_version: Box<str>, new_version: Box<str>, tab_id: Uuid) {
         self.current_version = Some(current_version);
         self.new_version = Some(new_version);
         self.tab_id = Some(tab_id);

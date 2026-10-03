@@ -75,8 +75,8 @@ impl DialogManager {
 
     pub fn open_updater_dialog(
         &mut self,
-        current_version: String,
-        new_version: String,
+        current_version: Box<str>,
+        new_version: Box<str>,
         tab_id: Uuid,
     ) {
         self.update_dialog

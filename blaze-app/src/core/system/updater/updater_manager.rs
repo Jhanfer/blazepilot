@@ -28,8 +28,8 @@ use crate::core::runtime::{bus_structs::UiEvent, event_bus::Dispatcher};
 #[derive(Debug)]
 pub enum UpdateMessages {
     NewVersionAvailable {
-        current_version: String,
-        new_version: String,
+        current_version: Box<str>,
+        new_version: Box<str>,
         tab_id: Uuid,
     },
 
@@ -37,18 +37,18 @@ pub enum UpdateMessages {
 }
 
 pub struct Updater {
-    pub version: String,
-    pub owner: String,
-    pub repo: String,
+    pub version: Box<str>,
+    pub owner: Box<str>,
+    pub repo: Box<str>,
     is_updating: Arc<AtomicBool>,
 }
 
 impl Updater {
     pub fn init() -> Self {
         Self {
-            version: cargo_crate_version!().to_string(),
-            owner: "Jhanfer".to_string(),
-            repo: "blazepilot".to_string(),
+            version: cargo_crate_version!().into(),
+            owner: "Jhanfer".into(),
+            repo: "blazepilot".into(),
             is_updating: Arc::new(AtomicBool::new(false)),
         }
     }
@@ -72,17 +72,17 @@ impl Updater {
         let repo = self.repo.clone();
 
         std::thread::spawn(move || {
-            let result = (|| -> Result<Option<String>, Box<dyn Error>> {
+            let result = (|| -> Result<Option<Box<str>>, Box<dyn Error>> {
                 let release = self_update::backends::github::ReleaseList::configure()
-                    .repo_owner(&owner)
-                    .repo_name(&repo)
+                    .repo_owner(&*owner)
+                    .repo_name(&*repo)
                     .build()?
                     .fetch()?;
 
-                if let Some(latest) = release.first()
-                    && latest.version != version
+                if let Some(latest) = release.all().first()
+                    && *latest.version() != *version
                 {
-                    return Ok(Some(latest.version.clone()));
+                    return Ok(Some(latest.version().into()));
                 }
                 Ok(None)
             })();
@@ -130,17 +130,17 @@ impl Updater {
         let flag = self.is_updating.clone();
         std::thread::spawn(move || {
             let status = self_update::backends::github::Update::configure()
-                .repo_owner(&owner)
-                .repo_name(&repo)
+                .repo_owner(&*owner)
+                .repo_name(&*repo)
                 .bin_name("blazepilot")
                 .show_download_progress(true)
-                .current_version(&version)
+                .current_version(&*version)
                 .no_confirm(true)
                 .build()
                 .and_then(|u| u.update());
 
             match status {
-                Ok(s) if s.updated() => {
+                Ok(s) if s.is_updated() => {
                     info!("Actualizado a {}. Reinicia el programa.", s.version());
                     std::process::exit(0)
                 }
