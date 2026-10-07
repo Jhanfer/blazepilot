@@ -134,7 +134,6 @@ pub fn miller_panel_frame(
     state: &mut BlazeCoreState,
     ui_state: &mut BlazeUiState,
     bottom_padding: i8,
-    tabs_height: i8,
 ) {
     let current_theme = with_theme(|t| t.current());
 
@@ -338,7 +337,7 @@ pub fn miller_panel_frame(
                 {
                     let files: &[Arc<FileEntry>] = &state.get_files_for(&focused);
                     //Isla y burbuja y las tabs
-                    render_island_bubble(ui, state, ui_state, files, bottom_padding, tabs_height);
+                    render_island_bubble(ui, state, ui_state, files, bottom_padding);
                 }
             });
         });

@@ -19,14 +19,19 @@ use crate::{
 use egui::{CentralPanel, Event, Frame, Margin, MouseWheelUnit, Ui};
 
 pub fn render_views(ui: &mut Ui, state: &mut BlazeCoreState, ui_state: &mut BlazeUiState) {
+    // -------------------------------
+    //  Toolbar
+    // -------------------------------
+    crate::ui::modules::toolbar::toolbar_component(ui, state, ui_state);
+
+    // -------------------------------
+    //  sidebar right
+    // -------------------------------
+    crate::ui::modules::sidebar_right_component::sidebar_right::sidebar_right_component(
+        ui, state, ui_state,
+    );
+
     let current_theme = with_theme(|t| t.current());
-
-    let tabs_height: i8 = if state.motor.borrow_mut().tabs.len() > 1 {
-        50
-    } else {
-        0
-    };
-
     let bottom_padding = 10.0 as i8;
 
     let custom_frame = Frame::NONE
@@ -35,7 +40,7 @@ pub fn render_views(ui: &mut Ui, state: &mut BlazeCoreState, ui_state: &mut Blaz
             left: 15,
             right: 15,
             top: 0,
-            bottom: bottom_padding + tabs_height,
+            bottom: bottom_padding,
         });
 
     let ctrl_scroll = ui.input(|i| {
@@ -196,27 +201,25 @@ pub fn render_views(ui: &mut Ui, state: &mut BlazeCoreState, ui_state: &mut Blaz
         match &state.view_mode {
             ViewMode::Normal(layout) => match layout.to_owned() {
                 LayoutMode::Row => {
-                    row_panel_frame(ui, state, ui_state, bottom_padding, tabs_height);
+                    row_panel_frame(ui, state, ui_state, bottom_padding);
                 }
 
                 LayoutMode::RowDetailed => {
-                    detailed_row_panel_frame(ui, state, ui_state, bottom_padding, tabs_height);
+                    detailed_row_panel_frame(ui, state, ui_state, bottom_padding);
                 }
 
                 LayoutMode::Grid => {
-                    grid_panel_frame(ui, state, ui_state, bottom_padding, tabs_height);
+                    grid_panel_frame(ui, state, ui_state, bottom_padding);
                 }
 
                 LayoutMode::Compact => {
-                    compact_row_panel_frame(ui, state, ui_state, bottom_padding, tabs_height);
+                    compact_row_panel_frame(ui, state, ui_state, bottom_padding);
                 }
 
-                LayoutMode::Miller => {
-                    miller_panel_frame(ui, state, ui_state, bottom_padding, tabs_height)
-                }
+                LayoutMode::Miller => miller_panel_frame(ui, state, ui_state, bottom_padding),
             },
             ViewMode::Tags(_) => {
-                tag_views(ui, state, ui_state, bottom_padding, tabs_height);
+                tag_views(ui, state, ui_state, bottom_padding);
             }
         }
     });

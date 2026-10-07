@@ -106,29 +106,53 @@ pub fn toolbar_component(ui: &mut Ui, state: &mut BlazeCoreState, ui_state: &mut
         .frame(
             Frame::new()
                 .fill(current_theme.semantic.bg_main.to_color())
-                .inner_margin(10),
+                .inner_margin(Margin {
+                    left: 10,
+                    right: 10,
+                    top: 10,
+                    bottom: 10,
+                }),
         )
-        .exact_size(80.0)
         .show_separator_line(false)
         .show(ui, |ui| {
+            ui.spacing_mut().item_spacing.y = 0.0;
+
+            // -------------------------------
+            //  TabsBar
+            // -------------------------------
+            super::tab_views::tabs_bar(ui, state, ui_state);
+
+            ui.add_space(10.0);
+
             let total_height = 35.0;
-            let spacing = 8.0;
 
-            ui.horizontal_centered(|ui| {
-                ui.spacing_mut().item_spacing.x = spacing;
+            let active_tab_index = state.motor.borrow_mut().active_tab_index;
 
-                let cwd = state.cwd();
+            let nw_radius = if active_tab_index == 0 { 0 } else { 20 };
+            let ne_radius = 20;
+            let cwd = state.cwd();
 
-                Frame::new()
-                    .corner_radius(20)
-                    .inner_margin(Margin::same(10))
-                    .fill(current_theme.components.panel.bg.to_color())
-                    .show(ui, |ui| {
-                        ui.set_height(total_height);
-                        ui.set_width(ui.available_width());
+            Frame::new()
+                .corner_radius(CornerRadius {
+                    nw: nw_radius,
+                    ne: ne_radius,
+                    sw: 20,
+                    se: 20,
+                })
+                .inner_margin(Margin::same(10))
+                .fill(current_theme.components.panel.bg.to_color())
+                .stroke(Stroke::new(
+                    0.5,
+                    current_theme.components.panel.border.to_color(),
+                ))
+                .show(ui, |ui| {
+                    ui.set_height(total_height);
+                    ui.set_width(ui.available_width());
 
-                        let back_active = state.can_go_back();
+                    let back_active = state.can_go_back();
 
+                    ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
+                        ui.spacing_mut().item_spacing.x = 8.0;
                         render_bar_button(
                             ui,
                             total_height,
@@ -331,6 +355,6 @@ pub fn toolbar_component(ui: &mut Ui, state: &mut BlazeCoreState, ui_state: &mut
                                 }
                             });
                     });
-            });
+                });
         });
 }

@@ -42,7 +42,6 @@ pub fn tag_views(
     state: &mut BlazeCoreState,
     ui_state: &mut BlazeUiState,
     bottom_padding: i8,
-    tabs_height: i8,
 ) {
     let current_theme = with_theme(|t| t.current());
 
@@ -556,7 +555,7 @@ pub fn tag_views(
                 });
             });
 
-            render_tags_island_bubble(ui, state, ui_state, bottom_padding, tabs_height, tag_len);
+            render_tags_island_bubble(ui, state, ui_state, bottom_padding, tag_len);
         });
 
     //Tags

@@ -8,7 +8,7 @@ use egui::{
     Align2, Area, Color32, CursorIcon, FontId, Frame, Id, Key, Order, Pos2, Rect, Response, Sense,
     Stroke, Ui, UiBuilder, pos2, vec2,
 };
-use tracing::{debug, info, warn};
+use tracing::{info, warn};
 
 use crate::{
     core::{
@@ -1021,8 +1021,6 @@ impl ContextMenuState {
                             .filter(|f| f.extension.is_image())
                             .map(|f| f.full_path.to_path_buf())
                             .collect();
-
-                        debug!("Coso de mielda: {}", file.full_path.display());
 
                         let pvw = ImagePreviewState::new(file.full_path.to_path_buf(), all_images);
 

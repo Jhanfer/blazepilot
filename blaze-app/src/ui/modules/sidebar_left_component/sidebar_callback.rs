@@ -20,13 +20,14 @@ use crate::{
             sidebar_left_component::sidebar_components::{
                 render_drives_button, render_header_text, render_local_buttons,
             },
+            utilities::ensure_min_lightness,
         },
         themes::{platform::structs::ToColor, theme_manager::with_theme},
     },
 };
 use egui::{
-    Area, Color32, CornerRadius, Frame, Id, Margin, Panel, Rect, ScrollArea, Sense, Stroke, Ui,
-    pos2, scroll_area::ScrollBarVisibility, vec2,
+    Align, Area, Color32, CornerRadius, Frame, Id, Label, Layout, Margin, Panel, Rect, RichText,
+    ScrollArea, Sense, Stroke, Ui, pos2, scroll_area::ScrollBarVisibility, vec2,
 };
 
 use crate::ui::modules::sidebar_left_component::leftbar_state::{
@@ -47,7 +48,7 @@ fn render_expanded_panel(
         .inner_margin(Margin {
             left: 15,
             right: 0,
-            top: 0,
+            top: 10,
             bottom: 10,
         });
 
@@ -59,7 +60,53 @@ fn render_expanded_panel(
         .resizable(true)
         .frame(custom_frame)
         .show(ui, |ui| {
-            //ui.set_width(current_order.leftpanel_state.width);
+            ui.with_layout(Layout::left_to_right(Align::Min), |ui| {
+                Frame::new()
+                    .inner_margin(Margin::symmetric(10, 4))
+                    .show(ui, |ui| {
+                        let (icon_plus_fol, icon_bytes_plus_fol) =
+                            ("blaze-logo", icons::LOGO_BLAZEPILOT);
+
+                        let icon_size = vec2(25.0, 25.0);
+                        let (icon_rect, new_fol) =
+                            ui.allocate_exact_size(icon_size, Sense::click());
+                        let rounded_rect = Rect::from_min_max(
+                            pos2(icon_rect.min.x.round(), icon_rect.min.y.round()),
+                            pos2(icon_rect.max.x.round(), icon_rect.max.y.round()),
+                        );
+
+                        let plus_color = if new_fol.hovered() {
+                            current_theme.components.tools.label_hover.to_color()
+                        } else {
+                            current_theme.components.tools.label_active.to_color()
+                        };
+
+                        let icon = ui_state.icon_cache.get_or_load(
+                            ui,
+                            icon_plus_fol,
+                            icon_bytes_plus_fol,
+                            ensure_min_lightness(plus_color),
+                            icon_size,
+                        );
+
+                        ui.painter().image(
+                            icon.id(),
+                            rounded_rect,
+                            Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
+                            Color32::WHITE,
+                        );
+
+                        ui.add(
+                            Label::new(
+                                RichText::new("BlazePilot")
+                                    .strong()
+                                    .size(18.0)
+                                    .color(current_theme.semantic.text_primary.to_color()),
+                            )
+                            .selectable(false),
+                        );
+                    });
+            });
 
             Frame::NONE
                 .inner_margin(egui::Margin::same(10))
@@ -70,7 +117,6 @@ fn render_expanded_panel(
                     color: current_theme.components.panel.border.to_color(),
                 })
                 .show(ui, |ui| {
-                    //ui.set_width(current_order.leftpanel_state.width);
                     ui.set_height(ui.available_height());
 
                     ScrollArea::vertical()

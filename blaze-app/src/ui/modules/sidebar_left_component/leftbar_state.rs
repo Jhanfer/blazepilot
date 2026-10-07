@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-pub const MIN_PANEL_WIDTH_TOLERANCE: f32 = 100.0;
+pub const MIN_PANEL_WIDTH_TOLERANCE: f32 = 151.0;
 pub const PANEL_TAB_WIDTH: f32 = 5.0;
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Copy)]
