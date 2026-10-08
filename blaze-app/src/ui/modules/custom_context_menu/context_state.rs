@@ -1,47 +1,44 @@
-use std::{
-    cell::Cell,
-    path::{Path, PathBuf},
-    sync::Arc,
-};
+use std::{path::Path, sync::Arc};
 
 use egui::{
     Align2, Area, Color32, CursorIcon, FontId, Frame, Id, Key, Order, Pos2, Rect, Response, Sense,
-    Stroke, Ui, UiBuilder, pos2, vec2,
+    Stroke, StrokeKind, Ui, pos2, vec2,
 };
-use tracing::{info, warn};
 
 use crate::{
     core::{
-        blaze_state::{BlazeCoreState, state_structs::NewItemType},
-        bootstrap::{
-            configs::config_manager::with_configs,
-            quick_access_manager::platform::structs::QuickLinks,
-        },
-        files::blaze_motor::motor_structs::FileEntry,
-        runtime::{
-            bus_structs::{FileOperation, QuickTagEvent, SureTo, UiEvent},
-            event_bus::{Dispatcher, with_event_bus},
-        },
-        system::{clipboard::global_clipboard::TOKIO_RUNTIME, disk_reader::disk::Disk},
+        files::blaze_motor::motor_structs::FileEntry, runtime::event_bus::Dispatcher,
+        system::disk_reader::disk::Disk,
     },
     ui::{
         blaze_ui_state::BlazeUiState,
-        custom_components::text_edit::BlazeTextEdit,
-        icons_cache::icons,
-        image_preview::image_preview_handler::ImagePreviewState,
         modules::utilities::ensure_min_lightness,
         themes::{platform::structs::ToColor, theme_manager::with_theme},
     },
 };
 
+/// Representa el contexto desde el que se abrió el menú contextual
+///
+/// Permite distinguir entre archivos, fondos, papelera y el panel
+/// de discos para determinar las acciones disponibles
 #[derive(Default, PartialEq)]
 pub enum ContextMenuKind {
     #[default]
     None,
+
+    /// Modo de archivo
     FileNormal,
+
+    /// Modo de archivo en papelera
     FileTrash,
+
+    /// Modo de fondo
     BackgroundNormal,
+
+    /// Modo de fondo en papelera
     BackgroundTrash,
+
+    /// Panel de discos
     DrivesPanel,
 }
 
@@ -54,9 +51,12 @@ pub struct ContextMenuState {
     pub target_file: Option<Arc<FileEntry>>,
     pub target_sender: Option<Dispatcher>,
     pub target_drive: Option<Disk>,
-    just_opened: bool,
+
+    /// Unicamnente para  modo miller
     pub target_col: Option<usize>,
     pub target_row_col: Option<usize>,
+
+    pub(crate) just_opened: bool,
 }
 
 impl ContextMenuState {
@@ -75,7 +75,12 @@ impl ContextMenuState {
         }
     }
 
+    /// Detecta las interacciones del ratón para abrir o cerrar
+    /// el menú contextual
+    ///
+    /// Evita cerrarlo mientras un campo de texto mantiene el foco
     pub fn handle_response(&mut self, response: &Response) {
+        // abre el menú
         if response.secondary_clicked() {
             self.open = true;
             self.just_opened = true;
@@ -86,6 +91,8 @@ impl ContextMenuState {
             self.clear_targets();
         }
 
+        // en caso de abierto, se cierra al detectar click en otra parte de la pantalla
+        // o al escribir en un input
         if self.open {
             let text_focused = response.ctx.memory(|m| m.focused().is_some());
             if !text_focused {
@@ -98,41 +105,24 @@ impl ContextMenuState {
         }
     }
 
-    fn handle_internal_response(&mut self, ui: &mut Ui, menu_rect: Rect) {
-        let text_edit_focused = ui.ctx().memory(|m| m.focused().is_some());
-
-        if text_edit_focused {
-            if ui.input(|i| i.key_pressed(Key::Escape)) {
-                self.open = false;
-            }
-            return;
-        }
-
-        let clicked_outside = ui.input(|i| {
-            (i.pointer.primary_clicked() || i.pointer.secondary_clicked())
-                && i.pointer
-                    .latest_pos()
-                    .map(|p| !menu_rect.contains(p))
-                    .unwrap_or(true)
-        });
-
-        if clicked_outside || ui.input(|i| i.key_pressed(Key::Escape)) {
-            self.open = false;
-        }
-    }
-
+    /// Limpia el contexto asociado al elemento seleccionado
     fn clear_targets(&mut self) {
         self.kind = ContextMenuKind::None;
         self.target_file = None;
         self.target_sender = None;
     }
 
+    /// Cierra el menú contextual y limpia su contexto
     pub fn close(&mut self) {
         self.open = false;
         self.clear_targets();
     }
 
-    fn show_menu<F>(&mut self, ui: &mut Ui, menu_id: &str, mut callback: F)
+    /// Renderiza el menú contextual en la posición donde fue abierto
+    ///
+    /// Ejecuta el callback encargado de construir sus acciones y
+    /// cierra el menú al hacer clic fuera de él o pulsar `Esc`
+    pub(crate) fn show_menu<F>(&mut self, ui: &mut Ui, menu_id: &str, mut callback: F)
     where
         F: FnMut(&mut Ui),
     {
@@ -141,13 +131,11 @@ impl ContextMenuState {
         let screen = ui.content_rect();
         let pos = self.position;
 
-        self.handle_internal_response(ui, screen);
-
-        let area_response = egui::Area::new(Id::new(menu_id))
+        let area_response = Area::new(Id::new(menu_id))
             .order(Order::Foreground)
             .fixed_pos(pos)
             .constrain_to(screen)
-            .show(ui.ctx(), |ui| {
+            .show(ui, |ui| {
                 Frame::new()
                     .fill(current_theme.components.panel.bg.to_color())
                     .corner_radius(12.0)
@@ -157,8 +145,8 @@ impl ContextMenuState {
                     ))
                     .inner_margin(8.0)
                     .show(ui, |ui| {
-                        ui.set_min_width(190.0);
-                        ui.set_max_width(190.0);
+                        ui.set_min_width(300.0);
+                        ui.set_max_width(300.0);
                         callback(ui);
                     });
             });
@@ -166,10 +154,11 @@ impl ContextMenuState {
         let menu_rect = area_response.response.rect;
         let clicked_outside = ui.input(|i| {
             i.pointer.primary_clicked()
-                && i.pointer
-                    .latest_pos()
-                    .map(|p| !menu_rect.contains(p))
-                    .unwrap_or(true)
+                || i.pointer.secondary_clicked()
+                    && i.pointer
+                        .latest_pos()
+                        .map(|p| !menu_rect.contains(p))
+                        .unwrap_or(true)
         });
 
         if clicked_outside || ui.input(|i| i.key_pressed(Key::Escape)) {
@@ -177,7 +166,12 @@ impl ContextMenuState {
         }
     }
 
-    fn render_small_context<I>(
+    /// Renderiza un pequeño submenú contextual asociado al botón
+    ///
+    /// Posiciona el submenú junto al botón, adaptando su ubicación
+    /// para evitar que se salga de los límites de la ventana, y
+    /// gestiona su cierre al hacer clic fuera de él
+    pub(crate) fn render_small_context<I>(
         ui: &mut Ui,
         state: &mut BlazeUiState,
         rect: Rect,
@@ -188,7 +182,7 @@ impl ContextMenuState {
         I: FnMut(&mut Ui, &mut BlazeUiState),
     {
         let current_theme = with_theme(|t| t.current());
-        let popup_size = vec2(120.0, 80.0);
+        let popup_size = vec2(120.0 + rect.size().x / 3.0, 80.0);
         let screen_rect = ui.content_rect();
 
         let anchor_x = hint_pos.x;
@@ -230,8 +224,13 @@ impl ContextMenuState {
         }
     }
 
+    /// Renderiza los botones del menú contextual
+    ///
+    /// Gestiona su apariencia, estado e interacción, ejecutando
+    /// acciones principales y, opcionalmente, mostrando un submenú
+    /// contextual para acciones adicionales
     #[allow(clippy::too_many_arguments)]
-    fn render_context_button<J, I>(
+    pub(crate) fn render_context_button<J, I>(
         ui: &mut Ui,
         ui_state: &mut BlazeUiState,
         label: &str,
@@ -312,24 +311,52 @@ impl ContextMenuState {
             text_color,
         );
 
-        let hint_galley = ui.painter().layout_no_wrap(
-            hint.to_string(),
-            FontId::proportional(10.0),
-            current_theme.semantic.text_primary.to_color(),
-        );
+        let mut hint_pos = pos2(rect.right() - padding, rect.center().y / 2.0);
 
-        let hint_width = hint_galley.size().x;
+        if !hint.is_empty() {
+            let c = current_theme.semantic.accent_glow.to_color();
 
-        let hint_pos = pos2(
-            rect.right() - padding - hint_width,
-            rect.center().y - hint_galley.size().y / 2.0,
-        );
+            let hint_stroke_color = Color32::from_rgba_unmultiplied(
+                c.r().saturating_add(20),
+                c.g().saturating_add(20),
+                c.b().saturating_add(20),
+                120,
+            );
 
-        ui.painter().galley(
-            hint_pos,
-            hint_galley,
-            current_theme.semantic.text_secondary.to_color(),
-        );
+            let hint_color = Color32::from_rgba_unmultiplied(
+                c.r().saturating_add(60),
+                c.g().saturating_add(60),
+                c.b().saturating_add(60),
+                160,
+            );
+
+            let hint_galley = ui.painter().layout_no_wrap(
+                hint.to_string(),
+                FontId::proportional(10.0),
+                ensure_min_lightness(hint_color),
+            );
+
+            let hint_size = hint_galley.size();
+            let hint_width = hint_galley.size().x;
+
+            hint_pos = pos2(
+                rect.right() - padding - hint_width - 10.0,
+                rect.center().y - hint_galley.size().y / 2.0,
+            );
+
+            let pad = vec2(4.0, 2.0);
+            let hint_rect = Rect::from_min_size(hint_pos, hint_size).expand2(pad);
+
+            ui.painter().rect(
+                hint_rect,
+                3.0,
+                current_theme.semantic.bg_container.to_color(),
+                Stroke::new(1.0, hint_stroke_color),
+                StrokeKind::Outside,
+            );
+
+            ui.painter().galley(hint_pos, hint_galley, hint_color);
+        }
 
         if enabled {
             if response.clicked() {
@@ -355,1168 +382,6 @@ impl ContextMenuState {
                 popup_id,
                 |ui: &mut Ui, state: &mut BlazeUiState| callback(ui, state),
             )
-        }
-    }
-
-    //Menú de los discos
-    pub fn render_drives_context(
-        &mut self,
-        ui: &mut Ui,
-        state: &mut BlazeCoreState,
-        ui_state: &mut BlazeUiState,
-    ) {
-        if !self.open {
-            return;
-        }
-        let Some(drive) = self.target_drive.clone() else {
-            return;
-        };
-
-        let mut should_close = false;
-        let is_removable = drive.is_removable;
-        let is_mounted = drive.mountpoint.is_none();
-        let is_system = drive.is_system;
-
-        self.show_menu(ui, "custom_ctx_drives", |ui| {
-            ui.horizontal(|ui| {
-                let icon = if is_mounted {
-                    ("mount", icons::ICON_OPEN_ARROW_UP)
-                } else {
-                    ("folder-open", icons::ICON_FOLDER_OPEN)
-                };
-
-                let label = if is_mounted { "Montar" } else { "Abrir" };
-                let hint = "";
-
-                let action: Cell<Option<u8>> = Cell::new(None);
-
-                Self::render_context_button(
-                    ui,
-                    ui_state,
-                    label,
-                    hint,
-                    icon,
-                    true,
-                    || {
-                        action.set(Some(0));
-                    },
-                    None::<fn(&mut Ui, &mut BlazeUiState)>,
-                );
-
-                if let Some(0) = action.get() {
-                    if is_mounted {
-                        let manager = state.motor.borrow_mut().disk_manager.clone();
-                        TOKIO_RUNTIME.block_on(async {
-                            let mut manager = manager.lock().await;
-                            manager.mount_disk(&drive).await.ok();
-                        });
-                    } else {
-                        let path_string = drive.mountpoint.clone().unwrap_or_default();
-                        let path = PathBuf::from(path_string).into();
-
-                        if state.miller_view.columns.is_empty() {
-                            state.navigate_to(path);
-                        } else {
-                            state.navigate_to(path.clone());
-                        }
-                    }
-                    should_close = true;
-                }
-            });
-
-            if is_mounted && is_removable {
-                ui.horizontal(|ui| {
-                    let icon = ("eject", icons::ICON_EJECT_FILLED);
-                    let label = "Expulsar";
-                    let hint = "";
-
-                    let action: Cell<Option<u8>> = Cell::new(None);
-
-                    Self::render_context_button(
-                        ui,
-                        ui_state,
-                        label,
-                        hint,
-                        icon,
-                        true,
-                        || {
-                            action.set(Some(0));
-                        },
-                        None::<fn(&mut Ui, &mut BlazeUiState)>,
-                    );
-
-                    if let Some(0) = action.get() {
-                        let manager = state.motor.borrow_mut().disk_manager.clone();
-                        TOKIO_RUNTIME.block_on(async {
-                            let mut manager = manager.lock().await;
-                            manager.eject_disk(&drive).await.ok();
-                        });
-                        should_close = true;
-                    }
-                });
-            }
-
-            if !is_mounted {
-                ui.horizontal(|ui| {
-                    let icon = ("unmount", icons::ICON_OPEN_ARROW_DOWN);
-                    let label = "Desmontar";
-                    let hint = "";
-
-                    let action: Cell<Option<u8>> = Cell::new(None);
-
-                    Self::render_context_button(
-                        ui,
-                        ui_state,
-                        label,
-                        hint,
-                        icon,
-                        !is_system,
-                        || {
-                            action.set(Some(0));
-                        },
-                        None::<fn(&mut Ui, &mut BlazeUiState)>,
-                    );
-
-                    if let Some(0) = action.get() {
-                        //protección básica
-                        if drive.is_system {
-                            warn!("¡No intentes desmontar raiz!");
-                            should_close = true;
-                            return;
-                        }
-
-                        let manager = state.motor.borrow_mut().disk_manager.clone();
-                        TOKIO_RUNTIME.block_on(async {
-                            let mut manager = manager.lock().await;
-                            manager.unmount_disk(&drive).await.ok();
-                        });
-                        should_close = true;
-                    }
-                });
-            }
-        });
-
-        if should_close {
-            self.close();
-        }
-    }
-
-    //Menús del fondo
-    pub fn background_context_menu_in_trash(
-        &mut self,
-        ui: &mut Ui,
-        state: &mut BlazeCoreState,
-        ui_state: &mut BlazeUiState,
-    ) {
-        let i18n = with_configs(|c| c.get_i18n());
-
-        if !self.open {
-            return;
-        }
-        let (Some(sender), Some(source_path)) =
-            (self.target_sender.clone(), self.source_path.clone())
-        else {
-            return;
-        };
-
-        let files: &[Arc<FileEntry>] = &state.get_files_for(&source_path);
-
-        let mut should_close = false;
-
-        self.show_menu(ui, "custom_ctx_background_trash", |ui| {
-            let sources = state.get_selected_paths(files);
-            let file_names: Vec<String> = sources
-                .iter()
-                .map(|(_, p)| {
-                    PathBuf::from(p.as_ref())
-                        .file_name()
-                        .unwrap_or_default()
-                        .to_string_lossy()
-                        .into_owned()
-                })
-                .collect();
-
-            ui.horizontal(|ui| {
-                let enable = !file_names.is_empty();
-
-                let icon = ("restore", icons::ICON_RESTORE);
-
-                let label = i18n.t("file_ops.restore");
-                let hint = "";
-
-                let action: Cell<Option<u8>> = Cell::new(None);
-
-                Self::render_context_button(
-                    ui,
-                    ui_state,
-                    &label,
-                    hint,
-                    icon,
-                    enable,
-                    || {
-                        action.set(Some(0));
-                    },
-                    None::<fn(&mut Ui, &mut BlazeUiState)>,
-                );
-
-                if let Some(0) = action.get() {
-                    sender
-                        .send(FileOperation::RestoreDeletedFiles { file_names })
-                        .ok();
-                    should_close = true;
-                }
-            });
-            ui.separator();
-
-            ui.horizontal(|ui| {
-                let enable = !sources.is_empty();
-
-                let icon = ("trash-forever", icons::ICON_TRASH);
-                let label = i18n.t("file_ops.delete");
-                let hint = "Supr";
-
-                let action: Cell<Option<u8>> = Cell::new(None);
-
-                Self::render_context_button(
-                    ui,
-                    ui_state,
-                    &label,
-                    hint,
-                    icon,
-                    enable,
-                    || {
-                        action.set(Some(0));
-                    },
-                    None::<fn(&mut Ui, &mut BlazeUiState)>,
-                );
-
-                if let Some(0) = action.get() {
-                    sender
-                        .send(UiEvent::SureTo(SureTo::SureToDelete {
-                            files: sources,
-                            tab_id: sender.tab_id,
-                        }))
-                        .ok();
-                    should_close = true;
-                }
-            });
-        });
-    }
-
-    pub fn background_context_menu(
-        &mut self,
-        ui: &mut Ui,
-        state: &mut BlazeCoreState,
-        ui_state: &mut BlazeUiState,
-    ) {
-        let i18n = with_configs(|c| c.get_i18n());
-        let current_theme = with_theme(|f| f.current());
-
-        if !self.open {
-            return;
-        }
-
-        let mut should_close = false;
-        let mut just_opened = Cell::new(self.just_opened);
-        self.show_menu(ui, "custom_ctx_menu_background", |ui| {
-            ui.horizontal(|ui| {
-                let icon = ("search", icons::ICON_ZOOM);
-                let icon_size = vec2(16.0, 16.0);
-                let padding = 8.0;
-
-                let (rect, _) =
-                    ui.allocate_exact_size(vec2(ui.available_width() - 2.0, 30.0), Sense::hover());
-
-                let search_id = Id::new("search_ctx_menu");
-                let has_focus = ui.memory(|mem| mem.has_focus(search_id));
-
-                let search_color = if has_focus {
-                    ensure_min_lightness(current_theme.components.input.border_focus.to_color())
-                } else {
-                    ensure_min_lightness(current_theme.components.input.border_idle.to_color())
-                };
-
-                let paint_rect = rect.shrink2(vec2(4.0, 0.0));
-                ui.painter().rect_filled(
-                    paint_rect,
-                    12.0,
-                    current_theme.components.input.bg.to_color(),
-                );
-
-                let icon_pos = rect.left_top() + vec2(padding, (rect.height() - icon_size.y) / 2.0);
-                let icon_rect = Rect::from_min_size(icon_pos, icon_size);
-
-                let rounded_rect = Rect::from_min_max(
-                    pos2(icon_rect.min.x.round(), icon_rect.min.y.round()),
-                    pos2(icon_rect.max.x.round(), icon_rect.max.y.round()),
-                );
-
-                let icon =
-                    ui_state
-                        .icon_cache
-                        .get_or_load(ui, icon.0, icon.1, search_color, icon_size);
-
-                ui.painter().image(
-                    icon.id(),
-                    rounded_rect,
-                    Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
-                    Color32::WHITE,
-                );
-
-                let text_rect = Rect::from_min_max(
-                    pos2(rounded_rect.right() + 6.0, rect.min.y + 4.0),
-                    pos2(rect.max.x - padding, rect.max.y - 4.0),
-                );
-
-                let mut child_ui = ui.new_child(UiBuilder::new().max_rect(text_rect));
-
-                let text_edit = BlazeTextEdit::singleline(&mut state.search_filter)
-                    .id(search_id)
-                    .hint_text(i18n.t("search.placeholder"))
-                    .font(FontId::proportional(13.0))
-                    .desired_width(text_rect.width());
-
-                let te_response = child_ui.add(text_edit);
-
-                if te_response.clicked() {
-                    te_response.request_focus();
-                    just_opened = true.into();
-                }
-            });
-
-            ui.horizontal(|ui| {
-                let icon = ("tab-icon", icons::ICON_TAB_ICON);
-
-                let label = i18n.t("bg_ctx_menu.new_tab");
-                let hint = "Ctrl + N";
-
-                let action: Cell<Option<u8>> = Cell::new(None);
-
-                Self::render_context_button(
-                    ui,
-                    ui_state,
-                    &label,
-                    hint,
-                    icon,
-                    true,
-                    || {
-                        action.set(Some(0));
-                    },
-                    None::<fn(&mut Ui, &mut BlazeUiState)>,
-                );
-
-                if let Some(0) = action.get() {
-                    state.create_tab();
-                    should_close = true;
-                }
-            });
-
-            ui.separator();
-
-            ui.horizontal(|ui| {
-                let enable = match state.clipboard.clipboard_has_files() {
-                    Ok(has_files) => has_files,
-                    Err(e) => {
-                        warn!("Error en el clipboard: {}", e);
-                        false
-                    }
-                };
-
-                let icon = if enable {
-                    ("clipboard", icons::ICON_CLIPBOARD)
-                } else {
-                    ("clipboard-disabled", icons::ICON_CLIPBOARD_DISABLE)
-                };
-
-                let label = i18n.t("file_ops.paste_here");
-                let hint = "Ctrl + V";
-
-                let action: Cell<Option<u8>> = Cell::new(None);
-
-                Self::render_context_button(
-                    ui,
-                    ui_state,
-                    &label,
-                    hint,
-                    icon,
-                    enable,
-                    || {
-                        action.set(Some(0));
-                    },
-                    None::<fn(&mut Ui, &mut BlazeUiState)>,
-                );
-
-                if let Some(0) = action.get() {
-                    let cwd = state.cwd();
-                    state.paste(cwd);
-                    should_close = true;
-                }
-            });
-
-            ui.separator();
-
-            ui.horizontal(|ui| {
-                let icon = ("terminal", icons::ICON_TERMINAL);
-
-                let label = i18n.t("bg_ctx_menu.open_terminal_here");
-                let hint = "Alt + T";
-
-                let action: Cell<Option<u8>> = Cell::new(None);
-
-                Self::render_context_button(
-                    ui,
-                    ui_state,
-                    &label,
-                    hint,
-                    icon,
-                    true,
-                    || {
-                        action.set(Some(0));
-                    },
-                    None::<fn(&mut Ui, &mut BlazeUiState)>,
-                );
-
-                if let Some(0) = action.get() {
-                    state.open_terminal_here();
-                    should_close = true;
-                }
-            });
-            ui.separator();
-
-            ui.horizontal(|ui| {
-                let icon = ("plus-folder", icons::ICON_PLUS_FOLDER);
-
-                let label = i18n.t("bg_ctx_menu.new_folder");
-                let hint = "Ctrl + Shfit + N";
-
-                let action: Cell<Option<u8>> = Cell::new(None);
-
-                Self::render_context_button(
-                    ui,
-                    ui_state,
-                    &label,
-                    hint,
-                    icon,
-                    true,
-                    || {
-                        action.set(Some(0));
-                    },
-                    None::<fn(&mut Ui, &mut BlazeUiState)>,
-                );
-
-                if let Some(0) = action.get() {
-                    state.creating_new = Some(NewItemType::Folder);
-                    state.new_item_buffer = label.to_string();
-                    should_close = true;
-                }
-            });
-
-            ui.horizontal(|ui| {
-                let icon = ("plus-file", icons::ICON_PLUS_FILE);
-
-                let label = i18n.t("bg_ctx_menu.new_file");
-                let hint = "Ctrl + Shfit + F";
-
-                let action: Cell<Option<u8>> = Cell::new(None);
-
-                Self::render_context_button(
-                    ui,
-                    ui_state,
-                    &label,
-                    hint,
-                    icon,
-                    true,
-                    || {
-                        action.set(Some(0));
-                    },
-                    None::<fn(&mut Ui, &mut BlazeUiState)>,
-                );
-
-                if let Some(0) = action.get() {
-                    state.creating_new = Some(NewItemType::File);
-                    state.new_item_buffer = label.to_string();
-                    should_close = true;
-                }
-            });
-        });
-
-        if should_close {
-            self.close();
-        }
-
-        self.just_opened = just_opened.get();
-    }
-
-    ///Menus files
-    pub fn file_context_menu_in_trash(
-        &mut self,
-        ui: &mut Ui,
-        state: &mut BlazeCoreState,
-        ui_state: &mut BlazeUiState,
-    ) {
-        let i18n = with_configs(|c| c.get_i18n());
-
-        if !self.open {
-            return;
-        }
-        let (Some(sender), Some(source_path)) =
-            (self.target_sender.clone(), self.source_path.clone())
-        else {
-            return;
-        };
-
-        let files: &[Arc<FileEntry>] = &state.get_files_for(&source_path);
-
-        let mut should_close = false;
-
-        self.show_menu(ui, "custom_ctx_menu_files_trash", |ui| {
-            let sources = state.get_selected_paths(files);
-            let file_names: Vec<String> = sources
-                .iter()
-                .map(|(_, p)| {
-                    PathBuf::from(p.as_ref())
-                        .file_name()
-                        .unwrap_or_default()
-                        .to_string_lossy()
-                        .into_owned()
-                })
-                .collect();
-
-            ui.horizontal(|ui| {
-                let enable = !file_names.is_empty();
-
-                let icon = ("restore", icons::ICON_RESTORE);
-
-                let label = i18n.t("file_ops.restore");
-                let hint = "";
-
-                let action: Cell<Option<u8>> = Cell::new(None);
-
-                Self::render_context_button(
-                    ui,
-                    ui_state,
-                    &label,
-                    hint,
-                    icon,
-                    enable,
-                    || {
-                        action.set(Some(0));
-                    },
-                    None::<fn(&mut Ui, &mut BlazeUiState)>,
-                );
-
-                if let Some(0) = action.get() {
-                    sender
-                        .send(FileOperation::RestoreDeletedFiles { file_names })
-                        .ok();
-                    should_close = true;
-                }
-
-                //Añadirle hotkey
-            });
-
-            ui.separator();
-
-            ui.horizontal(|ui| {
-                let enable = !sources.is_empty();
-
-                let icon = ("trash-forever", icons::ICON_TRASH);
-
-                let label = i18n.t("file_ops.delete");
-                let hint = "Supr";
-
-                let action: Cell<Option<u8>> = Cell::new(None);
-
-                Self::render_context_button(
-                    ui,
-                    ui_state,
-                    &label,
-                    hint,
-                    icon,
-                    enable,
-                    || {
-                        action.set(Some(0));
-                    },
-                    None::<fn(&mut Ui, &mut BlazeUiState)>,
-                );
-
-                if let Some(0) = action.get() {
-                    sender
-                        .send(UiEvent::SureTo(SureTo::SureToDelete {
-                            files: sources,
-                            tab_id: sender.tab_id,
-                        }))
-                        .ok();
-                    should_close = true;
-                }
-
-                //Añadirle hotkey
-            });
-        });
-
-        if should_close {
-            self.close();
-        }
-
-        if ui.input(|i| i.key_pressed(egui::Key::Escape)) {
-            self.open = false;
-        }
-    }
-
-    pub fn file_context_menu(
-        &mut self,
-        ui: &mut Ui,
-        state: &mut BlazeCoreState,
-        ui_state: &mut BlazeUiState,
-    ) {
-        let i18n = with_configs(|c| c.get_i18n());
-
-        if !self.open {
-            return;
-        }
-        let (Some(file), Some(sender), Some(source_path)) = (
-            self.target_file.clone(),
-            self.target_sender.clone(),
-            self.source_path.clone(),
-        ) else {
-            return;
-        };
-
-        let files: &[Arc<FileEntry>] = &state.get_files_for(&source_path);
-
-        let (col_index_opt, row_col_opt) = (self.target_col, self.target_row_col);
-
-        let mut should_close = false;
-        let is_media = file.extension.is_video() || file.extension.is_audio();
-
-        self.show_menu(ui, "custom_ctx_menu_files", |ui| {
-            if file.extension.is_image() {
-                ui.horizontal(|ui| {
-                    let icon = ("polaroid", icons::ICON_POLAROID);
-
-                    let label = i18n.t("file_ctx_menu.preview");
-                    let hint = "";
-
-                    let action: Cell<Option<u8>> = Cell::new(None);
-
-                    Self::render_context_button(
-                        ui,
-                        ui_state,
-                        &label,
-                        hint,
-                        icon,
-                        true,
-                        || {
-                            action.set(Some(0));
-                        },
-                        None::<fn(&mut Ui, &mut BlazeUiState)>,
-                    );
-
-                    if let Some(0) = action.get() {
-                        let all_images = files
-                            .iter()
-                            .filter(|f| f.extension.is_image())
-                            .map(|f| f.full_path.to_path_buf())
-                            .collect();
-
-                        let pvw = ImagePreviewState::new(file.full_path.to_path_buf(), all_images);
-
-                        sender
-                            .send(UiEvent::ShowImagePvw {
-                                pvw: Some(Box::new(pvw)),
-                            })
-                            .ok();
-
-                        should_close = true;
-                    }
-
-                    //Añadirle hotkey
-                });
-                ui.separator();
-            } else if is_media {
-                ui.horizontal(|ui| {
-                    let icon = if file.extension.is_video() {
-                        ("video", icons::ICON_VIDEO)
-                    } else {
-                        ("music", icons::ICON_MUSIC)
-                    };
-
-                    let label = if file.extension.is_video() {
-                        i18n.t("file_ctx_menu.preview_video")
-                    } else {
-                        i18n.t("file_ctx_menu.preview_audio")
-                    };
-
-                    let hint = "";
-
-                    let action: Cell<Option<u8>> = Cell::new(None);
-
-                    Self::render_context_button(
-                        ui,
-                        ui_state,
-                        &label,
-                        hint,
-                        icon,
-                        true,
-                        || {
-                            action.set(Some(0));
-                        },
-                        None::<fn(&mut Ui, &mut BlazeUiState)>,
-                    );
-
-                    if let Some(0) = action.get() {
-                        let media_path = file.full_path.clone();
-                        let media_name = file.name.clone();
-                        sender
-                            .send(UiEvent::OpenMediaPlayer {
-                                media_path,
-                                media_name,
-                                is_audio_only: file.extension.is_audio(),
-                            })
-                            .ok();
-                        should_close = true;
-                    }
-
-                    //Añadirle hotkey
-                });
-                ui.separator();
-            }
-
-            ui.horizontal(|ui| {
-                if !file.is_dir() {
-                    let icon = ("external-link", icons::ICON_EXTERNAL_LINK);
-                    let label = i18n.t("file_ctx_menu.open");
-                    let hint = "Enter";
-
-                    let action: Cell<Option<u8>> = Cell::new(None);
-
-                    Self::render_context_button(
-                        ui,
-                        ui_state,
-                        &label,
-                        hint,
-                        icon,
-                        true,
-                        || {
-                            action.set(Some(0));
-                        },
-                        Some(|ui: &mut Ui, ui_state: &mut BlazeUiState| {
-                            let icon = ("external-link", icons::ICON_EXTERNAL_LINK);
-                            let label = i18n.t("file_ctx_menu.open_with");
-                            let hint = "";
-
-                            Self::render_context_button(
-                                ui,
-                                ui_state,
-                                &label,
-                                hint,
-                                icon,
-                                true,
-                                || {
-                                    info!("Se ejecuta");
-                                    action.set(Some(1));
-                                },
-                                None::<fn(&mut Ui, &mut BlazeUiState)>,
-                            );
-                        }),
-                    );
-
-                    match action.get() {
-                        Some(0) => {
-                            if state.miller_view.columns.is_empty() {
-                                if file.is_dir() {
-                                    state.navigate_to(file.full_path.to_owned());
-                                    state.deselect_all();
-                                    state.resize_selection(files.len());
-                                } else {
-                                    state.open_file(&file);
-                                }
-                            } else {
-                                let (Some(col_index), Some(i)) = (col_index_opt, row_col_opt)
-                                else {
-                                    return;
-                                };
-
-                                state.miller_view.set_opened(col_index, i);
-
-                                if file.is_dir() {
-                                    state.navigate_to(file.full_path.clone());
-                                }
-                            }
-
-                            should_close = true;
-                        }
-                        Some(1) => {
-                            state.open_file_with(&file);
-                            should_close = true;
-                        }
-                        _ => {}
-                    }
-                } else {
-                    let icon = ("folder-open", icons::ICON_FOLDER_OPEN);
-                    let label = i18n.t("file_ctx_menu.open");
-                    let hint = "Enter";
-
-                    let action: Cell<Option<u8>> = Cell::new(None);
-
-                    Self::render_context_button(
-                        ui,
-                        ui_state,
-                        &label,
-                        hint,
-                        icon,
-                        true,
-                        || {
-                            action.set(Some(0));
-                        },
-                        Some(|ui: &mut Ui, ui_state: &mut BlazeUiState| {
-                            let icon = ("folder-open", icons::ICON_FOLDER_OPEN);
-                            let label = i18n.t("file_ctx_menu.open_in_new_tab");
-                            let hint = "";
-
-                            Self::render_context_button(
-                                ui,
-                                ui_state,
-                                &label,
-                                hint,
-                                icon,
-                                true,
-                                || {
-                                    action.set(Some(1));
-                                },
-                                None::<fn(&mut Ui, &mut BlazeUiState)>,
-                            );
-                        }),
-                    );
-
-                    match action.get() {
-                        Some(0) => {
-                            if state.miller_view.columns.is_empty() {
-                                if file.is_dir() {
-                                    state.navigate_to(file.full_path.to_owned());
-                                    state.deselect_all();
-                                    state.resize_selection(files.len());
-                                } else {
-                                    state.open_file(&file);
-                                }
-                            } else {
-                                let (Some(col_index), Some(i)) = (col_index_opt, row_col_opt)
-                                else {
-                                    return;
-                                };
-
-                                state.miller_view.set_opened(col_index, i);
-
-                                if file.is_dir() {
-                                    state.navigate_to(file.full_path.clone());
-                                }
-                            }
-                            should_close = true;
-                        }
-                        Some(1) => {
-                            state.add_tab_from_file(&file.full_path);
-                            should_close = true;
-                        }
-                        _ => {}
-                    }
-                }
-            });
-
-            //Pegar
-            ui.horizontal(|ui| {
-                let enable = match state.clipboard.clipboard_has_files() {
-                    Ok(has_files) => has_files && file.is_dir(),
-                    Err(e) => {
-                        warn!("Error en el clipboard: {}", e);
-                        false
-                    }
-                };
-
-                let icon = if enable {
-                    ("clipboard", icons::ICON_CLIPBOARD)
-                } else {
-                    ("clipboard-disable", icons::ICON_CLIPBOARD_DISABLE)
-                };
-
-                let label = i18n.t("file_ops.paste_here");
-                let hint = "";
-
-                let action: Cell<Option<u8>> = Cell::new(None);
-
-                Self::render_context_button(
-                    ui,
-                    ui_state,
-                    &label,
-                    hint,
-                    icon,
-                    enable,
-                    || {
-                        action.set(Some(0));
-                    },
-                    None::<fn(&mut Ui, &mut BlazeUiState)>,
-                );
-
-                if let Some(0) = action.get() {
-                    state.paste(file.full_path.to_owned());
-                    should_close = true;
-                }
-
-                //Añadirle hotkey
-            });
-
-            // Copiar
-            ui.horizontal(|ui| {
-                let icon = ("copy", icons::ICON_COPY);
-
-                let label = i18n.t("file_ops.copy");
-                let hint = "Ctrl + C";
-
-                let action: Cell<Option<u8>> = Cell::new(None);
-
-                Self::render_context_button(
-                    ui,
-                    ui_state,
-                    &label,
-                    hint,
-                    icon,
-                    true,
-                    || {
-                        action.set(Some(0));
-                    },
-                    None::<fn(&mut Ui, &mut BlazeUiState)>,
-                );
-
-                if let Some(0) = action.get() {
-                    state.copy(files);
-                    should_close = true;
-                }
-
-                //Añadirle hotkey
-            });
-
-            //Cortar
-            ui.horizontal(|ui| {
-                let icon = ("scissors", icons::ICON_SCISSORS);
-
-                let label = i18n.t("file_ops.cut");
-                let hint = "Ctrl + X";
-
-                let action: Cell<Option<u8>> = Cell::new(None);
-
-                Self::render_context_button(
-                    ui,
-                    ui_state,
-                    &label,
-                    hint,
-                    icon,
-                    true,
-                    || {
-                        action.set(Some(0));
-                    },
-                    None::<fn(&mut Ui, &mut BlazeUiState)>,
-                );
-
-                if let Some(0) = action.get() {
-                    state.cut(files);
-                    should_close = true;
-                }
-
-                //Añadirle hotkey
-            });
-
-            if file.extension.is_archive() {
-                ui.horizontal(|ui| {
-                    let icon = ("extract", icons::ICON_EXTRACT);
-
-                    let label = i18n.t("file_ops.extract_here");
-                    let hint = "";
-
-                    let action: Cell<Option<u8>> = Cell::new(None);
-
-                    Self::render_context_button(
-                        ui,
-                        ui_state,
-                        &label,
-                        hint,
-                        icon,
-                        true,
-                        || {
-                            action.set(Some(0));
-                        },
-                        None::<fn(&mut Ui, &mut BlazeUiState)>,
-                    );
-
-                    if let Some(0) = action.get() {
-                        let cwd = state.cwd();
-                        sender
-                            .send(FileOperation::ExtractHere {
-                                entry: file.clone(),
-                                dest_dir: cwd,
-                            })
-                            .ok();
-                        should_close = true;
-                    }
-                });
-            }
-
-            ui.separator();
-
-            if file.is_dir() {
-                //Color de carpeta
-                ui.horizontal(|ui| {
-                    let icon = ("palette", icons::ICON_PALETTE);
-
-                    let label = i18n.t("file_ops.folder_color");
-                    let hint = "";
-
-                    let action: Cell<Option<u8>> = Cell::new(None);
-
-                    Self::render_context_button(
-                        ui,
-                        ui_state,
-                        &label,
-                        hint,
-                        icon,
-                        true,
-                        || {
-                            action.set(Some(0));
-                        },
-                        None::<fn(&mut Ui, &mut BlazeUiState)>,
-                    );
-
-                    if let Some(0) = action.get() {
-                        let tab_id = state.active_id();
-                        let dispatcher = with_event_bus(|e| e.dispatcher(tab_id));
-                        let Some(folder_id) = file.unique_id else {
-                            return;
-                        };
-                        dispatcher
-                            .send(UiEvent::ShowFolderColorSelector { folder_id })
-                            .ok();
-
-                        should_close = true;
-                    }
-
-                    //Añadirle hotkey
-                });
-            }
-
-            //Agregar a Tags
-            ui.horizontal(|ui| {
-                let icon = ("star-row", icons::ICON_STAR);
-
-                let label = i18n.t("file_ctx_menu.add_to_tag");
-                let hint = "";
-
-                let action: Cell<Option<u8>> = Cell::new(None);
-
-                Self::render_context_button(
-                    ui,
-                    ui_state,
-                    &label,
-                    hint,
-                    icon,
-                    true,
-                    || {
-                        action.set(Some(0));
-                    },
-                    None::<fn(&mut Ui, &mut BlazeUiState)>,
-                );
-
-                if let Some(0) = action.get() {
-                    let qick = QuickLinks::new(file.name.clone(), Color32::GRAY)
-                        .with_path(file.full_path.clone())
-                        .with_kind(file.kind.clone())
-                        .with_is_dir(file.is_dir());
-
-                    sender
-                        .send(UiEvent::QuickTagEvent(QuickTagEvent::AddQuickLinkToTag {
-                            quicks: vec![qick],
-                        }))
-                        .ok();
-
-                    should_close = true;
-                }
-
-                //Añadirle hotkey
-            });
-
-            ui.separator();
-
-            //Mover a Papelera
-            ui.horizontal(|ui| {
-                let icon = ("trash", icons::ICON_TRASH);
-
-                let label = i18n.t("file_ops.move_to_trash");
-                let hint = "Supr";
-
-                let action: Cell<Option<u8>> = Cell::new(None);
-
-                Self::render_context_button(
-                    ui,
-                    ui_state,
-                    &label,
-                    hint,
-                    icon,
-                    true,
-                    || {
-                        action.set(Some(0));
-                    },
-                    None::<fn(&mut Ui, &mut BlazeUiState)>,
-                );
-
-                if let Some(0) = action.get() {
-                    let items = files
-                        .iter()
-                        .enumerate()
-                        .filter(|(index, _)| state.is_selected(*index))
-                        .map(|(_, f)| (f.name.clone(), f.full_path.to_owned()))
-                        .collect();
-                    state.move_to_trash(items);
-                    should_close = true;
-                }
-
-                //Añadirle hotkey
-            });
-
-            //Mover a Papelera
-            ui.horizontal(|ui| {
-                let icon = ("edit", icons::ICON_EDIT);
-
-                let label = i18n.t("file_ops.rename");
-                let hint = "";
-
-                let action: Cell<Option<u8>> = Cell::new(None);
-
-                Self::render_context_button(
-                    ui,
-                    ui_state,
-                    &label,
-                    hint,
-                    icon,
-                    true,
-                    || {
-                        action.set(Some(0));
-                    },
-                    None::<fn(&mut Ui, &mut BlazeUiState)>,
-                );
-
-                if let Some(0) = action.get() {
-                    state.renaming_file = Some(file.full_path.to_path_buf());
-                    state.rename_buffer = file.name.to_string();
-                    should_close = true;
-                }
-
-                //Añadirle hotkey
-            });
-        });
-
-        if should_close {
-            self.close();
-        }
-
-        if ui.input(|i| i.key_pressed(egui::Key::Escape)) {
-            self.open = false;
         }
     }
 }

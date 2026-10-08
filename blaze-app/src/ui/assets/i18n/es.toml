@@ -27,7 +27,7 @@ dimensions = "Dimensión:"
 git_status = "Estado Git:"
 
 [search]
-placeholder = "Buscar archivos..."
+placeholder = "Buscar"
 no_results = "Sin resultados para \"{query}\""
 searching = "Buscando..."
 
@@ -199,6 +199,42 @@ fallback = "Por defecto"
 theme-name = "Nombre del tema"
 save-as-custom = "Guardar como tema personalizado"
 reset-defaults = "Restablecer valores por defecto"
+
+# Fondos (completar)
+separator = "Separador"
+
+# Paneles
+panels = "Paneles"
+panel_border = "Borde del panel"
+
+# Botones
+buttons = "Botones"
+button_bg = "Fondo del botón"
+button_hover = "Fondo del botón (hover)"
+button_label_hover = "Texto del botón (hover)"
+button_label_active = "Texto del botón (activo)"
+button_label_inactive = "Texto del botón (inactivo)"
+
+# Input/Búsqueda
+input = "Barra de búsqueda"
+input_bg = "Fondo del input"
+input_border_idle = "Borde del input (reposo)"
+input_border_focus = "Borde del input (foco)"
+
+# Sidebar
+sidebar = "Barra lateral"
+sidebar_hover = "Fondo del sidebar (hover)"
+
+# Lista de archivos
+file_list = "Lista de archivos"
+list_hover = "Fondo de lista (hover)"
+list_selected = "Fondo de lista (seleccionado)"
+
+# Tools View (completar)
+tools_bg = "Fondo de herramientas"
+tools_label_hover = "Texto de herramienta (hover)"
+tools_label_active = "Texto de herramienta (activo)"
+tools_label_inactive = "Texto de herramienta (inactivo)"
 
 
 [configs_behavior]

@@ -27,7 +27,7 @@ dimensions = "Размеры:"
 git_status = "Статус Git:"
 
 [search]
-placeholder = "Поиск файлов..."
+placeholder = "Искать"
 no_results = "Нет результатов для \"{query}\""
 searching = "Поиск..."
 
@@ -190,6 +190,29 @@ fallback = "По умолчанию"
 theme-name = "Название темы"
 save-as-custom = "Сохранить как пользовательскую тему"
 reset-defaults = "Сбросить настройки по умолчанию"
+
+separator = "Разделитель"
+panels = "Панели"
+panel_border = "Граница панели"
+buttons = "Кнопки"
+button_bg = "Фон кнопки"
+button_hover = "Фон кнопки (при наведении)"
+button_label_hover = "Текст кнопки (при наведении)"
+button_label_active = "Текст кнопки (активная)"
+button_label_inactive = "Текст кнопки (неактивная)"
+input = "Поле ввода"
+input_bg = "Фон поля ввода"
+input_border_idle = "Граница поля ввода (обычное)"
+input_border_focus = "Граница поля ввода (в фокусе)"
+sidebar = "Боковая панель"
+sidebar_hover = "Фон боковой панели (при наведении)"
+file_list = "Список файлов"
+list_hover = "Фон списка (при наведении)"
+list_selected = "Фон списка (выбрано)"
+tools_bg = "Фон инструментов"
+tools_label_hover = "Текст инструмента (при наведении)"
+tools_label_active = "Текст инструмента (активный)"
+tools_label_inactive = "Текст инструмента (неактивный)"
 
 
 [configs_behavior]

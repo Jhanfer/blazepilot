@@ -33,8 +33,8 @@ use crate::ui::themes::platform::structs::ToColor;
 use crate::ui::themes::theme_manager::with_theme;
 use crate::utils::formating::{format_date, format_size};
 use egui::{
-    Align, Area, Button, Color32, ColorImage, CornerRadius, Frame, Grid, Id, Label, Layout, Margin,
-    Panel, Rect, RichText, Sense, Stroke, TextureOptions, Ui, pos2, vec2,
+    Align, Area, Button, Color32, ColorImage, CornerRadius, FontId, Frame, Grid, Id, Label, Layout,
+    Margin, Panel, Rect, RichText, Sense, Stroke, StrokeKind, TextureOptions, Ui, pos2, vec2,
 };
 use std::collections::HashMap;
 use std::path::Path;
@@ -162,11 +162,76 @@ fn render_expanded_panel(
                                 response.request_focus();
                             }
 
-                            if ui
-                                .add_enabled(!state.is_filter_empty(), Button::new("X"))
-                                .clicked()
-                            {
-                                state.clean_search();
+                            let extra_right_pad = 8.0;
+                            let trailing_size = vec2(28.0, 20.0);
+                            let (alloc_rect, _) = ui.allocate_exact_size(trailing_size, Sense::hover());
+
+                            if !response.has_focus() {
+                                let hint = "Ctrl + K";
+
+                                let c = current_theme
+                                    .semantic
+                                    .accent_glow
+                                    .to_color();
+
+                                let hint_stroke_color = Color32::from_rgba_unmultiplied(
+                                    c.r().saturating_add(20),
+                                    c.g().saturating_add(20),
+                                    c.b().saturating_add(20),
+                                    120,
+                                );
+
+                                let hint_color = Color32::from_rgba_unmultiplied(
+                                    c.r().saturating_add(60),
+                                    c.g().saturating_add(60),
+                                    c.b().saturating_add(60),
+                                    160,
+                                );
+
+                                let hint_galley = ui.painter().layout_no_wrap(
+                                    hint.to_string(),
+                                    FontId::proportional(10.0),
+                                    ensure_min_lightness(hint_color),
+                                );
+
+                                let pad = vec2(8.0, 2.0);
+                                let hint_size = hint_galley.size();
+                                let badge_size = hint_size + pad * 2.0;
+
+                                let trailing_rect = alloc_rect.translate(vec2(-extra_right_pad, 0.0));
+
+                                let hint_pos = pos2(
+                                    trailing_rect.center().x - hint_size.x / 2.0,
+                                    trailing_rect.center().y - hint_size.y / 2.0,
+                                );
+                                let hint_rect = Rect::from_center_size(
+                                    trailing_rect.center(),
+                                    badge_size,
+                                );
+
+                                ui.painter()
+                                    .rect(
+                                        hint_rect,
+                                        3.0,
+                                        current_theme.semantic.bg_container.to_color(),
+                                        Stroke::new(1.0, hint_stroke_color),
+                                        StrokeKind::Outside,
+                                    );
+
+                                ui.painter()
+                                    .galley(
+                                        hint_pos,
+                                        hint_galley,
+                                        hint_color,
+                                    );
+                            } else {
+                                let btn = ui.put(
+                                    alloc_rect,
+                                    Button::new("X").small()
+                                );
+                                if btn.clicked() && !state.is_filter_empty(){
+                                    state.clean_search();
+                                }
                             }
 
                         });
