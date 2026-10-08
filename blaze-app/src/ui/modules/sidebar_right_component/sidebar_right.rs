@@ -166,7 +166,7 @@ fn render_expanded_panel(
                             let trailing_size = vec2(28.0, 20.0);
                             let (alloc_rect, _) = ui.allocate_exact_size(trailing_size, Sense::hover());
 
-                            if !response.has_focus() {
+                            if !has_focus {
                                 let hint = "Ctrl + K";
 
                                 let c = current_theme
@@ -227,9 +227,11 @@ fn render_expanded_panel(
                             } else {
                                 let btn = ui.put(
                                     alloc_rect,
-                                    Button::new("X").small()
+                                    Button::new("X")
+                                        .small()
                                 );
-                                if btn.clicked() && !state.is_filter_empty(){
+                                if btn.clicked() && !state.is_filter_empty() {
+                                    ui.memory_mut(|m| m.request_focus(search_id));
                                     state.clean_search();
                                 }
                             }

@@ -94,6 +94,8 @@ impl BlazeCoreState {
 
         self.cwd_input = self.cwd().display().to_string();
 
+        self.clean_search();
+
         with_fonts(|f| f.enter_dir(&path));
     }
 
@@ -111,6 +113,8 @@ impl BlazeCoreState {
             .active_tab_mut()
             .miller_navigate_to(path.clone(), col_index, dispatcher)
             .ok();
+
+        self.clean_search();
 
         self.save_caches(false);
         self.last_navigation_time = Some(Instant::now());
@@ -154,6 +158,7 @@ impl BlazeCoreState {
             }
         }
 
+        self.clean_search();
         self.extended_info_manager.clear_directory(&prev_dir);
         dispatcher.send(SizerMessages::CancelAll).ok();
         with_fonts(|f| f.enter_dir(&self.cwd()));

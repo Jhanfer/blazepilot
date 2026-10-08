@@ -12,8 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::core::bootstrap::install_manager::{
-    installation_manager::InstallResult, platform::installation_trait::InstallationTrait,
+use crate::{
+    core::bootstrap::install_manager::{
+        installation_manager::InstallResult, platform::installation_trait::InstallationTrait,
+    },
+    ui::icons_cache::icons,
 };
 use std::{
     os::unix::fs::PermissionsExt,
@@ -79,6 +82,7 @@ impl InstallationTrait for LinuxInstallation {
     }
 
     fn post_install(&self) -> Result<(), String> {
+        self.install_icon()?;
         self.generate_desktop_file()?;
         self.register_mime_default();
         Ok(())
@@ -202,7 +206,7 @@ impl LinuxInstallation {
                 Name=BlazePilot\n\
                 Comment=Explorador con estilo\n\
                 Exec={} %u\n\
-                Icon=system-file-manager\n\
+                Icon=BlazeLogoDesktop\n\
                 Terminal=false\n\
                 Type=Application\n\
                 MimeType=inode/directory;\n\
@@ -267,5 +271,33 @@ impl LinuxInstallation {
                 warn!("Ha ocurrido un error actualizando database: {e}")
             }
         }
+    }
+
+    /// Instala el icono de la aplicación en las rutas
+    /// respectivas respetando freedesktop
+    fn install_icon(&self) -> Result<(), String> {
+        let data_home = self.get_data_home();
+
+        let icon_dir = data_home
+            .join("icons")
+            .join("hicolor")
+            .join("scalable")
+            .join("apps");
+
+        std::fs::create_dir_all(&icon_dir)
+            .map_err(|e| format!("No se ha podido crear directorio de iconos: {e}"))?;
+
+        let icon_path = icon_dir.join("BlazeLogoDesktop.svg");
+
+        std::fs::write(&icon_path, icons::DESKTOP_LOGO_BLAZEPILOT)
+            .map_err(|e| format!("No se ha podido escribir el icono: {e}"))?;
+
+        let hicolor = data_home.join("icons/hicolor");
+        let _ = Command::new("gtk-update-icon-cache")
+            .args(["-f", "-t"])
+            .arg(&hicolor)
+            .status();
+
+        Ok(())
     }
 }

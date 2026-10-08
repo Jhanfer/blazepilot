@@ -28,7 +28,6 @@ use crate::{
     },
     ui::custom_components::text_edit::BlazeTextEdit,
 };
-use core::f32;
 use egui::{
     CentralPanel, Color32, ComboBox, CornerRadius, Frame, Id, Key, Label, Margin, OpenUrl, Order,
     Panel, RichText, ScrollArea, Ui, Window,

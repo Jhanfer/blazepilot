@@ -2,6 +2,7 @@
 
 // Logo Blaze
 pub const LOGO_BLAZEPILOT: &[u8] = include_bytes!("../assets/icons/LogoBlazepilot.svg");
+pub const DESKTOP_LOGO_BLAZEPILOT: &[u8] = include_bytes!("../assets/icons/BlazeLogoDesktop.svg");
 
 //Extensiones de archivos e iconos del fileview
 pub const ICON_FOLDER: &[u8] = include_bytes!("../assets/icons/folder.svg");
