@@ -90,14 +90,14 @@ pub enum UiEvent {
     },
 
     ShowImagePvw {
-        pvw: Option<ImagePreviewState>,
+        pvw: Option<Box<ImagePreviewState>>,
     },
 
     SureTo(SureTo),
 
-    UpdateMessages(UpdateMessages),
+    UpdateMessages(Box<UpdateMessages>),
 
-    FileConflict(FileConflict),
+    FileConflict(Box<FileConflict>),
 
     ShowError(Box<str>),
 

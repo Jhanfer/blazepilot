@@ -477,7 +477,19 @@ pub fn render_miller_scrollview(
 
                         let extended = info_snapshot.get(&file.full_path);
                         let git = extended.and_then(|e| e.git_status.as_ref());
-                        let name_color = text_color_for_git(git);
+
+                        let is_cut = state.clipboard.is_cutted(&file.full_path).unwrap_or(false);
+                        let base_name_color = text_color_for_git(git);
+                        let (name_color, icon_tint) = if is_cut {
+                            let c = base_name_color;
+                            (
+                                Color32::from_rgba_unmultiplied(c.r(), c.g(), c.b(), 180),
+                                Color32::from_white_alpha(180),
+                            )
+                        } else {
+                            (base_name_color, Color32::WHITE)
+                        };
+
                         let dot_color = git_dot_color(git);
 
                         let dot_size = icon_size / 8.0;
@@ -514,7 +526,7 @@ pub fn render_miller_scrollview(
                                 tex.id(),
                                 icon_rect,
                                 Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
-                                Color32::WHITE,
+                                icon_tint,
                             );
                         } else if ui_state
                             .newly_calculated_thumbnails
@@ -548,7 +560,7 @@ pub fn render_miller_scrollview(
                                 icon.id(),
                                 rounded_rect,
                                 Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
-                                Color32::WHITE,
+                                icon_tint,
                             );
                         }
 

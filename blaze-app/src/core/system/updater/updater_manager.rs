@@ -93,17 +93,17 @@ impl Updater {
                         let tab_id = sender.tab_id;
                         if Self::is_newer_version(&version, &new_ver) {
                             sender
-                                .send(UiEvent::UpdateMessages(
+                                .send(UiEvent::UpdateMessages(Box::new(
                                     UpdateMessages::NewVersionAvailable {
                                         current_version: version,
                                         new_version: new_ver,
                                         tab_id,
                                     },
-                                ))
+                                )))
                                 .ok();
                         } else {
                             sender
-                                .send(UiEvent::UpdateMessages(UpdateMessages::UpToDate))
+                                .send(UiEvent::UpdateMessages(Box::new(UpdateMessages::UpToDate)))
                                 .ok();
                         }
                     } else {

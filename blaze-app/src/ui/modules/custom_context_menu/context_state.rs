@@ -417,9 +417,6 @@ impl ContextMenuState {
                         if state.miller_view.columns.is_empty() {
                             state.navigate_to(path);
                         } else {
-                            // state.miller_view.truncate_to(0);
-
-                            // state.miller_view.push_column(path.clone());
                             state.navigate_to(path.clone());
                         }
                     }
@@ -1024,7 +1021,11 @@ impl ContextMenuState {
 
                         let pvw = ImagePreviewState::new(file.full_path.to_path_buf(), all_images);
 
-                        sender.send(UiEvent::ShowImagePvw { pvw: Some(pvw) }).ok();
+                        sender
+                            .send(UiEvent::ShowImagePvw {
+                                pvw: Some(Box::new(pvw)),
+                            })
+                            .ok();
 
                         should_close = true;
                     }

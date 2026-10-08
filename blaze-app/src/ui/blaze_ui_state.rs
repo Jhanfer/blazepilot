@@ -159,7 +159,7 @@ impl BlazeUiState {
                         self.dialog_manager.open_sure_to_delete(files, tab_id);
                     }
                 },
-                UiEvent::UpdateMessages(update_message) => match update_message {
+                UiEvent::UpdateMessages(update_message) => match *update_message {
                     UpdateMessages::NewVersionAvailable {
                         current_version,
                         new_version,
@@ -177,7 +177,7 @@ impl BlazeUiState {
                     }
                 },
 
-                UiEvent::FileConflict(file_conflict) => match file_conflict {
+                UiEvent::FileConflict(file_conflict) => match *file_conflict {
                     FileConflict::AlreadyExist { name, path } => {
                         info!("Ya existe {} en {:?}", name, path);
                     }
@@ -201,7 +201,7 @@ impl BlazeUiState {
 
                 UiEvent::ShowImagePvw { pvw } => {
                     if let Some(img_pvw) = pvw {
-                        self.dialog_manager.open_img_pvw_dialog(img_pvw);
+                        self.dialog_manager.open_img_pvw_dialog(*img_pvw);
                     }
                 }
 

@@ -160,6 +160,7 @@ impl BlazeApp {
             if let egui::Event::Key { key, modifiers, .. } = event {
                 if *key == egui::Key::V && modifiers.ctrl {
                     if let Some(text) = with_text_clipboard(|c| c.paste()) {
+                        tracing::debug!("Ctrl + V");
                         with_keyboard_state(|k| {
                             k.set_action(
                                 KeyboardAction::Paste(text.clone()),

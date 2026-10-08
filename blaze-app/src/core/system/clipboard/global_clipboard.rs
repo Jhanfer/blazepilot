@@ -94,6 +94,10 @@ impl GlobalClipboard {
         Self::inner().clipboard_has_files()
     }
 
+    pub fn is_cutted(&self, requested_item: &Arc<Path>) -> ClipBoardResult<bool> {
+        Self::inner().is_cutted(requested_item)
+    }
+
     pub fn clear(&self) -> ClipBoardResult<()> {
         Self::inner().clear()
     }
@@ -194,6 +198,14 @@ impl Clipboard {
     pub fn clipboard_has_files(&self) -> ClipBoardResult<bool> {
         let inner = self.get_inner()?;
         Ok(!inner.items.is_empty())
+    }
+
+    pub fn is_cutted(&self, requested_item: &Arc<Path>) -> ClipBoardResult<bool> {
+        let inner = self.get_inner()?;
+        let is_cut = matches!(inner.mode, Some(ClipboardMode::Cut));
+        let exist = inner.items.iter().any(|i| i.src_path == *requested_item);
+
+        Ok(is_cut && exist)
     }
 
     pub fn clear(&self) -> ClipBoardResult<()> {
@@ -787,10 +799,12 @@ impl Clipboard {
                         }
                         ConflictStrategy::Ask => {
                             sender
-                                .send(UiEvent::FileConflict(FileConflict::AlreadyExist {
-                                    name: file_name.to_string_lossy().to_string(),
-                                    path: target.into(),
-                                }))
+                                .send(UiEvent::FileConflict(Box::new(
+                                    FileConflict::AlreadyExist {
+                                        name: file_name.to_string_lossy().to_string(),
+                                        path: target.into(),
+                                    },
+                                )))
                                 .ok();
 
                             continue;
