@@ -583,12 +583,6 @@ impl ThumbnailManager {
 
         let mut ictx = input_with_dictionary(path, ops).map_err(ThumbError::FfmpegError)?;
 
-        unsafe {
-            let ctx = ictx.as_mut_ptr();
-            (*ctx).max_interleave_delta = 100000;
-            (*ctx).flags |= 8;
-        }
-
         let video_stream = ictx
             .streams()
             .best(Type::Video)
