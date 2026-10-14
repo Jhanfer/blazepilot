@@ -20,7 +20,7 @@ use crate::{
         runtime::bus_structs::QuickTagEvent,
     },
     ui::{
-        custom_components::{label::UiExt, text_edit::BlazeTextEdit},
+        custom_components::{UiExt, text_edit::BlazeTextEdit},
         dialog_manager::manager::ModalDialog,
         themes::{platform::structs::ToColor, theme_manager::with_theme},
     },

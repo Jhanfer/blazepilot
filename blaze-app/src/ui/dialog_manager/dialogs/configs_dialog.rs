@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::ui::custom_components::label::UiExt;
+use crate::ui::custom_components::UiExt;
 use crate::ui::dialog_manager::manager::ModalDialog;
 use crate::ui::themes::platform::structs::ToColor;
 use crate::ui::themes::theme_manager::with_theme;

@@ -12,7 +12,7 @@ use crate::{
     },
     ui::{
         blaze_ui_state::BlazeUiState,
-        custom_components::label::UiExt,
+        custom_components::UiExt,
         icons_cache::thumbnails::thumbnails_manager::Thumbnail,
         modules::{
             island_n_bubble::render_tags_island_bubble,

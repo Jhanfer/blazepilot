@@ -36,7 +36,7 @@ use crate::{
         },
     },
     ui::{
-        custom_components::label::UiExt,
+        custom_components::UiExt,
         dialog_manager::manager::ModalDialog,
         themes::{platform::structs::ToColor, theme_manager::with_theme},
     },

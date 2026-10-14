@@ -53,6 +53,7 @@ pub struct BlazeUiState {
     pub newly_calculated_thumbnails: HashSet<Arc<Path>>,
     last_thumb_cache_dir: Option<Arc<Path>>,
     pub color_snapshot: HashMap<FileId, Color32>,
+    pub show_clipboard_manager: bool,
 }
 
 impl Default for BlazeUiState {
@@ -77,7 +78,12 @@ impl BlazeUiState {
             newly_calculated_thumbnails: HashSet::new(),
             last_thumb_cache_dir: None,
             color_snapshot: HashMap::new(),
+            show_clipboard_manager: false,
         }
+    }
+
+    pub fn toggle_clipboard(&mut self) {
+        self.show_clipboard_manager = !self.show_clipboard_manager
     }
 
     pub fn cleanup(&mut self) {

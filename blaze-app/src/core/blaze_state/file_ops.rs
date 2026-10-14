@@ -65,11 +65,19 @@ impl BlazeCoreState {
         source.files_just_loaded.load(Ordering::Relaxed)
     }
 
-    #[allow(unused)]
     pub fn clear_clipboard(&self) {
         match self.clipboard.clear() {
             Ok(_) => {
                 info!("Se limpia el clipboard");
+            }
+            Err(e) => warn!("Eror en clipboard: {e}"),
+        }
+    }
+
+    pub fn delete_one_from_clipboard(&self, name: Box<str>) {
+        match self.clipboard.delete_one(name) {
+            Ok(deleted) => {
+                info!("Se ha eliminado {} del clipboard", deleted);
             }
             Err(e) => warn!("Eror en clipboard: {e}"),
         }

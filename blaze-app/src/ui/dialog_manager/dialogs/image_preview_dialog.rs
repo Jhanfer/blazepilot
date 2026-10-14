@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use crate::core::bootstrap::configs::config_manager::with_configs;
-use crate::ui::custom_components::label::UiExt;
+use crate::ui::custom_components::UiExt;
 use crate::ui::image_preview::image_preview_handler::ImagePreviewState;
 use crate::ui::themes::platform::structs::ToColor;
 use crate::ui::{dialog_manager::manager::ModalDialog, themes::theme_manager::with_theme};

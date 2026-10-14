@@ -62,10 +62,19 @@ impl IconCache {
     }
 }
 
-fn rasterize_svg(svg_bytes: &[u8], width: u32, height: u32, tint: egui::Color32) -> ColorImage {
+fn rasterize_svg(
+    svg_bytes: &[u8],
+    mut width: u32,
+    mut height: u32,
+    tint: egui::Color32,
+) -> ColorImage {
+    if width == 0 || height == 0 {
+        width = 1;
+        height = 1;
+    }
+
     let opt = Options::default();
     let tree = resvg::usvg::Tree::from_data(svg_bytes, &opt).unwrap();
-
     let mut pixmap = resvg::tiny_skia::Pixmap::new(width, height).unwrap();
 
     let transform = resvg::tiny_skia::Transform::from_scale(

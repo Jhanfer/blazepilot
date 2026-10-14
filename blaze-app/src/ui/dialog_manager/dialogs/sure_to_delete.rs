@@ -16,7 +16,7 @@ use std::{path::Path, sync::Arc};
 
 use crate::core::bootstrap::configs::config_manager::with_configs;
 use crate::core::runtime::{bus_structs::FileOperation, event_bus::Dispatcher};
-use crate::ui::custom_components::label::UiExt;
+use crate::ui::custom_components::UiExt;
 use crate::ui::dialog_manager::manager::ModalDialog;
 use crate::ui::themes::platform::structs::ToColor;
 use crate::ui::themes::theme_manager::with_theme;

@@ -1,16 +1,8 @@
 use egui::{Label, Response, Ui, WidgetText};
 
-pub trait UiExt {
-    fn label_ns<T>(&mut self, text: T) -> Response
-    where
-        T: Into<WidgetText>;
-}
-
-impl UiExt for Ui {
-    fn label_ns<T>(&mut self, text: T) -> Response
-    where
-        T: Into<WidgetText>,
-    {
-        self.add(Label::new(text).selectable(false))
-    }
+pub(crate) fn label_ns<T>(ui: &mut Ui, text: T) -> Response
+where
+    T: Into<WidgetText>,
+{
+    ui.add(Label::new(text).selectable(false))
 }

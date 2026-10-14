@@ -27,6 +27,9 @@ pub enum ClipBoardError {
 
     #[error("Error de lock envenenado")]
     PoisonedLock,
+
+    #[error("Error al devolver el modo del portapapeles.")]
+    ModeUnavailable,
 }
 
 pub type ClipBoardResult<T> = Result<T, ClipBoardError>;

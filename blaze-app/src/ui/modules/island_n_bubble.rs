@@ -2,48 +2,22 @@ use std::sync::Arc;
 
 use crate::{
     core::{
-        blaze_state::BlazeCoreState, blaze_state::state_structs::TagViewFilter,
+        blaze_state::{BlazeCoreState, state_structs::TagViewFilter},
         files::blaze_motor::motor_structs::FileEntry,
     },
     ui::{
         blaze_ui_state::BlazeUiState,
-        custom_components::label::UiExt,
+        custom_components::UiExt,
         icons_cache::icons,
         task_manager::tasks::TaskStatus,
         themes::{platform::structs::ToColor, theme_manager::with_theme},
     },
-    utils::formating::format_size,
+    utils::{easing::ease_in_out_bounce, formating::format_size},
 };
 use egui::{
     Align2, Area, Color32, CornerRadius, Frame, Margin, Order, Rect, ScrollArea, Sense, Stroke, Ui,
     pos2, vec2,
 };
-
-fn ease_out_bounce(t: f32) -> f32 {
-    let n1 = 7.5625_f32;
-    let d1 = 2.75_f32;
-
-    if t < 1.0 / d1 {
-        n1 * t * t
-    } else if t < 2.0 / d1 {
-        let t = t - 1.5 / d1;
-        n1 * t * t + 0.75
-    } else if t < 2.5 / d1 {
-        let t = t - 2.25 / d1;
-        n1 * t * t + 0.9375
-    } else {
-        let t = t - 2.625 / d1;
-        n1 * t * t + 0.984375
-    }
-}
-
-fn ease_in_out_bounce(t: f32) -> f32 {
-    if t < 0.5 {
-        (1.0 - ease_out_bounce(1.0 - 2.0 * t)) / 2.0
-    } else {
-        (1.0 + ease_out_bounce(2.0 * t - 1.0)) / 2.0
-    }
-}
 
 pub fn generic_island<F>(
     ui: &mut Ui,

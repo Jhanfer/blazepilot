@@ -2,6 +2,7 @@ use crate::{
     core::{blaze_state::BlazeCoreState, system::disk_reader::disk::Disk},
     ui::{
         blaze_ui_state::BlazeUiState,
+        custom_components::UiExt,
         icons_cache::icons::*,
         modules::{
             custom_context_menu::context_state::ContextMenuKind, utilities::ensure_min_lightness,
@@ -9,10 +10,7 @@ use crate::{
         themes::{platform::structs::ToColor, theme_manager::with_theme},
     },
 };
-use egui::{
-    Align2, Color32, CursorIcon, FontId, PointerButton, Rect, Sense, Stroke, StrokeKind, Ui, pos2,
-    vec2,
-};
+use egui::{Align2, Color32, FontId, PointerButton, Rect, Sense, Ui, pos2, vec2};
 use std::{
     path::{Path, PathBuf},
     sync::Arc,
@@ -105,58 +103,43 @@ pub fn render_local_buttons(
     ui_state: &mut BlazeUiState,
 ) {
     let current_theme = with_theme(|t| t.current());
+    let (icon_name, icon_bytes) = get_folder_icon(icon_key);
 
     let is_dark_theme = current_theme.semantic.text_primary.to_color().r() > 128;
 
-    let (rect, response) =
-        ui.allocate_exact_size(vec2(ui.available_width(), 35.0), Sense::click_and_drag());
-
-    let (bg_color, icon_color) = if response.hovered() {
-        ui.set_cursor_icon(CursorIcon::PointingHand);
-        let hover_bg = if is_dark_theme {
-            Color32::from_rgba_unmultiplied(
-                current_theme.components.button.bg_hover.to_color().r(),
-                current_theme.components.button.bg_hover.to_color().g(),
-                current_theme.components.button.bg_hover.to_color().b(),
-                80,
-            )
-        } else {
-            Color32::from_rgba_unmultiplied(
-                current_theme.components.button.bg_hover.to_color().r(),
-                current_theme.components.button.bg_hover.to_color().g(),
-                current_theme.components.button.bg_hover.to_color().b(),
-                10,
-            )
-        };
-
-        let icon_hover =
-            ensure_min_lightness(current_theme.components.button.label_hover.to_color());
-
-        (hover_bg, icon_hover)
+    let cbg = current_theme.components.button.bg_hover.to_color();
+    let bg = current_theme.components.button.bg.to_color();
+    let hover_bg = if is_dark_theme {
+        Color32::from_rgba_unmultiplied(cbg.r(), cbg.g(), cbg.b(), 80)
     } else {
-        (
-            current_theme.components.button.bg.to_color(),
-            current_theme.components.button.label_active.to_color(),
-        )
+        Color32::from_rgba_unmultiplied(cbg.r(), cbg.g(), cbg.b(), 10)
     };
 
-    ui.painter().rect(
-        rect,
-        20.0,
-        bg_color,
-        if response.hovered() {
-            Stroke::new(0.5, icon_color)
-        } else {
-            Stroke::NONE
-        },
-        StrokeKind::Outside,
-    );
+    let icon_color = current_theme.components.button.label_active.to_color();
+    let hover_icon = ensure_min_lightness(current_theme.components.button.label_hover.to_color());
+
+    let btn_id = ui.id().with(label);
+    let btn_resp = ui
+        .blaze_button(label, &mut ui_state.icon_cache)
+        .id(btn_id)
+        .size((ui.available_width(), 35.0))
+        .background_color(bg)
+        .hover_background_color(hover_bg)
+        .radius(20)
+        .stroke_color(Color32::TRANSPARENT)
+        .hover_stroke_color(hover_icon)
+        .icon(icon_name, icon_bytes)
+        .icon_color(icon_color)
+        .hover_icon_color(hover_icon)
+        .icon_size(16_f32)
+        .text_color(current_theme.semantic.text_primary.to_color())
+        .show(ui);
 
     let middle_clicked = ui.input(|i| {
         i.pointer.button_pressed(PointerButton::Middle)
             && i.pointer
                 .interact_pos()
-                .map(|p| rect.contains(p))
+                .map(|p| btn_resp.rect.contains(p))
                 .unwrap_or(false)
     });
 
@@ -164,25 +147,13 @@ pub fn render_local_buttons(
         state.add_tab_from_file(&path);
     }
 
-    if response.clicked() {
+    if btn_resp.clicked() {
         if !state.is_miller() {
             state.navigate_to(path);
         } else {
             state.miller_reset_to(path);
         }
     }
-
-    let (icon_name, icon_bytes) = get_folder_icon(icon_key);
-
-    render_icon(ui, ui_state, icon_name, icon_color, icon_bytes, rect);
-
-    ui.painter().text(
-        rect.left_center() + vec2(34.0, 0.0),
-        Align2::LEFT_CENTER,
-        label,
-        FontId::default(),
-        current_theme.semantic.text_secondary.to_color(),
-    );
 }
 
 pub fn render_drives_button(
@@ -199,73 +170,50 @@ pub fn render_drives_button(
     let is_removable = drive.is_removable;
     let is_system = drive.is_system;
 
-    let btn_h = if is_mounted { 50.0 } else { 35.0 };
-
-    let (rect, response) =
-        ui.allocate_exact_size(vec2(ui.available_width(), btn_h), Sense::click_and_drag());
-
-    if response.clicked() && is_mounted {
-        let path_string = drive.mountpoint.clone().unwrap_or_default();
-        let path = PathBuf::from(path_string);
-        state.navigate_to(path.as_path().into());
-    }
-
     let display_name = if drive.mountpoint == Some("/".to_owned()) {
         "Root".to_owned()
     } else {
         drive.display_name.clone()
     };
 
-    if response.secondary_clicked() {
-        ui_state.context_menu_state.handle_response(&response);
-        ui_state.context_menu_state.kind = ContextMenuKind::DrivesPanel;
-        ui_state.context_menu_state.target_drive = Some(drive);
-    }
+    let (icon_name, icon_bytes) = if is_system {
+        ("system", ICON_DEVICE_PC)
+    } else if is_removable {
+        ("usb", ICON_USB)
+    } else {
+        ("server", ICON_SERVER)
+    };
 
     let is_dark_theme = current_theme.semantic.text_primary.to_color().r() > 128;
 
-    let (bg_color, icon_color) = if response.hovered() {
-        ui.set_cursor_icon(CursorIcon::PointingHand);
-        let hover_bg = if is_dark_theme {
-            Color32::from_rgba_unmultiplied(
-                current_theme.components.button.bg_hover.to_color().r(),
-                current_theme.components.button.bg_hover.to_color().g(),
-                current_theme.components.button.bg_hover.to_color().b(),
-                80,
-            )
-        } else {
-            Color32::from_rgba_unmultiplied(
-                current_theme.components.button.bg_hover.to_color().r(),
-                current_theme.components.button.bg_hover.to_color().g(),
-                current_theme.components.button.bg_hover.to_color().b(),
-                10,
-            )
-        };
-
-        let icon_hover =
-            ensure_min_lightness(current_theme.components.button.label_hover.to_color());
-
-        (hover_bg, icon_hover)
+    let cbg = current_theme.components.button.bg_hover.to_color();
+    let bg = current_theme.components.button.bg.to_color();
+    let hover_bg = if is_dark_theme {
+        Color32::from_rgba_unmultiplied(cbg.r(), cbg.g(), cbg.b(), 80)
     } else {
-        (
-            current_theme.components.button.bg.to_color(),
-            current_theme.components.button.label_active.to_color(),
-        )
+        Color32::from_rgba_unmultiplied(cbg.r(), cbg.g(), cbg.b(), 10)
     };
 
-    ui.painter().rect(
-        rect,
-        20.0,
-        bg_color,
-        if response.hovered() {
-            Stroke::new(0.5, icon_color)
-        } else {
-            Stroke::NONE
-        },
-        StrokeKind::Outside,
-    );
+    let icon_color = current_theme.components.button.label_active.to_color();
+    let hover_icon = ensure_min_lightness(current_theme.components.button.label_hover.to_color());
 
-    response.on_hover_text(used_percentage);
+    let btn_id = ui.id().with(&display_name);
+    let btn_resp = ui
+        .blaze_button(&display_name, &mut ui_state.icon_cache)
+        .id(btn_id)
+        .size((ui.available_width(), if is_mounted { 50.0 } else { 35.0 }))
+        .background_color(bg)
+        .hover_background_color(hover_bg)
+        .radius(20)
+        .stroke_color(Color32::TRANSPARENT)
+        .hover_stroke_color(hover_icon)
+        .icon(icon_name, icon_bytes)
+        .icon_color(icon_color)
+        .hover_icon_color(hover_icon)
+        .icon_size(16_f32)
+        .text_color(current_theme.semantic.text_primary.to_color())
+        .content_offset_y(if is_mounted { -8.0 } else { 0.0 })
+        .show(ui);
 
     if is_mounted {
         let padding_x = 34.0;
@@ -274,10 +222,10 @@ pub fn render_drives_button(
 
         let progress_rect = Rect::from_min_size(
             pos2(
-                rect.min.x + padding_x,
-                rect.min.y - height + rect.height() - padding_y,
+                btn_resp.rect.min.x + padding_x,
+                btn_resp.rect.min.y - height + btn_resp.rect.height() - padding_y,
             ),
-            vec2(rect.width() - (padding_x * 2.0), height),
+            vec2(btn_resp.rect.width() - (padding_x * 2.0), height),
         );
 
         //Fondo de la barra
@@ -293,39 +241,22 @@ pub fn render_drives_button(
             vec2(filled_width, progress_rect.height()),
         );
 
-        let progress_color = if used >= 0.90 {
-            Color32::from_rgb(239, 68, 68)
-        } else if used >= 0.75 {
-            Color32::from_rgb(249, 115, 22)
-        } else if used >= 0.50 {
-            Color32::from_rgb(250, 204, 21)
-        } else if used >= 0.25 {
-            Color32::from_rgb(56, 189, 248)
-        } else {
-            Color32::from_rgb(94, 234, 212)
-        };
-
         //relleno
-        ui.painter().rect_filled(filled_rect, 10.0, progress_color);
+        ui.painter()
+            .rect_filled(filled_rect, 10.0, current_theme.semantic.accent.to_color());
     }
 
-    let (icon, bytes) = if is_system {
-        ("system", ICON_DEVICE_PC)
-    } else if is_removable {
-        ("usb", ICON_USB)
-    } else {
-        ("server", ICON_SERVER)
-    };
+    if btn_resp.clicked() && is_mounted {
+        let path_string = drive.mountpoint.clone().unwrap_or_default();
+        let path = PathBuf::from(path_string);
+        state.navigate_to(path.as_path().into());
+    }
 
-    render_icon(ui, ui_state, icon, icon_color, bytes, rect);
+    if btn_resp.secondary_clicked() {
+        ui_state.context_menu_state.handle_response(&btn_resp);
+        ui_state.context_menu_state.kind = ContextMenuKind::DrivesPanel;
+        ui_state.context_menu_state.target_drive = Some(drive);
+    }
 
-    let y = if is_mounted { -8.0 } else { 0.0 };
-
-    ui.painter().text(
-        rect.left_center() + vec2(34.0, y),
-        Align2::LEFT_CENTER,
-        display_name,
-        FontId::default(),
-        current_theme.semantic.text_secondary.to_color(),
-    );
+    btn_resp.on_hover_text(used_percentage);
 }

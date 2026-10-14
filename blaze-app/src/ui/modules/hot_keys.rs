@@ -246,6 +246,10 @@ pub fn hot_keys_logic(
     }
 
     // Portapapeles
+    if mods_key.ctrl && input.key_pressed(Key::B) {
+        ui_state.toggle_clipboard();
+    }
+
     let (mut do_copy, mut do_cut, mut do_paste) = (false, false, false);
     with_keyboard_state(|k| match k.get(ui.cumulative_frame_nr()) {
         Some(KeyboardAction::Copy) => do_copy = true,

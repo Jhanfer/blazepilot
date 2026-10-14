@@ -18,7 +18,7 @@ use crate::{
         runtime::{bus_structs::FileOperation, event_bus::Dispatcher},
     },
     ui::{
-        custom_components::label::UiExt,
+        custom_components::UiExt,
         dialog_manager::manager::ModalDialog,
         themes::{platform::structs::ToColor, theme_manager::with_theme},
     },
