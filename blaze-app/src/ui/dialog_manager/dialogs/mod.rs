@@ -1,4 +1,4 @@
-pub mod configs_dialog;
+pub mod config_dialog;
 pub mod error_dialog;
 pub mod folder_color_selector_dialog;
 pub mod image_preview_dialog;

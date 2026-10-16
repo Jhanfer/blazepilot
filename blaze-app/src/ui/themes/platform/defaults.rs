@@ -1,7 +1,7 @@
 #[allow(deprecated)]
 use crate::ui::themes::platform::structs::{
     ButtonTokens, ComponentTokens, FileTheme, InputTokens, ListItemTokens, NewTheme, PanelTokens,
-    SemanticTokens, SidebarItemTokens, Theme, ThemeDefault, ToolsViewTokens,
+    SemanticTokens, SidebarItemTokens, ThemeDefault, ToolsViewTokens,
 };
 
 impl Default for FileTheme {
@@ -91,7 +91,7 @@ impl NewTheme {
                 separator: "#574069".into(),
                 accent: "#8C4BF7".into(),
                 accent_glow: "#BA6EFF".into(),
-                rubberband: "#8C4BF73E".into(),
+                rubberband: "#8D4BF7".into(),
                 text_primary: "#FFFFFF".into(),
                 text_secondary: "#E2D5ED".into(),
                 text_muted: "#7A6A85".into(),
@@ -146,7 +146,7 @@ impl NewTheme {
                 separator: "#FFD1DC".into(),
                 accent: "#FF6584".into(),
                 accent_glow: "#FF85A2".into(),
-                rubberband: "#FF658426".into(),
+                rubberband: "#FF6584".into(),
                 text_primary: "#3A1A22".into(),
                 text_secondary: "#704852".into(),
                 text_muted: "#A3858D".into(),
@@ -201,7 +201,7 @@ impl NewTheme {
                 separator: "#3C3C3C".into(),
                 accent: "#007ACC".into(),
                 accent_glow: "#1C97EA".into(),
-                rubberband: "#007ACC33".into(),
+                rubberband: "#007ACC".into(),
                 text_primary: "#CCCCCC".into(),
                 text_secondary: "#858585".into(),
                 text_muted: "#6A6A6A".into(),
@@ -256,7 +256,7 @@ impl NewTheme {
                 separator: "#E4E4E4".into(),
                 accent: "#007ACC".into(),
                 accent_glow: "#0062A3".into(),
-                rubberband: "#007ACC26".into(),
+                rubberband: "#007ACC".into(),
                 text_primary: "#555555".into(),
                 text_secondary: "#636363".into(),
                 text_muted: "#969696".into(),
@@ -296,65 +296,6 @@ impl NewTheme {
                 },
             },
             file_theme: FileTheme::default_light(),
-        }
-    }
-}
-
-#[allow(deprecated)]
-//migración de temas antiguos al nuevo sistema. El 'Theme' está deprecated
-impl Theme {
-    pub fn migrate_to_new(self) -> NewTheme {
-        NewTheme {
-            name: self.name,
-            autor: self.autor,
-            version: "2.0.0".into(),
-            luminance: self.luminance,
-            semantic: SemanticTokens {
-                bg_main: self.bg_main,
-                bg_container: self.bg_container.clone(),
-                separator: self.border_panel.clone(),
-                accent: self.accent.clone(),
-                accent_glow: self.accent_glow,
-                rubberband: self.rubberband.clone(),
-                text_primary: self.text_primary.clone(),
-                text_secondary: self.text_secondary.clone(),
-                text_muted: self.text_muted.clone(),
-                error: self.error,
-                success: self.success,
-                warn: self.warn,
-            },
-            components: ComponentTokens {
-                panel: PanelTokens {
-                    bg: self.bg_panel.clone(),
-                    border: self.border_panel.clone(),
-                },
-                input: InputTokens {
-                    bg: self.bg_container,
-                    border_idle: self.border_panel,
-                    border_focus: self.accent,
-                },
-                button: ButtonTokens {
-                    bg: self.main_buttons,
-                    bg_hover: self.bg_hover.clone(),
-                    label_hover: self.tool_btn_hovered.clone(),
-                    label_active: self.tool_btn_active.clone(),
-                    label_inactive: self.tool_btn_inactive.clone(),
-                },
-                sidebar_item: SidebarItemTokens {
-                    bg_hover: self.bg_hover.clone(),
-                },
-                list_item: ListItemTokens {
-                    bg_hover: self.bg_hover,
-                    bg_selected: self.item_selected,
-                },
-                tools: ToolsViewTokens {
-                    bg: self.bg_panel,
-                    label_hover: self.tool_btn_hovered,
-                    label_active: self.tool_btn_active,
-                    label_inactive: self.tool_btn_inactive,
-                },
-            },
-            file_theme: self.file_theme,
         }
     }
 }

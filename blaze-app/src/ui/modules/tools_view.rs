@@ -90,7 +90,7 @@ fn render_tag_button(ui: &mut Ui, state: &mut BlazeCoreState, ui_state: &mut Bla
         capsule_rect,
         radius,
         Stroke::new(1.0, current_theme.components.panel.border.to_color()),
-        egui::StrokeKind::Outside,
+        egui::StrokeKind::Middle,
     );
 
     let icon_size = vec2(16.0, 16.0);

@@ -23,28 +23,19 @@ pub fn render_row_rubberband(
             panel_top + state.rubber_band.rubber_band_start_content_y - state.scroll_offset;
         let start_screen = pos2(start.x, start_screen_y);
         let rect = Rect::from_two_pos(start_screen, current);
+        let rubber = current_theme.semantic.rubberband.to_color();
 
         clipped_painter.rect_filled(
             rect,
             10.0,
-            Color32::from_rgba_unmultiplied(
-                current_theme.semantic.accent_glow.to_color().r(),
-                current_theme.semantic.accent_glow.to_color().g(),
-                current_theme.semantic.accent_glow.to_color().b(),
-                40,
-            ),
+            Color32::from_rgba_unmultiplied(rubber.r(), rubber.g(), rubber.b(), 40),
         );
 
         let mut points = Vec::new();
 
         let stroke = Stroke::new(
             3.0,
-            Color32::from_rgba_unmultiplied(
-                current_theme.semantic.accent_glow.to_color().r(),
-                current_theme.semantic.accent_glow.to_color().g(),
-                current_theme.semantic.accent_glow.to_color().b(),
-                200,
-            ),
+            Color32::from_rgba_unmultiplied(rubber.r(), rubber.g(), rubber.b(), 200),
         );
         let radius = (rect.width().min(rect.height()) / 2.0).min(10.0);
         let steps = 8;

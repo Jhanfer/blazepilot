@@ -14,6 +14,7 @@
 
 use crate::core::bootstrap::configs::config_manager::with_configs;
 use crate::ui::custom_components::UiExt;
+use crate::ui::icons_cache::icon_cache::IconCache;
 use crate::ui::image_preview::image_preview_handler::ImagePreviewState;
 use crate::ui::themes::platform::structs::ToColor;
 use crate::ui::{dialog_manager::manager::ModalDialog, themes::theme_manager::with_theme};
@@ -35,7 +36,7 @@ impl ModalDialog for ImagePreviewDialog {
     fn close(&mut self) {
         self.close()
     }
-    fn render(&mut self, ui: &mut Ui) -> bool {
+    fn render(&mut self, ui: &mut Ui, _icon_cache: &mut IconCache) -> bool {
         self.render_dialog(ui)
     }
 }

@@ -352,7 +352,7 @@ impl ContextMenuState {
                 3.0,
                 current_theme.semantic.bg_container.to_color(),
                 Stroke::new(1.0, hint_stroke_color),
-                StrokeKind::Outside,
+                StrokeKind::Middle,
             );
 
             ui.painter().galley(hint_pos, hint_galley, hint_color);

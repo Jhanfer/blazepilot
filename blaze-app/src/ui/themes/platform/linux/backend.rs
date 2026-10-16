@@ -26,7 +26,7 @@ use crate::{
     },
     ui::themes::platform::{
         ColorsTrait,
-        structs::{NewTheme, Theme, ThemeDefault},
+        structs::{NewTheme, ThemeDefault},
     },
 };
 
@@ -234,32 +234,6 @@ impl LinuxTheme {
 
             let theme = if let Ok(t) = serde_json::from_str::<NewTheme>(&content) {
                 t
-            } else if let Ok(old) = serde_json::from_str::<Theme>(&content) {
-                let migrated = old.migrate_to_new();
-
-                match serde_json::to_string_pretty(&migrated) {
-                    Ok(json) => {
-                        if let Err(e) = std::fs::write(&path, json) {
-                            warn!(
-                                "No se ha podido guardar el tema migrado {}: {}",
-                                path.display(),
-                                e
-                            );
-                        } else {
-                            info!("Tema migrado a v2: {:?}", path);
-                        }
-                    }
-
-                    Err(e) => {
-                        warn!(
-                            "No se ha podido serializar el tema migrado {}: {}",
-                            path.display(),
-                            e
-                        );
-                    }
-                }
-
-                migrated
             } else {
                 warn!("JSON inválido, no se ha podido migrar: {}", path.display());
                 continue;

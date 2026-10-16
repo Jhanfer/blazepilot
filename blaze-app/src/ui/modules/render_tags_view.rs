@@ -454,7 +454,7 @@ pub fn tag_views(
                                                 color.b().saturating_add(bg_alpha),
                                             ),
                                             Stroke::new(0.5, color),
-                                            StrokeKind::Outside,
+                                            StrokeKind::Middle,
                                         );
 
                                         let n = 3;

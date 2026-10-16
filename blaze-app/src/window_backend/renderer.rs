@@ -214,10 +214,10 @@ impl Renderer {
                     resolve_target: None,
                     ops: Operations {
                         load: LoadOp::Clear(egui_wgpu::wgpu::Color {
-                            r: 0.12,
-                            g: 0.08,
-                            b: 0.20,
-                            a: 1.0,
+                            r: 0.0,
+                            g: 0.0,
+                            b: 0.0,
+                            a: 0.0,
                         }),
                         store: StoreOp::Store,
                     },
