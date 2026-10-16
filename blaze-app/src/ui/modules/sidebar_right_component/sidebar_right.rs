@@ -18,7 +18,7 @@ use crate::core::bootstrap::configs::platform::linux::conf_structs::{
     OrderingDirection, OrderingKind, OrderingMode,
 };
 use crate::ui::blaze_ui_state::BlazeUiState;
-use crate::ui::custom_components::text_edit::BlazeTextEdit;
+use crate::ui::custom_components::UiExt;
 use crate::ui::icons_cache::icons;
 use crate::ui::modules::sidebar_right_component::components::animated_section::render_animated_section;
 use crate::ui::modules::sidebar_right_component::components::clipboard_manager::render_clipboard_menu;
@@ -30,8 +30,8 @@ use crate::ui::modules::utilities::ensure_min_lightness;
 use crate::ui::themes::platform::structs::ToColor;
 use crate::ui::themes::theme_manager::with_theme;
 use egui::{
-    Align, Area, Button, Color32, CornerRadius, FontId, Frame, Id, Layout, Margin, Panel, Rect,
-    Sense, Stroke, StrokeKind, Ui, pos2, vec2,
+    Align, Area, Color32, CornerRadius, Frame, Id, Layout, Margin, Panel, Rect, Sense, Stroke, Ui,
+    pos2, vec2,
 };
 use std::sync::Arc;
 
@@ -68,13 +68,6 @@ fn render_expanded_panel(
 
             let search_id = Id::new("search_bar");
             let has_focus = ui.memory(|mem| mem.has_focus(search_id));
-
-            let search_color = if has_focus {
-                ensure_min_lightness(current_theme.components.input.border_focus.to_color())
-            } else {
-                current_theme.components.panel.border.to_color()
-            };
-
             Frame::NONE
                 .inner_margin(Margin::same(10))
                 .fill(current_theme.components.panel.bg.to_color())
@@ -84,123 +77,58 @@ fn render_expanded_panel(
                     color: current_theme.components.panel.border.to_color(),
                 })
                 .show(ui, |ui| {
-                    Frame::NONE
-                        .fill(current_theme.components.input.bg.to_color())
-                        .stroke(Stroke::new(0.5, search_color))
-                        .corner_radius(CornerRadius::same(99))
-                        .inner_margin(Margin::symmetric(10, 6))
-                        .show(ui, |ui| {
-                            ui.horizontal(|ui| {
-                                let icon_size = vec2(14.0, 14.0);
-                                let (icon_rect, _) =
-                                    ui.allocate_exact_size(icon_size, Sense::hover());
-                                let (icon_name, icon_bytes) = ("search", icons::ICON_SEARCH);
-                                let rounded_rect = Rect::from_min_max(
-                                    pos2(icon_rect.min.x.round(), icon_rect.min.y.round()),
-                                    pos2(icon_rect.max.x.round(), icon_rect.max.y.round()),
-                                );
+                    let search_color = if has_focus {
+                        ensure_min_lightness(current_theme.components.input.border_focus.to_color())
+                    } else {
+                        ensure_min_lightness(current_theme.components.input.border_idle.to_color())
+                    };
 
-                                let search_color = if has_focus {
-                                    ensure_min_lightness(
-                                        current_theme.components.input.border_focus.to_color(),
-                                    )
-                                } else {
-                                    ensure_min_lightness(
-                                        current_theme.components.input.border_idle.to_color(),
-                                    )
-                                };
+                    let (icon_name, icon_bytes) = ("search", icons::ICON_SEARCH);
 
-                                let icon = ui_state.icon_cache.get_or_load(
-                                    ui,
-                                    icon_name,
-                                    icon_bytes,
-                                    search_color,
-                                    icon_size,
-                                );
+                    let c = current_theme.semantic.accent_glow.to_color();
+                    let hint_stroke_color = Color32::from_rgba_unmultiplied(
+                        c.r().saturating_add(20),
+                        c.g().saturating_add(20),
+                        c.b().saturating_add(20),
+                        120,
+                    );
 
-                                ui.painter().image(
-                                    icon.id(),
-                                    rounded_rect,
-                                    Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
-                                    Color32::WHITE,
-                                );
+                    let hint_color = Color32::from_rgba_unmultiplied(
+                        c.r().saturating_add(60),
+                        c.g().saturating_add(60),
+                        c.b().saturating_add(60),
+                        160,
+                    );
 
-                                let mut search = state.current_search_filter().to_string();
+                    let mut search = state.current_search_filter().to_string();
 
-                                let response = ui.add(
-                                    BlazeTextEdit::singleline(&mut search)
-                                        .hint_text(i18n.t("search.placeholder"))
-                                        .desired_width(100.0)
-                                        .id(search_id),
-                                );
-
-                                if response.changed() {
-                                    state.set_search(search);
-                                    response.request_focus();
-                                }
-
-                                let extra_right_pad = 8.0;
-                                let trailing_size = vec2(28.0, 20.0);
-                                let (alloc_rect, _) =
-                                    ui.allocate_exact_size(trailing_size, Sense::hover());
-
-                                if !has_focus {
-                                    let hint = "Ctrl + K";
-
-                                    let c = current_theme.semantic.accent_glow.to_color();
-
-                                    let hint_stroke_color = Color32::from_rgba_unmultiplied(
-                                        c.r().saturating_add(20),
-                                        c.g().saturating_add(20),
-                                        c.b().saturating_add(20),
-                                        120,
-                                    );
-
-                                    let hint_color = Color32::from_rgba_unmultiplied(
-                                        c.r().saturating_add(60),
-                                        c.g().saturating_add(60),
-                                        c.b().saturating_add(60),
-                                        160,
-                                    );
-
-                                    let hint_galley = ui.painter().layout_no_wrap(
-                                        hint.to_string(),
-                                        FontId::proportional(10.0),
-                                        ensure_min_lightness(hint_color),
-                                    );
-
-                                    let pad = vec2(8.0, 2.0);
-                                    let hint_size = hint_galley.size();
-                                    let badge_size = hint_size + pad * 2.0;
-
-                                    let trailing_rect =
-                                        alloc_rect.translate(vec2(-extra_right_pad, 0.0));
-
-                                    let hint_pos = pos2(
-                                        trailing_rect.center().x - hint_size.x / 2.0,
-                                        trailing_rect.center().y - hint_size.y / 2.0,
-                                    );
-                                    let hint_rect =
-                                        Rect::from_center_size(trailing_rect.center(), badge_size);
-
-                                    ui.painter().rect(
-                                        hint_rect,
-                                        3.0,
-                                        current_theme.semantic.bg_container.to_color(),
-                                        Stroke::new(1.0, hint_stroke_color),
-                                        StrokeKind::Outside,
-                                    );
-
-                                    ui.painter().galley(hint_pos, hint_galley, hint_color);
-                                } else {
-                                    let btn = ui.put(alloc_rect, Button::new("X").small());
-                                    if btn.clicked() && !state.is_filter_empty() {
-                                        ui.memory_mut(|m| m.request_focus(search_id));
-                                        state.clean_search();
-                                    }
-                                }
-                            });
+                    let response = ui
+                        .blaze_input(
+                            &i18n.t("search.placeholder"),
+                            Some("Ctrl + K"),
+                            &mut search,
+                            &mut ui_state.icon_cache,
+                        )
+                        .id(search_id)
+                        .hint_background_color(current_theme.semantic.bg_container.to_color())
+                        .hint_stroke_color(hint_stroke_color)
+                        .hint_text_color(hint_color)
+                        .size((200.0, 30.0))
+                        .radius(20)
+                        .text_color(current_theme.semantic.text_secondary.to_color())
+                        .background_color(current_theme.semantic.bg_container.to_color())
+                        .stroke_color(search_color)
+                        .x_color(current_theme.semantic.accent_glow.to_color())
+                        .icon(icon_name, icon_bytes)
+                        .icon_color(search_color)
+                        .show(ui, || {
+                            state.clean_search();
                         });
+
+                    if response.changed() {
+                        state.set_search(search);
+                        response.request_focus();
+                    }
 
                     ui.add_space(5.0);
 

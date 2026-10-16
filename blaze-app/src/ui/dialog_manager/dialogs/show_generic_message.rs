@@ -17,6 +17,7 @@ use crate::{
     ui::{
         custom_components::UiExt,
         dialog_manager::manager::ModalDialog,
+        icons_cache::icon_cache::IconCache,
         themes::{platform::structs::ToColor, theme_manager::with_theme},
     },
 };
@@ -35,7 +36,7 @@ impl ModalDialog for ShowGenericDialog {
     fn close(&mut self) {
         self.close()
     }
-    fn render(&mut self, ui: &mut Ui) -> bool {
+    fn render(&mut self, ui: &mut Ui, _icon_cache: &mut IconCache) -> bool {
         self.render_dialog(ui)
     }
 }

@@ -295,7 +295,7 @@ pub fn render_button<F, C>(
         CornerRadius::same(20),
         fill_color,
         Stroke::new(0.9, accent_color),
-        StrokeKind::Outside,
+        StrokeKind::Middle,
     );
 
     ui.painter().text(
@@ -407,7 +407,7 @@ pub fn render_op_buttons<F, C>(
                 CornerRadius::same(20),
                 bg_color1,
                 Stroke::new(0.5, accent1),
-                StrokeKind::Outside,
+                StrokeKind::Middle,
             );
 
             let bg_color2 = Color32::from_rgb(165, 42, 42);
@@ -423,7 +423,7 @@ pub fn render_op_buttons<F, C>(
                 CornerRadius::same(20),
                 bg_color2,
                 Stroke::new(0.5, accent2),
-                StrokeKind::Outside,
+                StrokeKind::Middle,
             );
 
             let icon_edit = ui_state

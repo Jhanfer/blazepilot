@@ -587,7 +587,7 @@ pub fn new_render_scrollview(
                             rect,
                             5.0,
                             Stroke::new(2.0, Color32::from_rgb(150, 150, 255)),
-                            StrokeKind::Outside,
+                            StrokeKind::Middle,
                         );
                     }
                 } else if let Some(ref target_invalid) = state.row_view.drop_invalid_target.clone()
@@ -597,7 +597,7 @@ pub fn new_render_scrollview(
                         rect,
                         5.0,
                         Stroke::new(2.0, Color32::from_rgb(255, 150, 150)),
-                        StrokeKind::Outside,
+                        StrokeKind::Middle,
                     );
                 }
 

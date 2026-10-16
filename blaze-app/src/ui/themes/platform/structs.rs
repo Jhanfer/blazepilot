@@ -1,40 +1,6 @@
 use egui::Color32;
 use serde::{Deserialize, Serialize};
 
-#[deprecated(
-    since = "0.18.0",
-    note = "Esta función será removida en la versión 0.20.0. Usar 'NewTheme' en su lugar."
-)]
-#[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct Theme {
-    pub name: Box<str>,
-    pub autor: Box<str>,
-    pub version: Box<str>,
-    pub luminance: f32,
-    pub error: String,
-    pub success: String,
-    pub warn: String,
-    pub bg_main: String,
-    pub bg_panel: String,
-    pub bg_container: String,
-    pub border_panel: String,
-    pub main_buttons: String,
-    pub bg_hover: String,
-    pub accent: String,
-    pub accent_glow: String,
-    pub rubberband: String,
-    pub item_selected: String,
-    pub text_primary: String,
-    pub text_secondary: String,
-    pub text_muted: String,
-    pub tools_primary: String,
-    pub tools_secondary: String,
-    pub tool_btn_active: String,
-    pub tool_btn_inactive: String,
-    pub tool_btn_hovered: String,
-    pub file_theme: FileTheme,
-}
-
 //Traits
 pub trait ThemeDefault: Sized {
     fn default_dark() -> Self;

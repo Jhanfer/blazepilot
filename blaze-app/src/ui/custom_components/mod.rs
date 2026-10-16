@@ -1,8 +1,14 @@
-use egui::{Response, Ui, WidgetText};
+use egui::{Color32, Response, Ui, WidgetText};
+use std::{fmt::Debug, hash::Hash};
 
-use crate::ui::{custom_components::button::BlazeButton, icons_cache::icon_cache::IconCache};
+use crate::ui::{
+    custom_components::{button::BlazeButton, color_picker::BlazeColorPicker, input::BlazeInput},
+    icons_cache::icon_cache::IconCache,
+};
 
 pub mod button;
+pub mod color_picker;
+pub mod input;
 pub mod label;
 pub mod text_edit;
 
@@ -16,6 +22,20 @@ pub trait UiExt {
         text: T,
         icon_cache: &'a mut IconCache,
     ) -> BlazeButton<'a>;
+
+    fn color_picker<'a, T: Into<&'a mut Color32>, U: Hash + Debug>(
+        &mut self,
+        rgba: T,
+        id_source: U,
+    ) -> BlazeColorPicker<'a>;
+
+    fn blaze_input<'a, T: Into<&'a mut String>>(
+        &mut self,
+        input_hint_text: &'a str,
+        hint_text: Option<&'a str>,
+        input: T,
+        icon_cache: &'a mut IconCache,
+    ) -> BlazeInput<'a>;
 }
 
 impl UiExt for Ui {
@@ -32,5 +52,23 @@ impl UiExt for Ui {
         icon_cache: &'a mut IconCache,
     ) -> BlazeButton<'a> {
         BlazeButton::new(self, text, icon_cache)
+    }
+
+    fn color_picker<'a, T: Into<&'a mut Color32>, U: Hash + Debug>(
+        &mut self,
+        rgba: T,
+        id_source: U,
+    ) -> BlazeColorPicker<'a> {
+        BlazeColorPicker::new(self, rgba, id_source)
+    }
+
+    fn blaze_input<'a, T: Into<&'a mut String>>(
+        &mut self,
+        input_hint_text: &'a str,
+        hint_text: Option<&'a str>,
+        input: T,
+        icon_cache: &'a mut IconCache,
+    ) -> BlazeInput<'a> {
+        BlazeInput::new(self, input, input_hint_text, hint_text, icon_cache)
     }
 }

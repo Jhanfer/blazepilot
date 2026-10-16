@@ -497,7 +497,7 @@ pub fn render_grid_scrollview(
                             rect,
                             8.0,
                             Stroke::new(2.0, Color32::from_rgb(150, 150, 255)),
-                            StrokeKind::Outside,
+                            StrokeKind::Middle,
                         );
                     }
                 } else if let Some(ref target_invalid) =
@@ -508,7 +508,7 @@ pub fn render_grid_scrollview(
                         rect,
                         8.0,
                         Stroke::new(2.0, Color32::from_rgb(255, 150, 150)),
-                        StrokeKind::Outside,
+                        StrokeKind::Middle,
                     );
                 }
 

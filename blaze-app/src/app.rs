@@ -230,7 +230,9 @@ impl BlazeApp {
 
         self.state.process_messages();
 
-        self.ui_state.dialog_manager.render_area(ui);
+        self.ui_state
+            .dialog_manager
+            .render_area(ui, &mut self.ui_state.icon_cache);
         self.ui_state.process_events();
 
         connect_ui_components_callback(ui, &mut self.state, &mut self.ui_state);

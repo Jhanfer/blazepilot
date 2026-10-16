@@ -1,6 +1,6 @@
 use egui::{
     Color32, CornerRadius, CursorIcon, Id, Rect, Response, Sense, Stroke, StrokeKind, TextStyle,
-    TextWrapMode, Ui, Vec2, WidgetText, pos2,
+    TextWrapMode, Ui, Vec2, WidgetText, pos2, vec2,
 };
 
 use crate::ui::icons_cache::icon_cache::IconCache;
@@ -146,18 +146,15 @@ impl<'a> BlazeButton<'a> {
         let gap = 6.0;
         let padding_x = 10_f32;
 
-        let icon_w = if self.icon.is_some() {
-            icon_size + gap
-        } else {
-            0.0
-        };
+        let has_text = !self.text.is_empty();
+        let has_icon = self.icon.is_some();
+
+        let gap_eff = if has_icon && has_text { gap } else { 0.0 };
+        let icon_w = if has_icon { icon_size + gap_eff } else { 0.0 };
 
         let available_w = ui.available_width();
-
         let button_w = self.width.max(0.0).min(available_w);
         let text_max_w = (button_w - icon_w - padding_x * 2.0).max(0.0);
-
-        let has_text = !self.text.is_empty();
 
         let galley = self.text.into_galley(
             ui,
@@ -166,15 +163,20 @@ impl<'a> BlazeButton<'a> {
             TextStyle::Button,
         );
 
-        let show_text = text_max_w > 0.0 && !galley.is_empty() && galley.size().x <= text_max_w;
+        let text_size = if has_text { galley.size() } else { Vec2::ZERO };
+        let show_text = has_text && text_max_w > 0.0 && text_size.x <= text_max_w;
 
-        let min_w = icon_w + galley.size().x + padding_x * 2.0;
-        let min_h = galley.size().y.max(icon_size) + 12.0;
+        let content_w = icon_w + text_size.x;
+        let content_h = text_size.y.max(if has_icon { icon_size } else { 0.0 });
 
-        let desired_size = Vec2::new(
-            self.width.max(min_w).min(available_w),
-            self.height.max(min_h),
-        );
+        let min_w = content_w + padding_x * 2.0;
+        let min_h = content_h + 12.0;
+
+        let desired_size = if has_text {
+            Vec2::new(self.width.max(min_w), self.height.max(min_h))
+        } else {
+            Vec2::new(self.width.max(0.0), self.height.max(0.0))
+        };
 
         let rect = ui.allocate_space(desired_size).1;
         let resp = ui.interact(rect, self.id, Sense::click());
@@ -195,19 +197,22 @@ impl<'a> BlazeButton<'a> {
             self.corner_radius,
             bg,
             Stroke::new(0.5, st_c),
-            StrokeKind::Outside,
+            StrokeKind::Middle,
         );
 
-        let mut cursor_x = rect.min.x + padding_x;
+        let mut cursor_x = rect.min.x + if has_text { padding_x } else { 0.0 };
 
         if let Some((name, bytes)) = self.icon {
-            let icon_rect = Rect::from_min_size(
+            let center = if has_text {
                 pos2(
-                    cursor_x,
-                    rect.center().y - icon_size / 2.0 + self.content_offset_y,
-                ),
-                Vec2::splat(icon_size),
-            );
+                    cursor_x + icon_size / 2.0,
+                    rect.center().y + self.content_offset_y,
+                )
+            } else {
+                rect.center() + vec2(0.0, self.content_offset_y)
+            };
+
+            let icon_rect = Rect::from_center_size(center, Vec2::splat(icon_size));
 
             let rounded_rect = Rect::from_min_max(
                 pos2(icon_rect.min.x.round(), icon_rect.min.y.round()),
