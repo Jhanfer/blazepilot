@@ -153,12 +153,13 @@ impl ContextMenuState {
 
         let menu_rect = area_response.response.rect;
         let clicked_outside = ui.input(|i| {
-            i.pointer.primary_clicked()
-                || i.pointer.secondary_clicked()
-                    && i.pointer
-                        .latest_pos()
-                        .map(|p| !menu_rect.contains(p))
-                        .unwrap_or(true)
+            let Some(pos) = i.pointer.latest_pos() else {
+                return false;
+            };
+            if menu_rect.contains(pos) {
+                return false;
+            }
+            i.pointer.primary_clicked() || i.pointer.secondary_clicked()
         });
 
         if clicked_outside || ui.input(|i| i.key_pressed(Key::Escape)) {

@@ -66,7 +66,7 @@ fn render_expanded_panel(
         .show(ui, |ui| {
             inner_width = ui.available_width();
 
-            let search_id = Id::new("search_bar");
+            let search_id: Id = Id::new("search_bar");
             let has_focus = ui.memory(|mem| mem.has_focus(search_id));
             Frame::NONE
                 .inner_margin(Margin::same(10))

@@ -24,8 +24,8 @@ use crate::ui::icons_cache::icon_cache::IconCache;
 use crate::ui::themes::platform::structs::ToColor;
 use crate::ui::themes::theme_manager::with_theme;
 use egui::{
-    Align2, Color32, CornerRadius, Frame, Id, Key, Margin, Order, RichText, Stroke, Ui, Vec2,
-    Window,
+    Align2, CentralPanel, Color32, CornerRadius, Frame, Id, Key, Margin, Order, Panel, RichText,
+    Stroke, Ui, Vec2, Window,
 };
 
 #[derive(PartialEq, Clone, Copy)]
@@ -200,7 +200,7 @@ impl ConfigDialog {
 
         let search_id = egui::Id::new("config_search_bar");
 
-        let w = ui.available_width() + 20.0;
+        let w = ui.available_width();
 
         let resp = ui
             .blaze_input("Buscar...", None, &mut self.config_search, icon_cache)
@@ -265,7 +265,7 @@ impl ConfigDialog {
             };
 
             if ui
-                .blaze_button(label, icon_cache)
+                .blaze_button(label, Some(icon_cache))
                 .size((w, 20.0))
                 .background_color(bg)
                 .hover_background_color(hover_bg)
@@ -307,12 +307,12 @@ impl ConfigDialog {
                 0.5,
                 current_theme.components.panel.border.to_color(),
             ))
-            .corner_radius(CornerRadius::same(10))
+            .corner_radius(CornerRadius::same(15))
             .inner_margin(Margin::same(5));
 
         let screen_rect = ui.viewport_rect();
-        let desired_width = screen_rect.width() * 0.68;
-        let desired_height = screen_rect.height() * 0.65;
+        let desired_width = screen_rect.width() * 0.88;
+        let desired_height = screen_rect.height() * 0.85;
 
         Window::new(
             RichText::new(i18n.t("configs.title"))
@@ -337,29 +337,31 @@ impl ConfigDialog {
                 ui.set_width(ui.available_width());
                 ui.set_height(h);
 
-                ui.vertical(|ui| {
-                    ui.set_width(160.0);
-                    ui.add_space(8.0);
+                Panel::left("configs_sidebar")
+                    .exact_size(160.0)
+                    .resizable(false)
+                    .show(ui, |ui| {
+                        self.render_config_sidebar(ui, icon_cache);
+                    });
 
-                    self.render_config_sidebar(ui, icon_cache);
-                });
-
-                ui.separator();
-
-                ui.vertical(|ui| {
-                    ui.set_height(h);
-                    ui.add_space(8.0);
+                CentralPanel::default().show(ui, |ui| {
                     let query = self.config_search.trim().to_lowercase();
 
                     match self.current_config_tab {
                         CurrentConfigTab::General => render_general_settings(ui, &query),
-                        CurrentConfigTab::Terminal => render_terminal_settings(self, ui, &query),
-                        CurrentConfigTab::Backend => render_backend_settings(ui, &query),
+                        CurrentConfigTab::Terminal => {
+                            render_terminal_settings(self, ui, &query, icon_cache)
+                        }
+                        CurrentConfigTab::Backend => {
+                            render_backend_settings(ui, &query, icon_cache)
+                        }
                         CurrentConfigTab::Appearance => {
                             render_appearance_settings(self, ui, &query, icon_cache)
                         }
                         CurrentConfigTab::Behavior => {}
-                        CurrentConfigTab::Language => render_language_settings(ui, &query),
+                        CurrentConfigTab::Language => {
+                            render_language_settings(ui, &query, icon_cache)
+                        }
                     }
                 });
             });

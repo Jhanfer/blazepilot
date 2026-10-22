@@ -1,6 +1,7 @@
+use core::ops::RangeInclusive;
 use egui::{
-    Color32, Id, Mesh, Popup, PopupCloseBehavior, Rect, Response, Sense, Shape, Slider,
-    SliderClamping, Stroke, Ui, lerp, pos2, vec2,
+    Color32, Id, Layout, Mesh, Popup, PopupCloseBehavior, Rect, Response, Sense, Shape, Stroke,
+    StrokeKind, Ui, emath, lerp, pos2, remap_clamp, vec2,
 };
 use std::fmt::Debug;
 
@@ -44,6 +45,7 @@ impl BlazeHsva {
 struct PickerState {
     hsvs: BlazeHsva,
     target_hue: f32,
+    target_alpha: f32,
     last_color: Color32,
 }
 
@@ -80,6 +82,7 @@ impl<'a> BlazeColorPicker<'a> {
             PickerState {
                 hsvs,
                 target_hue: hsvs.h,
+                target_alpha: hsvs.a,
                 last_color: color,
             }
         };
@@ -113,62 +116,173 @@ impl<'a> BlazeColorPicker<'a> {
             .id(popup_id)
             .close_behavior(PopupCloseBehavior::CloseOnClickOutside)
             .show(|ui| {
-                ui.add(
-                    Slider::new(&mut ps.target_hue, 0.0..=1.0)
-                        .clamping(SliderClamping::Always)
-                        .text("Hue"),
+                ui.allocate_ui_with_layout(
+                    vec2(200.0, 200.0),
+                    Layout::bottom_up(egui::Align::Center),
+                    |ui| {
+                        self.paint_hue_alpha_slider(
+                            ui,
+                            0.0..=1.0,
+                            &mut ps.target_hue,
+                            ps.hsvs.h,
+                            ps.hsvs.s,
+                            ps.hsvs.v,
+                            ps.hsvs.a,
+                            true,
+                        );
+
+                        self.paint_hue_alpha_slider(
+                            ui,
+                            0.0..=1.0,
+                            &mut ps.target_alpha,
+                            ps.hsvs.h,
+                            ps.hsvs.s,
+                            ps.hsvs.v,
+                            ps.hsvs.a,
+                            false,
+                        );
+
+                        let diff_hue = ps.target_hue - ps.hsvs.h;
+                        let diff_alpha = ps.target_alpha - ps.hsvs.a;
+
+                        if diff_hue.abs() > 0.001 {
+                            ps.hsvs.h += diff_hue;
+                        } else {
+                            ps.hsvs.h = ps.target_hue;
+                        }
+
+                        if diff_alpha.abs() > 0.001 {
+                            ps.hsvs.a += diff_alpha;
+                        } else {
+                            ps.hsvs.a = ps.target_alpha;
+                        }
+
+                        let size = vec2(240.0, 180.0);
+                        let (rect, mut response) =
+                            ui.allocate_exact_size(size, Sense::click_and_drag());
+
+                        if (response.dragged() || response.clicked())
+                            && let Some(pointer_pos) = response.interact_pointer_pos()
+                        {
+                            ps.hsvs.s =
+                                ((pointer_pos.x - rect.left()) / rect.width()).clamp(0.0, 1.0);
+                            ps.hsvs.v = (1.0 - (pointer_pos.y - rect.top()) / rect.height())
+                                .clamp(0.0, 1.0);
+                        }
+
+                        let [r, g, b, a] = ps.hsvs.to_rgba();
+                        let q = |x: f32| (x * 255.0).round().clamp(0.0, 255.0) as u8;
+                        let new_color = Color32::from_rgba_unmultiplied(q(r), q(g), q(b), q(a));
+
+                        if new_color != *self.rgba {
+                            *self.rgba = new_color;
+                            response.mark_changed();
+                        }
+
+                        ps.last_color = new_color;
+                        ui.data_mut(|data| {
+                            data.insert_temp(memory_id, ps);
+                        });
+
+                        if ui.is_rect_visible(rect) {
+                            self.paint_sv_square(
+                                ui, rect, ps.hsvs.h, ps.hsvs.s, ps.hsvs.v, ps.hsvs.a,
+                            );
+                        }
+
+                        sv_response = response;
+                    },
                 );
-
-                ui.add(
-                    Slider::new(&mut ps.hsvs.a, 0.0..=1.0)
-                        .clamping(SliderClamping::Always)
-                        .text("Alpha"),
-                );
-
-                let diff = ps.target_hue - ps.hsvs.h;
-
-                if diff.abs() > 0.001 {
-                    ps.hsvs.h += diff;
-                } else {
-                    ps.hsvs.h = ps.target_hue;
-                }
-
-                let size = vec2(240.0, 180.0);
-                let (rect, mut response) = ui.allocate_exact_size(size, Sense::click_and_drag());
-
-                if (response.dragged() || response.clicked())
-                    && let Some(pointer_pos) = response.interact_pointer_pos()
-                {
-                    ps.hsvs.s = ((pointer_pos.x - rect.left()) / rect.width()).clamp(0.0, 1.0);
-                    ps.hsvs.v =
-                        (1.0 - (pointer_pos.y - rect.top()) / rect.height()).clamp(0.0, 1.0);
-                }
-
-                let [r, g, b, a] = ps.hsvs.to_rgba();
-                let q = |x: f32| (x * 255.0).round().clamp(0.0, 255.0) as u8;
-                let new_color = Color32::from_rgba_unmultiplied(q(r), q(g), q(b), q(a));
-
-                if new_color != *self.rgba {
-                    *self.rgba = new_color;
-                    response.mark_changed();
-                }
-
-                ps.last_color = new_color;
-                ui.data_mut(|data| {
-                    data.insert_temp(memory_id, ps);
-                });
-
-                if ui.is_rect_visible(rect) {
-                    self.paint_sv_square(ui, rect, ps.hsvs.h, ps.hsvs.s, ps.hsvs.v);
-                }
-
-                sv_response = response;
             });
 
         sv_response
     }
 
-    fn paint_sv_square(&self, ui: &mut Ui, rect: Rect, hue: f32, selected_s: f32, selected_v: f32) {
+    #[allow(clippy::too_many_arguments)]
+    fn paint_hue_alpha_slider<Num: emath::Numeric>(
+        &mut self,
+        ui: &mut Ui,
+        range: impl Into<RangeInclusive<Num>>,
+        value: &mut Num,
+        h: f32,
+        s: f32,
+        v: f32,
+        a: f32,
+        is_hue: bool,
+    ) {
+        let range = range.into();
+        let range_f64 = range.start().to_f64()..=range.end().to_f64();
+        let (rect, mut response) =
+            ui.allocate_exact_size(vec2(240.0, 16.0), Sense::click_and_drag());
+
+        if (response.dragged() || response.clicked())
+            && let Some(pos) = response.interact_pointer_pos()
+        {
+            let t = ((pos.x - rect.left()) / rect.width()).clamp(0.0, 1.0);
+            let v = lerp(range_f64.clone(), t as f64);
+            *value = Num::from_f64(v);
+            response.mark_changed();
+        }
+
+        let t = remap_clamp(value.to_f64(), range_f64, 0.0..=1.0) as f32;
+
+        if ui.is_rect_visible(rect) {
+            const STEPS: usize = 64;
+            let mut mesh = Mesh::default();
+
+            for i in 0..=STEPS {
+                let t = i as f32 / STEPS as f32;
+                let x = lerp(rect.left()..=rect.right(), t);
+
+                let color = if is_hue {
+                    hsva_to_color32(t, s, v, a)
+                } else {
+                    hsva_to_color32(h, s, t, a)
+                };
+
+                let base = mesh.vertices.len() as u32;
+
+                mesh.colored_vertex(pos2(x, rect.top()), color);
+
+                mesh.colored_vertex(pos2(x, rect.bottom()), color);
+
+                if i > 0 {
+                    let prev_top = base - 2;
+                    let prev_bottom = base - 1;
+                    let cur_top = base;
+                    let cur_bottom = base + 1;
+
+                    mesh.add_triangle(prev_top, cur_top, prev_bottom);
+                    mesh.add_triangle(cur_top, cur_bottom, prev_bottom);
+                }
+            }
+
+            ui.painter().add(Shape::mesh(mesh));
+
+            let r = rect.height() / 2.0;
+            let w = r * 0.42 + 1.0;
+            let bg = ui.visuals().panel_fill;
+            ui.painter()
+                .rect_stroke(rect, r, Stroke::new(w, bg), StrokeKind::Outside);
+
+            let x = lerp(rect.left()..=rect.right(), t);
+            let center = pos2(x, rect.center().y);
+
+            ui.painter().circle_filled(center, 6.0, Color32::WHITE);
+            ui.painter()
+                .circle_stroke(center, 6.0, Stroke::new(1.5, Color32::BLACK));
+        }
+    }
+
+    fn paint_sv_square(
+        &self,
+        ui: &mut Ui,
+        rect: Rect,
+        hue: f32,
+        selected_s: f32,
+        selected_v: f32,
+        a: f32,
+    ) {
         const STEPS: usize = 36;
         let mut mesh = Mesh::default();
 
@@ -177,7 +291,7 @@ impl<'a> BlazeColorPicker<'a> {
                 let s = x as f32 / STEPS as f32;
                 let v = 1.0 - y as f32 / STEPS as f32;
 
-                let color = hsv_to_rgb(hue, s, v);
+                let color = hsva_to_color32(hue, s, v, a);
 
                 let px = lerp(rect.left()..=rect.right(), s);
 
@@ -208,7 +322,7 @@ impl<'a> BlazeColorPicker<'a> {
             lerp(rect.bottom()..=rect.top(), selected_v),
         );
 
-        let color = hsv_to_rgb(hue, selected_s, selected_v);
+        let color = hsva_to_color32(hue, selected_s, selected_v, a);
 
         ui.painter().circle_filled(selector_pos, 8.0, color);
 
@@ -220,26 +334,10 @@ impl<'a> BlazeColorPicker<'a> {
     }
 }
 
-fn hsv_to_rgb(h: f32, s: f32, v: f32) -> Color32 {
-    let h = h.rem_euclid(1.0) * 6.0;
-    let c = v * s;
-    let x = c * (1.0 - (h.rem_euclid(2.0) - 1.0).abs());
-    let m = v - c;
-
-    let (r, g, b) = match h as u32 {
-        0 => (c, x, 0.0),
-        1 => (x, c, 0.0),
-        2 => (0.0, c, x),
-        3 => (0.0, x, c),
-        4 => (x, 0.0, c),
-        _ => (c, 0.0, x),
-    };
-
-    Color32::from_rgb(
-        ((r + m) * 255.0).round() as u8,
-        ((g + m) * 255.0).round() as u8,
-        ((b + m) * 255.0).round() as u8,
-    )
+fn hsva_to_color32(h: f32, s: f32, v: f32, a: f32) -> Color32 {
+    let [r, g, b, a] = BlazeHsva { h, s, v, a }.to_rgba();
+    let q = |x: f32| (x.clamp(0.0, 1.0) * 255.0).round() as u8;
+    Color32::from_rgba_unmultiplied(q(r), q(g), q(b), q(a))
 }
 
 fn rgb_to_hsv(r: f32, g: f32, b: f32, a: f32) -> BlazeHsva {

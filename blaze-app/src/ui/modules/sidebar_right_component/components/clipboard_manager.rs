@@ -76,7 +76,7 @@ pub fn render_clipboard_menu(
 
                 if expansion > 0.0 && show {
                     let btn_resp = ui
-                        .blaze_button("Limpiar", &mut ui_state.icon_cache)
+                        .blaze_button("Limpiar", Some(&mut ui_state.icon_cache))
                         .size((current_w, 14.0))
                         .radius(20)
                         .stroke_color(Color32::TRANSPARENT)
@@ -109,7 +109,7 @@ pub fn render_clipboard_menu(
                                         Color32::from_rgba_unmultiplied(178, 34, 34, 200);
 
                                     let btn = ui
-                                        .blaze_button(item.clone(), &mut ui_state.icon_cache)
+                                        .blaze_button(item.clone(), Some(&mut ui_state.icon_cache))
                                         .size((current_w - 5.0, 14.0))
                                         .radius(20)
                                         .stroke_color(Color32::TRANSPARENT)
@@ -156,7 +156,7 @@ pub fn render_clipboard_menu(
 
                 if current_w > 0.8 {
                     let btn_resp = ui
-                        .blaze_button(label, &mut ui_state.icon_cache)
+                        .blaze_button(label, Some(&mut ui_state.icon_cache))
                         .background_color(bg)
                         .hover_background_color(hover_bg)
                         .size((current_w, 10.0 * presence))

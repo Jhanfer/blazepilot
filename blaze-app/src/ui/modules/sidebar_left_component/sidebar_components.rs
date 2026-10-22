@@ -120,7 +120,7 @@ pub fn render_local_buttons(
 
     let btn_id = ui.id().with(label);
     let btn_resp = ui
-        .blaze_button(label, &mut ui_state.icon_cache)
+        .blaze_button(label, Some(&mut ui_state.icon_cache))
         .id(btn_id)
         .size((ui.available_width(), 35.0))
         .background_color(bg)
@@ -199,7 +199,7 @@ pub fn render_drives_button(
 
     let btn_id = ui.id().with(&display_name);
     let btn_resp = ui
-        .blaze_button(&display_name, &mut ui_state.icon_cache)
+        .blaze_button(&display_name, Some(&mut ui_state.icon_cache))
         .id(btn_id)
         .size((ui.available_width(), if is_mounted { 50.0 } else { 35.0 }))
         .background_color(bg)

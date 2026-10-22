@@ -111,9 +111,26 @@ pub fn git_dot_color(git: Option<&GitStatus>) -> Option<Color32> {
     }
 }
 
+pub fn contrats_to_text_color(color: Color32) -> Color32 {
+    let r = color.r() as f32 / 255.0;
+    let g = color.g() as f32 / 255.0;
+    let b = color.b() as f32 / 255.0;
+
+    let luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+
+    if luminance > 0.5 {
+        Color32::from_rgb(30, 30, 30)
+    } else {
+        Color32::WHITE
+    }
+}
+
 pub fn ensure_min_lightness(color: Color32) -> Color32 {
     let min_lightness = with_theme(|t| t.current().luminance);
+    ensure_min_lightness_with_luminance(color, min_lightness)
+}
 
+pub fn ensure_min_lightness_with_luminance(color: Color32, min_lightness: f32) -> Color32 {
     let r = color.r() as f32 / 255.0;
     let g = color.g() as f32 / 255.0;
     let b = color.b() as f32 / 255.0;

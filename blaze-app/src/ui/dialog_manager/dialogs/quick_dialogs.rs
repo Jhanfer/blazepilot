@@ -26,7 +26,7 @@ use crate::{
         themes::{platform::structs::ToColor, theme_manager::with_theme},
     },
 };
-use egui::{Color32, CornerRadius, Frame, Margin, Modal, Order, Ui, Window};
+use egui::{Color32, CornerRadius, Frame, Margin, Modal, Order, RichText, Ui, Window};
 
 pub struct QuickAccDialog {
     event: Option<QuickTagEvent>,
@@ -43,8 +43,8 @@ impl ModalDialog for QuickAccDialog {
     fn close(&mut self) {
         self.close()
     }
-    fn render(&mut self, ui: &mut Ui, _icon_cache: &mut IconCache) -> bool {
-        self.process_events(ui)
+    fn render(&mut self, ui: &mut Ui, icon_cache: &mut IconCache) -> bool {
+        self.process_events(ui, icon_cache)
     }
 }
 
@@ -77,11 +77,13 @@ impl QuickAccDialog {
         });
     }
 
-    fn process_events(&mut self, ui: &mut Ui) -> bool {
+    fn process_events(&mut self, ui: &mut Ui, icon_cache: &mut IconCache) -> bool {
         let Some(event) = self.event.take() else {
             return false;
         };
 
+        let current_theme = with_theme(|t| t.current().clone());
+        let is_dark_theme = current_theme.semantic.text_primary.to_color().r() > 128;
         let i18n = with_configs(|c| c.get_i18n());
 
         match event {
@@ -102,23 +104,51 @@ impl QuickAccDialog {
                         ui.set_min_height(100.0);
 
                         ui.vertical_centered(|ui| {
-                            egui::ComboBox::from_label(
-                                i18n.t("quick_dialog_quick_to_tag.select_tag"),
-                            )
-                            .selected_text(
-                                tags.get(selected_index)
-                                    .map(|t| t.title.as_ref())
-                                    .unwrap_or(&i18n.t("quick_dialog_quick_to_tag.select_tag")),
-                            )
-                            .show_ui(ui, |ui| {
-                                for (i, tag) in tags.iter().enumerate() {
-                                    if ui
-                                        .selectable_label(selected_index == i, &*tag.title)
-                                        .clicked()
-                                    {
-                                        selected_index = i;
-                                    }
-                                }
+                            let cbg = current_theme.components.button.bg_hover.to_color();
+                            let hover_bg = if is_dark_theme {
+                                Color32::from_rgba_unmultiplied(cbg.r(), cbg.g(), cbg.b(), 80)
+                            } else {
+                                Color32::from_rgba_unmultiplied(cbg.r(), cbg.g(), cbg.b(), 10)
+                            };
+
+                            ui.label_ns(i18n.t("quick_dialog_quick_to_tag.select_tag"));
+
+                            ui.horizontal(|ui| {
+                                ui.blaze_combobox(Some(icon_cache))
+                                    .selected_text(&*current_theme.name)
+                                    .text_color(current_theme.semantic.text_primary.to_color())
+                                    .size((150.0, 30.0))
+                                    .background_color(current_theme.components.button.bg.to_color())
+                                    .hover_background_color(hover_bg)
+                                    .show(ui, |ui| {
+                                        let w = ui.available_width();
+
+                                        for (i, tag) in tags.iter().enumerate() {
+                                            let label = RichText::new(&*tag.title).color(
+                                                current_theme.semantic.text_primary.to_color(),
+                                            );
+
+                                            let bg = if selected_index == i {
+                                                current_theme.semantic.accent_glow.to_color()
+                                            } else {
+                                                current_theme.components.button.bg.to_color()
+                                            };
+
+                                            if ui
+                                                .blaze_button(label, None)
+                                                .id(format!("quick_tag{i}"))
+                                                .size((w, 20.0))
+                                                .background_color(bg)
+                                                .hover_background_color(hover_bg)
+                                                .stroke_color(Color32::TRANSPARENT)
+                                                .radius(20)
+                                                .show(ui)
+                                                .clicked()
+                                            {
+                                                selected_index = i;
+                                            }
+                                        }
+                                    });
                             });
 
                             ui.add_space(8.0);

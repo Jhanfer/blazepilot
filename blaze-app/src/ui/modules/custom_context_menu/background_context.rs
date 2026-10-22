@@ -1,6 +1,6 @@
 use std::{cell::Cell, path::PathBuf, sync::Arc};
 
-use egui::{Color32, FontId, Id, Rect, Sense, Ui, UiBuilder, pos2, vec2};
+use egui::{Color32, Id, Ui};
 use tracing::warn;
 
 use crate::{
@@ -12,7 +12,7 @@ use crate::{
     },
     ui::{
         blaze_ui_state::BlazeUiState,
-        custom_components::text_edit::BlazeTextEdit,
+        custom_components::UiExt,
         icons_cache::icons,
         modules::utilities::ensure_min_lightness,
         themes::{platform::structs::ToColor, theme_manager::with_theme},
@@ -140,70 +140,68 @@ impl ContextMenuState {
         let mut should_close = false;
         let mut just_opened = Cell::new(self.just_opened);
         self.show_menu(ui, "custom_ctx_menu_background", |ui| {
-            ui.horizontal(|ui| {
-                let icon = ("search", icons::ICON_ZOOM);
-                let icon_size = vec2(16.0, 16.0);
-                let padding = 8.0;
+            let w = ui.available_width();
+            let search_id = Id::new("search_ctx_menu");
+            let has_focus = ui.memory(|mem| mem.has_focus(search_id));
 
-                let (rect, _) =
-                    ui.allocate_exact_size(vec2(ui.available_width() - 2.0, 30.0), Sense::hover());
+            let search_color = if has_focus {
+                ensure_min_lightness(current_theme.components.input.border_focus.to_color())
+            } else {
+                ensure_min_lightness(current_theme.components.input.border_idle.to_color())
+            };
 
-                let search_id = Id::new("search_ctx_menu");
-                let has_focus = ui.memory(|mem| mem.has_focus(search_id));
+            let (icon_name, icon_bytes) = ("search", icons::ICON_SEARCH);
 
-                let search_color = if has_focus {
-                    ensure_min_lightness(current_theme.components.input.border_focus.to_color())
-                } else {
-                    ensure_min_lightness(current_theme.components.input.border_idle.to_color())
-                };
+            let c = current_theme.semantic.accent_glow.to_color();
+            let hint_stroke_color = Color32::from_rgba_unmultiplied(
+                c.r().saturating_add(20),
+                c.g().saturating_add(20),
+                c.b().saturating_add(20),
+                120,
+            );
 
-                let paint_rect = rect.shrink2(vec2(4.0, 0.0));
-                ui.painter().rect_filled(
-                    paint_rect,
-                    12.0,
-                    current_theme.components.input.bg.to_color(),
-                );
+            let hint_color = Color32::from_rgba_unmultiplied(
+                c.r().saturating_add(60),
+                c.g().saturating_add(60),
+                c.b().saturating_add(60),
+                160,
+            );
 
-                let icon_pos = rect.left_top() + vec2(padding, (rect.height() - icon_size.y) / 2.0);
-                let icon_rect = Rect::from_min_size(icon_pos, icon_size);
+            let mut search = state.current_search_filter().to_string();
 
-                let rounded_rect = Rect::from_min_max(
-                    pos2(icon_rect.min.x.round(), icon_rect.min.y.round()),
-                    pos2(icon_rect.max.x.round(), icon_rect.max.y.round()),
-                );
+            let response = ui
+                .blaze_input(
+                    &i18n.t("search.placeholder"),
+                    None,
+                    &mut search,
+                    &mut ui_state.icon_cache,
+                )
+                .id(search_id)
+                .hint_background_color(current_theme.semantic.bg_container.to_color())
+                .hint_stroke_color(hint_stroke_color)
+                .hint_text_color(hint_color)
+                .size((w, 30.0))
+                .radius(20)
+                .text_color(current_theme.semantic.text_secondary.to_color())
+                .background_color(current_theme.semantic.bg_container.to_color())
+                .stroke_color(search_color)
+                .x_color(current_theme.semantic.accent_glow.to_color())
+                .icon(icon_name, icon_bytes)
+                .icon_color(search_color)
+                .show(ui, || {
+                    state.clean_search();
+                });
 
-                let icon =
-                    ui_state
-                        .icon_cache
-                        .get_or_load(ui, icon.0, icon.1, search_color, icon_size);
+            if response.clicked() {
+                just_opened = true.into();
+            }
 
-                ui.painter().image(
-                    icon.id(),
-                    rounded_rect,
-                    Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
-                    Color32::WHITE,
-                );
+            if response.changed() {
+                state.set_search(search);
+                response.request_focus();
+            }
 
-                let text_rect = Rect::from_min_max(
-                    pos2(rounded_rect.right() + 6.0, rect.min.y + 4.0),
-                    pos2(rect.max.x - padding, rect.max.y - 4.0),
-                );
-
-                let mut child_ui = ui.new_child(UiBuilder::new().max_rect(text_rect));
-
-                let text_edit = BlazeTextEdit::singleline(&mut state.search_filter)
-                    .id(search_id)
-                    .hint_text(i18n.t("search.placeholder"))
-                    .font(FontId::proportional(13.0))
-                    .desired_width(text_rect.width());
-
-                let te_response = child_ui.add(text_edit);
-
-                if te_response.clicked() {
-                    te_response.request_focus();
-                    just_opened = true.into();
-                }
-            });
+            ui.add_space(5.0);
 
             ui.horizontal(|ui| {
                 let icon = ("tab-icon", icons::ICON_TAB_ICON);

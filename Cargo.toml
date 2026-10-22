@@ -76,7 +76,7 @@ cpal = "0.18.2"
 ffmpeg-next = "9.0.0"
 egui-wgpu = { git = "https://github.com/Jhanfer/egui-custom.git", branch = "main" }
 egui = { git = "https://github.com/Jhanfer/egui-custom.git", branch = "main", features = ["serde"] }
-egui_extras = { version = "0.35.0", default-features = false }
+egui_extras = { git = "https://github.com/Jhanfer/egui-custom.git", branch = "main" }
 tokio-util = "0.7.19"
 libmimalloc-sys = { version = "0.1.49", features = ["extended"] }
 

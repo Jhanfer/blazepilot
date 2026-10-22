@@ -29,12 +29,16 @@ pub(crate) struct BlazeButton<'a> {
     icon_color: Color32,
     hover_icon_color: Option<Color32>,
     icon_size: f32,
-    icon_cache: &'a mut IconCache,
+    icon_cache: Option<&'a mut IconCache>,
 }
 
 impl<'a> BlazeButton<'a> {
     /// Crea un botón con valores predeterminados e identidad basada en texto
-    pub fn new<T: Into<WidgetText>>(ui: &mut Ui, text: T, icon_cache: &'a mut IconCache) -> Self {
+    pub fn new<T: Into<WidgetText>>(
+        ui: &mut Ui,
+        text: T,
+        icon_cache: Option<&'a mut IconCache>,
+    ) -> Self {
         let widget = text.into();
         let salt = widget.text();
         Self {
@@ -202,7 +206,9 @@ impl<'a> BlazeButton<'a> {
 
         let mut cursor_x = rect.min.x + if has_text { padding_x } else { 0.0 };
 
-        if let Some((name, bytes)) = self.icon {
+        if let Some((name, bytes)) = self.icon
+            && let Some(icon_cache) = self.icon_cache
+        {
             let center = if has_text {
                 pos2(
                     cursor_x + icon_size / 2.0,
@@ -219,9 +225,7 @@ impl<'a> BlazeButton<'a> {
                 pos2(icon_rect.max.x.round(), icon_rect.max.y.round()),
             );
 
-            let icon = self
-                .icon_cache
-                .get_or_load(ui, name, bytes, ic_c, Vec2::splat(icon_size));
+            let icon = icon_cache.get_or_load(ui, name, bytes, ic_c, Vec2::splat(icon_size));
 
             ui.painter().image(
                 icon.id(),

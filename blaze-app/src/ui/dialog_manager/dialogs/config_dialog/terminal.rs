@@ -3,10 +3,12 @@ use crate::core::system::{
     clipboard::global_clipboard::TOKIO_RUNTIME,
     terminal_opener::terminal_manager::GLOBAL_TERMINAL_MANAGER,
 };
+use crate::ui::custom_components::UiExt;
 use crate::ui::dialog_manager::dialogs::config_dialog::configs_dialog::ConfigDialog;
+use crate::ui::icons_cache::icon_cache::IconCache;
 use crate::ui::themes::platform::structs::ToColor;
 use crate::ui::themes::theme_manager::with_theme;
-use egui::{ComboBox, Label, RichText, Ui};
+use egui::{Color32, Label, RichText, Ui};
 use std::time::Duration;
 use tracing::warn;
 
@@ -32,8 +34,14 @@ fn reset_terminal_loading_state(c_dialog: &mut ConfigDialog) {
     c_dialog.terminal_rx = None;
 }
 
-pub(crate) fn render_terminal_settings(c_dialog: &mut ConfigDialog, ui: &mut Ui, _query: &str) {
+pub(crate) fn render_terminal_settings(
+    c_dialog: &mut ConfigDialog,
+    ui: &mut Ui,
+    _query: &str,
+    icon_cache: &mut IconCache,
+) {
     let current_theme = with_theme(|t| t.current());
+    let is_dark_theme = current_theme.semantic.text_primary.to_color().r() > 128;
     let i18n = with_configs(|c| c.get_i18n());
 
     ui.add_space(10.0);
@@ -170,26 +178,55 @@ pub(crate) fn render_terminal_settings(c_dialog: &mut ConfigDialog, ui: &mut Ui,
             return;
         }
 
-        ComboBox::from_label(
-            RichText::new(i18n.t("configs_terminal.combo_box_label"))
-                .color(current_theme.semantic.text_primary.to_color()),
-        )
-        .selected_text(get_selected_terminal_text(
-            &i18n.t("configs_terminal.selection"),
-        ))
-        .show_ui(ui, |ui| {
-            for term in &c_dialog.available_terminals {
-                let is_selected = is_terminal_selected(term);
+        let cbg = current_theme.components.button.bg_hover.to_color();
+        let hover_bg = if is_dark_theme {
+            Color32::from_rgba_unmultiplied(cbg.r(), cbg.g(), cbg.b(), 80)
+        } else {
+            Color32::from_rgba_unmultiplied(cbg.r(), cbg.g(), cbg.b(), 10)
+        };
 
-                let label =
-                    RichText::new(term).color(current_theme.semantic.text_primary.to_color());
+        ui.label_ns(i18n.t("configs_terminal.combo_box_label"));
 
-                if ui.selectable_label(is_selected, label).clicked() {
-                    with_configs(|c| {
-                        c.set_default_terminal(term.to_string());
-                    });
-                }
-            }
+        ui.horizontal(|ui| {
+            ui.blaze_combobox(Some(icon_cache))
+                .selected_text(get_selected_terminal_text(
+                    &i18n.t("configs_terminal.selection"),
+                ))
+                .text_color(current_theme.semantic.text_primary.to_color())
+                .size((150.0, 30.0))
+                .background_color(current_theme.components.button.bg.to_color())
+                .hover_background_color(hover_bg)
+                .show(ui, |ui| {
+                    let w = ui.available_width();
+                    for (i, term) in c_dialog.available_terminals.iter().enumerate() {
+                        let is_selected = is_terminal_selected(term);
+
+                        let label = RichText::new(term)
+                            .color(current_theme.semantic.text_primary.to_color());
+
+                        let bg = if is_selected {
+                            current_theme.semantic.accent_glow.to_color()
+                        } else {
+                            current_theme.components.button.bg.to_color()
+                        };
+
+                        if ui
+                            .blaze_button(label, None)
+                            .id(format!("terminal{i}"))
+                            .size((w, 20.0))
+                            .background_color(bg)
+                            .hover_background_color(hover_bg)
+                            .stroke_color(Color32::TRANSPARENT)
+                            .radius(20)
+                            .show(ui)
+                            .clicked()
+                        {
+                            with_configs(|c| {
+                                c.set_default_terminal(term.to_string());
+                            });
+                        }
+                    }
+                });
         });
 
         ui.add_space(12.0);
