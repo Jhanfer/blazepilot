@@ -1,7 +1,9 @@
 use crate::{
     core::{
-        blaze_state::BlazeCoreState,
-        blaze_state::state_structs::{LayoutMode, NewItemType, ViewMode},
+        blaze_state::{
+            BlazeCoreState,
+            state_structs::{LayoutMode, NewItemType, ViewMode},
+        },
         bootstrap::configs::config_manager::with_configs,
         files::blaze_motor::motor_structs::FileEntry,
         runtime::{
@@ -13,8 +15,8 @@ use crate::{
     ui::{
         blaze_ui_state::BlazeUiState,
         icons_cache::icons::*,
-        modules::utilities::ensure_min_lightness,
-        themes::{platform::structs::ToColor, theme_manager::with_theme},
+        modules::utilities::{ensure_min_lightness, shade_color},
+        themes::theme_manager::with_theme,
     },
 };
 use egui::{
@@ -89,7 +91,10 @@ fn render_tag_button(ui: &mut Ui, state: &mut BlazeCoreState, ui_state: &mut Bla
     ui.painter().rect_stroke(
         capsule_rect,
         radius,
-        Stroke::new(1.0, current_theme.components.panel.border.to_color()),
+        Stroke::new(
+            current_theme.global.panel_stroke_width,
+            current_theme.main_area.accent(),
+        ),
         egui::StrokeKind::Middle,
     );
 
@@ -133,12 +138,10 @@ fn render_tag_button(ui: &mut Ui, state: &mut BlazeCoreState, ui_state: &mut Bla
         ("tag", ICON_TAG, icon2_rect, anim == 1.0),
     ];
 
+    let color = current_theme.main_area.accent();
+
     for (name, bytes, rect, is_active) in icons {
-        let base_color = if is_active {
-            current_theme.components.button.label_active.to_color()
-        } else {
-            current_theme.components.button.label_inactive.to_color()
-        };
+        let base_color = if is_active { color } else { shade_color(color) };
 
         let color = ensure_min_lightness(base_color);
 
@@ -181,11 +184,9 @@ fn render_views_mode(ui: &mut Ui, state: &mut BlazeCoreState, ui_state: &mut Bla
             };
             let icon_size = vec2(18.0, 18.0);
 
-            let base_color = if is_active {
-                current_theme.components.button.label_active.to_color()
-            } else {
-                current_theme.components.button.label_inactive.to_color()
-            };
+            let color = current_theme.main_area.accent();
+
+            let base_color = if is_active { color } else { shade_color(color) };
 
             let (new_name, new_bytes) = if is_list_button {
                 match current_layout {
@@ -211,19 +212,12 @@ fn render_views_mode(ui: &mut Ui, state: &mut BlazeCoreState, ui_state: &mut Bla
             if response.hovered() {
                 ui.set_cursor_icon(CursorIcon::PointingHand);
                 ui.painter()
-                    .rect_filled(rect, 4.0, current_theme.semantic.bg_container.to_color());
+                    .rect_filled(rect, 4.0, current_theme.main_area.bg_hover());
             }
 
             if is_active {
-                ui.painter().rect_filled(
-                    rect,
-                    4.0,
-                    current_theme
-                        .semantic
-                        .accent
-                        .to_color()
-                        .linear_multiply(0.2),
-                );
+                ui.painter()
+                    .rect_filled(rect, 4.0, current_theme.main_area.bg_active());
             }
 
             let icon_rect = Rect::from_center_size(rect.center(), icon_size);
@@ -270,7 +264,7 @@ pub fn tools(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, ui: &mut U
     let current_theme = with_theme(|t| t.current());
 
     Frame::new()
-        .fill(current_theme.components.tools.bg.to_color())
+        .fill(current_theme.main_area.bg_elevated())
         .inner_margin(Margin {
             left: 15,
             right: 15,
@@ -285,7 +279,7 @@ pub fn tools(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, ui: &mut U
         })
         .stroke(Stroke {
             width: 0.5,
-            color: current_theme.components.panel.border.to_color(),
+            color: current_theme.main_area.border(),
         })
         .show(ui, |ui| {
             let toolbar_height = 25.0;
@@ -308,9 +302,11 @@ pub fn tools(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, ui: &mut U
                     );
 
                     let plus_color = if new_fol.hovered() {
-                        current_theme.components.tools.label_hover.to_color()
+                        current_theme
+                            .main_area
+                            .icon_hover_on_color(current_theme.main_area.bg_elevated())
                     } else {
-                        current_theme.components.tools.label_active.to_color()
+                        current_theme.main_area.icon_primary()
                     };
 
                     let icon = ui_state.icon_cache.get_or_load(
@@ -343,9 +339,11 @@ pub fn tools(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, ui: &mut U
                     );
 
                     let plus_color = if new_file.hovered() {
-                        current_theme.components.tools.label_hover.to_color()
+                        current_theme
+                            .main_area
+                            .icon_hover_on_color(current_theme.main_area.bg_elevated())
                     } else {
-                        current_theme.components.tools.label_active.to_color()
+                        current_theme.main_area.icon_primary()
                     };
 
                     let icon = ui_state.icon_cache.get_or_load(
@@ -399,9 +397,11 @@ pub fn tools(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, ui: &mut U
                 );
 
                 let sissors_color = if cut_resp.hovered() && has_selection {
-                    current_theme.components.tools.label_hover.to_color()
+                    current_theme
+                        .main_area
+                        .icon_hover_on_color(current_theme.main_area.bg_elevated())
                 } else {
-                    current_theme.components.tools.label_active.to_color()
+                    current_theme.main_area.icon_primary()
                 };
 
                 let icon = ui_state.icon_cache.get_or_load(
@@ -437,9 +437,11 @@ pub fn tools(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, ui: &mut U
                 );
 
                 let clip_color = if cop_resp.hovered() && has_selection {
-                    current_theme.components.tools.label_hover.to_color()
+                    current_theme
+                        .main_area
+                        .icon_hover_on_color(current_theme.main_area.bg_elevated())
                 } else {
-                    current_theme.components.tools.label_active.to_color()
+                    current_theme.main_area.icon_primary()
                 };
 
                 let icon = ui_state.icon_cache.get_or_load(
@@ -475,9 +477,11 @@ pub fn tools(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, ui: &mut U
                 );
 
                 let pas_color = if pas_resp.hovered() && has_clipboard {
-                    current_theme.components.tools.label_hover.to_color()
+                    current_theme
+                        .main_area
+                        .icon_hover_on_color(current_theme.main_area.bg_elevated())
                 } else {
-                    current_theme.components.tools.label_active.to_color()
+                    current_theme.main_area.icon_primary()
                 };
 
                 let icon = ui_state.icon_cache.get_or_load(
@@ -514,9 +518,11 @@ pub fn tools(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, ui: &mut U
                 );
 
                 let del_color = if del_resp.hovered() && has_selection {
-                    current_theme.components.tools.label_hover.to_color()
+                    current_theme
+                        .main_area
+                        .icon_hover_on_color(current_theme.main_area.bg_elevated())
                 } else {
-                    current_theme.components.tools.label_active.to_color()
+                    current_theme.main_area.icon_primary()
                 };
 
                 let icon = ui_state.icon_cache.get_or_load(
@@ -577,9 +583,11 @@ pub fn tools(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, ui: &mut U
                 );
 
                 let sel_color = if select_resp.hovered() {
-                    current_theme.components.tools.label_hover.to_color()
+                    current_theme
+                        .main_area
+                        .icon_hover_on_color(current_theme.main_area.bg_elevated())
                 } else {
-                    current_theme.components.tools.label_active.to_color()
+                    current_theme.main_area.icon_primary()
                 };
 
                 let icon = ui_state.icon_cache.get_or_load(
@@ -613,9 +621,11 @@ pub fn tools(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, ui: &mut U
                 );
 
                 let ref_color = if refresh_resp.hovered() {
-                    current_theme.components.tools.label_hover.to_color()
+                    current_theme
+                        .main_area
+                        .icon_hover_on_color(current_theme.main_area.bg_elevated())
                 } else {
-                    current_theme.components.tools.label_active.to_color()
+                    current_theme.main_area.icon_primary()
                 };
 
                 let icon = ui_state.icon_cache.get_or_load(
@@ -670,9 +680,11 @@ pub fn tools(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, ui: &mut U
                     );
 
                     let hidd_color = if hidd_resp.hovered() {
-                        current_theme.components.tools.label_hover.to_color()
+                        current_theme
+                            .main_area
+                            .icon_hover_on_color(current_theme.main_area.bg_elevated())
                     } else {
-                        current_theme.components.tools.label_active.to_color()
+                        current_theme.main_area.icon_primary()
                     };
 
                     let icon = ui_state.icon_cache.get_or_load(

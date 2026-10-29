@@ -26,8 +26,7 @@ use crate::ui::modules::sidebar_right_component::rightbar_state::{
     MIN_PANEL_WIDTH_TOLERANCE, PANEL_TAB_WIDTH,
 };
 use crate::ui::modules::sidebar_right_component::sidebar_components::render_ordering_btn;
-use crate::ui::modules::utilities::ensure_min_lightness;
-use crate::ui::themes::platform::structs::ToColor;
+use crate::ui::themes::platform::structs::BlazeAppTheme;
 use crate::ui::themes::theme_manager::with_theme;
 use egui::{
     Align, Area, Color32, CornerRadius, Frame, Id, Layout, Margin, Panel, Rect, Sense, Stroke, Ui,
@@ -39,12 +38,12 @@ fn render_expanded_panel(
     ui: &mut Ui,
     state: &mut BlazeCoreState,
     ui_state: &mut BlazeUiState,
-    current_theme: Arc<crate::ui::themes::platform::structs::NewTheme>,
+    current_theme: Arc<BlazeAppTheme>,
     current_order: OrderingMode,
 ) {
     let i18n = with_configs(|c| c.get_i18n());
     let custom_frame = Frame::NONE
-        .fill(current_theme.semantic.bg_main.to_color())
+        .fill(current_theme.global.bg_main())
         .inner_margin(Margin {
             left: 0,
             right: 15,
@@ -70,22 +69,24 @@ fn render_expanded_panel(
             let has_focus = ui.memory(|mem| mem.has_focus(search_id));
             Frame::NONE
                 .inner_margin(Margin::same(10))
-                .fill(current_theme.components.panel.bg.to_color())
+                .fill(current_theme.sidebar_right.bg_panel())
                 .corner_radius(CornerRadius::same(20))
                 .stroke(Stroke {
                     width: 0.5,
-                    color: current_theme.components.panel.border.to_color(),
+                    color: current_theme.sidebar_right.border(),
                 })
                 .show(ui, |ui| {
+                    let bg = current_theme.sidebar_right.bg_elevated();
+                    let c = current_theme.sidebar_right.accent();
+
                     let search_color = if has_focus {
-                        ensure_min_lightness(current_theme.components.input.border_focus.to_color())
+                        current_theme.sidebar_right.color_hover_on_color(c, bg)
                     } else {
-                        ensure_min_lightness(current_theme.components.input.border_idle.to_color())
+                        bg
                     };
 
                     let (icon_name, icon_bytes) = ("search", icons::ICON_SEARCH);
 
-                    let c = current_theme.semantic.accent_glow.to_color();
                     let hint_stroke_color = Color32::from_rgba_unmultiplied(
                         c.r().saturating_add(20),
                         c.g().saturating_add(20),
@@ -107,20 +108,21 @@ fn render_expanded_panel(
                             &i18n.t("search.placeholder"),
                             Some("Ctrl + K"),
                             &mut search,
-                            &mut ui_state.icon_cache,
+                            Some(&mut ui_state.icon_cache),
                         )
                         .id(search_id)
-                        .hint_background_color(current_theme.semantic.bg_container.to_color())
+                        .hint_background_color(c)
                         .hint_stroke_color(hint_stroke_color)
                         .hint_text_color(hint_color)
                         .size((200.0, 30.0))
                         .radius(20)
-                        .text_color(current_theme.semantic.text_secondary.to_color())
-                        .background_color(current_theme.semantic.bg_container.to_color())
+                        .text_color(current_theme.global.text_primary())
+                        .background_color(bg)
                         .stroke_color(search_color)
-                        .x_color(current_theme.semantic.accent_glow.to_color())
+                        .x_color(c)
                         .icon(icon_name, icon_bytes)
                         .icon_color(search_color)
+                        .stroke_width(current_theme.global.components_stroke_width)
                         .show(ui, || {
                             state.clean_search();
                         });
@@ -135,10 +137,10 @@ fn render_expanded_panel(
                     let frame_width = 110.0;
                     ui.with_layout(Layout::top_down(Align::Center), |ui| {
                         Frame::NONE
-                            .fill(current_theme.components.sidebar_item.bg_hover.to_color())
+                            .fill(current_theme.sidebar_right.bg_elevated())
                             .stroke(Stroke::new(
-                                0.5,
-                                current_theme.components.panel.border.to_color(),
+                                current_theme.global.panel_stroke_width,
+                                current_theme.sidebar_right.border(),
                             ))
                             .corner_radius(CornerRadius::same(99))
                             .inner_margin(Margin::symmetric(10, 6))
@@ -315,7 +317,7 @@ fn render_expanded_panel(
 fn render_collapsed_tab(
     ui: &mut Ui,
     ui_state: &mut BlazeUiState,
-    current_theme: Arc<crate::ui::themes::platform::structs::NewTheme>,
+    current_theme: Arc<BlazeAppTheme>,
 ) {
     let area_id = Id::new("right_tab");
     let hover_state_id = Id::new("right_tab_hover_state");
@@ -341,10 +343,10 @@ fn render_collapsed_tab(
 
                     Frame::NONE
                         .inner_margin(Margin::same(10))
-                        .fill(current_theme.components.panel.bg.to_color())
+                        .fill(current_theme.sidebar_right.bg_panel())
                         .stroke(Stroke::new(
-                            0.5,
-                            current_theme.components.panel.border.to_color(),
+                            current_theme.global.panel_stroke_width,
+                            current_theme.sidebar_right.border(),
                         ))
                         .corner_radius(CornerRadius::same(20))
                         .show(ui, |ui| {

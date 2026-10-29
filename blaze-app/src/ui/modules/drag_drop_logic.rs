@@ -1,6 +1,6 @@
 use crate::{
     core::{blaze_state::BlazeCoreState, files::blaze_motor::motor_structs::FileEntry},
-    ui::themes::{platform::structs::ToColor, theme_manager::with_theme},
+    ui::themes::theme_manager::with_theme,
 };
 use egui::{Color32, Rect, Ui, vec2};
 use std::sync::Arc;
@@ -53,7 +53,7 @@ pub fn drag_files(
                 first_name.to_string()
             },
             egui::FontId::default(),
-            current_theme.semantic.text_primary.to_color(),
+            current_theme.global.text_primary(),
         );
     }
 

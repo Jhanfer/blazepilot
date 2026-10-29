@@ -6,11 +6,8 @@ use crate::{
         files::blaze_motor::motor_structs::FileEntry,
     },
     ui::{
-        blaze_ui_state::BlazeUiState,
-        custom_components::UiExt,
-        icons_cache::icons,
-        task_manager::tasks::TaskStatus,
-        themes::{platform::structs::ToColor, theme_manager::with_theme},
+        blaze_ui_state::BlazeUiState, custom_components::UiExt, icons_cache::icons,
+        task_manager::tasks::TaskStatus, themes::theme_manager::with_theme,
     },
     utils::{easing::ease_in_out_bounce, formating::format_size},
 };
@@ -43,10 +40,10 @@ where
         .show(ui, |ui| {
             Frame::NONE
                 .inner_margin(egui::Margin::same(10))
-                .fill(current_theme.components.panel.bg.to_color())
+                .fill(current_theme.main_area.bg_panel())
                 .stroke(Stroke::new(
-                    0.5,
-                    current_theme.components.panel.border.to_color(),
+                    current_theme.global.panel_stroke_width,
+                    current_theme.main_area.border(),
                 ))
                 .corner_radius(CornerRadius::same(20))
                 .show(ui, |ui| {
@@ -205,10 +202,10 @@ pub fn render_island_bubble(
         .show(ui, |ui| {
             Frame::NONE
                 .inner_margin(Margin::same(10))
-                .fill(current_theme.components.panel.bg.to_color())
+                .fill(current_theme.main_area.bg_panel())
                 .stroke(Stroke::new(
-                    0.5,
-                    current_theme.components.panel.border.to_color(),
+                    current_theme.global.panel_stroke_width,
+                    current_theme.main_area.border(),
                 ))
                 .corner_radius(CornerRadius::same(20))
                 .show(ui, |ui| {

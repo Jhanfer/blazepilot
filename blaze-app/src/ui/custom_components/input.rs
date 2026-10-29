@@ -1,4 +1,17 @@
 #![allow(unused)]
+// Copyright 2026 Jhanfer
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 use egui::{
     Color32, CornerRadius, CursorIcon, FontId, Id, Rect, Response, Sense, Stroke, StrokeKind, Ui,
@@ -11,6 +24,8 @@ use crate::ui::{
     modules::utilities::ensure_min_lightness,
 };
 
+/// Entrada de texto con soporte para icono, etiqueta de sugerencias y botón
+/// de limpieza
 pub(crate) struct BlazeInput<'a> {
     id: Id,
     input: &'a mut String,
@@ -19,6 +34,7 @@ pub(crate) struct BlazeInput<'a> {
     hint_text_color: Option<Color32>,
     hint_background_color: Option<Color32>,
     hint_stroke_color: Option<Color32>,
+    stroke_width: f32,
     width: f32,
     height: f32,
     corner_radius: CornerRadius,
@@ -32,16 +48,23 @@ pub(crate) struct BlazeInput<'a> {
     icon_color: Color32,
     hover_icon_color: Option<Color32>,
     icon_size: f32,
-    icon_cache: &'a mut IconCache,
+    icon_cache: Option<&'a mut IconCache>,
 }
 
 impl<'a> BlazeInput<'a> {
+    /// Inicializa la estructura [`BlazeInput`] con los parámetros base y valores por defecto
+    ///
+    /// # Parámetros:
+    /// - `input`: referencia mutable a la cadena de tecto editada por el usuario
+    /// - `input_hint_text`: texto de sugerencia de hot_keys
+    /// - `hint_text`: Texto explicativo que se renderiza dentro del input cuando está vacío
+    /// - `icon_cache`: Pool de caché opcional para registrar o recuperar texturas de iconos y evitar rasterizar imágenes repetidas
     pub(crate) fn new<T: Into<&'a mut String>>(
         ui: &mut Ui,
         input: T,
         input_hint_text: &'a str,
         hint_text: Option<&'a str>,
-        icon_cache: &'a mut IconCache,
+        icon_cache: Option<&'a mut IconCache>,
     ) -> Self {
         Self {
             id: ui.id().with("input"),
@@ -51,6 +74,7 @@ impl<'a> BlazeInput<'a> {
             hint_text_color: None,
             hint_background_color: None,
             hint_stroke_color: None,
+            stroke_width: 0.8,
             width: 100.0,
             height: 30.0,
             corner_radius: CornerRadius::same(5),
@@ -79,6 +103,12 @@ impl<'a> BlazeInput<'a> {
         let (w, h) = size.into();
         self.width = w;
         self.height = h;
+        self
+    }
+
+    /// Establece el ancho de la línea del borde
+    pub fn stroke_width(mut self, width: f32) -> Self {
+        self.stroke_width = width;
         self
     }
 
@@ -166,6 +196,7 @@ impl<'a> BlazeInput<'a> {
         self
     }
 
+    /// Renderiza el campo entrada, calcula la distribución del contenido (iconos, texto, sugerencias) y gestiona eventos de borrado
     pub fn show<F: FnMut()>(&mut self, ui: &mut Ui, mut callback: F) -> Response {
         let icon_size = self.icon_size;
         let gap = 6.0;
@@ -174,6 +205,7 @@ impl<'a> BlazeInput<'a> {
         let list_id = Id::new("inputs");
         let input_id = self.id;
 
+        // registra el id de la instancia en la memoria temporal para el reastro de entradas
         ui.data_mut(|data| {
             let mut ids: Vec<Id> = data.get_temp(list_id).unwrap_or_default();
             if !ids.contains(&input_id) {
@@ -185,6 +217,7 @@ impl<'a> BlazeInput<'a> {
         let size = vec2(self.width, self.height);
         let (rect, resp) = ui.allocate_exact_size(size, Sense::click());
 
+        // determina la paleta de colores según el estado de interacción
         let (bg, st_c, ic_c) = if resp.hovered() {
             ui.set_cursor_icon(CursorIcon::Text);
             (
@@ -200,26 +233,28 @@ impl<'a> BlazeInput<'a> {
             rect,
             self.corner_radius,
             bg,
-            Stroke::new(0.5, st_c),
+            Stroke::new(self.stroke_width, st_c),
             StrokeKind::Middle,
         );
 
         let mut cursor_x = rect.min.x + padding_x;
 
-        if let Some((name, bytes)) = self.icon {
+        // dibuja el icono inicial si se ha aportado
+        if let Some((name, bytes)) = self.icon
+            && let Some(icon_cache) = self.icon_cache.as_deref_mut()
+        {
             let icon_rect = Rect::from_min_size(
                 pos2(cursor_x, rect.center().y - icon_size / 2.0),
                 Vec2::splat(icon_size),
             );
 
+            // redondea las coordenadas a enteros y prevenir distorciones por subpixeles
             let rounded_rect = Rect::from_min_max(
                 pos2(icon_rect.min.x.round(), icon_rect.min.y.round()),
                 pos2(icon_rect.max.x.round(), icon_rect.max.y.round()),
             );
 
-            let icon = self
-                .icon_cache
-                .get_or_load(ui, name, bytes, ic_c, Vec2::splat(icon_size));
+            let icon = icon_cache.get_or_load(ui, name, bytes, ic_c, Vec2::splat(icon_size));
 
             ui.painter().image(
                 icon.id(),
@@ -237,28 +272,14 @@ impl<'a> BlazeInput<'a> {
 
         let right_edge = rect.max.x - padding_x;
 
-        let show_clear = !self.input.is_empty();
+        // el botón de limpieza solo si es visible cuando el campo contiene texto y existe
+        // gestor de la caché para el icono
+        let show_clear = !self.input.is_empty() && self.icon_cache.is_some();
 
-        let text_right = if show_clear {
-            right_edge - clear_w - gap_edit
-        } else {
-            right_edge
-        };
+        let mut text_right = right_edge;
 
-        let text_rect = Rect::from_min_max(
-            pos2(cursor_x, rect.min.y + padding_y),
-            pos2(text_right, rect.max.y - padding_y),
-        );
-
-        let response = ui.place(
-            text_rect,
-            BlazeTextEdit::singleline(self.input)
-                .hint_text(self.input_hint_text)
-                .desired_width(100.0)
-                .id(self.id),
-        );
-
-        // Renderizado de la sugerencia
+        // calcula el área ocupada por la insignia de sugerencia si el botón de limpieza no la sobrescribe
+        let mut hint_data = None;
         if !show_clear && let Some(hint) = self.hint_text {
             let (hint_color, hint_bg, hint_stc) = match (
                 self.hint_text_color,
@@ -274,13 +295,33 @@ impl<'a> BlazeInput<'a> {
                 FontId::proportional(10.0),
                 ensure_min_lightness(hint_color),
             );
-
-            let hint_size = hint_galley.size();
             let pad = vec2(8.0, 2.0);
-            let badge_size = hint_size + pad * 2.0;
+            let badge_size = hint_galley.size() + pad * 2.0;
 
-            let right_edge = rect.max.x - padding_x;
+            // reestringe el margen derecho del área de edición para no solapar la etiqueta de sugerencia
+            text_right -= badge_size.x + gap_edit;
+            hint_data = Some((hint_galley, badge_size, hint_bg, hint_stc));
+        }
 
+        if show_clear {
+            text_right -= clear_w + gap_edit;
+        }
+
+        let text_rect = Rect::from_min_max(
+            pos2(cursor_x, rect.min.y + padding_y),
+            pos2(text_right, rect.max.y - padding_y),
+        );
+
+        let response = ui.place(
+            text_rect,
+            BlazeTextEdit::singleline(self.input)
+                .hint_text(self.input_hint_text)
+                .desired_width(100.0)
+                .id(self.id),
+        );
+
+        // Renderizado de la etiqueta de la sugerencia sobre el margen derecho disponible
+        if let Some((hint_galley, badge_size, hint_bg, hint_stc)) = hint_data {
             let hint_rect = Rect::from_min_size(
                 pos2(
                     right_edge - badge_size.x,
@@ -297,14 +338,13 @@ impl<'a> BlazeInput<'a> {
                 StrokeKind::Middle,
             );
 
-            let hint_pos = hint_rect.min + pad;
-
+            let hint_pos = hint_rect.min + vec2(8.0, 2.0);
             ui.painter()
                 .galley(hint_pos, hint_galley, Color32::DARK_GREEN);
         }
 
-        // Icono de X para eliminar el input
-        if show_clear {
+        // renderizado del botón de limpieza de contenido
+        if show_clear && let Some(icon_cache) = self.icon_cache.as_deref_mut() {
             let c = self.background_color;
             let color = Color32::from_rgba_unmultiplied(
                 c.r().saturating_add(50),
@@ -338,9 +378,7 @@ impl<'a> BlazeInput<'a> {
                 pos2(icon_rect.max.x.round(), icon_rect.max.y.round()),
             );
 
-            let icon =
-                self.icon_cache
-                    .get_or_load(ui, "x", icons::ICON_X, ic_c, Vec2::splat(icon_size));
+            let icon = icon_cache.get_or_load(ui, "x", icons::ICON_X, ic_c, Vec2::splat(icon_size));
 
             ui.painter().image(
                 icon.id(),

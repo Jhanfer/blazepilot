@@ -4,31 +4,28 @@ use crate::ui::dialog_manager::dialogs::config_dialog::configs_dialog::ConfigDia
 use crate::ui::examples::examples_components::{ExamplesUiState, render_examples_ui};
 use crate::ui::icons_cache::icon_cache::IconCache;
 use crate::ui::icons_cache::icons;
-use crate::ui::themes::platform::structs::ToColor;
 use crate::ui::themes::theme_manager::with_theme;
 use egui::scroll_area::ScrollSource;
-use egui::{Color32, Id, Label, RichText, ScrollArea, Ui};
+use egui::{CollapsingHeader, Color32, Id, Label, RichText, ScrollArea, Ui};
 use egui_extras::{Size, StripBuilder};
 use tracing::{info, warn};
 
 macro_rules! color_field {
-    ($ui:expr_2021, $current_theme:expr_2021, $label:expr_2021, $($path:tt)*) => {{
+    ($ui:expr, $label:expr, $c_theme:expr, $($path:tt)*) => {{
         $ui.horizontal(|ui| {
-            let current_hex = &$current_theme.$($path)*;
+            let current_hex = &$c_theme.$($path)*;
             let mut color = Color32::from_hex(current_hex)
                 .unwrap_or(Color32::DEBUG_COLOR);
 
             ui.label_ns(
                 RichText::new($label)
-                    .color($current_theme.semantic.text_primary.to_color()),
+                    .color($c_theme.global.text_primary()),
             );
 
-            if ui.color_picker(
-                &mut color,
-                &*$label,
-            )
-            .show(ui)
-            .changed() {
+            if ui.color_picker(&mut color, ($label, stringify!($($path)*)))
+                .background_color($c_theme.main_area.bg_panel())
+                .show(ui)
+                .changed() {
                 with_theme(|t| {
                     t.update_theme(
                         |theme, c| {
@@ -36,7 +33,7 @@ macro_rules! color_field {
                             theme.$($path)* = format!(
                                 "#{:02X}{:02X}{:02X}{:02X}",
                                 r, g, b, a
-                            );
+                            ).into();
                         },
                         color,
                     );
@@ -56,8 +53,6 @@ pub(crate) fn render_appearance_settings(
     let (available_themes, current_theme) =
         with_theme(|t| (t.get_available_themes_names(), t.current().clone()));
 
-    let is_dark_theme = current_theme.semantic.text_primary.to_color().r() > 128;
-
     ui.add_space(10.0);
 
     ui.vertical(|ui| {
@@ -67,38 +62,38 @@ pub(crate) fn render_appearance_settings(
             Label::new(
                 RichText::new(i18n.t("configs_appearance.title"))
                     .strong()
-                    .color(current_theme.semantic.text_primary.to_color()),
+                    .color(current_theme.global.text_primary()),
             )
             .selectable(false),
         );
         ui.add_space(8.0);
 
-        let cbg = current_theme.components.button.bg_hover.to_color();
-        let hover_bg = if is_dark_theme {
-            Color32::from_rgba_unmultiplied(cbg.r(), cbg.g(), cbg.b(), 80)
-        } else {
-            Color32::from_rgba_unmultiplied(cbg.r(), cbg.g(), cbg.b(), 10)
-        };
+        let hover_bg = current_theme.sidebar_left.bg_hover();
 
         // i18n.t("configs_appearance.selection")
         ui.horizontal(|ui| {
             ui.blaze_combobox(Some(icon_cache))
-                .selected_text(&*current_theme.name)
-                .text_color(current_theme.semantic.text_primary.to_color())
+                .selected_text(&*current_theme.meta.name)
+                .text_color(current_theme.global.text_primary())
                 .size((150.0, 30.0))
-                .background_color(current_theme.components.button.bg.to_color())
-                .hover_background_color(hover_bg)
+                .background_color(current_theme.sidebar_left.bg_elevated())
+                .hover_background_color(current_theme.sidebar_left.bg_hover())
                 .show(ui, |ui| {
                     let w = ui.available_width();
 
                     for (i, theme) in available_themes.iter().enumerate() {
-                        let label = RichText::new(&**theme)
-                            .color(current_theme.semantic.text_primary.to_color());
-
-                        let bg = if current_theme.name == *theme {
-                            current_theme.semantic.accent_glow.to_color()
+                        let is_selected = current_theme.meta.name == *theme;
+                        let text_color = if is_selected {
+                            current_theme.global.text_primary()
                         } else {
-                            current_theme.components.button.bg.to_color()
+                            current_theme.global.text_secondary()
+                        };
+                        let label = RichText::new(&**theme).color(text_color);
+
+                        let bg = if is_selected {
+                            current_theme.sidebar_left.bg_active()
+                        } else {
+                            Color32::TRANSPARENT
                         };
 
                         if ui
@@ -123,12 +118,13 @@ pub(crate) fn render_appearance_settings(
                 .blaze_button("", Some(icon_cache))
                 .id("reload_theme")
                 .size((30.0, 30.0))
-                .background_color(current_theme.components.button.bg.to_color())
+                .background_color(current_theme.sidebar_left.bg_elevated())
                 .hover_background_color(hover_bg)
                 .stroke_color(Color32::TRANSPARENT)
                 .radius(20)
                 .icon("reset", icons::ICON_RESTORE)
-                .icon_color(current_theme.semantic.accent_glow.to_color())
+                .icon_color(current_theme.sidebar_left.accent())
+                .stroke_width(current_theme.global.components_stroke_width)
                 .show(ui)
                 .clicked()
             {
@@ -147,7 +143,7 @@ pub(crate) fn render_appearance_settings(
         ui.label_ns(
             RichText::new(i18n.t("configs_appearance.color_editor"))
                 .strong()
-                .color(current_theme.semantic.text_primary.to_color()),
+                .color(current_theme.global.text_primary()),
         );
         ui.add_space(6.0);
 
@@ -171,377 +167,391 @@ pub(crate) fn render_appearance_settings(
                                         ScrollSource::MOUSE_WHEEL | ScrollSource::SCROLL_BAR,
                                     )
                                     .show(ui, |ui| {
-                                        // --- 1. Fondos ---
-                                        ui.label_ns(
-                                            RichText::new(i18n.t("configs_appearance.background"))
-                                                .strong()
-                                                .color(
-                                                    current_theme
-                                                        .semantic
-                                                        .text_secondary
-                                                        .to_color(),
-                                                ),
-                                        );
-                                        color_field!(
-                                            ui,
-                                            current_theme,
-                                            i18n.t("configs_appearance.main_bg"),
-                                            semantic.bg_main
-                                        );
-                                        color_field!(
-                                            ui,
-                                            current_theme,
-                                            i18n.t("configs_appearance.container_bg"),
-                                            semantic.bg_container
-                                        );
-                                        color_field!(
-                                            ui,
-                                            current_theme,
-                                            i18n.t("configs_appearance.separator"),
-                                            semantic.separator
-                                        );
-                                        ui.add_space(8.0);
+                                        // --- 1. Globales ---
+                                        CollapsingHeader::new("Globales")
+                                            .default_open(true) // Mantenemos el primero abierto por defecto
+                                            .show(ui, |ui| {
+                                                color_field!(
+                                                    ui,
+                                                    "Fondo Principal",
+                                                    current_theme,
+                                                    global.bg_main
+                                                );
+                                                color_field!(
+                                                    ui,
+                                                    "Efecto Rebote",
+                                                    current_theme,
+                                                    global.rubberband
+                                                );
+                                                color_field!(
+                                                    ui,
+                                                    "Texto Principal",
+                                                    current_theme,
+                                                    global.text_primary
+                                                );
+                                                color_field!(
+                                                    ui,
+                                                    "Texto Secundario",
+                                                    current_theme,
+                                                    global.text_secondary
+                                                );
+                                                color_field!(
+                                                    ui,
+                                                    "Error",
+                                                    current_theme,
+                                                    global.error
+                                                );
+                                                color_field!(
+                                                    ui,
+                                                    "Advertencia",
+                                                    current_theme,
+                                                    global.warn
+                                                );
+                                                color_field!(
+                                                    ui,
+                                                    "Éxito",
+                                                    current_theme,
+                                                    global.success
+                                                );
 
-                                        // --- 2. Textos ---
-                                        ui.label_ns(
-                                            RichText::new(i18n.t("configs_appearance.texts"))
-                                                .strong()
-                                                .color(
-                                                    current_theme
-                                                        .semantic
-                                                        .text_secondary
-                                                        .to_color(),
-                                                ),
-                                        );
-                                        color_field!(
-                                            ui,
-                                            current_theme,
-                                            i18n.t("configs_appearance.primary_text"),
-                                            semantic.text_primary
-                                        );
-                                        color_field!(
-                                            ui,
-                                            current_theme,
-                                            i18n.t("configs_appearance.secondary_text"),
-                                            semantic.text_secondary
-                                        );
-                                        color_field!(
-                                            ui,
-                                            current_theme,
-                                            i18n.t("configs_appearance.muted_text"),
-                                            semantic.text_muted
-                                        );
-                                        ui.add_space(8.0);
+                                                ui.label_ns(
+                                                    RichText::new("Stroke Width")
+                                                        .color(current_theme.global.text_primary()),
+                                                );
 
-                                        // --- 3. Estados Semánticos ---
-                                        color_field!(
-                                            ui,
-                                            current_theme,
-                                            i18n.t("configs_appearance.error"),
-                                            semantic.error
-                                        );
-                                        color_field!(
-                                            ui,
-                                            current_theme,
-                                            i18n.t("configs_appearance.success"),
-                                            semantic.success
-                                        );
-                                        color_field!(
-                                            ui,
-                                            current_theme,
-                                            i18n.t("configs_appearance.warn"),
-                                            semantic.warn
-                                        );
-                                        ui.add_space(8.0);
+                                                let mut panel_stroke =
+                                                    current_theme.global.panel_stroke_width;
 
-                                        // --- 4. Acentos ---
-                                        ui.label_ns(
-                                            RichText::new(i18n.t("configs_appearance.accent"))
-                                                .strong()
-                                                .color(
-                                                    current_theme
-                                                        .semantic
-                                                        .text_secondary
-                                                        .to_color(),
-                                                ),
-                                        );
-                                        color_field!(
-                                            ui,
-                                            current_theme,
-                                            i18n.t("configs_appearance.accent"),
-                                            semantic.accent
-                                        );
-                                        color_field!(
-                                            ui,
-                                            current_theme,
-                                            i18n.t("configs_appearance.accent_glow"),
-                                            semantic.accent_glow
-                                        );
-                                        color_field!(
-                                            ui,
-                                            current_theme,
-                                            i18n.t("configs_appearance.rubberband"),
-                                            semantic.rubberband
-                                        );
-                                        ui.add_space(8.0);
+                                                if ui
+                                                    .blaze_slider(&mut panel_stroke, 0.0..=1.0)
+                                                    .size((80.0, 20.0))
+                                                    .background_color(
+                                                        current_theme.main_area.bg_panel(),
+                                                    )
+                                                    .accent(current_theme.main_area.accent())
+                                                    .show(ui)
+                                                    .changed()
+                                                {
+                                                    with_theme(|t| {
+                                                        t.update_theme(
+                                                            |theme, val| {
+                                                                theme.global.panel_stroke_width =
+                                                                    val;
+                                                            },
+                                                            panel_stroke,
+                                                        );
+                                                    });
+                                                }
 
-                                        // --- 5. Paneles ---
-                                        ui.label_ns(
-                                            RichText::new(i18n.t("configs_appearance.panels"))
-                                                .strong()
-                                                .color(
-                                                    current_theme
-                                                        .semantic
-                                                        .text_secondary
-                                                        .to_color(),
-                                                ),
-                                        );
-                                        color_field!(
-                                            ui,
-                                            current_theme,
-                                            i18n.t("configs_appearance.panel_bg"),
-                                            components.panel.bg
-                                        );
-                                        color_field!(
-                                            ui,
-                                            current_theme,
-                                            i18n.t("configs_appearance.panel_border"),
-                                            components.panel.border
-                                        );
-                                        ui.add_space(8.0);
+                                                let mut component_stroke =
+                                                    current_theme.global.components_stroke_width;
 
-                                        // --- 6. Botones ---
-                                        ui.label_ns(
-                                            RichText::new(i18n.t("configs_appearance.buttons"))
-                                                .strong()
-                                                .color(
-                                                    current_theme
-                                                        .semantic
-                                                        .text_secondary
-                                                        .to_color(),
-                                                ),
-                                        );
-                                        color_field!(
-                                            ui,
-                                            current_theme,
-                                            i18n.t("configs_appearance.button_bg"),
-                                            components.button.bg
-                                        );
-                                        color_field!(
-                                            ui,
-                                            current_theme,
-                                            i18n.t("configs_appearance.button_hover"),
-                                            components.button.bg_hover
-                                        );
-                                        color_field!(
-                                            ui,
-                                            current_theme,
-                                            i18n.t("configs_appearance.button_label_hover"),
-                                            components.button.label_hover
-                                        );
-                                        color_field!(
-                                            ui,
-                                            current_theme,
-                                            i18n.t("configs_appearance.button_label_active"),
-                                            components.button.label_active
-                                        );
-                                        color_field!(
-                                            ui,
-                                            current_theme,
-                                            i18n.t("configs_appearance.button_label_inactive"),
-                                            components.button.label_inactive
-                                        );
-                                        ui.add_space(8.0);
+                                                if ui
+                                                    .blaze_slider(&mut component_stroke, 0.0..=1.0)
+                                                    .size((80.0, 20.0))
+                                                    .background_color(
+                                                        current_theme.main_area.bg_panel(),
+                                                    )
+                                                    .accent(current_theme.main_area.accent())
+                                                    .show(ui)
+                                                    .changed()
+                                                {
+                                                    with_theme(|t| {
+                                                        t.update_theme(
+                                                            |theme, val| {
+                                                                theme
+                                                                    .global
+                                                                    .components_stroke_width = val;
+                                                            },
+                                                            component_stroke,
+                                                        );
+                                                    });
+                                                }
+                                            });
 
-                                        // --- 7. Barra de búsqueda (Input) ---
-                                        ui.label_ns(
-                                            RichText::new(i18n.t("configs_appearance.input"))
-                                                .strong()
-                                                .color(
-                                                    current_theme
-                                                        .semantic
-                                                        .text_secondary
-                                                        .to_color(),
-                                                ),
-                                        );
-                                        color_field!(
+                                        // --- 2. Iconos de Archivos ---
+                                        CollapsingHeader::new("Iconos de Archivos").show(
                                             ui,
-                                            current_theme,
-                                            i18n.t("configs_appearance.input_bg"),
-                                            components.input.bg
+                                            |ui| {
+                                                color_field!(
+                                                    ui,
+                                                    "Carpeta (Por defecto)",
+                                                    current_theme,
+                                                    file_icons.folder_default
+                                                );
+                                                color_field!(
+                                                    ui,
+                                                    "Imagen",
+                                                    current_theme,
+                                                    file_icons.image
+                                                );
+                                                color_field!(
+                                                    ui,
+                                                    "PDF",
+                                                    current_theme,
+                                                    file_icons.pdf
+                                                );
+                                                color_field!(
+                                                    ui,
+                                                    "Documento",
+                                                    current_theme,
+                                                    file_icons.document
+                                                );
+                                                color_field!(
+                                                    ui,
+                                                    "Vídeo",
+                                                    current_theme,
+                                                    file_icons.video
+                                                );
+                                                color_field!(
+                                                    ui,
+                                                    "Audio",
+                                                    current_theme,
+                                                    file_icons.audio
+                                                );
+                                                color_field!(
+                                                    ui,
+                                                    "Archivo (Zip/Rar)",
+                                                    current_theme,
+                                                    file_icons.archive
+                                                );
+                                                color_field!(
+                                                    ui,
+                                                    "Código",
+                                                    current_theme,
+                                                    file_icons.code
+                                                );
+                                                color_field!(
+                                                    ui,
+                                                    "Fuente",
+                                                    current_theme,
+                                                    file_icons.font
+                                                );
+                                                color_field!(
+                                                    ui,
+                                                    "Ejecutable",
+                                                    current_theme,
+                                                    file_icons.executable
+                                                );
+                                                color_field!(
+                                                    ui,
+                                                    "Desconocido (Fallback)",
+                                                    current_theme,
+                                                    file_icons.fallback
+                                                );
+                                            },
                                         );
-                                        color_field!(
-                                            ui,
-                                            current_theme,
-                                            i18n.t("configs_appearance.input_border_idle"),
-                                            components.input.border_idle
-                                        );
-                                        color_field!(
-                                            ui,
-                                            current_theme,
-                                            i18n.t("configs_appearance.input_border_focus"),
-                                            components.input.border_focus
-                                        );
-                                        ui.add_space(8.0);
 
-                                        // --- 8. Sidebar ---
-                                        ui.label_ns(
-                                            RichText::new(i18n.t("configs_appearance.sidebar"))
-                                                .strong()
-                                                .color(
-                                                    current_theme
-                                                        .semantic
-                                                        .text_secondary
-                                                        .to_color(),
-                                                ),
-                                        );
-                                        color_field!(
+                                        // --- 3. Secciones (Ejemplo: Barra Lateral Izquierda) ---
+                                        CollapsingHeader::new("Barra lateral izquierda").show(
                                             ui,
-                                            current_theme,
-                                            i18n.t("configs_appearance.sidebar_hover"),
-                                            components.sidebar_item.bg_hover
+                                            |ui| {
+                                                color_field!(
+                                                    ui,
+                                                    "Fondo del Panel",
+                                                    current_theme,
+                                                    sidebar_left.bg_panel
+                                                );
+                                                color_field!(
+                                                    ui,
+                                                    "Fondo Elevado",
+                                                    current_theme,
+                                                    sidebar_left.bg_elevated
+                                                );
+                                                color_field!(
+                                                    ui,
+                                                    "Fondo Hover",
+                                                    current_theme,
+                                                    sidebar_left.bg_hover
+                                                );
+                                                color_field!(
+                                                    ui,
+                                                    "Fondo Activo",
+                                                    current_theme,
+                                                    sidebar_left.bg_active
+                                                );
+                                                color_field!(
+                                                    ui,
+                                                    "Icono Principal",
+                                                    current_theme,
+                                                    sidebar_left.icon_primary
+                                                );
+                                                color_field!(
+                                                    ui,
+                                                    "Icono Secundario",
+                                                    current_theme,
+                                                    sidebar_left.icon_secondary
+                                                );
+                                                color_field!(
+                                                    ui,
+                                                    "Acento",
+                                                    current_theme,
+                                                    sidebar_left.accent
+                                                );
+                                                color_field!(
+                                                    ui,
+                                                    "Borde",
+                                                    current_theme,
+                                                    sidebar_left.border
+                                                );
+                                            },
                                         );
-                                        ui.add_space(8.0);
 
-                                        // --- 9. Lista de archivos ---
-                                        ui.label_ns(
-                                            RichText::new(i18n.t("configs_appearance.file_list"))
-                                                .strong()
-                                                .color(
-                                                    current_theme
-                                                        .semantic
-                                                        .text_secondary
-                                                        .to_color(),
-                                                ),
-                                        );
-                                        color_field!(
-                                            ui,
-                                            current_theme,
-                                            i18n.t("configs_appearance.list_hover"),
-                                            components.list_item.bg_hover
-                                        );
-                                        color_field!(
-                                            ui,
-                                            current_theme,
-                                            i18n.t("configs_appearance.list_selected"),
-                                            components.list_item.bg_selected
-                                        );
-                                        ui.add_space(8.0);
+                                        CollapsingHeader::new("Panel central").show(ui, |ui| {
+                                            color_field!(
+                                                ui,
+                                                "Fondo del Panel",
+                                                current_theme,
+                                                main_area.bg_panel
+                                            );
+                                            color_field!(
+                                                ui,
+                                                "Fondo Elevado",
+                                                current_theme,
+                                                main_area.bg_elevated
+                                            );
+                                            color_field!(
+                                                ui,
+                                                "Fondo Hover",
+                                                current_theme,
+                                                main_area.bg_hover
+                                            );
+                                            color_field!(
+                                                ui,
+                                                "Fondo Activo",
+                                                current_theme,
+                                                main_area.bg_active
+                                            );
+                                            color_field!(
+                                                ui,
+                                                "Icono Principal",
+                                                current_theme,
+                                                main_area.icon_primary
+                                            );
+                                            color_field!(
+                                                ui,
+                                                "Icono Secundario",
+                                                current_theme,
+                                                main_area.icon_secondary
+                                            );
+                                            color_field!(
+                                                ui,
+                                                "Acento",
+                                                current_theme,
+                                                main_area.accent
+                                            );
+                                            color_field!(
+                                                ui,
+                                                "Borde",
+                                                current_theme,
+                                                main_area.border
+                                            );
+                                        });
 
-                                        // --- 10. Tools View ---
-                                        ui.label_ns(
-                                            RichText::new(i18n.t("configs_appearance.tools"))
-                                                .strong()
-                                                .color(
-                                                    current_theme
-                                                        .semantic
-                                                        .text_secondary
-                                                        .to_color(),
-                                                ),
-                                        );
-                                        color_field!(
+                                        CollapsingHeader::new("Barra lateral derecha").show(
                                             ui,
-                                            current_theme,
-                                            i18n.t("configs_appearance.tools_bg"),
-                                            components.tools.bg
+                                            |ui| {
+                                                color_field!(
+                                                    ui,
+                                                    "Fondo del Panel",
+                                                    current_theme,
+                                                    sidebar_right.bg_panel
+                                                );
+                                                color_field!(
+                                                    ui,
+                                                    "Fondo Elevado",
+                                                    current_theme,
+                                                    sidebar_right.bg_elevated
+                                                );
+                                                color_field!(
+                                                    ui,
+                                                    "Fondo Hover",
+                                                    current_theme,
+                                                    sidebar_right.bg_hover
+                                                );
+                                                color_field!(
+                                                    ui,
+                                                    "Fondo Activo",
+                                                    current_theme,
+                                                    sidebar_right.bg_active
+                                                );
+                                                color_field!(
+                                                    ui,
+                                                    "Icono Principal",
+                                                    current_theme,
+                                                    sidebar_right.icon_primary
+                                                );
+                                                color_field!(
+                                                    ui,
+                                                    "Icono Secundario",
+                                                    current_theme,
+                                                    sidebar_right.icon_secondary
+                                                );
+                                                color_field!(
+                                                    ui,
+                                                    "Acento",
+                                                    current_theme,
+                                                    sidebar_right.accent
+                                                );
+                                                color_field!(
+                                                    ui,
+                                                    "Borde",
+                                                    current_theme,
+                                                    sidebar_right.border
+                                                );
+                                            },
                                         );
-                                        color_field!(
-                                            ui,
-                                            current_theme,
-                                            i18n.t("configs_appearance.tools_label_hover"),
-                                            components.tools.label_hover
-                                        );
-                                        color_field!(
-                                            ui,
-                                            current_theme,
-                                            i18n.t("configs_appearance.tools_label_active"),
-                                            components.tools.label_active
-                                        );
-                                        color_field!(
-                                            ui,
-                                            current_theme,
-                                            i18n.t("configs_appearance.tools_label_inactive"),
-                                            components.tools.label_inactive
-                                        );
-                                        ui.add_space(8.0);
 
-                                        // --- 11. Iconos de archivo ---
-                                        ui.label_ns(
-                                            RichText::new(i18n.t("configs_appearance.files"))
-                                                .strong()
-                                                .color(
-                                                    current_theme
-                                                        .semantic
-                                                        .text_secondary
-                                                        .to_color(),
-                                                ),
-                                        );
-                                        color_field!(
-                                            ui,
-                                            current_theme,
-                                            i18n.t("configs_appearance.folder"),
-                                            file_theme.folder_default
-                                        );
-                                        color_field!(
-                                            ui,
-                                            current_theme,
-                                            i18n.t("configs_appearance.image"),
-                                            file_theme.image
-                                        );
-                                        color_field!(
-                                            ui,
-                                            current_theme,
-                                            i18n.t("configs_appearance.pdf"),
-                                            file_theme.pdf
-                                        );
-                                        color_field!(
-                                            ui,
-                                            current_theme,
-                                            i18n.t("configs_appearance.doc"),
-                                            file_theme.document
-                                        );
-                                        color_field!(
-                                            ui,
-                                            current_theme,
-                                            i18n.t("configs_appearance.video"),
-                                            file_theme.video
-                                        );
-                                        color_field!(
-                                            ui,
-                                            current_theme,
-                                            i18n.t("configs_appearance.audio"),
-                                            file_theme.audio
-                                        );
-                                        color_field!(
-                                            ui,
-                                            current_theme,
-                                            i18n.t("configs_appearance.archive"),
-                                            file_theme.archive
-                                        );
-                                        color_field!(
-                                            ui,
-                                            current_theme,
-                                            i18n.t("configs_appearance.code"),
-                                            file_theme.code
-                                        );
-                                        color_field!(
-                                            ui,
-                                            current_theme,
-                                            i18n.t("configs_appearance.font"),
-                                            file_theme.font
-                                        );
-                                        color_field!(
-                                            ui,
-                                            current_theme,
-                                            i18n.t("configs_appearance.exe"),
-                                            file_theme.executable
-                                        );
-                                        color_field!(
-                                            ui,
-                                            current_theme,
-                                            i18n.t("configs_appearance.fallback"),
-                                            file_theme.fallback
-                                        );
+                                        CollapsingHeader::new("Menu contextual").show(ui, |ui| {
+                                            color_field!(
+                                                ui,
+                                                "Fondo del Panel",
+                                                current_theme,
+                                                context_menu.bg_panel
+                                            );
+                                            color_field!(
+                                                ui,
+                                                "Fondo Elevado",
+                                                current_theme,
+                                                context_menu.bg_elevated
+                                            );
+                                            color_field!(
+                                                ui,
+                                                "Fondo Hover",
+                                                current_theme,
+                                                context_menu.bg_hover
+                                            );
+                                            color_field!(
+                                                ui,
+                                                "Fondo Activo",
+                                                current_theme,
+                                                context_menu.bg_active
+                                            );
+                                            color_field!(
+                                                ui,
+                                                "Icono Principal",
+                                                current_theme,
+                                                context_menu.icon_primary
+                                            );
+                                            color_field!(
+                                                ui,
+                                                "Icono Secundario",
+                                                current_theme,
+                                                context_menu.icon_secondary
+                                            );
+                                            color_field!(
+                                                ui,
+                                                "Acento",
+                                                current_theme,
+                                                context_menu.accent
+                                            );
+                                            color_field!(
+                                                ui,
+                                                "Borde",
+                                                current_theme,
+                                                context_menu.border
+                                            );
+                                        });
                                     });
                             });
 
@@ -572,25 +582,26 @@ pub(crate) fn render_appearance_settings(
 
         ui.horizontal(|ui| {
             // Input para nombre de tema personalizado
-            ui.blaze_input("save", None, &mut c_dialog.custom_theme_name, icon_cache)
-                .id("save_theme_placeholder")
-                .size((200.0, 30.0))
-                .radius(20)
-                .text_color(current_theme.semantic.text_secondary.to_color())
-                .background_color(current_theme.semantic.bg_container.to_color())
-                .stroke_color(Color32::TRANSPARENT)
-                .x_color(current_theme.semantic.accent_glow.to_color())
-                .show(ui, || {});
+            ui.blaze_input(
+                "save",
+                None,
+                &mut c_dialog.custom_theme_name,
+                Some(icon_cache),
+            )
+            .id("save_theme_placeholder")
+            .size((200.0, 30.0))
+            .radius(20)
+            .text_color(current_theme.global.text_secondary())
+            .background_color(current_theme.sidebar_left.bg_elevated())
+            .stroke_color(Color32::TRANSPARENT)
+            .x_color(current_theme.sidebar_left.accent())
+            .stroke_width(current_theme.global.components_stroke_width)
+            .show(ui, || {});
 
             ui.add_space(8.0);
 
-            let cbg = current_theme.components.button.bg_hover.to_color();
-            let bg = current_theme.components.button.bg.to_color();
-            let hover_bg = if is_dark_theme {
-                Color32::from_rgba_unmultiplied(cbg.r(), cbg.g(), cbg.b(), 80)
-            } else {
-                Color32::from_rgba_unmultiplied(cbg.r(), cbg.g(), cbg.b(), 10)
-            };
+            let hover_bg = current_theme.sidebar_left.bg_hover();
+            let bg = current_theme.sidebar_left.bg_elevated();
 
             if ui
                 .blaze_button("", Some(icon_cache))
@@ -601,7 +612,7 @@ pub(crate) fn render_appearance_settings(
                 .stroke_color(Color32::TRANSPARENT)
                 .radius(20)
                 .icon("server", icons::ICON_SERVER)
-                .icon_color(current_theme.semantic.accent_glow.to_color())
+                .icon_color(current_theme.sidebar_left.accent())
                 .show(ui)
                 .clicked()
             {
@@ -644,35 +655,8 @@ pub(crate) fn render_appearance_settings(
         ui.add_space(8.0);
         ui.label_ns(
             RichText::new(i18n.t("configs_appearance.message"))
-                .color(current_theme.semantic.text_secondary.to_color()),
+                .color(current_theme.global.text_secondary()),
         );
     });
 }
-
-// // Layout horizontal a dos columnas: Editor (Izq) | Preview (Der)
-// ui.horizontal(|ui| {
-//     ui.set_width(ui.available_width());
-//     ui.set_height(content_h);
-
-//     let avail_w = ui.available_width();
-//     let spacing = 16.0;
-//     // La columna izquierda toma 280px para los campos y color pickers;
-//     // la derecha toma el resto disponible holgadamente.
-//     let left_w = (avail_w * 0.20).clamp(240.0, 300.0);
-//     let right_w = (avail_w - left_w - spacing).max(230.0);
-
-//     tracing::debug!("content_h: {content_h}");
-//     tracing::debug!("left_w: {left_w}");
-//     tracing::debug!("right_w: {right_w}");
-
-//     // 1. Columna izquierda: Editor de colores con scroll
-//     ui.vertical(|ui| {
-//         ui.set_width(left_w);
-//         ui.set_height(content_h);
-
-//     // Separador vertical sutil entre ambas secciones
-//     ui.separator();
-
-//     // 2. Columna derecha: Vista previa interactiva
-
-// });
+// eliminar fondo activo

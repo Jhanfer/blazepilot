@@ -18,10 +18,10 @@ use std::path::Path;
 use std::sync::Arc;
 
 use crate::core::files::file_extension::{FileExtension, sniff_magic_bytes};
+use crate::ui::dialog_manager::manager::ModalDialog;
 use crate::ui::icons_cache::icon_cache::IconCache;
 use crate::ui::media_player::media_player_backend::MediaPlayer;
-use crate::ui::themes::platform::structs::ToColor;
-use crate::ui::{dialog_manager::manager::ModalDialog, themes::theme_manager::with_theme};
+use crate::ui::themes::theme_manager::with_theme;
 use crate::utils::formating::format_hms;
 use egui::{
     Align2, Color32, CornerRadius, Frame, Key, Margin, Order, Rect, Sense, Slider, SliderClamping,
@@ -262,10 +262,10 @@ impl MediaPlayerDialog {
             let preview_height = (available_height * 0.9).max(200.0);
 
             Frame::NONE
-                .fill(current_theme.semantic.bg_container.to_color())
+                .fill(current_theme.main_area.bg_elevated())
                 .stroke(Stroke::new(
-                    0.5,
-                    current_theme.semantic.accent_glow.to_color(),
+                    current_theme.global.panel_stroke_width,
+                    current_theme.main_area.accent(),
                 ))
                 .corner_radius(8.0)
                 .inner_margin(10.0)

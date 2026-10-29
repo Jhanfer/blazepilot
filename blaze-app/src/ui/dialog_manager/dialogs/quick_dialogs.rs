@@ -23,7 +23,7 @@ use crate::{
         custom_components::{UiExt, text_edit::BlazeTextEdit},
         dialog_manager::manager::ModalDialog,
         icons_cache::icon_cache::IconCache,
-        themes::{platform::structs::ToColor, theme_manager::with_theme},
+        themes::theme_manager::with_theme,
     },
 };
 use egui::{Color32, CornerRadius, Frame, Margin, Modal, Order, RichText, Ui, Window};
@@ -83,7 +83,6 @@ impl QuickAccDialog {
         };
 
         let current_theme = with_theme(|t| t.current().clone());
-        let is_dark_theme = current_theme.semantic.text_primary.to_color().r() > 128;
         let i18n = with_configs(|c| c.get_i18n());
 
         match event {
@@ -104,34 +103,34 @@ impl QuickAccDialog {
                         ui.set_min_height(100.0);
 
                         ui.vertical_centered(|ui| {
-                            let cbg = current_theme.components.button.bg_hover.to_color();
-                            let hover_bg = if is_dark_theme {
-                                Color32::from_rgba_unmultiplied(cbg.r(), cbg.g(), cbg.b(), 80)
-                            } else {
-                                Color32::from_rgba_unmultiplied(cbg.r(), cbg.g(), cbg.b(), 10)
-                            };
+                            let hover_bg = current_theme.main_area.bg_hover();
 
                             ui.label_ns(i18n.t("quick_dialog_quick_to_tag.select_tag"));
 
                             ui.horizontal(|ui| {
                                 ui.blaze_combobox(Some(icon_cache))
-                                    .selected_text(&*current_theme.name)
-                                    .text_color(current_theme.semantic.text_primary.to_color())
+                                    .selected_text(&*current_theme.meta.name)
+                                    .text_color(current_theme.global.text_primary())
                                     .size((150.0, 30.0))
-                                    .background_color(current_theme.components.button.bg.to_color())
-                                    .hover_background_color(hover_bg)
+                                    .background_color(current_theme.main_area.bg_elevated())
+                                    .hover_background_color(current_theme.main_area.bg_hover())
                                     .show(ui, |ui| {
                                         let w = ui.available_width();
 
                                         for (i, tag) in tags.iter().enumerate() {
-                                            let label = RichText::new(&*tag.title).color(
-                                                current_theme.semantic.text_primary.to_color(),
-                                            );
-
-                                            let bg = if selected_index == i {
-                                                current_theme.semantic.accent_glow.to_color()
+                                            let is_selected = selected_index == i;
+                                            let text_color = if is_selected {
+                                                current_theme.global.text_primary()
                                             } else {
-                                                current_theme.components.button.bg.to_color()
+                                                current_theme.global.text_secondary()
+                                            };
+                                            let label =
+                                                RichText::new(&*tag.title).color(text_color);
+
+                                            let bg = if is_selected {
+                                                current_theme.main_area.bg_active()
+                                            } else {
+                                                Color32::TRANSPARENT
                                             };
 
                                             if ui
@@ -142,6 +141,9 @@ impl QuickAccDialog {
                                                 .hover_background_color(hover_bg)
                                                 .stroke_color(Color32::TRANSPARENT)
                                                 .radius(20)
+                                                .stroke_width(
+                                                    current_theme.global.components_stroke_width,
+                                                )
                                                 .show(ui)
                                                 .clicked()
                                             {
@@ -586,7 +588,7 @@ impl QuickAccDialog {
         let mut should_close = false;
 
         let custom_frame = Frame::NONE
-            .fill(current_theme.semantic.bg_main.to_color())
+            .fill(current_theme.main_area.bg_elevated())
             .corner_radius(CornerRadius::same(10))
             .inner_margin(Margin::same(10));
 

@@ -20,7 +20,7 @@ use crate::{
             custom_context_menu::context_state::ContextMenuKind,
             utilities::{ensure_min_lightness, git_dot_color, resolve_icon, text_color_for_git},
         },
-        themes::{platform::structs::ToColor, theme_manager::with_theme},
+        themes::theme_manager::with_theme,
     },
 };
 use egui::{
@@ -439,12 +439,11 @@ pub fn render_miller_scrollview(
                         let is_selected = state.is_selected_for(&col_path, i);
 
                         // painter de la selección y directorio abierto
+                        let mut c = current_theme.main_area.accent();
                         if is_opened || is_selected {
                             let color = if is_opened {
-                                let c = current_theme.components.list_item.bg_selected.to_color();
                                 Color32::from_rgba_unmultiplied(c.r(), c.g(), c.b(), 200)
                             } else {
-                                let c = current_theme.components.list_item.bg_selected.to_color();
                                 Color32::from_rgba_unmultiplied(c.r(), c.g(), c.b(), 60)
                             };
 
@@ -454,8 +453,6 @@ pub fn render_miller_scrollview(
                         // painter del hover
                         if resp.hovered() {
                             ui.set_cursor_icon(CursorIcon::PointingHand);
-
-                            let mut c = current_theme.components.list_item.bg_selected.to_color();
                             c = Color32::from_rgba_unmultiplied(c.r(), c.g(), c.b(), 60);
 
                             ui.painter().rect_filled(rect, 5.0, c);
@@ -633,7 +630,7 @@ pub fn render_miller_scrollview(
                                 Align2::RIGHT_CENTER,
                                 "›",
                                 FontId::proportional(14.0),
-                                current_theme.semantic.text_secondary.to_color(),
+                                current_theme.global.text_primary(),
                             );
                         }
                     }

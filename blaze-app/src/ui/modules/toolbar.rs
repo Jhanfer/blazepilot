@@ -23,8 +23,8 @@ use crate::{
         blaze_ui_state::BlazeUiState,
         custom_components::{UiExt, text_edit::BlazeTextEdit},
         icons_cache::icons::{self},
-        modules::{tabs_view::tab_views::tabs, utilities::ensure_min_lightness},
-        themes::{platform::structs::ToColor, theme_manager::with_theme},
+        modules::tabs_view::tab_views::tabs,
+        themes::theme_manager::with_theme,
     },
 };
 use egui::{
@@ -49,10 +49,15 @@ fn render_bar_button<F>(
 {
     let current_theme = with_theme(|t| t.current());
 
+    let bg = current_theme.top_bar.bg_panel();
+
     let ball_size = 35.0;
     Frame::new()
-        .fill(current_theme.components.button.bg.to_color())
-        .stroke(Stroke::new(0.5, current_theme.semantic.accent.to_color()))
+        .fill(bg)
+        .stroke(Stroke::new(
+            current_theme.global.panel_stroke_width,
+            current_theme.top_bar.border(),
+        ))
         .corner_radius(CornerRadius::same((ball_size / 1.5) as u8))
         .show(ui, |ui| {
             ui.set_width(ball_size);
@@ -70,11 +75,11 @@ fn render_bar_button<F>(
             );
 
             let color = if resp.hovered() && active {
-                ensure_min_lightness(current_theme.components.button.label_hover.to_color())
+                current_theme.top_bar.icon_hover_on_color(bg)
             } else if !active {
-                current_theme.components.button.label_inactive.to_color()
+                current_theme.top_bar.icon_secondary()
             } else {
-                current_theme.components.button.label_active.to_color()
+                current_theme.top_bar.icon_primary()
             };
 
             let icon = ui_state
@@ -105,7 +110,7 @@ pub fn toolbar_component(ui: &mut Ui, state: &mut BlazeCoreState, ui_state: &mut
     Panel::top("toolbar")
         .frame(
             Frame::new()
-                .fill(current_theme.semantic.bg_main.to_color())
+                .fill(current_theme.global.bg_main())
                 .inner_margin(Margin {
                     left: 10,
                     right: 10,
@@ -202,10 +207,10 @@ pub fn toolbar_component(ui: &mut Ui, state: &mut BlazeCoreState, ui_state: &mut
 
                     let cwd = state.cwd();
                     Frame::new()
-                        .fill(current_theme.components.input.bg.to_color())
+                        .fill(current_theme.top_bar.bg_elevated())
                         .stroke(Stroke::new(
-                            0.5,
-                            current_theme.components.input.border_idle.to_color(),
+                            current_theme.global.panel_stroke_width,
+                            current_theme.top_bar.border(),
                         ))
                         .corner_radius(CornerRadius::same(20))
                         .inner_margin(0)
@@ -279,15 +284,15 @@ pub fn toolbar_component(ui: &mut Ui, state: &mut BlazeCoreState, ui_state: &mut
                                         let button = Button::new(
                                             RichText::new(name)
                                                 .color(if is_last {
-                                                    current_theme.semantic.text_primary.to_color()
+                                                    current_theme.global.text_primary()
                                                 } else {
-                                                    current_theme.semantic.text_secondary.to_color()
+                                                    current_theme.global.text_secondary()
                                                 })
                                                 .strong(),
                                         )
                                         .frame(true)
                                         .fill(if is_last {
-                                            current_theme.semantic.accent_glow.to_color()
+                                            current_theme.top_bar.accent()
                                         } else {
                                             Color32::TRANSPARENT
                                         })
@@ -313,12 +318,7 @@ pub fn toolbar_component(ui: &mut Ui, state: &mut BlazeCoreState, ui_state: &mut
                                         if !is_last {
                                             ui.label_ns(
                                                 RichText::new("›")
-                                                    .color(
-                                                        current_theme
-                                                            .semantic
-                                                            .text_secondary
-                                                            .to_color(),
-                                                    )
+                                                    .color(current_theme.global.text_secondary())
                                                     .size(16.0),
                                             );
                                         }

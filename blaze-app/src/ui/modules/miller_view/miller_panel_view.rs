@@ -18,7 +18,7 @@ use crate::{
             island_n_bubble::render_island_bubble,
             miller_view::miller_scrollview::render_miller_scrollview,
         },
-        themes::{platform::structs::ToColor, theme_manager::with_theme},
+        themes::theme_manager::with_theme,
     },
 };
 use egui::{CornerRadius, Frame, Margin, Rect, ScrollArea, Sense, Stroke, Ui};
@@ -166,7 +166,7 @@ pub fn miller_panel_frame(
                             top: 0,
                             bottom: 5,
                         })
-                        .fill(current_theme.components.panel.bg.to_color())
+                        .fill(current_theme.main_area.bg_panel())
                         .corner_radius(CornerRadius {
                             nw: 0,
                             ne: 0,
@@ -176,9 +176,9 @@ pub fn miller_panel_frame(
                         .stroke(Stroke {
                             width: 0.5,
                             color: if is_focused {
-                                current_theme.semantic.accent_glow.to_color()
+                                current_theme.main_area.accent()
                             } else {
-                                current_theme.components.panel.bg.to_color()
+                                current_theme.main_area.bg_panel()
                             },
                         })
                         .show(ui, |ui| {

@@ -11,7 +11,7 @@ use crate::{
         custom_components::UiExt,
         icons_cache::{icon_cache::IconCache, icons},
         modules::utilities::{contrats_to_text_color, ensure_min_lightness, resolve_icon},
-        themes::{platform::structs::ToColor, theme_manager::with_theme},
+        themes::theme_manager::with_theme,
     },
     utils::formating::{format_date, format_size},
 };
@@ -46,18 +46,17 @@ pub fn render_examples_ui(ui: &mut Ui, state: &mut ExamplesUiState, icon_cache: 
 
     // Contenedor principal
     Frame::NONE
-        .fill(current_theme.components.panel.bg.to_color())
+        .fill(current_theme.main_area.bg_panel())
         .stroke(Stroke {
             width: 0.5,
-            color: current_theme.components.panel.border.to_color(),
+            color: current_theme.main_area.border(),
         })
         .corner_radius(CornerRadius::same(12))
         .inner_margin(Margin::same(10))
         .show(ui, |ui| {
             ui.add(
                 Label::new(
-                    RichText::new("1. Tipografía")
-                        .color(current_theme.semantic.text_primary.to_color()),
+                    RichText::new("1. Tipografía").color(current_theme.global.text_primary()),
                 )
                 .selectable(false),
             );
@@ -68,7 +67,7 @@ pub fn render_examples_ui(ui: &mut Ui, state: &mut ExamplesUiState, icon_cache: 
                 Label::new(
                     RichText::new("Primary text")
                         .heading()
-                        .color(current_theme.semantic.text_primary.to_color()),
+                        .color(current_theme.global.text_primary()),
                 )
                 .selectable(false),
             );
@@ -77,7 +76,7 @@ pub fn render_examples_ui(ui: &mut Ui, state: &mut ExamplesUiState, icon_cache: 
                 Label::new(
                     RichText::new("Texto secundario para rutas o descripciones")
                         .small()
-                        .color(current_theme.semantic.text_secondary.to_color()),
+                        .color(current_theme.global.text_secondary()),
                 )
                 .selectable(false),
             );
@@ -86,7 +85,7 @@ pub fn render_examples_ui(ui: &mut Ui, state: &mut ExamplesUiState, icon_cache: 
                 Label::new(
                     RichText::new("Texto silenciado")
                         .small()
-                        .color(current_theme.semantic.text_muted.to_color()),
+                        .color(current_theme.global.text_secondary()),
                 )
                 .selectable(false),
             );
@@ -96,7 +95,7 @@ pub fn render_examples_ui(ui: &mut Ui, state: &mut ExamplesUiState, icon_cache: 
             ui.add(
                 Label::new(
                     RichText::new("2. Controles básicos")
-                        .color(current_theme.semantic.text_primary.to_color()),
+                        .color(current_theme.global.text_primary()),
                 )
                 .selectable(false),
             );
@@ -104,50 +103,52 @@ pub fn render_examples_ui(ui: &mut Ui, state: &mut ExamplesUiState, icon_cache: 
             ui.horizontal(|ui| {
                 ui.blaze_button("Normal", None)
                     .size((80.0, 20.0))
-                    .background_color(current_theme.components.button.bg.to_color())
+                    .background_color(current_theme.main_area.bg_elevated())
                     .radius(20)
+                    .stroke_width(current_theme.global.components_stroke_width)
                     .show(ui);
 
                 ui.blaze_button("Hover", None)
                     .size((80.0, 20.0))
-                    .background_color(current_theme.components.button.bg_hover.to_color())
+                    .background_color(current_theme.main_area.bg_hover())
                     .radius(20)
+                    .stroke_width(current_theme.global.components_stroke_width)
                     .show(ui);
 
                 ui.blaze_button("Active", None)
                     .size((80.0, 20.0))
-                    .background_color(current_theme.components.button.label_active.to_color())
+                    .background_color(current_theme.main_area.bg_active())
                     .radius(20)
+                    .stroke_width(current_theme.global.components_stroke_width)
                     .show(ui);
             });
 
             ui.blaze_combobox(Some(icon_cache))
                 .selected_text("Test")
-                .text_color(current_theme.semantic.text_primary.to_color())
+                .text_color(current_theme.global.text_primary())
                 .size((150.0, 30.0))
-                .background_color(current_theme.components.button.bg.to_color())
+                .background_color(current_theme.main_area.bg_elevated())
                 .show(ui, |ui| {
                     let w = ui.available_width();
 
                     for (i, name) in state.example_combobox.iter().enumerate() {
-                        let label = RichText::new(&**name)
-                            .color(current_theme.semantic.text_primary.to_color());
+                        let label =
+                            RichText::new(&**name).color(current_theme.global.text_primary());
 
                         let bg = if "test1" == *name {
-                            current_theme.semantic.accent_glow.to_color()
+                            current_theme.main_area.accent()
                         } else {
-                            current_theme.components.button.bg.to_color()
+                            current_theme.main_area.bg_elevated()
                         };
 
                         ui.blaze_button(label, None)
                             .id(format!("example_btn_{i}"))
                             .size((w, 20.0))
                             .background_color(bg)
-                            .hover_background_color(
-                                current_theme.components.button.bg_hover.to_color(),
-                            )
+                            .hover_background_color(current_theme.main_area.bg_hover())
                             .stroke_color(Color32::TRANSPARENT)
                             .radius(20)
+                            .stroke_width(current_theme.global.components_stroke_width)
                             .show(ui);
                     }
                 });
@@ -155,14 +156,11 @@ pub fn render_examples_ui(ui: &mut Ui, state: &mut ExamplesUiState, icon_cache: 
             ui.separator();
 
             ui.add(
-                Label::new(
-                    RichText::new("3. Inputs")
-                        .color(current_theme.semantic.text_primary.to_color()),
-                )
-                .selectable(false),
+                Label::new(RichText::new("3. Inputs").color(current_theme.global.text_primary()))
+                    .selectable(false),
             );
 
-            let c = current_theme.semantic.accent_glow.to_color();
+            let c = current_theme.main_area.accent();
             let hint_stroke_color = Color32::from_rgba_unmultiplied(
                 c.r().saturating_add(20),
                 c.g().saturating_add(20),
@@ -180,52 +178,47 @@ pub fn render_examples_ui(ui: &mut Ui, state: &mut ExamplesUiState, icon_cache: 
             let (icon_name, icon_bytes) = ("search", icons::ICON_SEARCH);
             let mut test = String::new();
 
-            ui.blaze_input("test iddle", Some("hint"), &mut test, icon_cache)
+            ui.blaze_input("test iddle", Some("hint"), &mut test, Some(icon_cache))
                 .id("test_input_1")
-                .hint_background_color(current_theme.semantic.bg_container.to_color())
+                .hint_background_color(current_theme.main_area.bg_elevated())
                 .hint_stroke_color(hint_stroke_color)
                 .hint_text_color(hint_color)
                 .size((200.0, 30.0))
                 .radius(20)
-                .text_color(current_theme.semantic.text_secondary.to_color())
-                .background_color(current_theme.semantic.bg_container.to_color())
-                .stroke_color(ensure_min_lightness(
-                    current_theme.components.input.border_idle.to_color(),
-                ))
-                .x_color(current_theme.semantic.accent_glow.to_color())
+                .text_color(current_theme.global.text_secondary())
+                .background_color(current_theme.main_area.bg_elevated())
+                .stroke_color(ensure_min_lightness(current_theme.main_area.border()))
+                .x_color(current_theme.main_area.accent())
                 .icon(icon_name, icon_bytes)
-                .icon_color(ensure_min_lightness(
-                    current_theme.components.input.border_idle.to_color(),
-                ))
+                .icon_color(ensure_min_lightness(current_theme.main_area.border()))
+                .stroke_width(current_theme.global.components_stroke_width)
                 .show(ui, || {});
 
-            ui.blaze_input("test focused", Some("hint"), &mut test, icon_cache)
+            ui.blaze_input("test focused", Some("hint"), &mut test, Some(icon_cache))
                 .id("test_input_2")
-                .hint_background_color(current_theme.semantic.bg_container.to_color())
+                .hint_background_color(current_theme.main_area.bg_elevated())
                 .hint_stroke_color(hint_stroke_color)
                 .hint_text_color(hint_color)
                 .size((200.0, 30.0))
                 .radius(20)
-                .text_color(current_theme.semantic.text_secondary.to_color())
-                .background_color(current_theme.semantic.bg_container.to_color())
-                .stroke_color(ensure_min_lightness(
-                    current_theme.components.input.border_focus.to_color(),
-                ))
-                .x_color(current_theme.semantic.accent_glow.to_color())
+                .text_color(current_theme.global.text_secondary())
+                .background_color(current_theme.main_area.bg_elevated())
+                .stroke_color(ensure_min_lightness(current_theme.main_area.accent()))
+                .x_color(current_theme.main_area.accent())
                 .icon(icon_name, icon_bytes)
-                .icon_color(ensure_min_lightness(
-                    current_theme.components.input.border_focus.to_color(),
-                ))
+                .icon_color(ensure_min_lightness(current_theme.main_area.accent()))
+                .stroke_width(current_theme.global.components_stroke_width)
                 .show(ui, || {});
 
-            ui.blaze_input("test no icon", None, &mut test, icon_cache)
+            ui.blaze_input("test no icon", None, &mut test, Some(icon_cache))
                 .id("test_input_3")
                 .size((200.0, 30.0))
                 .radius(20)
-                .text_color(current_theme.semantic.text_secondary.to_color())
-                .background_color(current_theme.semantic.bg_container.to_color())
+                .text_color(current_theme.global.text_secondary())
+                .background_color(current_theme.main_area.bg_elevated())
                 .stroke_color(Color32::TRANSPARENT)
-                .x_color(current_theme.semantic.accent_glow.to_color())
+                .x_color(current_theme.main_area.accent())
+                .stroke_width(current_theme.global.components_stroke_width)
                 .show(ui, || {});
 
             ui.separator();
@@ -233,7 +226,7 @@ pub fn render_examples_ui(ui: &mut Ui, state: &mut ExamplesUiState, icon_cache: 
             ui.add(
                 Label::new(
                     RichText::new("4. Estados semánticos")
-                        .color(current_theme.semantic.text_primary.to_color()),
+                        .color(current_theme.global.text_primary()),
                 )
                 .selectable(false),
             );
@@ -242,9 +235,9 @@ pub fn render_examples_ui(ui: &mut Ui, state: &mut ExamplesUiState, icon_cache: 
             ui.horizontal(|ui| {
                 let (rect1, _) = ui.allocate_exact_size(state_size, Sense::hover());
                 ui.painter()
-                    .rect_filled(rect1, 20, current_theme.semantic.error.to_color());
+                    .rect_filled(rect1, 20, current_theme.global.error());
 
-                let text_color = contrats_to_text_color(current_theme.semantic.error.to_color());
+                let text_color = contrats_to_text_color(current_theme.global.error());
                 ui.painter().text(
                     rect1.center(),
                     Align2::CENTER_CENTER,
@@ -255,9 +248,9 @@ pub fn render_examples_ui(ui: &mut Ui, state: &mut ExamplesUiState, icon_cache: 
 
                 let (rect2, _) = ui.allocate_exact_size(state_size, Sense::hover());
                 ui.painter()
-                    .rect_filled(rect2, 20, current_theme.semantic.warn.to_color());
+                    .rect_filled(rect2, 20, current_theme.global.warn());
 
-                let text_color = contrats_to_text_color(current_theme.semantic.warn.to_color());
+                let text_color = contrats_to_text_color(current_theme.global.warn());
                 ui.painter().text(
                     rect2.center(),
                     Align2::CENTER_CENTER,
@@ -268,9 +261,9 @@ pub fn render_examples_ui(ui: &mut Ui, state: &mut ExamplesUiState, icon_cache: 
 
                 let (rect3, _) = ui.allocate_exact_size(state_size, Sense::hover());
                 ui.painter()
-                    .rect_filled(rect3, 20, current_theme.semantic.success.to_color());
+                    .rect_filled(rect3, 20, current_theme.global.success());
 
-                let text_color = contrats_to_text_color(current_theme.semantic.success.to_color());
+                let text_color = contrats_to_text_color(current_theme.global.success());
                 ui.painter().text(
                     rect3.center(),
                     Align2::CENTER_CENTER,
@@ -283,11 +276,8 @@ pub fn render_examples_ui(ui: &mut Ui, state: &mut ExamplesUiState, icon_cache: 
             ui.separator();
 
             ui.add(
-                Label::new(
-                    RichText::new("5. Archivos")
-                        .color(current_theme.semantic.text_primary.to_color()),
-                )
-                .selectable(false),
+                Label::new(RichText::new("5. Archivos").color(current_theme.global.text_primary()))
+                    .selectable(false),
             );
 
             ui.vertical(|ui| {
@@ -368,14 +358,11 @@ pub fn render_examples_ui(ui: &mut Ui, state: &mut ExamplesUiState, icon_cache: 
 
                         // Hover: única interacción conservada.
                         if response.hovered() {
-                            ui.painter().rect_filled(
-                                rect,
-                                5.0,
-                                current_theme.components.list_item.bg_hover.to_color(),
-                            );
+                            ui.painter()
+                                .rect_filled(rect, 5.0, current_theme.main_area.bg_hover());
                         }
 
-                        let text_color = current_theme.semantic.text_primary.to_color();
+                        let text_color = current_theme.global.text_primary();
 
                         // --- Icono ---
                         let icon_size = 16.0;
@@ -487,19 +474,16 @@ pub fn render_examples_ui(ui: &mut Ui, state: &mut ExamplesUiState, icon_cache: 
             ui.separator();
 
             ui.add(
-                Label::new(
-                    RichText::new("6. Paneles")
-                        .color(current_theme.semantic.text_primary.to_color()),
-                )
-                .selectable(false),
+                Label::new(RichText::new("6. Paneles").color(current_theme.global.text_primary()))
+                    .selectable(false),
             );
 
             let state_size = vec2(100.0, 100.0);
             ui.horizontal(|ui| {
                 let (rect1, _) = ui.allocate_exact_size(state_size, Sense::hover());
                 ui.painter()
-                    .rect_filled(rect1, 20, current_theme.semantic.bg_main.to_color());
-                let text_color = contrats_to_text_color(current_theme.semantic.bg_main.to_color());
+                    .rect_filled(rect1, 20, current_theme.global.bg_main());
+                let text_color = contrats_to_text_color(current_theme.global.bg_main());
                 ui.painter().text(
                     rect1.center(),
                     Align2::CENTER_CENTER,
@@ -510,9 +494,8 @@ pub fn render_examples_ui(ui: &mut Ui, state: &mut ExamplesUiState, icon_cache: 
 
                 let (rect2, _) = ui.allocate_exact_size(state_size, Sense::hover());
                 ui.painter()
-                    .rect_filled(rect2, 20, current_theme.semantic.bg_container.to_color());
-                let text_color =
-                    contrats_to_text_color(current_theme.semantic.bg_container.to_color());
+                    .rect_filled(rect2, 20, current_theme.main_area.bg_elevated());
+                let text_color = contrats_to_text_color(current_theme.main_area.bg_elevated());
                 ui.painter().text(
                     rect2.center(),
                     Align2::CENTER_CENTER,
@@ -525,12 +508,14 @@ pub fn render_examples_ui(ui: &mut Ui, state: &mut ExamplesUiState, icon_cache: 
                 ui.painter().rect(
                     rect3,
                     20,
-                    current_theme.components.panel.bg.to_color(),
-                    Stroke::new(0.5, current_theme.components.panel.border.to_color()),
+                    current_theme.main_area.bg_panel(),
+                    Stroke::new(
+                        current_theme.global.panel_stroke_width,
+                        current_theme.main_area.border(),
+                    ),
                     StrokeKind::Middle,
                 );
-                let text_color =
-                    contrats_to_text_color(current_theme.components.panel.bg.to_color());
+                let text_color = contrats_to_text_color(current_theme.main_area.bg_panel());
                 ui.painter().text(
                     rect3.center(),
                     Align2::CENTER_CENTER,

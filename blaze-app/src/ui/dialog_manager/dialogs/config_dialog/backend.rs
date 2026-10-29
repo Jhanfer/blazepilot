@@ -3,13 +3,11 @@ use crate::core::bootstrap::configs::{
 };
 use crate::ui::custom_components::UiExt;
 use crate::ui::icons_cache::icon_cache::IconCache;
-use crate::ui::themes::platform::structs::ToColor;
 use crate::ui::themes::theme_manager::with_theme;
 use egui::{Color32, Label, RichText, Ui};
 
 pub(crate) fn render_backend_settings(ui: &mut Ui, _query: &str, icon_cache: &mut IconCache) {
     let current_theme = with_theme(|t| t.current());
-    let is_dark_theme = current_theme.semantic.text_primary.to_color().r() > 128;
     let i18n = with_configs(|c| c.get_i18n());
 
     ui.add_space(10.0);
@@ -19,7 +17,7 @@ pub(crate) fn render_backend_settings(ui: &mut Ui, _query: &str, icon_cache: &mu
             Label::new(
                 RichText::new(i18n.t("configs_backend.title"))
                     .strong()
-                    .color(current_theme.semantic.text_primary.to_color()),
+                    .color(current_theme.global.text_primary()),
             )
             .selectable(false),
         );
@@ -28,22 +26,17 @@ pub(crate) fn render_backend_settings(ui: &mut Ui, _query: &str, icon_cache: &mu
 
         let current = with_configs(|c| c.get_display_backend());
 
-        let cbg = current_theme.components.button.bg_hover.to_color();
-        let hover_bg = if is_dark_theme {
-            Color32::from_rgba_unmultiplied(cbg.r(), cbg.g(), cbg.b(), 80)
-        } else {
-            Color32::from_rgba_unmultiplied(cbg.r(), cbg.g(), cbg.b(), 10)
-        };
+        let hover_bg = current_theme.sidebar_left.bg_hover();
 
         ui.label_ns(i18n.t("configs_backend.selection"));
 
         ui.horizontal(|ui| {
             ui.blaze_combobox(Some(icon_cache))
                 .selected_text(current.name())
-                .text_color(current_theme.semantic.text_primary.to_color())
+                .text_color(current_theme.global.text_primary())
                 .size((150.0, 30.0))
-                .background_color(current_theme.components.button.bg.to_color())
-                .hover_background_color(hover_bg)
+                .background_color(current_theme.sidebar_left.bg_elevated())
+                .hover_background_color(current_theme.sidebar_left.bg_hover())
                 .show(ui, |ui| {
                     let w = ui.available_width();
 
@@ -55,13 +48,18 @@ pub(crate) fn render_backend_settings(ui: &mut Ui, _query: &str, icon_cache: &mu
                     .iter()
                     .enumerate()
                     {
-                        let label = RichText::new(*name)
-                            .color(current_theme.semantic.text_primary.to_color());
-
-                        let bg = if current == *backend {
-                            current_theme.semantic.accent_glow.to_color()
+                        let is_selected = current == *backend;
+                        let text_color = if is_selected {
+                            current_theme.global.text_primary()
                         } else {
-                            current_theme.components.button.bg.to_color()
+                            current_theme.global.text_secondary()
+                        };
+                        let label = RichText::new(*name).color(text_color);
+
+                        let bg = if is_selected {
+                            current_theme.sidebar_left.bg_active()
+                        } else {
+                            Color32::TRANSPARENT
                         };
 
                         if ui
@@ -72,6 +70,7 @@ pub(crate) fn render_backend_settings(ui: &mut Ui, _query: &str, icon_cache: &mu
                             .hover_background_color(hover_bg)
                             .stroke_color(Color32::TRANSPARENT)
                             .radius(20)
+                            .stroke_width(current_theme.global.components_stroke_width)
                             .show(ui)
                             .clicked()
                         {
@@ -88,7 +87,7 @@ pub(crate) fn render_backend_settings(ui: &mut Ui, _query: &str, icon_cache: &mu
         ui.add(
             Label::new(
                 RichText::new(i18n.t("configs_backend.hint"))
-                    .color(current_theme.semantic.text_primary.to_color()),
+                    .color(current_theme.global.text_primary()),
             )
             .selectable(false),
         );
@@ -96,7 +95,7 @@ pub(crate) fn render_backend_settings(ui: &mut Ui, _query: &str, icon_cache: &mu
         ui.add(
             Label::new(
                 RichText::new(i18n.t("configs_backend.message"))
-                    .color(current_theme.semantic.text_secondary.to_color()),
+                    .color(current_theme.global.text_secondary()),
             )
             .selectable(false),
         );

@@ -1,13 +1,9 @@
 use crate::{
     core::{blaze_state::BlazeCoreState, system::disk_reader::disk::Disk},
     ui::{
-        blaze_ui_state::BlazeUiState,
-        custom_components::UiExt,
-        icons_cache::icons::*,
-        modules::{
-            custom_context_menu::context_state::ContextMenuKind, utilities::ensure_min_lightness,
-        },
-        themes::{platform::structs::ToColor, theme_manager::with_theme},
+        blaze_ui_state::BlazeUiState, custom_components::UiExt, icons_cache::icons::*,
+        modules::custom_context_menu::context_state::ContextMenuKind,
+        themes::theme_manager::with_theme,
     },
 };
 use egui::{Align2, Color32, FontId, PointerButton, Rect, Sense, Ui, pos2, vec2};
@@ -80,7 +76,7 @@ pub fn render_header_text(icon_key: &str, label: &str, ui: &mut Ui, ui_state: &m
         ui,
         ui_state,
         icon_name,
-        current_theme.semantic.text_primary.to_color(),
+        current_theme.global.text_primary(),
         icon_bytes,
         rect,
     );
@@ -90,7 +86,7 @@ pub fn render_header_text(icon_key: &str, label: &str, ui: &mut Ui, ui_state: &m
         Align2::LEFT_CENTER,
         label,
         FontId::proportional(20.0),
-        current_theme.semantic.text_primary.to_color(),
+        current_theme.global.text_primary(),
     );
 }
 
@@ -105,18 +101,11 @@ pub fn render_local_buttons(
     let current_theme = with_theme(|t| t.current());
     let (icon_name, icon_bytes) = get_folder_icon(icon_key);
 
-    let is_dark_theme = current_theme.semantic.text_primary.to_color().r() > 128;
+    let hover_bg = current_theme.sidebar_left.bg_hover();
+    let bg = current_theme.sidebar_left.bg_elevated();
 
-    let cbg = current_theme.components.button.bg_hover.to_color();
-    let bg = current_theme.components.button.bg.to_color();
-    let hover_bg = if is_dark_theme {
-        Color32::from_rgba_unmultiplied(cbg.r(), cbg.g(), cbg.b(), 80)
-    } else {
-        Color32::from_rgba_unmultiplied(cbg.r(), cbg.g(), cbg.b(), 10)
-    };
-
-    let icon_color = current_theme.components.button.label_active.to_color();
-    let hover_icon = ensure_min_lightness(current_theme.components.button.label_hover.to_color());
+    let icon_color = current_theme.sidebar_left.icon_primary();
+    let hover_icon = current_theme.sidebar_left.icon_hover_on_color(hover_bg);
 
     let btn_id = ui.id().with(label);
     let btn_resp = ui
@@ -132,7 +121,8 @@ pub fn render_local_buttons(
         .icon_color(icon_color)
         .hover_icon_color(hover_icon)
         .icon_size(16_f32)
-        .text_color(current_theme.semantic.text_primary.to_color())
+        .text_color(current_theme.global.text_primary())
+        .stroke_width(current_theme.global.components_stroke_width)
         .show(ui);
 
     let middle_clicked = ui.input(|i| {
@@ -184,18 +174,11 @@ pub fn render_drives_button(
         ("server", ICON_SERVER)
     };
 
-    let is_dark_theme = current_theme.semantic.text_primary.to_color().r() > 128;
+    let hover_bg = current_theme.sidebar_left.bg_hover();
+    let bg = current_theme.sidebar_left.bg_elevated();
 
-    let cbg = current_theme.components.button.bg_hover.to_color();
-    let bg = current_theme.components.button.bg.to_color();
-    let hover_bg = if is_dark_theme {
-        Color32::from_rgba_unmultiplied(cbg.r(), cbg.g(), cbg.b(), 80)
-    } else {
-        Color32::from_rgba_unmultiplied(cbg.r(), cbg.g(), cbg.b(), 10)
-    };
-
-    let icon_color = current_theme.components.button.label_active.to_color();
-    let hover_icon = ensure_min_lightness(current_theme.components.button.label_hover.to_color());
+    let icon_color = current_theme.sidebar_left.icon_primary();
+    let hover_icon = current_theme.sidebar_left.icon_hover_on_color(hover_bg);
 
     let btn_id = ui.id().with(&display_name);
     let btn_resp = ui
@@ -211,8 +194,9 @@ pub fn render_drives_button(
         .icon_color(icon_color)
         .hover_icon_color(hover_icon)
         .icon_size(16_f32)
-        .text_color(current_theme.semantic.text_primary.to_color())
+        .text_color(current_theme.global.text_primary())
         .content_offset_y(if is_mounted { -8.0 } else { 0.0 })
+        .stroke_width(current_theme.global.components_stroke_width)
         .show(ui);
 
     if is_mounted {
@@ -243,7 +227,7 @@ pub fn render_drives_button(
 
         //relleno
         ui.painter()
-            .rect_filled(filled_rect, 10.0, current_theme.semantic.accent.to_color());
+            .rect_filled(filled_rect, 10.0, current_theme.sidebar_left.accent());
     }
 
     if btn_resp.clicked() && is_mounted {

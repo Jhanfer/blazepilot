@@ -20,7 +20,7 @@ use crate::{
             island_n_bubble::render_island_bubble,
             row_view::rubber_band_logic::render_row_rubberband,
         },
-        themes::{platform::structs::ToColor, theme_manager::with_theme},
+        themes::theme_manager::with_theme,
     },
 };
 use egui::{CornerRadius, Frame, Margin, Rect, Stroke, Ui};
@@ -150,7 +150,7 @@ pub fn detailed_row_panel_frame(
             top: 0,
             bottom: 10,
         })
-        .fill(current_theme.components.panel.bg.to_color())
+        .fill(current_theme.main_area.bg_panel())
         .corner_radius(CornerRadius {
             nw: 0,
             ne: 0,
@@ -159,7 +159,7 @@ pub fn detailed_row_panel_frame(
         })
         .stroke(Stroke {
             width: 0.5,
-            color: current_theme.components.panel.border.to_color(),
+            color: current_theme.main_area.border(),
         })
         .show(ui, |ui| {
             let original_clip = ui.clip_rect();

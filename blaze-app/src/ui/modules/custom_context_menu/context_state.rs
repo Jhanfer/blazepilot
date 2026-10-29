@@ -11,9 +11,8 @@ use crate::{
         system::disk_reader::disk::Disk,
     },
     ui::{
-        blaze_ui_state::BlazeUiState,
-        modules::utilities::ensure_min_lightness,
-        themes::{platform::structs::ToColor, theme_manager::with_theme},
+        blaze_ui_state::BlazeUiState, modules::utilities::ensure_min_lightness,
+        themes::theme_manager::with_theme,
     },
 };
 
@@ -137,11 +136,11 @@ impl ContextMenuState {
             .constrain_to(screen)
             .show(ui, |ui| {
                 Frame::new()
-                    .fill(current_theme.components.panel.bg.to_color())
+                    .fill(current_theme.context_menu.bg_panel())
                     .corner_radius(12.0)
                     .stroke(Stroke::new(
-                        0.5,
-                        current_theme.components.panel.border.to_color(),
+                        current_theme.global.panel_stroke_width,
+                        current_theme.context_menu.border(),
                     ))
                     .inner_margin(8.0)
                     .show(ui, |ui| {
@@ -202,10 +201,10 @@ impl ContextMenuState {
             .fixed_pos(popup_pos)
             .show(ui.ctx(), |ui| {
                 Frame::popup(ui.style())
-                    .fill(current_theme.components.panel.bg.to_color())
+                    .fill(current_theme.context_menu.bg_panel())
                     .stroke(Stroke::new(
-                        0.5,
-                        current_theme.components.panel.border.to_color(),
+                        current_theme.global.panel_stroke_width,
+                        current_theme.context_menu.border(),
                     ))
                     .show(ui, |ui| {
                         ui.set_min_size(popup_size);
@@ -255,9 +254,9 @@ impl ContextMenuState {
         let paint_rect = rect.shrink2(vec2(h_padding, 0.0));
 
         let text_color = if enabled {
-            current_theme.semantic.text_primary.to_color()
+            current_theme.global.text_primary()
         } else {
-            current_theme.semantic.text_secondary.to_color()
+            current_theme.global.text_secondary()
         };
 
         let popup_id = response.id.with("popup");
@@ -266,14 +265,11 @@ impl ContextMenuState {
         let (bg_color, icon_color) = if response.hovered() && enabled {
             ui.set_cursor_icon(CursorIcon::PointingHand);
             (
-                current_theme.components.button.bg.to_color(),
-                current_theme.components.button.label_hover.to_color(),
+                current_theme.context_menu.bg_elevated(),
+                current_theme.context_menu.bg_hover(),
             )
         } else {
-            (
-                Color32::TRANSPARENT,
-                current_theme.components.button.label_active.to_color(),
-            )
+            (Color32::TRANSPARENT, current_theme.context_menu.bg_active())
         };
 
         ui.painter().rect_filled(paint_rect, 12.0, bg_color);
@@ -315,7 +311,7 @@ impl ContextMenuState {
         let mut hint_pos = pos2(rect.right() - padding, rect.center().y / 2.0);
 
         if !hint.is_empty() {
-            let c = current_theme.semantic.accent_glow.to_color();
+            let c = current_theme.context_menu.accent();
 
             let hint_stroke_color = Color32::from_rgba_unmultiplied(
                 c.r().saturating_add(20),
@@ -351,8 +347,8 @@ impl ContextMenuState {
             ui.painter().rect(
                 hint_rect,
                 3.0,
-                current_theme.semantic.bg_container.to_color(),
-                Stroke::new(1.0, hint_stroke_color),
+                current_theme.global.bg_main(),
+                Stroke::new(0.8, hint_stroke_color),
                 StrokeKind::Middle,
             );
 

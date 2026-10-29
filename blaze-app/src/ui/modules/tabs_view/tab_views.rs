@@ -7,7 +7,7 @@ use crate::{
             FLOAT_GAP, INACTIVE_MIN_VISIBLE_W, INACTIVE_TOP_INSET, MIN_VISIBLE_W, R_INACTIVE,
             R_TAB, TAB_H, TAB_MAX_WIDTH, TAB_MIN_WIDTH, TAB_SPACING, draw_tab_bar, draw_tab_merged,
         },
-        themes::{platform::structs::ToColor, theme_manager::with_theme},
+        themes::theme_manager::with_theme,
     },
 };
 use egui::{
@@ -65,7 +65,7 @@ pub fn render_label(
             ui,
             icon_n,
             icon_b,
-            current_theme.semantic.accent_glow.to_color(),
+            current_theme.top_bar.accent(),
             vec2(icon_size, icon_size),
         );
 
@@ -96,7 +96,7 @@ pub fn render_label(
             label,
             TextFormat {
                 font_id: FontId::default(),
-                color: current_theme.semantic.text_primary.to_color(),
+                color: current_theme.global.text_primary(),
                 ..Default::default()
             },
         );
@@ -109,7 +109,7 @@ pub fn render_label(
                 rect.center().y - galley.size().y + FLOAT_GAP / 1.5,
             ),
             galley,
-            current_theme.semantic.text_primary.to_color(),
+            current_theme.global.text_primary(),
         );
     }
 
@@ -117,7 +117,7 @@ pub fn render_label(
     if show_close && tab_count > 1 {
         let resp_x = ui.interact(x_rect, ui.id().with("tab_x").with(i), Sense::click());
 
-        let cc = current_theme.components.button.bg_hover.to_color();
+        let cc = current_theme.top_bar.bg_hover();
         let circ_color = Color32::from_rgba_unmultiplied(cc.r(), cc.g(), cc.b(), 80);
 
         ui.painter()
@@ -138,7 +138,7 @@ pub fn render_label(
             pos2(x_rect.max.x.round(), x_rect.max.y.round()),
         );
 
-        let xc = current_theme.semantic.accent_glow.to_color();
+        let xc = current_theme.top_bar.accent();
         let x_color = Color32::from_rgba_unmultiplied(xc.r(), xc.g(), xc.b(), 200);
 
         ui.painter().image(
@@ -219,15 +219,15 @@ pub fn tabs(
 
                             let (bg, stc) = if resp.hovered() {
                                 ui.set_cursor_icon(CursorIcon::PointingHand);
-                                let b = current_theme.components.button.bg_hover.to_color();
+                                let b = current_theme.top_bar.bg_hover();
                                 (
                                     Color32::from_rgba_unmultiplied(b.r(), b.g(), b.b(), 80),
-                                    current_theme.components.panel.border.to_color(),
+                                    current_theme.top_bar.border(),
                                 )
                             } else {
                                 (
-                                    current_theme.components.panel.bg.to_color(),
-                                    current_theme.components.panel.border.to_color(),
+                                    current_theme.top_bar.bg_panel(),
+                                    current_theme.top_bar.border(),
                                 )
                             };
 
@@ -235,7 +235,7 @@ pub fn tabs(
                                 floating,
                                 R_INACTIVE,
                                 bg,
-                                Stroke::new(0.5, stc),
+                                Stroke::new(current_theme.global.panel_stroke_width, stc),
                                 StrokeKind::Middle,
                             );
 
@@ -299,12 +299,18 @@ pub fn tabs(
 
     let painter = ui.painter().with_clip_rect(clip);
 
-    let bg = current_theme.components.panel.bg.to_color();
-    let stc = current_theme.components.panel.border.to_color();
+    let bg = current_theme.top_bar.bg_panel();
+    let stc = current_theme.top_bar.border();
 
     match visible_tab {
         Some(tab) => {
-            draw_tab_merged(&painter, bar_rect, tab, bg, Stroke::new(0.5, stc));
+            draw_tab_merged(
+                &painter,
+                bar_rect,
+                tab,
+                bg,
+                Stroke::new(current_theme.global.panel_stroke_width, stc),
+            );
 
             let resp = ui.interact(tab, ui.id().with("active_label"), Sense::all());
 
@@ -335,7 +341,12 @@ pub fn tabs(
             );
         }
         None => {
-            draw_tab_bar(&painter, bar_rect, bg, Stroke::new(0.5, stc));
+            draw_tab_bar(
+                &painter,
+                bar_rect,
+                bg,
+                Stroke::new(current_theme.global.panel_stroke_width, stc),
+            );
         }
     }
 

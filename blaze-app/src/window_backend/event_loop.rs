@@ -28,6 +28,11 @@ pub struct BlazeEventLoop {
 
 impl BlazeEventLoop {
     pub fn new(render_config: RendererConfig, initial_path: Option<Arc<Path>>) -> Self {
+        let egui_context = egui::Context::default();
+        egui_context.tessellation_options_mut(|tess_options| {
+            tess_options.feathering = false;
+        });
+
         Self {
             cached_primitives: Vec::new(),
             window: None,
@@ -36,7 +41,7 @@ impl BlazeEventLoop {
             render_config,
             initial_path,
             egui_state: None,
-            egui_context: egui::Context::default(),
+            egui_context,
             repaint_signal: RepaintSignal::new(),
         }
     }
@@ -112,8 +117,12 @@ impl ApplicationHandler for BlazeEventLoop {
         match event {
             WindowEvent::ScaleFactorChanged { scale_factor, .. } => {
                 let size = window.inner_size();
-                renderer.resize(size.width, size.height, scale_factor as f32);
+                let ppp = scale_factor as f32;
+
+                renderer.resize(size.width, size.height, ppp);
                 self.egui_context.set_pixels_per_point(scale_factor as f32);
+
+                window.request_redraw();
             }
 
             WindowEvent::Resized(size) => {

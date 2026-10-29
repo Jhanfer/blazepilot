@@ -21,7 +21,6 @@ use crate::ui::dialog_manager::dialogs::config_dialog::language::render_language
 use crate::ui::dialog_manager::dialogs::config_dialog::terminal::render_terminal_settings;
 use crate::ui::dialog_manager::manager::ModalDialog;
 use crate::ui::icons_cache::icon_cache::IconCache;
-use crate::ui::themes::platform::structs::ToColor;
 use crate::ui::themes::theme_manager::with_theme;
 use egui::{
     Align2, CentralPanel, Color32, CornerRadius, Frame, Id, Key, Margin, Order, Panel, RichText,
@@ -203,14 +202,14 @@ impl ConfigDialog {
         let w = ui.available_width();
 
         let resp = ui
-            .blaze_input("Buscar...", None, &mut self.config_search, icon_cache)
+            .blaze_input("Buscar...", None, &mut self.config_search, Some(icon_cache))
             .id(search_id)
             .size((w, 30.0))
             .radius(20)
-            .text_color(current_theme.semantic.text_secondary.to_color())
-            .background_color(current_theme.semantic.bg_container.to_color())
+            .text_color(current_theme.global.text_primary())
+            .background_color(current_theme.sidebar_left.bg_elevated())
             .stroke_color(Color32::TRANSPARENT)
-            .x_color(current_theme.semantic.accent_glow.to_color())
+            .x_color(current_theme.sidebar_left.accent())
             .show(ui, || {});
 
         if resp.clicked() || resp.gained_focus() {
@@ -243,25 +242,18 @@ impl ConfigDialog {
         for tab in &filtered {
             let is_selected = self.current_config_tab == *tab;
 
-            let label =
-                RichText::new(tab.name()).color(current_theme.semantic.text_primary.to_color());
-
-            let is_dark_theme = current_theme.semantic.text_primary.to_color().r() > 128;
-            let cbg = current_theme.components.button.bg_hover.to_color();
-            let hover_bg = if is_selected {
-                current_theme.semantic.accent_glow.to_color()
+            let text_color = if is_selected {
+                current_theme.global.text_primary()
             } else {
-                if is_dark_theme {
-                    Color32::from_rgba_unmultiplied(cbg.r(), cbg.g(), cbg.b(), 80)
-                } else {
-                    Color32::from_rgba_unmultiplied(cbg.r(), cbg.g(), cbg.b(), 10)
-                }
+                current_theme.global.text_secondary()
             };
+            let label = RichText::new(tab.name()).color(text_color);
 
+            let hover_bg = current_theme.sidebar_left.bg_hover();
             let bg = if is_selected {
-                current_theme.semantic.accent_glow.to_color()
+                current_theme.sidebar_left.bg_active()
             } else {
-                current_theme.components.button.bg.to_color()
+                current_theme.sidebar_left.bg_elevated()
             };
 
             if ui
@@ -271,6 +263,7 @@ impl ConfigDialog {
                 .hover_background_color(hover_bg)
                 .stroke_color(Color32::TRANSPARENT)
                 .radius(20)
+                .stroke_width(current_theme.global.components_stroke_width)
                 .show(ui)
                 .clicked()
             {
@@ -284,7 +277,7 @@ impl ConfigDialog {
                 ui.label_ns(
                     RichText::new("No se encontraron resultados")
                         .weak()
-                        .color(current_theme.semantic.text_primary.to_color()),
+                        .color(current_theme.global.text_secondary()),
                 );
             });
         }
@@ -302,10 +295,10 @@ impl ConfigDialog {
         }
 
         let custom_frame = Frame::NONE
-            .fill(current_theme.semantic.bg_main.to_color())
+            .fill(current_theme.sidebar_left.bg_panel())
             .stroke(Stroke::new(
-                0.5,
-                current_theme.components.panel.border.to_color(),
+                current_theme.global.panel_stroke_width,
+                current_theme.sidebar_left.border(),
             ))
             .corner_radius(CornerRadius::same(15))
             .inner_margin(Margin::same(5));
@@ -315,8 +308,7 @@ impl ConfigDialog {
         let desired_height = screen_rect.height() * 0.85;
 
         Window::new(
-            RichText::new(i18n.t("configs.title"))
-                .color(current_theme.semantic.text_primary.to_color()),
+            RichText::new(i18n.t("configs.title")).color(current_theme.global.text_primary()),
         )
         .id(Id::new("config_modal_window"))
         .frame(custom_frame)

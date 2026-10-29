@@ -11,11 +11,8 @@ use crate::{
         runtime::bus_structs::{FileOperation, SureTo, UiEvent},
     },
     ui::{
-        blaze_ui_state::BlazeUiState,
-        custom_components::UiExt,
-        icons_cache::icons,
-        modules::utilities::ensure_min_lightness,
-        themes::{platform::structs::ToColor, theme_manager::with_theme},
+        blaze_ui_state::BlazeUiState, custom_components::UiExt, icons_cache::icons,
+        themes::theme_manager::with_theme,
     },
 };
 
@@ -144,15 +141,16 @@ impl ContextMenuState {
             let search_id = Id::new("search_ctx_menu");
             let has_focus = ui.memory(|mem| mem.has_focus(search_id));
 
+            let bg = current_theme.context_menu.bg_elevated();
+            let c = current_theme.context_menu.accent();
+
             let search_color = if has_focus {
-                ensure_min_lightness(current_theme.components.input.border_focus.to_color())
+                current_theme.context_menu.color_hover_on_color(c, bg)
             } else {
-                ensure_min_lightness(current_theme.components.input.border_idle.to_color())
+                bg
             };
 
             let (icon_name, icon_bytes) = ("search", icons::ICON_SEARCH);
-
-            let c = current_theme.semantic.accent_glow.to_color();
             let hint_stroke_color = Color32::from_rgba_unmultiplied(
                 c.r().saturating_add(20),
                 c.g().saturating_add(20),
@@ -174,20 +172,21 @@ impl ContextMenuState {
                     &i18n.t("search.placeholder"),
                     None,
                     &mut search,
-                    &mut ui_state.icon_cache,
+                    Some(&mut ui_state.icon_cache),
                 )
                 .id(search_id)
-                .hint_background_color(current_theme.semantic.bg_container.to_color())
+                .hint_background_color(c)
                 .hint_stroke_color(hint_stroke_color)
                 .hint_text_color(hint_color)
                 .size((w, 30.0))
                 .radius(20)
-                .text_color(current_theme.semantic.text_secondary.to_color())
-                .background_color(current_theme.semantic.bg_container.to_color())
+                .text_color(current_theme.global.text_primary())
+                .background_color(bg)
                 .stroke_color(search_color)
-                .x_color(current_theme.semantic.accent_glow.to_color())
+                .x_color(c)
                 .icon(icon_name, icon_bytes)
                 .icon_color(search_color)
+                .stroke_width(current_theme.global.components_stroke_width)
                 .show(ui, || {
                     state.clean_search();
                 });

@@ -6,7 +6,6 @@ use crate::core::system::{
 use crate::ui::custom_components::UiExt;
 use crate::ui::dialog_manager::dialogs::config_dialog::configs_dialog::ConfigDialog;
 use crate::ui::icons_cache::icon_cache::IconCache;
-use crate::ui::themes::platform::structs::ToColor;
 use crate::ui::themes::theme_manager::with_theme;
 use egui::{Color32, Label, RichText, Ui};
 use std::time::Duration;
@@ -41,7 +40,6 @@ pub(crate) fn render_terminal_settings(
     icon_cache: &mut IconCache,
 ) {
     let current_theme = with_theme(|t| t.current());
-    let is_dark_theme = current_theme.semantic.text_primary.to_color().r() > 128;
     let i18n = with_configs(|c| c.get_i18n());
 
     ui.add_space(10.0);
@@ -100,7 +98,7 @@ pub(crate) fn render_terminal_settings(
             Label::new(
                 RichText::new(i18n.t("configs_terminal.title"))
                     .strong()
-                    .color(current_theme.semantic.text_primary.to_color()),
+                    .color(current_theme.global.text_primary()),
             )
             .selectable(false),
         );
@@ -120,7 +118,7 @@ pub(crate) fn render_terminal_settings(
                                 ("query", &c_dialog.max_retries.to_string()),
                             ],
                         ))
-                        .color(current_theme.semantic.text_primary.to_color()),
+                        .color(current_theme.global.text_primary()),
                     )
                     .selectable(false),
                 );
@@ -133,7 +131,7 @@ pub(crate) fn render_terminal_settings(
 
             if c_dialog.no_terminals_error {
                 ui.colored_label(
-                    current_theme.semantic.error.to_color(),
+                    current_theme.global.error(),
                     i18n.t("configs_terminal.no_terminals_error"),
                 );
 
@@ -145,14 +143,14 @@ pub(crate) fn render_terminal_settings(
                     }
                 } else {
                     ui.colored_label(
-                        current_theme.semantic.warn.to_color(),
+                        current_theme.global.warn(),
                         i18n.t("configs_terminal.max_retries_error"),
                     );
 
                     ui.add(
                         Label::new(
                             RichText::new(i18n.t("configs_terminal.verify_terminals_message"))
-                                .color(current_theme.semantic.text_secondary.to_color()),
+                                .color(current_theme.global.text_secondary()),
                         )
                         .selectable(false),
                     );
@@ -161,7 +159,7 @@ pub(crate) fn render_terminal_settings(
                 ui.add(
                     Label::new(
                         RichText::new(i18n.t("configs_terminal.no_terminals_error"))
-                            .color(current_theme.semantic.text_secondary.to_color()),
+                            .color(current_theme.global.text_secondary()),
                     )
                     .selectable(false),
                 );
@@ -170,7 +168,7 @@ pub(crate) fn render_terminal_settings(
             if show_retry {
                 ui.add_space(8.0);
                 ui.colored_label(
-                    current_theme.semantic.warn.to_color(),
+                    current_theme.global.warn(),
                     i18n.t("configs_terminal.suggestion_message"),
                 );
             }
@@ -178,12 +176,7 @@ pub(crate) fn render_terminal_settings(
             return;
         }
 
-        let cbg = current_theme.components.button.bg_hover.to_color();
-        let hover_bg = if is_dark_theme {
-            Color32::from_rgba_unmultiplied(cbg.r(), cbg.g(), cbg.b(), 80)
-        } else {
-            Color32::from_rgba_unmultiplied(cbg.r(), cbg.g(), cbg.b(), 10)
-        };
+        let hover_bg = current_theme.sidebar_left.bg_hover();
 
         ui.label_ns(i18n.t("configs_terminal.combo_box_label"));
 
@@ -192,22 +185,26 @@ pub(crate) fn render_terminal_settings(
                 .selected_text(get_selected_terminal_text(
                     &i18n.t("configs_terminal.selection"),
                 ))
-                .text_color(current_theme.semantic.text_primary.to_color())
+                .text_color(current_theme.global.text_primary())
                 .size((150.0, 30.0))
-                .background_color(current_theme.components.button.bg.to_color())
-                .hover_background_color(hover_bg)
+                .background_color(current_theme.sidebar_left.bg_elevated())
+                .hover_background_color(current_theme.sidebar_left.bg_hover())
                 .show(ui, |ui| {
                     let w = ui.available_width();
                     for (i, term) in c_dialog.available_terminals.iter().enumerate() {
                         let is_selected = is_terminal_selected(term);
+                        let text_color = if is_selected {
+                            current_theme.global.text_primary()
+                        } else {
+                            current_theme.global.text_secondary()
+                        };
 
-                        let label = RichText::new(term)
-                            .color(current_theme.semantic.text_primary.to_color());
+                        let label = RichText::new(term).color(text_color);
 
                         let bg = if is_selected {
-                            current_theme.semantic.accent_glow.to_color()
+                            current_theme.sidebar_left.bg_active()
                         } else {
-                            current_theme.components.button.bg.to_color()
+                            Color32::TRANSPARENT
                         };
 
                         if ui
@@ -218,6 +215,7 @@ pub(crate) fn render_terminal_settings(
                             .hover_background_color(hover_bg)
                             .stroke_color(Color32::TRANSPARENT)
                             .radius(20)
+                            .stroke_width(current_theme.global.components_stroke_width)
                             .show(ui)
                             .clicked()
                         {
@@ -233,7 +231,7 @@ pub(crate) fn render_terminal_settings(
         ui.add(
             Label::new(
                 RichText::new(i18n.t("configs_terminal.message"))
-                    .color(current_theme.semantic.text_primary.to_color()),
+                    .color(current_theme.global.text_primary()),
             )
             .selectable(false),
         );

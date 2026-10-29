@@ -25,7 +25,7 @@ use crate::{
             custom_context_menu::context_state::ContextMenuKind,
             utilities::{ensure_min_lightness, git_dot_color, resolve_icon, text_color_for_git},
         },
-        themes::{platform::structs::ToColor, theme_manager::with_theme},
+        themes::theme_manager::with_theme,
     },
     utils::formating::{format_date, format_size},
 };
@@ -371,9 +371,9 @@ pub fn render_detailed_row_scrollview(
                 Button::new(
                     RichText::new(label)
                         .size(11.0)
-                        .color(current_theme.semantic.text_primary.to_color()),
+                        .color(current_theme.global.text_primary()),
                 )
-                .fill(current_theme.semantic.bg_container.to_color())
+                .fill(current_theme.global.bg_main())
                 .stroke(Stroke::NONE)
                 .frame(true),
             )
@@ -394,13 +394,9 @@ pub fn render_detailed_row_scrollview(
 
         if handle_response.hovered() || handle_response.dragged() {
             ui.set_cursor_icon(CursorIcon::ResizeColumn);
-            painter.rect_filled(handle_rect, 0.0, current_theme.semantic.accent.to_color());
+            painter.rect_filled(handle_rect, 0.0, current_theme.main_area.accent());
         } else {
-            painter.rect_filled(
-                handle_rect,
-                0.0,
-                current_theme.semantic.text_muted.to_color(),
-            );
+            painter.rect_filled(handle_rect, 0.0, current_theme.global.text_secondary());
         }
 
         if handle_response.dragged() {
@@ -534,38 +530,16 @@ pub fn render_detailed_row_scrollview(
             // --- Selección y hover ---
             if response.hovered() {
                 ui.set_cursor_icon(CursorIcon::PointingHand);
-                ui.painter().rect_filled(
-                    rect,
-                    5.0,
-                    current_theme.components.list_item.bg_hover.to_color(),
-                );
+                ui.painter()
+                    .rect_filled(rect, 5.0, current_theme.main_area.bg_hover());
             }
 
             if state.is_selected(i) {
+                let c = current_theme.main_area.accent();
                 ui.painter().rect_filled(
                     rect,
                     5.0,
-                    Color32::from_rgba_unmultiplied(
-                        current_theme
-                            .components
-                            .list_item
-                            .bg_selected
-                            .to_color()
-                            .r(),
-                        current_theme
-                            .components
-                            .list_item
-                            .bg_selected
-                            .to_color()
-                            .g(),
-                        current_theme
-                            .components
-                            .list_item
-                            .bg_selected
-                            .to_color()
-                            .b(),
-                        60,
-                    ),
+                    Color32::from_rgba_unmultiplied(c.r(), c.g(), c.b(), 60),
                 );
             }
 
@@ -671,7 +645,7 @@ pub fn render_detailed_row_scrollview(
                 let cell_rect =
                     Rect::from_min_max(pos2(cell_x, rect.min.y), pos2(cell_x + col_w, rect.max.y));
 
-                let text_color = current_theme.semantic.text_primary.to_color();
+                let text_color = current_theme.global.text_primary();
 
                 if *col == DetailedColumn::Name {
                     let dot_size = icon_size / 8.0;

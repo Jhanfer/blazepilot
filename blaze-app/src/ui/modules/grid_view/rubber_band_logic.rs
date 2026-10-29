@@ -1,6 +1,6 @@
 use crate::{
     core::{blaze_state::BlazeCoreState, files::blaze_motor::motor_structs::FileEntry},
-    ui::themes::{platform::structs::ToColor, theme_manager::with_theme},
+    ui::themes::theme_manager::with_theme,
 };
 use egui::{Color32, Painter, Rect, Stroke, pos2, vec2};
 use std::sync::Arc;
@@ -24,7 +24,7 @@ pub fn render_grid_rubberband(
             - state.scroll_offset;
         let start_screen = pos2(start.x, start_screen_y);
         let rect = Rect::from_two_pos(start_screen, current);
-        let rubber = current_theme.semantic.rubberband.to_color();
+        let rubber = current_theme.global.rubberband();
 
         clipped_painter.rect_filled(
             rect,

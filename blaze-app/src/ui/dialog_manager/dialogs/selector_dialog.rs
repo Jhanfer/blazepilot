@@ -36,10 +36,8 @@ use crate::{
         },
     },
     ui::{
-        custom_components::UiExt,
-        dialog_manager::manager::ModalDialog,
-        icons_cache::icon_cache::IconCache,
-        themes::{platform::structs::ToColor, theme_manager::with_theme},
+        custom_components::UiExt, dialog_manager::manager::ModalDialog,
+        icons_cache::icon_cache::IconCache, themes::theme_manager::with_theme,
     },
 };
 
@@ -330,7 +328,7 @@ impl AppSelectorDialog {
                 let current_theme = with_theme(|t| t.current());
 
                 let custom_frame = Frame::NONE
-                    .fill(current_theme.semantic.bg_main.to_color())
+                    .fill(current_theme.main_area.bg_elevated())
                     .inner_margin(Margin::same(20));
                 let file_name = data
                     .path
@@ -358,7 +356,7 @@ impl AppSelectorDialog {
                         ScrollArea::vertical().max_height(height).show(ui, |ui| {
                             ui.label_ns(
                                 RichText::new(i18n.t("selector_dialog.recomends"))
-                                    .color(current_theme.semantic.text_primary.to_color())
+                                    .color(current_theme.global.text_primary())
                                     .strong(),
                             );
                             ui.add_space(6.0);
@@ -376,7 +374,7 @@ impl AppSelectorDialog {
 
                             ui.label_ns(
                                 RichText::new(i18n.t("selector_dialog.all_apps"))
-                                    .color(current_theme.semantic.text_primary.to_color())
+                                    .color(current_theme.global.text_primary())
                                     .strong(),
                             );
                             ui.add_space(6.0);

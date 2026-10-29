@@ -14,10 +14,10 @@
 
 use crate::core::bootstrap::configs::config_manager::with_configs;
 use crate::ui::custom_components::UiExt;
+use crate::ui::dialog_manager::manager::ModalDialog;
 use crate::ui::icons_cache::icon_cache::IconCache;
 use crate::ui::image_preview::image_preview_handler::ImagePreviewState;
-use crate::ui::themes::platform::structs::ToColor;
-use crate::ui::{dialog_manager::manager::ModalDialog, themes::theme_manager::with_theme};
+use crate::ui::themes::theme_manager::with_theme;
 use egui::{
     Button, Color32, CornerRadius, Frame, Key, Margin, Order, Rect, Sense, Stroke, Ui, Vec2,
     Window, pos2, vec2,
@@ -245,8 +245,8 @@ impl ImagePreviewDialog {
             Frame::NONE
                 .fill(pvw.background_color.linear_multiply(0.8))
                 .stroke(Stroke::new(
-                    0.5,
-                    current_theme.semantic.accent_glow.to_color(),
+                    current_theme.global.panel_stroke_width,
+                    current_theme.main_area.accent(),
                 ))
                 .corner_radius(8.0)
                 .inner_margin(10.0)

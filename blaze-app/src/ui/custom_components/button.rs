@@ -1,3 +1,17 @@
+// Copyright 2026 Jhanfer
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 use egui::{
     Color32, CornerRadius, CursorIcon, Id, Rect, Response, Sense, Stroke, StrokeKind, TextStyle,
     TextWrapMode, Ui, Vec2, WidgetText, pos2, vec2,
@@ -20,6 +34,7 @@ pub(crate) struct BlazeButton<'a> {
     height: f32,
     content_offset_y: f32,
     corner_radius: CornerRadius,
+    stroke_width: f32,
     text_color: Color32,
     background_color: Color32,
     hover_background_color: Option<Color32>,
@@ -48,6 +63,7 @@ impl<'a> BlazeButton<'a> {
             height: 15.0,
             content_offset_y: 0.0,
             corner_radius: CornerRadius::same(5),
+            stroke_width: 0.8,
             background_color: Color32::GRAY,
             hover_background_color: None,
             stroke_color: Color32::GRAY,
@@ -72,6 +88,12 @@ impl<'a> BlazeButton<'a> {
         let (w, h) = size.into();
         self.width = w;
         self.height = h;
+        self
+    }
+
+    /// Establece el ancho de la linea del borde
+    pub fn stroke_width(mut self, width: f32) -> Self {
+        self.stroke_width = width;
         self
     }
 
@@ -200,7 +222,7 @@ impl<'a> BlazeButton<'a> {
             rect,
             self.corner_radius,
             bg,
-            Stroke::new(0.5, st_c),
+            Stroke::new(self.stroke_width, st_c),
             StrokeKind::Middle,
         );
 
