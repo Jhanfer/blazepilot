@@ -21,7 +21,7 @@ use crate::{
             custom_context_menu::context_state::ContextMenuKind,
             utilities::{ensure_min_lightness, git_dot_color, resolve_icon, text_color_for_git},
         },
-        themes::{platform::structs::ToColor, theme_manager::with_theme},
+        themes::theme_manager::with_theme,
     },
     utils::formating::{format_date, format_size},
 };
@@ -452,7 +452,7 @@ pub fn render_grid_scrollview(
                     ui.painter().rect_filled(
                         selection_rect,
                         8.0,
-                        current_theme.components.list_item.bg_hover.to_color(),
+                        current_theme.main_area.bg_hover(),
                     );
                 }
 
@@ -463,30 +463,11 @@ pub fn render_grid_scrollview(
                         pos2(rect.max.x - margin, rect.max.y - margin),
                     );
 
+                    let c = current_theme.main_area.accent();
                     ui.painter().rect_filled(
                         selection_rect,
                         8.0,
-                        Color32::from_rgba_unmultiplied(
-                            current_theme
-                                .components
-                                .list_item
-                                .bg_selected
-                                .to_color()
-                                .r(),
-                            current_theme
-                                .components
-                                .list_item
-                                .bg_selected
-                                .to_color()
-                                .g(),
-                            current_theme
-                                .components
-                                .list_item
-                                .bg_selected
-                                .to_color()
-                                .b(),
-                            60,
-                        ),
+                        Color32::from_rgba_unmultiplied(c.r(), c.g(), c.b(), 60),
                     );
                 }
 
@@ -497,7 +478,7 @@ pub fn render_grid_scrollview(
                             rect,
                             8.0,
                             Stroke::new(2.0, Color32::from_rgb(150, 150, 255)),
-                            StrokeKind::Outside,
+                            StrokeKind::Middle,
                         );
                     }
                 } else if let Some(ref target_invalid) =
@@ -508,7 +489,7 @@ pub fn render_grid_scrollview(
                         rect,
                         8.0,
                         Stroke::new(2.0, Color32::from_rgb(255, 150, 150)),
-                        StrokeKind::Outside,
+                        StrokeKind::Middle,
                     );
                 }
 

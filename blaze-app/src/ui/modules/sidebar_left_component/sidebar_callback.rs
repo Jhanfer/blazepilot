@@ -20,9 +20,8 @@ use crate::{
             sidebar_left_component::sidebar_components::{
                 render_drives_button, render_header_text, render_local_buttons,
             },
-            utilities::ensure_min_lightness,
         },
-        themes::{platform::structs::ToColor, theme_manager::with_theme},
+        themes::{platform::structs::BlazeAppTheme, theme_manager::with_theme},
     },
 };
 use egui::{
@@ -44,7 +43,7 @@ fn render_expanded_panel(
     let i18n = with_configs(|c| c.get_i18n());
 
     let custom_frame = Frame::NONE
-        .fill(current_theme.semantic.bg_main.to_color())
+        .fill(current_theme.global.bg_main())
         .inner_margin(Margin {
             left: 15,
             right: 0,
@@ -64,30 +63,27 @@ fn render_expanded_panel(
                 Frame::new()
                     .inner_margin(Margin::symmetric(10, 4))
                     .show(ui, |ui| {
-                        let (icon_plus_fol, icon_bytes_plus_fol) =
-                            ("blaze-logo", icons::LOGO_BLAZEPILOT);
+                        let (blaze_icon, bytes) = ("blaze-logo", icons::LOGO_BLAZEPILOT);
 
                         let icon_size = vec2(25.0, 25.0);
-                        let (icon_rect, new_fol) =
-                            ui.allocate_exact_size(icon_size, Sense::click());
+                        let (icon_rect, resp) = ui.allocate_exact_size(icon_size, Sense::click());
                         let rounded_rect = Rect::from_min_max(
                             pos2(icon_rect.min.x.round(), icon_rect.min.y.round()),
                             pos2(icon_rect.max.x.round(), icon_rect.max.y.round()),
                         );
 
-                        let plus_color = if new_fol.hovered() {
-                            current_theme.components.tools.label_hover.to_color()
+                        let color = if resp.hovered() {
+                            current_theme.sidebar_left.color_hover_on_color(
+                                current_theme.global.text_primary(),
+                                current_theme.global.bg_main(),
+                            )
                         } else {
-                            current_theme.components.tools.label_active.to_color()
+                            current_theme.global.text_primary()
                         };
 
-                        let icon = ui_state.icon_cache.get_or_load(
-                            ui,
-                            icon_plus_fol,
-                            icon_bytes_plus_fol,
-                            ensure_min_lightness(plus_color),
-                            icon_size,
-                        );
+                        let icon = ui_state
+                            .icon_cache
+                            .get_or_load(ui, blaze_icon, bytes, color, icon_size);
 
                         ui.painter().image(
                             icon.id(),
@@ -101,7 +97,7 @@ fn render_expanded_panel(
                                 RichText::new("BlazePilot")
                                     .strong()
                                     .size(18.0)
-                                    .color(current_theme.semantic.text_primary.to_color()),
+                                    .color(current_theme.global.text_primary()),
                             )
                             .selectable(false),
                         );
@@ -110,11 +106,11 @@ fn render_expanded_panel(
 
             Frame::NONE
                 .inner_margin(egui::Margin::same(10))
-                .fill(current_theme.components.panel.bg.to_color())
+                .fill(current_theme.sidebar_left.bg_panel())
                 .corner_radius(CornerRadius::same(20))
                 .stroke(Stroke {
                     width: 0.5,
-                    color: current_theme.components.panel.border.to_color(),
+                    color: current_theme.sidebar_left.border(),
                 })
                 .show(ui, |ui| {
                     ui.set_height(ui.available_height());
@@ -215,7 +211,7 @@ fn render_expanded_panel(
 fn render_collapsed_tab(
     ui: &mut Ui,
     ui_state: &mut BlazeUiState,
-    current_theme: Arc<crate::ui::themes::platform::structs::NewTheme>,
+    current_theme: Arc<BlazeAppTheme>,
 ) {
     let area_id = Id::new("left_tab");
     let hover_state_id = Id::new("left_tab_hover_state");
@@ -241,10 +237,10 @@ fn render_collapsed_tab(
 
                     Frame::NONE
                         .inner_margin(Margin::same(10))
-                        .fill(current_theme.components.panel.bg.to_color())
+                        .fill(current_theme.sidebar_left.bg_panel())
                         .stroke(Stroke::new(
-                            0.5,
-                            current_theme.components.panel.border.to_color(),
+                            current_theme.global.panel_stroke_width,
+                            current_theme.sidebar_left.border(),
                         ))
                         .corner_radius(CornerRadius::same(20))
                         .show(ui, |ui| {

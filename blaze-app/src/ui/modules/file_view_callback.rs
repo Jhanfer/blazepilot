@@ -13,7 +13,7 @@ use crate::{
             miller_view::miller_panel_view::miller_panel_frame, render_tags_view::tag_views,
             row_view::render_row_panel_view::row_panel_frame, tools_view::tools,
         },
-        themes::{platform::structs::ToColor, theme_manager::with_theme},
+        themes::theme_manager::with_theme,
     },
 };
 use egui::{CentralPanel, Event, Frame, Margin, MouseWheelUnit, Ui};
@@ -35,7 +35,7 @@ pub fn render_views(ui: &mut Ui, state: &mut BlazeCoreState, ui_state: &mut Blaz
     let bottom_padding = 10.0 as i8;
 
     let custom_frame = Frame::NONE
-        .fill(current_theme.semantic.bg_main.to_color())
+        .fill(current_theme.global.bg_main())
         .inner_margin(Margin {
             left: 15,
             right: 15,

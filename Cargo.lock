@@ -499,7 +499,7 @@ dependencies = [
  "crossbeam-channel",
  "dashmap",
  "directories",
- "egui 0.35.0 (git+https://github.com/Jhanfer/egui-custom.git?branch=main)",
+ "egui",
  "egui-wgpu",
  "egui-winit",
  "egui_extras",
@@ -1376,19 +1376,10 @@ checksum = "92773504d58c093f6de2459af4af33faa518c13451eb8f2b5698ed3d36e7c813"
 [[package]]
 name = "ecolor"
 version = "0.35.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6758be723a3f298bbfda4db75748bc2ba0abafe096b6383c7c32da264764fbc3"
-dependencies = [
- "emath 0.35.0 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
-name = "ecolor"
-version = "0.35.0"
 source = "git+https://github.com/Jhanfer/egui-custom.git?branch=main#e29b2cfd82a3f43160fa0d585d4c34a44b0e0adc"
 dependencies = [
  "bytemuck",
- "emath 0.35.0 (git+https://github.com/Jhanfer/egui-custom.git?branch=main)",
+ "emath",
  "serde",
 ]
 
@@ -1420,32 +1411,13 @@ dependencies = [
 [[package]]
 name = "egui"
 version = "0.35.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2796c98d50b79631281d516343a6f6e93c0666462ca36e2c93b39f25d7793325"
-dependencies = [
- "accesskit",
- "ahash 0.8.12",
- "bitflags 2.13.1",
- "emath 0.35.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "epaint 0.35.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "itertools 0.14.0",
- "log",
- "nohash-hasher",
- "profiling",
- "smallvec",
- "unicode-segmentation",
-]
-
-[[package]]
-name = "egui"
-version = "0.35.0"
 source = "git+https://github.com/Jhanfer/egui-custom.git?branch=main#e29b2cfd82a3f43160fa0d585d4c34a44b0e0adc"
 dependencies = [
  "accesskit",
  "ahash 0.8.12",
  "bitflags 2.13.1",
- "emath 0.35.0 (git+https://github.com/Jhanfer/egui-custom.git?branch=main)",
- "epaint 0.35.0 (git+https://github.com/Jhanfer/egui-custom.git?branch=main)",
+ "emath",
+ "epaint",
  "itertools 0.15.0",
  "log",
  "nohash-hasher",
@@ -1463,7 +1435,7 @@ dependencies = [
  "ahash 0.8.12",
  "bytemuck",
  "document-features",
- "epaint 0.35.0 (git+https://github.com/Jhanfer/egui-custom.git?branch=main)",
+ "epaint",
  "log",
  "profiling",
  "thiserror 2.0.21",
@@ -1479,7 +1451,7 @@ source = "git+https://github.com/Jhanfer/egui-custom.git?branch=main#e29b2cfd82a
 dependencies = [
  "arboard",
  "bytemuck",
- "egui 0.35.0 (git+https://github.com/Jhanfer/egui-custom.git?branch=main)",
+ "egui",
  "log",
  "objc2 0.6.4",
  "objc2-foundation 0.3.2",
@@ -1495,14 +1467,14 @@ dependencies = [
 [[package]]
 name = "egui_extras"
 version = "0.35.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e2bd33be7338367bf21f54d62e069d58a5fb3ae033fa8bc6df7a77b9ef4cf957"
+source = "git+https://github.com/Jhanfer/egui-custom.git?branch=main#e29b2cfd82a3f43160fa0d585d4c34a44b0e0adc"
 dependencies = [
  "ahash 0.8.12",
- "egui 0.35.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "egui",
  "enum-map",
- "itertools 0.14.0",
+ "itertools 0.15.0",
  "log",
+ "mime_guess2",
  "profiling",
 ]
 
@@ -1511,12 +1483,6 @@ name = "either"
 version = "1.17.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9e5e8f6c15a24b9a3ee5efec809ccd006d3b30e8b3bb63c39af737c7f87daa1d"
-
-[[package]]
-name = "emath"
-version = "0.35.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cd4ec073c9898516584d8c6cfdcee95b530b3d941cd5031ef4050aa36812308b"
 
 [[package]]
 name = "emath"
@@ -1615,35 +1581,12 @@ dependencies = [
 [[package]]
 name = "epaint"
 version = "0.35.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4e60a8888b51da911df23918fd7301359b1d43a406a0ff3b8863af093dd7fc6c"
-dependencies = [
- "ahash 0.8.12",
- "ecolor 0.35.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "emath 0.35.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "font-types 0.11.3",
- "harfrust 0.7.0",
- "log",
- "nohash-hasher",
- "parking_lot",
- "profiling",
- "self_cell",
- "skrifa 0.42.1",
- "smallvec",
- "unicode-general-category",
- "unicode-segmentation",
- "vello_cpu",
-]
-
-[[package]]
-name = "epaint"
-version = "0.35.0"
 source = "git+https://github.com/Jhanfer/egui-custom.git?branch=main#e29b2cfd82a3f43160fa0d585d4c34a44b0e0adc"
 dependencies = [
  "ahash 0.8.12",
  "bytemuck",
- "ecolor 0.35.0 (git+https://github.com/Jhanfer/egui-custom.git?branch=main)",
- "emath 0.35.0 (git+https://github.com/Jhanfer/egui-custom.git?branch=main)",
+ "ecolor",
+ "emath",
  "epaint_default_fonts",
  "font-types 0.11.3",
  "harfrust 0.7.0",
@@ -2778,15 +2721,6 @@ dependencies = [
 
 [[package]]
 name = "itertools"
-version = "0.14.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2b192c782037fadd9cfa75548310488aabdbf3d2da73885b31bd0abd03351285"
-dependencies = [
- "either",
-]
-
-[[package]]
-name = "itertools"
 version = "0.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8b4baf93f58d4425749ca49a51c50ebab072c5df6994d08fed93541c331481dc"
@@ -3272,6 +3206,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f7c44f8e672c00fe5308fa235f821cb4198414e1c77935c1ab6948d3fd78550e"
 dependencies = [
  "mime",
+ "unicase",
+]
+
+[[package]]
+name = "mime_guess2"
+version = "2.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1706dc14a2e140dec0a7a07109d9a3d5890b81e85bd6c60b906b249a77adf0ca"
+dependencies = [
+ "mime",
+ "phf",
+ "phf_shared",
  "unicase",
 ]
 
@@ -4157,6 +4103,50 @@ name = "percent-encoding"
 version = "2.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9b4f627cb1b25917193a259e49bdad08f671f8d9708acfd5fe0a8c1455d87220"
+
+[[package]]
+name = "phf"
+version = "0.11.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1fd6780a80ae0c52cc120a26a1a42c1ae51b247a253e4e06113d23d2c2edd078"
+dependencies = [
+ "phf_macros",
+ "phf_shared",
+]
+
+[[package]]
+name = "phf_generator"
+version = "0.11.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3c80231409c20246a13fddb31776fb942c38553c51e871f8cbd687a4cfb5843d"
+dependencies = [
+ "phf_shared",
+ "rand 0.8.7",
+]
+
+[[package]]
+name = "phf_macros"
+version = "0.11.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f84ac04429c13a7ff43785d75ad27569f2951ce0ffd30a3321230db2fc727216"
+dependencies = [
+ "phf_generator",
+ "phf_shared",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.119",
+ "unicase",
+]
+
+[[package]]
+name = "phf_shared"
+version = "0.11.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "67eabc2ef2a60eb7faa00097bd1ffdb5bd28e62bf39990626a582201b7a754e5"
+dependencies = [
+ "siphasher",
+ "unicase",
+]
 
 [[package]]
 name = "pico-args"

@@ -23,7 +23,7 @@ use crate::{
             custom_context_menu::context_state::ContextMenuKind,
             utilities::{ensure_min_lightness, git_dot_color, resolve_icon, text_color_for_git},
         },
-        themes::{platform::structs::ToColor, theme_manager::with_theme},
+        themes::theme_manager::with_theme,
     },
     utils::formating::{format_date, format_size},
 };
@@ -298,9 +298,9 @@ pub fn new_render_scrollview(
             Button::new(
                 RichText::new(name_label)
                     .size(11.0)
-                    .color(current_theme.semantic.text_primary.to_color()),
+                    .color(current_theme.global.text_primary()),
             )
-            .fill(current_theme.semantic.bg_container.to_color())
+            .fill(current_theme.global.bg_main())
             .stroke(Stroke::NONE)
             .frame(true),
         )
@@ -340,9 +340,9 @@ pub fn new_render_scrollview(
             Button::new(
                 RichText::new(date_label)
                     .size(11.0)
-                    .color(current_theme.semantic.text_primary.to_color()),
+                    .color(current_theme.global.text_primary()),
             )
-            .fill(current_theme.semantic.bg_container.to_color())
+            .fill(current_theme.global.bg_main())
             .stroke(Stroke::NONE)
             .frame(true),
         )
@@ -382,9 +382,9 @@ pub fn new_render_scrollview(
             Button::new(
                 RichText::new(size_label)
                     .size(11.0)
-                    .color(current_theme.semantic.text_primary.to_color()),
+                    .color(current_theme.global.text_primary()),
             )
-            .fill(current_theme.semantic.bg_container.to_color())
+            .fill(current_theme.global.bg_main())
             .stroke(Stroke::NONE)
             .frame(true),
         )
@@ -419,13 +419,9 @@ pub fn new_render_scrollview(
 
         if handle_response.hovered() || handle_response.dragged() {
             ui.set_cursor_icon(CursorIcon::ResizeColumn);
-            painter.rect_filled(handle_rect, 0.0, current_theme.semantic.accent.to_color());
+            painter.rect_filled(handle_rect, 0.0, current_theme.main_area.accent());
         } else {
-            painter.rect_filled(
-                handle_rect,
-                0.0,
-                current_theme.semantic.text_muted.to_color(),
-            );
+            painter.rect_filled(handle_rect, 0.0, current_theme.global.text_secondary());
         }
 
         if handle_response.dragged() {
@@ -545,38 +541,16 @@ pub fn new_render_scrollview(
                 // --- Selección y hover ---
                 if response.hovered() {
                     ui.set_cursor_icon(CursorIcon::PointingHand);
-                    ui.painter().rect_filled(
-                        rect,
-                        5.0,
-                        current_theme.components.list_item.bg_hover.to_color(),
-                    );
+                    ui.painter()
+                        .rect_filled(rect, 5.0, current_theme.main_area.bg_hover());
                 }
 
                 if state.is_selected(i) {
+                    let c = current_theme.main_area.accent();
                     ui.painter().rect_filled(
                         rect,
-                        5.0,
-                        Color32::from_rgba_unmultiplied(
-                            current_theme
-                                .components
-                                .list_item
-                                .bg_selected
-                                .to_color()
-                                .r(),
-                            current_theme
-                                .components
-                                .list_item
-                                .bg_selected
-                                .to_color()
-                                .g(),
-                            current_theme
-                                .components
-                                .list_item
-                                .bg_selected
-                                .to_color()
-                                .b(),
-                            60,
-                        ),
+                        8.0,
+                        Color32::from_rgba_unmultiplied(c.r(), c.g(), c.b(), 60),
                     );
                 }
 
@@ -587,7 +561,7 @@ pub fn new_render_scrollview(
                             rect,
                             5.0,
                             Stroke::new(2.0, Color32::from_rgb(150, 150, 255)),
-                            StrokeKind::Outside,
+                            StrokeKind::Middle,
                         );
                     }
                 } else if let Some(ref target_invalid) = state.row_view.drop_invalid_target.clone()
@@ -597,7 +571,7 @@ pub fn new_render_scrollview(
                         rect,
                         5.0,
                         Stroke::new(2.0, Color32::from_rgb(255, 150, 150)),
-                        StrokeKind::Outside,
+                        StrokeKind::Middle,
                     );
                 }
 
@@ -816,7 +790,7 @@ pub fn new_render_scrollview(
                     f.layout_no_wrap(
                         format_date(file.modified).to_string(),
                         FontId::proportional(date_font_size),
-                        current_theme.semantic.text_primary.to_color(),
+                        current_theme.global.text_primary(),
                     )
                 });
                 ui.painter().with_clip_rect(date_rect).galley(
@@ -855,7 +829,7 @@ pub fn new_render_scrollview(
                     f.layout_no_wrap(
                         size_text,
                         FontId::proportional(size_font_size),
-                        current_theme.semantic.text_primary.to_color(),
+                        current_theme.global.text_primary(),
                     )
                 });
                 ui.painter().with_clip_rect(size_rect).galley(

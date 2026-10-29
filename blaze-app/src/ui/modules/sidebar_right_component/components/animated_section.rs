@@ -6,7 +6,7 @@ use crate::ui::blaze_ui_state::BlazeUiState;
 use crate::ui::custom_components::UiExt;
 use crate::ui::icons_cache::thumbnails::thumbnails_manager::Thumbnail;
 use crate::ui::modules::utilities::{ensure_min_lightness, resolve_icon};
-use crate::ui::themes::platform::structs::ToColor;
+use crate::ui::themes::platform::structs::BlazeAppTheme;
 use crate::utils::formating::{format_date, format_size};
 use egui::{
     Align, Color32, ColorImage, CornerRadius, Frame, Grid, Label, Layout, Margin, Rect, RichText,
@@ -21,7 +21,7 @@ pub(crate) fn render_animated_section(
     ui: &mut Ui,
     state: &mut BlazeCoreState,
     ui_state: &mut BlazeUiState,
-    current_theme: Arc<crate::ui::themes::platform::structs::NewTheme>,
+    current_theme: Arc<BlazeAppTheme>,
 ) {
     ui.add_space(10.0);
 
@@ -50,13 +50,8 @@ pub(crate) fn render_animated_section(
         ui.set_clip_rect(clip_rect);
 
         let animated_stroke = Stroke::new(
-            (0.5 * anim).clamp(0.0, 0.5),
-            current_theme
-                .components
-                .panel
-                .border
-                .to_color()
-                .linear_multiply(anim),
+            (current_theme.global.panel_stroke_width * anim).clamp(0.0, 0.5),
+            current_theme.sidebar_right.border().linear_multiply(anim),
         );
 
         let animated_radius = CornerRadius::same((20.0 * anim) as u8);
@@ -66,20 +61,16 @@ pub(crate) fn render_animated_section(
                 .outer_margin(Margin::symmetric(1, 1))
                 .inner_margin(Margin::same(10))
                 .stroke(animated_stroke)
-                .fill(current_theme.semantic.bg_main.to_color())
+                .fill(current_theme.global.bg_main())
                 .corner_radius(animated_radius)
                 .show(ui, |ui| {
                     let file = &files[first_selected_idx];
 
                     ui.add(
                         Label::new(
-                            RichText::new(i18n.t("right_sidebar.info")).heading().color(
-                                current_theme
-                                    .semantic
-                                    .text_primary
-                                    .to_color()
-                                    .linear_multiply(anim),
-                            ),
+                            RichText::new(i18n.t("right_sidebar.info"))
+                                .heading()
+                                .color(current_theme.global.text_primary()),
                         )
                         .selectable(false),
                     );
@@ -175,15 +166,9 @@ pub(crate) fn render_animated_section(
                             Layout::top_down(Align::Center),
                             |ui| {
                                 ui.add(
-                                    Label::new(
-                                        RichText::new(file.name.clone()).color(
-                                            current_theme
-                                                .semantic
-                                                .text_primary
-                                                .to_color()
-                                                .linear_multiply(anim),
-                                        ),
-                                    )
+                                    Label::new(RichText::new(file.name.clone()).color(
+                                        current_theme.global.text_primary().linear_multiply(anim),
+                                    ))
                                     .wrap()
                                     .selectable(false),
                                 );

@@ -91,3 +91,4 @@ pub const ICON_LAYOUT_LIST_DETAILED: &[u8] =
 pub const ICON_LAYOUT_LIST_COMPACT: &[u8] =
     include_bytes!("../assets/icons/layout-list-compact.svg");
 pub const ICON_LAYOUT_MILLER: &[u8] = include_bytes!("../assets/icons/layout-miller.svg");
+pub const ICON_CHEVRON_UP: &[u8] = include_bytes!("../assets/icons/chevron-up.svg");

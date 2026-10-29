@@ -22,10 +22,11 @@ use crate::{
     ui::{
         custom_components::{UiExt, text_edit::BlazeTextEdit},
         dialog_manager::manager::ModalDialog,
-        themes::{platform::structs::ToColor, theme_manager::with_theme},
+        icons_cache::icon_cache::IconCache,
+        themes::theme_manager::with_theme,
     },
 };
-use egui::{Color32, CornerRadius, Frame, Margin, Modal, Order, Ui, Window};
+use egui::{Color32, CornerRadius, Frame, Margin, Modal, Order, RichText, Ui, Window};
 
 pub struct QuickAccDialog {
     event: Option<QuickTagEvent>,
@@ -42,8 +43,8 @@ impl ModalDialog for QuickAccDialog {
     fn close(&mut self) {
         self.close()
     }
-    fn render(&mut self, ui: &mut Ui) -> bool {
-        self.process_events(ui)
+    fn render(&mut self, ui: &mut Ui, icon_cache: &mut IconCache) -> bool {
+        self.process_events(ui, icon_cache)
     }
 }
 
@@ -76,11 +77,12 @@ impl QuickAccDialog {
         });
     }
 
-    fn process_events(&mut self, ui: &mut Ui) -> bool {
+    fn process_events(&mut self, ui: &mut Ui, icon_cache: &mut IconCache) -> bool {
         let Some(event) = self.event.take() else {
             return false;
         };
 
+        let current_theme = with_theme(|t| t.current().clone());
         let i18n = with_configs(|c| c.get_i18n());
 
         match event {
@@ -101,23 +103,54 @@ impl QuickAccDialog {
                         ui.set_min_height(100.0);
 
                         ui.vertical_centered(|ui| {
-                            egui::ComboBox::from_label(
-                                i18n.t("quick_dialog_quick_to_tag.select_tag"),
-                            )
-                            .selected_text(
-                                tags.get(selected_index)
-                                    .map(|t| t.title.as_ref())
-                                    .unwrap_or(&i18n.t("quick_dialog_quick_to_tag.select_tag")),
-                            )
-                            .show_ui(ui, |ui| {
-                                for (i, tag) in tags.iter().enumerate() {
-                                    if ui
-                                        .selectable_label(selected_index == i, &*tag.title)
-                                        .clicked()
-                                    {
-                                        selected_index = i;
-                                    }
-                                }
+                            let hover_bg = current_theme.main_area.bg_hover();
+
+                            ui.label_ns(i18n.t("quick_dialog_quick_to_tag.select_tag"));
+
+                            ui.horizontal(|ui| {
+                                ui.blaze_combobox(Some(icon_cache))
+                                    .selected_text(&*current_theme.meta.name)
+                                    .text_color(current_theme.global.text_primary())
+                                    .size((150.0, 30.0))
+                                    .background_color(current_theme.main_area.bg_elevated())
+                                    .hover_background_color(current_theme.main_area.bg_hover())
+                                    .show(ui, |ui| {
+                                        let w = ui.available_width();
+
+                                        for (i, tag) in tags.iter().enumerate() {
+                                            let is_selected = selected_index == i;
+                                            let text_color = if is_selected {
+                                                current_theme.global.text_primary()
+                                            } else {
+                                                current_theme.global.text_secondary()
+                                            };
+                                            let label =
+                                                RichText::new(&*tag.title).color(text_color);
+
+                                            let bg = if is_selected {
+                                                current_theme.main_area.bg_active()
+                                            } else {
+                                                Color32::TRANSPARENT
+                                            };
+
+                                            if ui
+                                                .blaze_button(label, None)
+                                                .id(format!("quick_tag{i}"))
+                                                .size((w, 20.0))
+                                                .background_color(bg)
+                                                .hover_background_color(hover_bg)
+                                                .stroke_color(Color32::TRANSPARENT)
+                                                .radius(20)
+                                                .stroke_width(
+                                                    current_theme.global.components_stroke_width,
+                                                )
+                                                .show(ui)
+                                                .clicked()
+                                            {
+                                                selected_index = i;
+                                            }
+                                        }
+                                    });
                             });
 
                             ui.add_space(8.0);
@@ -555,7 +588,7 @@ impl QuickAccDialog {
         let mut should_close = false;
 
         let custom_frame = Frame::NONE
-            .fill(current_theme.semantic.bg_main.to_color())
+            .fill(current_theme.main_area.bg_elevated())
             .corner_radius(CornerRadius::same(10))
             .inner_margin(Margin::same(10));
 

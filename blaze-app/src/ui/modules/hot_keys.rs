@@ -17,25 +17,30 @@ use crate::{
     },
     ui::blaze_ui_state::BlazeUiState,
 };
-use egui::{Color32, Key, PointerButton, Ui};
+use egui::{Color32, Id, Key, PointerButton, Ui};
 use std::{path::Path, sync::Arc};
 use tracing::warn;
 
 /// Inputs que capturan el teclado. Si alguno tiene foco, las hotkeys
 /// se desactivan
 const TEXT_EDIT_IDS: &[&str] = &[
-    "search_bar",
     "search_ctx_menu",
     "creating_new",
     "rename_space",
     "quick_tag_name",
-    "save_theme_placeholder",
     "route_bar",
-    "config_search_bar",
 ];
 
 fn any_focused(ui: &mut Ui) -> bool {
-    ui.memory(|m| TEXT_EDIT_IDS.iter().any(|id| m.has_focus((*id).into())))
+    let any = ui.data(|data| {
+        data.get_temp::<Vec<Id>>(Id::new("inputs"))
+            .map(|ids| ui.memory(|m| ids.iter().any(|id| m.has_focus(*id))))
+            .unwrap_or(false)
+    });
+
+    let hardcoded = ui.memory(|m| TEXT_EDIT_IDS.iter().any(|id| m.has_focus((*id).into())));
+
+    any || hardcoded
 }
 
 pub fn hot_keys_logic(

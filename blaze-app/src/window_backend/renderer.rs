@@ -9,7 +9,7 @@ use egui_winit::winit::window::Window;
 use std::{sync::Arc, time::Duration};
 use tracing::debug;
 
-const MAX_PRIMITIVES_PER_FRAME: usize = 512;
+const MAX_PRIMITIVES_PER_FRAME: usize = 256;
 
 #[derive(Debug, Clone)]
 pub struct RendererConfig {
@@ -59,6 +59,8 @@ pub struct Renderer {
     egui_renderer: egui_wgpu::Renderer,
     screen_descriptor: egui_wgpu::ScreenDescriptor,
     staging: egui_wgpu::wgpu::util::StagingBelt,
+    msaa_view: egui_wgpu::wgpu::TextureView,
+    msaa_samples: u32,
 }
 
 impl Renderer {
@@ -123,8 +125,18 @@ impl Renderer {
 
         surface.configure(&device, &config);
 
-        let egui_renderer =
-            egui_wgpu::Renderer::new(&device, format, egui_wgpu::RendererOptions::default());
+        let msaa_samples = 4_u32;
+        let msaa_view = Self::create_msaa_view(&device, &config, msaa_samples);
+
+        let egui_renderer = egui_wgpu::Renderer::new(
+            &device,
+            format,
+            egui_wgpu::RendererOptions {
+                msaa_samples,
+                dithering: true,
+                ..Default::default()
+            },
+        );
 
         let staging = egui_wgpu::wgpu::util::StagingBelt::new(device.clone(), 1024 * 1024);
 
@@ -136,7 +148,31 @@ impl Renderer {
             egui_renderer,
             screen_descriptor,
             staging,
+            msaa_view,
+            msaa_samples,
         })
+    }
+
+    fn create_msaa_view(
+        device: &egui_wgpu::wgpu::Device,
+        config: &SurfaceConfiguration,
+        samples: u32,
+    ) -> egui_wgpu::wgpu::TextureView {
+        let texture = device.create_texture(&egui_wgpu::wgpu::TextureDescriptor {
+            label: Some("MSAA_Texture"),
+            size: egui_wgpu::wgpu::Extent3d {
+                width: config.width,
+                height: config.height,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: samples,
+            dimension: egui_wgpu::wgpu::TextureDimension::D2,
+            format: config.format,
+            usage: TextureUsages::RENDER_ATTACHMENT,
+            view_formats: &[],
+        });
+        texture.create_view(&Default::default())
     }
 
     pub fn max_texture_side(&self) -> usize {
@@ -152,6 +188,7 @@ impl Renderer {
         self.config.height = height;
 
         self.surface.configure(&self.device, &self.config);
+        self.msaa_view = Self::create_msaa_view(&self.device, &self.config, self.msaa_samples);
 
         self.screen_descriptor = egui_wgpu::ScreenDescriptor {
             size_in_pixels: [width, height],
@@ -166,11 +203,6 @@ impl Renderer {
     ) {
         for id in &textures_delta.free {
             self.egui_renderer.free_texture(id);
-        }
-
-        for (id, image_delta) in &textures_delta.set {
-            self.egui_renderer
-                .update_texture(&self.device, &self.queue, *id, image_delta);
         }
 
         let primitives = &primitives[..primitives.len().min(MAX_PRIMITIVES_PER_FRAME)];
@@ -207,22 +239,31 @@ impl Renderer {
         );
 
         {
-            let render_pass = encoder.begin_render_pass(&RenderPassDescriptor {
-                label: Some("RenderPass"),
-                color_attachments: &[Some(RenderPassColorAttachment {
-                    view: &view,
-                    resolve_target: None,
+            let color_attachment = if self.msaa_samples > 1 {
+                RenderPassColorAttachment {
+                    view: &self.msaa_view,
+                    resolve_target: Some(&view),
                     ops: Operations {
-                        load: LoadOp::Clear(egui_wgpu::wgpu::Color {
-                            r: 0.12,
-                            g: 0.08,
-                            b: 0.20,
-                            a: 1.0,
-                        }),
+                        load: LoadOp::Clear(egui_wgpu::wgpu::Color::TRANSPARENT),
                         store: StoreOp::Store,
                     },
                     depth_slice: None,
-                })],
+                }
+            } else {
+                RenderPassColorAttachment {
+                    view: &view,
+                    resolve_target: None,
+                    ops: Operations {
+                        load: LoadOp::Clear(egui_wgpu::wgpu::Color::TRANSPARENT),
+                        store: StoreOp::Store,
+                    },
+                    depth_slice: None,
+                }
+            };
+
+            let render_pass = encoder.begin_render_pass(&RenderPassDescriptor {
+                label: Some("RenderPass"),
+                color_attachments: &[Some(color_attachment)],
                 depth_stencil_attachment: None,
                 occlusion_query_set: None,
                 timestamp_writes: None,

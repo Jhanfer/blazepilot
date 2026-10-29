@@ -2,9 +2,8 @@ use crate::core::bootstrap::configs::platform::linux::conf_structs::{
     OrderingDirection, OrderingKind, OrderingMode,
 };
 use crate::ui::blaze_ui_state::BlazeUiState;
-use crate::ui::themes::platform::structs::ToColor;
 use crate::ui::themes::theme_manager::with_theme;
-use egui::{Color32, Rect, Sense, Ui, pos2, vec2};
+use egui::{Color32, CursorIcon, Rect, Sense, Ui, pos2, vec2};
 
 pub fn render_ordering_btn<F>(
     ui: &mut Ui,
@@ -40,11 +39,11 @@ pub fn render_ordering_btn<F>(
         callback();
     }
 
-    let mut color = current_theme.components.tools.label_active.to_color();
+    let mut color = current_theme.sidebar_right.accent();
 
     if resp.hovered() {
-        ui.set_cursor_icon(egui::CursorIcon::PointingHand);
-        color = current_theme.components.tools.label_hover.to_color();
+        ui.set_cursor_icon(CursorIcon::PointingHand);
+        color = current_theme.sidebar_right.bg_hover();
     }
 
     let rounded_rect = Rect::from_min_max(

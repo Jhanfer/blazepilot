@@ -1,6 +1,20 @@
+// Copyright 2026 Jhanfer
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 use egui::{
     Color32, CornerRadius, CursorIcon, Id, Rect, Response, Sense, Stroke, StrokeKind, TextStyle,
-    TextWrapMode, Ui, Vec2, WidgetText, pos2,
+    TextWrapMode, Ui, Vec2, WidgetText, pos2, vec2,
 };
 
 use crate::ui::icons_cache::icon_cache::IconCache;
@@ -20,6 +34,7 @@ pub(crate) struct BlazeButton<'a> {
     height: f32,
     content_offset_y: f32,
     corner_radius: CornerRadius,
+    stroke_width: f32,
     text_color: Color32,
     background_color: Color32,
     hover_background_color: Option<Color32>,
@@ -29,12 +44,16 @@ pub(crate) struct BlazeButton<'a> {
     icon_color: Color32,
     hover_icon_color: Option<Color32>,
     icon_size: f32,
-    icon_cache: &'a mut IconCache,
+    icon_cache: Option<&'a mut IconCache>,
 }
 
 impl<'a> BlazeButton<'a> {
     /// Crea un botón con valores predeterminados e identidad basada en texto
-    pub fn new<T: Into<WidgetText>>(ui: &mut Ui, text: T, icon_cache: &'a mut IconCache) -> Self {
+    pub fn new<T: Into<WidgetText>>(
+        ui: &mut Ui,
+        text: T,
+        icon_cache: Option<&'a mut IconCache>,
+    ) -> Self {
         let widget = text.into();
         let salt = widget.text();
         Self {
@@ -44,6 +63,7 @@ impl<'a> BlazeButton<'a> {
             height: 15.0,
             content_offset_y: 0.0,
             corner_radius: CornerRadius::same(5),
+            stroke_width: 0.8,
             background_color: Color32::GRAY,
             hover_background_color: None,
             stroke_color: Color32::GRAY,
@@ -68,6 +88,12 @@ impl<'a> BlazeButton<'a> {
         let (w, h) = size.into();
         self.width = w;
         self.height = h;
+        self
+    }
+
+    /// Establece el ancho de la linea del borde
+    pub fn stroke_width(mut self, width: f32) -> Self {
+        self.stroke_width = width;
         self
     }
 
@@ -146,18 +172,15 @@ impl<'a> BlazeButton<'a> {
         let gap = 6.0;
         let padding_x = 10_f32;
 
-        let icon_w = if self.icon.is_some() {
-            icon_size + gap
-        } else {
-            0.0
-        };
+        let has_text = !self.text.is_empty();
+        let has_icon = self.icon.is_some();
+
+        let gap_eff = if has_icon && has_text { gap } else { 0.0 };
+        let icon_w = if has_icon { icon_size + gap_eff } else { 0.0 };
 
         let available_w = ui.available_width();
-
         let button_w = self.width.max(0.0).min(available_w);
         let text_max_w = (button_w - icon_w - padding_x * 2.0).max(0.0);
-
-        let has_text = !self.text.is_empty();
 
         let galley = self.text.into_galley(
             ui,
@@ -166,15 +189,20 @@ impl<'a> BlazeButton<'a> {
             TextStyle::Button,
         );
 
-        let show_text = text_max_w > 0.0 && !galley.is_empty() && galley.size().x <= text_max_w;
+        let text_size = if has_text { galley.size() } else { Vec2::ZERO };
+        let show_text = has_text && text_max_w > 0.0 && text_size.x <= text_max_w;
 
-        let min_w = icon_w + galley.size().x + padding_x * 2.0;
-        let min_h = galley.size().y.max(icon_size) + 12.0;
+        let content_w = icon_w + text_size.x;
+        let content_h = text_size.y.max(if has_icon { icon_size } else { 0.0 });
 
-        let desired_size = Vec2::new(
-            self.width.max(min_w).min(available_w),
-            self.height.max(min_h),
-        );
+        let min_w = content_w + padding_x * 2.0;
+        let min_h = content_h + 12.0;
+
+        let desired_size = if has_text {
+            Vec2::new(self.width.max(min_w), self.height.max(min_h))
+        } else {
+            Vec2::new(self.width.max(0.0), self.height.max(0.0))
+        };
 
         let rect = ui.allocate_space(desired_size).1;
         let resp = ui.interact(rect, self.id, Sense::click());
@@ -194,29 +222,32 @@ impl<'a> BlazeButton<'a> {
             rect,
             self.corner_radius,
             bg,
-            Stroke::new(0.5, st_c),
-            StrokeKind::Outside,
+            Stroke::new(self.stroke_width, st_c),
+            StrokeKind::Middle,
         );
 
-        let mut cursor_x = rect.min.x + padding_x;
+        let mut cursor_x = rect.min.x + if has_text { padding_x } else { 0.0 };
 
-        if let Some((name, bytes)) = self.icon {
-            let icon_rect = Rect::from_min_size(
+        if let Some((name, bytes)) = self.icon
+            && let Some(icon_cache) = self.icon_cache
+        {
+            let center = if has_text {
                 pos2(
-                    cursor_x,
-                    rect.center().y - icon_size / 2.0 + self.content_offset_y,
-                ),
-                Vec2::splat(icon_size),
-            );
+                    cursor_x + icon_size / 2.0,
+                    rect.center().y + self.content_offset_y,
+                )
+            } else {
+                rect.center() + vec2(0.0, self.content_offset_y)
+            };
+
+            let icon_rect = Rect::from_center_size(center, Vec2::splat(icon_size));
 
             let rounded_rect = Rect::from_min_max(
                 pos2(icon_rect.min.x.round(), icon_rect.min.y.round()),
                 pos2(icon_rect.max.x.round(), icon_rect.max.y.round()),
             );
 
-            let icon = self
-                .icon_cache
-                .get_or_load(ui, name, bytes, ic_c, Vec2::splat(icon_size));
+            let icon = icon_cache.get_or_load(ui, name, bytes, ic_c, Vec2::splat(icon_size));
 
             ui.painter().image(
                 icon.id(),

@@ -22,7 +22,7 @@ use crate::core::{
 };
 use crate::ui::custom_components::UiExt;
 use crate::ui::dialog_manager::manager::ModalDialog;
-use crate::ui::themes::platform::structs::ToColor;
+use crate::ui::icons_cache::icon_cache::IconCache;
 use crate::ui::themes::theme_manager::with_theme;
 use egui::{CornerRadius, Frame, Margin, Order, Ui, Window};
 
@@ -37,7 +37,7 @@ impl ModalDialog for WantToInstallDialog {
     fn close(&mut self) {
         self.close()
     }
-    fn render(&mut self, ui: &mut Ui) -> bool {
+    fn render(&mut self, ui: &mut Ui, _icon_cache: &mut IconCache) -> bool {
         self.render_dialog(ui)
     }
 }
@@ -62,7 +62,7 @@ impl WantToInstallDialog {
 
         let mut should_close = false;
         let custom_frame = Frame::NONE
-            .fill(current_theme.semantic.bg_main.to_color())
+            .fill(current_theme.main_area.bg_elevated())
             .corner_radius(CornerRadius::same(10))
             .inner_margin(Margin::same(10));
 

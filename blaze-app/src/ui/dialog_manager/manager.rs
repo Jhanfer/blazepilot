@@ -8,7 +8,7 @@ use crate::{
     core::runtime::bus_structs::QuickTagEvent,
     ui::{
         dialog_manager::dialogs::{
-            configs_dialog::ConfigDialog, error_dialog::ErrorDialog,
+            config_dialog::configs_dialog::ConfigDialog, error_dialog::ErrorDialog,
             folder_color_selector_dialog::FolderColorSelector,
             image_preview_dialog::ImagePreviewDialog, media_player_dialog::MediaPlayerDialog,
             quick_dialogs::QuickAccDialog, selector_dialog::AppSelectorDialog,
@@ -16,6 +16,7 @@ use crate::{
             sure_to_move_to::SureToMoveToDialog, update_dialog::UpdateDialog,
             want_donwload::WantToDonwloadDialog, want_to_install::WantToInstallDialog,
         },
+        icons_cache::icon_cache::IconCache,
         image_preview::image_preview_handler::ImagePreviewState,
     },
 };
@@ -23,7 +24,7 @@ use crate::{
 pub trait ModalDialog {
     fn is_open(&self) -> bool;
     fn close(&mut self);
-    fn render(&mut self, ui: &mut Ui) -> bool;
+    fn render(&mut self, ui: &mut Ui, icon_cache: &mut IconCache) -> bool;
 }
 
 pub struct DialogManager {
@@ -125,7 +126,7 @@ impl DialogManager {
             .open(media_path, media_name, is_audio_only);
     }
 
-    pub fn render_area(&mut self, ui: &mut Ui) {
+    pub fn render_area(&mut self, ui: &mut Ui, icon_cache: &mut IconCache) {
         let dialogs: Vec<&mut dyn ModalDialog> = vec![
             &mut self.selector_dialog,
             &mut self.sure_to_dialog,
@@ -165,7 +166,7 @@ impl DialogManager {
                 resp.inner
             };
 
-            let dialog_requested_close = dialog.render(ui);
+            let dialog_requested_close = dialog.render(ui, icon_cache);
 
             if backdrop_clicked || dialog_requested_close {
                 dialog.close();

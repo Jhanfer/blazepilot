@@ -18,7 +18,7 @@ use crate::core::bootstrap::configs::config_manager::with_configs;
 use crate::core::runtime::{bus_structs::FileOperation, event_bus::Dispatcher};
 use crate::ui::custom_components::UiExt;
 use crate::ui::dialog_manager::manager::ModalDialog;
-use crate::ui::themes::platform::structs::ToColor;
+use crate::ui::icons_cache::icon_cache::IconCache;
 use crate::ui::themes::theme_manager::with_theme;
 use egui::{CornerRadius, Frame, Margin, Order, RichText, Ui, Window};
 use uuid::Uuid;
@@ -36,7 +36,7 @@ impl ModalDialog for SureToDeleteDialog {
     fn close(&mut self) {
         self.close()
     }
-    fn render(&mut self, ui: &mut Ui) -> bool {
+    fn render(&mut self, ui: &mut Ui, _icon_cache: &mut IconCache) -> bool {
         self.render_dialog(ui)
     }
 }
@@ -70,7 +70,7 @@ impl SureToDeleteDialog {
         };
 
         let custom_frame = Frame::NONE
-            .fill(current_theme.semantic.bg_main.to_color())
+            .fill(current_theme.main_area.bg_elevated())
             .corner_radius(CornerRadius::same(10))
             .inner_margin(Margin::same(10));
 
@@ -102,7 +102,7 @@ impl SureToDeleteDialog {
                             "sure_to_delete_dialog.and_more",
                             &[("query", &(total - MAX_SHOWN).to_string())],
                         ))
-                        .color(current_theme.semantic.text_primary.to_color())
+                        .color(current_theme.global.text_primary())
                         .weak()
                         .italics(),
                     );
