@@ -132,7 +132,6 @@ impl FolderColorSelector {
                             cm.save_color_cache().await;
                         });
 
-                        ui.request_repaint();
                         should_close = true;
                     }
                 });

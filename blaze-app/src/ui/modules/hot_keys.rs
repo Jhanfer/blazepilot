@@ -206,7 +206,6 @@ pub fn hot_keys_logic(
             CacheManager::global().invalidate(path);
         }
 
-        ui.request_repaint();
         state.reload_all();
     }
 

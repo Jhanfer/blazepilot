@@ -293,7 +293,6 @@ fn render_collapsed_tab(
                 ui.data_mut(|data| {
                     data.insert_temp(hover_state_id, is_hovered);
                 });
-                ui.request_repaint();
             }
         });
 }

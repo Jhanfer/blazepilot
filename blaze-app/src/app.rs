@@ -25,7 +25,6 @@ use crate::ui::blaze_ui_state::BlazeUiState;
 use crate::ui::fonts::fonts_manager::with_fonts;
 use crate::ui::modules::ui_callback::connect_ui_components_callback;
 use crate::utils::mimalloc_fn::free_mi;
-use crate::window_backend::repaint_signal::RepaintSignal;
 use egui::Ui;
 use std::path::Path;
 use std::sync::Arc;
@@ -73,7 +72,6 @@ impl BlazeAppBuilder {
             state,
             ui_state,
             dnd,
-            repaint_signal: RepaintSignal::new(),
             past_cleanup: Instant::now(),
         }
     }
@@ -89,7 +87,6 @@ pub struct BlazeApp {
     pub state: BlazeCoreState,  //motor, archivos, mover
     pub ui_state: BlazeUiState, //visuales
     pub dnd: Option<WaylandDndReceiver>,
-    repaint_signal: RepaintSignal,
     past_cleanup: Instant,
 }
 
@@ -158,7 +155,7 @@ impl BlazeApp {
             if f.dirty {
                 let defs = f.build_font_definitions();
                 ui.set_fonts(defs);
-                ui.request_repaint();
+
                 f.dirty = false;
             }
 
@@ -167,7 +164,6 @@ impl BlazeApp {
 
                 let defs = f.build_font_definitions();
                 ui.set_fonts(defs);
-                ui.request_repaint();
             }
         });
 
@@ -188,14 +184,6 @@ impl BlazeApp {
         self.ui_state.process_events();
 
         connect_ui_components_callback(ui, &mut self.state, &mut self.ui_state);
-
-        if self.state.is_loading || self.state.active_tasks > 0 {
-            self.repaint_signal.request_repaint_immediate();
-            ui.request_repaint();
-        } else {
-            self.repaint_signal.request_repaint_after(100);
-            ui.request_repaint_after(std::time::Duration::from_millis(100));
-        }
     }
 
     pub fn on_exit(&mut self) {

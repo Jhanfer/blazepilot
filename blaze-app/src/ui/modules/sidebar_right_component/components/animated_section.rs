@@ -36,10 +36,6 @@ pub(crate) fn render_animated_section(
     let anim = ui.animate_value_with_time(anim_id, target, 0.10);
 
     if anim > 0.001 {
-        if anim != target {
-            ui.request_repaint();
-        }
-
         let max_height = 350.0;
         let current_height = max_height * anim;
 
@@ -177,9 +173,7 @@ pub(crate) fn render_animated_section(
 
                         ui.add_space(10.0);
 
-                        if should_repaint {
-                            ui.request_repaint();
-                        }
+                        if should_repaint {}
                     });
 
                     Grid::new("file_info_grid")

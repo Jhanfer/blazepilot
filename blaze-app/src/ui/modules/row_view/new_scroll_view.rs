@@ -854,7 +854,6 @@ pub fn new_render_scrollview(
             ui_state.context_menu_state = ctx_menu;
 
             if ui_state.needs_repaint || should_repaint {
-                ui.request_repaint();
                 ui_state.needs_repaint = false;
             }
 

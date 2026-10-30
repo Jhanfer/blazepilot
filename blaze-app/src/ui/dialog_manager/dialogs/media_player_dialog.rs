@@ -208,9 +208,7 @@ impl MediaPlayerDialog {
 
                 self.media_player.volume(self.current_volume);
 
-                if (self.current_volume - self.target_volume).abs() > 0.001 {
-                    ui.request_repaint();
-                }
+                if (self.current_volume - self.target_volume).abs() > 0.001 {}
             });
         }
 

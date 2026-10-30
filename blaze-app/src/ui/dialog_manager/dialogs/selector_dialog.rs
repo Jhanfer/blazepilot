@@ -236,9 +236,7 @@ impl AppSelectorDialog {
             }
         }
 
-        if needs_repaint {
-            ui.request_repaint();
-        }
+        if needs_repaint {}
     }
 
     fn render_selector_button(
