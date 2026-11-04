@@ -2,14 +2,14 @@ use std::{path::Path, sync::Arc};
 
 use egui::{
     Align2, Color32, CornerRadius, FontId, Frame, Label, Margin, Rect, RichText, ScrollArea, Sense,
-    Stroke, StrokeKind, Ui, pos2, vec2,
+    Stroke, StrokeKind, Ui, Vec2, pos2, vec2,
 };
 
 use crate::{
     core::files::{blaze_motor::motor_structs::FileEntry, file_extension::FileExtension},
     ui::{
         custom_components::UiExt,
-        icons_cache::{icon_cache::IconCache, icons},
+        icons_cache::icons,
         modules::utilities::{contrats_to_text_color, ensure_min_lightness, resolve_icon},
         themes::theme_manager::with_theme,
     },
@@ -38,7 +38,7 @@ impl<'a> ExamplesUiState<'a> {
 /// - List items)
 /// - ComboBox
 /// - Indicadores semánticos (Error, Warning, Success)
-pub fn render_examples_ui(ui: &mut Ui, state: &mut ExamplesUiState, icon_cache: &mut IconCache) {
+pub fn render_examples_ui(ui: &mut Ui, state: &mut ExamplesUiState) {
     if !state.is_initialized {
         state.is_initialized = true;
     }
@@ -49,7 +49,7 @@ pub fn render_examples_ui(ui: &mut Ui, state: &mut ExamplesUiState, icon_cache: 
         .fill(current_theme.main_area.bg_panel())
         .stroke(Stroke {
             width: 0.5,
-            color: current_theme.main_area.border(),
+            color: current_theme.main_area.panel_border(),
         })
         .corner_radius(CornerRadius::same(12))
         .inner_margin(Margin::same(10))
@@ -101,34 +101,34 @@ pub fn render_examples_ui(ui: &mut Ui, state: &mut ExamplesUiState, icon_cache: 
             );
 
             ui.horizontal(|ui| {
-                ui.blaze_button("Normal", None)
+                ui.blaze_button("Normal")
                     .size((80.0, 20.0))
                     .background_color(current_theme.main_area.bg_elevated())
                     .radius(20)
                     .stroke_width(current_theme.global.components_stroke_width)
-                    .show(ui);
+                    .show();
 
-                ui.blaze_button("Hover", None)
+                ui.blaze_button("Hover")
                     .size((80.0, 20.0))
                     .background_color(current_theme.main_area.bg_hover())
                     .radius(20)
                     .stroke_width(current_theme.global.components_stroke_width)
-                    .show(ui);
+                    .show();
 
-                ui.blaze_button("Active", None)
+                ui.blaze_button("Active")
                     .size((80.0, 20.0))
                     .background_color(current_theme.main_area.bg_active())
                     .radius(20)
                     .stroke_width(current_theme.global.components_stroke_width)
-                    .show(ui);
+                    .show();
             });
 
-            ui.blaze_combobox(Some(icon_cache))
+            ui.blaze_combobox()
                 .selected_text("Test")
                 .text_color(current_theme.global.text_primary())
                 .size((150.0, 30.0))
                 .background_color(current_theme.main_area.bg_elevated())
-                .show(ui, |ui| {
+                .show(|ui| {
                     let w = ui.available_width();
 
                     for (i, name) in state.example_combobox.iter().enumerate() {
@@ -141,7 +141,7 @@ pub fn render_examples_ui(ui: &mut Ui, state: &mut ExamplesUiState, icon_cache: 
                             current_theme.main_area.bg_elevated()
                         };
 
-                        ui.blaze_button(label, None)
+                        ui.blaze_button(label)
                             .id(format!("example_btn_{i}"))
                             .size((w, 20.0))
                             .background_color(bg)
@@ -149,7 +149,7 @@ pub fn render_examples_ui(ui: &mut Ui, state: &mut ExamplesUiState, icon_cache: 
                             .stroke_color(Color32::TRANSPARENT)
                             .radius(20)
                             .stroke_width(current_theme.global.components_stroke_width)
-                            .show(ui);
+                            .show();
                     }
                 });
 
@@ -178,7 +178,7 @@ pub fn render_examples_ui(ui: &mut Ui, state: &mut ExamplesUiState, icon_cache: 
             let (icon_name, icon_bytes) = ("search", icons::ICON_SEARCH);
             let mut test = String::new();
 
-            ui.blaze_input("test iddle", Some("hint"), &mut test, Some(icon_cache))
+            ui.blaze_input("test iddle", Some("hint"), &mut test)
                 .id("test_input_1")
                 .hint_background_color(current_theme.main_area.bg_elevated())
                 .hint_stroke_color(hint_stroke_color)
@@ -187,14 +187,14 @@ pub fn render_examples_ui(ui: &mut Ui, state: &mut ExamplesUiState, icon_cache: 
                 .radius(20)
                 .text_color(current_theme.global.text_secondary())
                 .background_color(current_theme.main_area.bg_elevated())
-                .stroke_color(ensure_min_lightness(current_theme.main_area.border()))
+                .stroke_color(ensure_min_lightness(current_theme.main_area.panel_border()))
                 .x_color(current_theme.main_area.accent())
                 .icon(icon_name, icon_bytes)
-                .icon_color(ensure_min_lightness(current_theme.main_area.border()))
+                .icon_color(ensure_min_lightness(current_theme.main_area.panel_border()))
                 .stroke_width(current_theme.global.components_stroke_width)
-                .show(ui, || {});
+                .show(|| {});
 
-            ui.blaze_input("test focused", Some("hint"), &mut test, Some(icon_cache))
+            ui.blaze_input("test focused", Some("hint"), &mut test)
                 .id("test_input_2")
                 .hint_background_color(current_theme.main_area.bg_elevated())
                 .hint_stroke_color(hint_stroke_color)
@@ -208,9 +208,9 @@ pub fn render_examples_ui(ui: &mut Ui, state: &mut ExamplesUiState, icon_cache: 
                 .icon(icon_name, icon_bytes)
                 .icon_color(ensure_min_lightness(current_theme.main_area.accent()))
                 .stroke_width(current_theme.global.components_stroke_width)
-                .show(ui, || {});
+                .show(|| {});
 
-            ui.blaze_input("test no icon", None, &mut test, Some(icon_cache))
+            ui.blaze_input("test no icon", None, &mut test)
                 .id("test_input_3")
                 .size((200.0, 30.0))
                 .radius(20)
@@ -219,7 +219,7 @@ pub fn render_examples_ui(ui: &mut Ui, state: &mut ExamplesUiState, icon_cache: 
                 .stroke_color(Color32::TRANSPARENT)
                 .x_color(current_theme.main_area.accent())
                 .stroke_width(current_theme.global.components_stroke_width)
-                .show(ui, || {});
+                .show(|| {});
 
             ui.separator();
 
@@ -366,29 +366,15 @@ pub fn render_examples_ui(ui: &mut Ui, state: &mut ExamplesUiState, icon_cache: 
 
                         // --- Icono ---
                         let icon_size = 16.0;
-                        let left_padding = icon_size / 6.0;
 
-                        let icon_rect = Rect::from_min_size(
-                            pos2(rect.min.x + left_padding, rect.center().y - icon_size / 2.0),
-                            vec2(icon_size, icon_size),
-                        );
+                        let (icon_name, icon_bytes, color) = resolve_icon(file, Some(text_color));
 
-                        let (icon_name, icon_bytes, color) = resolve_icon(file, None);
-
-                        let icon = icon_cache.get_or_load(
-                            ui,
-                            &icon_name,
-                            icon_bytes,
-                            ensure_min_lightness(color),
-                            vec2(icon_size, icon_size),
-                        );
-
-                        ui.painter().image(
-                            icon.id(),
-                            icon_rect,
-                            Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
-                            Color32::WHITE,
-                        );
+                        let icon_rect = ui
+                            .draw_icon((&icon_name, icon_bytes))
+                            .size(Vec2::splat(icon_size))
+                            .tint(color)
+                            .show()
+                            .rect;
 
                         // --- Nombre ---
 
@@ -511,7 +497,7 @@ pub fn render_examples_ui(ui: &mut Ui, state: &mut ExamplesUiState, icon_cache: 
                     current_theme.main_area.bg_panel(),
                     Stroke::new(
                         current_theme.global.panel_stroke_width,
-                        current_theme.main_area.border(),
+                        current_theme.main_area.panel_border(),
                     ),
                     StrokeKind::Middle,
                 );

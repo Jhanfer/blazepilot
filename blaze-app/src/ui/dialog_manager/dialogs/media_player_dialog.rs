@@ -19,7 +19,6 @@ use std::sync::Arc;
 
 use crate::core::files::file_extension::{FileExtension, sniff_magic_bytes};
 use crate::ui::dialog_manager::manager::ModalDialog;
-use crate::ui::icons_cache::icon_cache::IconCache;
 use crate::ui::media_player::media_player_backend::MediaPlayer;
 use crate::ui::themes::theme_manager::with_theme;
 use crate::utils::formating::format_hms;
@@ -49,7 +48,7 @@ impl ModalDialog for MediaPlayerDialog {
     fn close(&mut self) {
         self.close()
     }
-    fn render(&mut self, ui: &mut Ui, _icon_cache: &mut IconCache) -> bool {
+    fn render(&mut self, ui: &mut Ui) -> bool {
         self.render_dialog(ui)
     }
 }

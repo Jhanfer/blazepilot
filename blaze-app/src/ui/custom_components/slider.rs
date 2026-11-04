@@ -21,6 +21,7 @@ use std::ops::RangeInclusive;
 /// personalizados
 pub(crate) struct BlazeSlider<'a, Num: Numeric> {
     id: Id,
+    ui: &'a mut Ui,
     value: &'a mut Num,
     range: RangeInclusive<Num>,
     height: f32,
@@ -37,12 +38,13 @@ impl<'a, Num: Numeric> BlazeSlider<'a, Num> {
     /// - `value`: Referencia mutable al valor numérico que se actualizará con el deslizador
     /// - `range`: Rango inclusivo que delimita los valores mínimos y máximos permitidos por el deslizador
     pub(crate) fn new(
-        ui: &mut Ui,
+        ui: &'a mut Ui,
         value: &'a mut Num,
         range: impl Into<RangeInclusive<Num>>,
     ) -> Self {
         Self {
             id: ui.id().with("Slider"),
+            ui,
             value,
             range: range.into(),
             height: 30.0,
@@ -109,9 +111,10 @@ impl<'a, Num: Numeric> BlazeSlider<'a, Num> {
     /// # Retorno
     /// Devuelve un [`Response`] que refleja el estado de interacción y marca el cambio
     /// (`response.mark_changed()`) si el valor vinculado ha sido modificado
-    pub fn show(&mut self, ui: &mut Ui) -> Response {
-        let (rect, mut response) =
-            ui.allocate_exact_size(vec2(self.width, self.height), Sense::click_and_drag());
+    pub fn show(&mut self) -> Response {
+        let (rect, mut response) = self
+            .ui
+            .allocate_exact_size(vec2(self.width, self.height), Sense::click_and_drag());
 
         response.id = self.id;
 
@@ -133,13 +136,13 @@ impl<'a, Num: Numeric> BlazeSlider<'a, Num> {
         let animation_time = if response.dragged() { 0.0 } else { 0.5 };
 
         // usa como clave dinámica "target_x" para reaccionar ante cambios bruscos de valor
-        let animated_x = ui.animate_value_with_time(
+        let animated_x = self.ui.animate_value_with_time(
             self.id.with(format!("slider_animated_{target_x}")),
             target_x,
             animation_time,
         );
 
-        if ui.is_rect_visible(rect) {
+        if self.ui.is_rect_visible(rect) {
             let radius = self.height / 2.5;
 
             let progress_rect = Rect::from_min_size(
@@ -148,7 +151,8 @@ impl<'a, Num: Numeric> BlazeSlider<'a, Num> {
             );
 
             // dibuja el fondo de la barra
-            ui.painter()
+            self.ui
+                .painter()
                 .rect_filled(progress_rect, self.height / 2.0, self.bg_color);
 
             let center = pos2(animated_x, progress_rect.center().y);
@@ -159,12 +163,16 @@ impl<'a, Num: Numeric> BlazeSlider<'a, Num> {
             );
 
             // dibuja el relleno de progreso hasta la posición animada
-            ui.painter()
+            self.ui
+                .painter()
                 .rect_filled(filled_rect, self.height / 2.0, self.accent);
 
             // renderiza el indicador o botón circular del deslizador
-            ui.painter().circle_filled(center, radius, Color32::WHITE);
-            ui.painter()
+            self.ui
+                .painter()
+                .circle_filled(center, radius, Color32::WHITE);
+            self.ui
+                .painter()
                 .circle_stroke(center, radius, Stroke::new(1.5, Color32::BLACK));
         }
 

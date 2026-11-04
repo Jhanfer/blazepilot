@@ -55,7 +55,7 @@ pub fn render_clipboard_menu(
             .fill(current_theme.sidebar_right.bg_panel())
             .stroke(Stroke::new(
                 current_theme.global.panel_stroke_width * expansion,
-                current_theme.sidebar_right.border(),
+                current_theme.sidebar_right.panel_border(),
             ))
             .corner_radius(CornerRadius::same(radius))
             .inner_margin(Margin::symmetric(m_h, m_v))
@@ -76,7 +76,7 @@ pub fn render_clipboard_menu(
 
                 if expansion > 0.0 && show {
                     let btn_resp = ui
-                        .blaze_button("Limpiar", Some(&mut ui_state.icon_cache))
+                        .blaze_button("Limpiar")
                         .size((current_w, 14.0))
                         .radius(20)
                         .stroke_color(Color32::TRANSPARENT)
@@ -86,7 +86,7 @@ pub fn render_clipboard_menu(
                         .icon_size(icon_size)
                         .text_color(eased_color)
                         .stroke_width(current_theme.global.components_stroke_width)
-                        .show(ui);
+                        .show();
 
                     if btn_resp.clicked() {
                         state.clear_clipboard();
@@ -110,7 +110,7 @@ pub fn render_clipboard_menu(
                                         Color32::from_rgba_unmultiplied(178, 34, 34, 200);
 
                                     let btn = ui
-                                        .blaze_button(item.clone(), Some(&mut ui_state.icon_cache))
+                                        .blaze_button(item.clone())
                                         .size((current_w - 5.0, 14.0))
                                         .radius(20)
                                         .stroke_color(Color32::TRANSPARENT)
@@ -121,7 +121,7 @@ pub fn render_clipboard_menu(
                                         .hover_icon_color(hover_stroke)
                                         .text_color(eased_color)
                                         .stroke_width(current_theme.global.components_stroke_width)
-                                        .show(ui);
+                                        .show();
 
                                     if btn.clicked() {
                                         state.delete_one_from_clipboard(item.clone());
@@ -158,7 +158,7 @@ pub fn render_clipboard_menu(
 
                 if current_w > 0.8 {
                     let btn_resp = ui
-                        .blaze_button(label, Some(&mut ui_state.icon_cache))
+                        .blaze_button(label)
                         .background_color(bg)
                         .hover_background_color(hover_bg)
                         .size((current_w, 10.0 * presence))
@@ -168,7 +168,7 @@ pub fn render_clipboard_menu(
                         .icon_size(icon_size_f)
                         .text_color(eased_color)
                         .stroke_width(current_theme.global.components_stroke_width)
-                        .show(ui);
+                        .show();
 
                     if btn_resp.clicked() {
                         ui_state.toggle_clipboard();

@@ -16,7 +16,6 @@ use crate::{
             sure_to_move_to::SureToMoveToDialog, update_dialog::UpdateDialog,
             want_donwload::WantToDonwloadDialog, want_to_install::WantToInstallDialog,
         },
-        icons_cache::icon_cache::IconCache,
         image_preview::image_preview_handler::ImagePreviewState,
     },
 };
@@ -24,7 +23,7 @@ use crate::{
 pub trait ModalDialog {
     fn is_open(&self) -> bool;
     fn close(&mut self);
-    fn render(&mut self, ui: &mut Ui, icon_cache: &mut IconCache) -> bool;
+    fn render(&mut self, ui: &mut Ui) -> bool;
 }
 
 pub struct DialogManager {
@@ -126,7 +125,7 @@ impl DialogManager {
             .open(media_path, media_name, is_audio_only);
     }
 
-    pub fn render_area(&mut self, ui: &mut Ui, icon_cache: &mut IconCache) {
+    pub fn render_area(&mut self, ui: &mut Ui) {
         let dialogs: Vec<&mut dyn ModalDialog> = vec![
             &mut self.selector_dialog,
             &mut self.sure_to_dialog,
@@ -166,7 +165,7 @@ impl DialogManager {
                 resp.inner
             };
 
-            let dialog_requested_close = dialog.render(ui, icon_cache);
+            let dialog_requested_close = dialog.render(ui);
 
             if backdrop_clicked || dialog_requested_close {
                 dialog.close();

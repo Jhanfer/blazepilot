@@ -9,6 +9,7 @@ use crate::{
     },
     ui::{
         blaze_ui_state::BlazeUiState,
+        custom_components::UiExt,
         icons_cache::{icons::*, thumbnails::thumbnails_manager::Thumbnail},
         themes::theme_manager::with_theme,
     },
@@ -230,20 +231,11 @@ pub fn render_quicklink_icon(
     };
 
     let (icon_name, icon_bytes, color) = resolve_icon(&Arc::from(dummy_entry), None);
-    let rounded_rect = Rect::from_min_max(
-        pos2(icon_rect.min.x.round(), icon_rect.min.y.round()),
-        pos2(icon_rect.max.x.round(), icon_rect.max.y.round()),
-    );
-    let icon = ui_state
-        .icon_cache
-        .get_or_load(ui, &icon_name, icon_bytes, color, icon_size);
 
-    ui.painter().image(
-        icon.id(),
-        rounded_rect,
-        Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
-        Color32::WHITE,
-    );
+    ui.draw_icon((&icon_name, icon_bytes))
+        .size(icon_size)
+        .tint(color)
+        .show();
 }
 
 pub fn render_button<F, C>(
@@ -330,13 +322,8 @@ pub fn render_button<F, C>(
     );
 }
 
-pub fn render_op_buttons<F, C>(
-    ui: &mut Ui,
-    ui_state: &mut BlazeUiState,
-    tag_color: Color32,
-    editcallback: F,
-    deletecallback: C,
-) where
+pub fn render_op_buttons<F, C>(ui: &mut Ui, tag_color: Color32, editcallback: F, deletecallback: C)
+where
     F: Fn(),
     C: Fn(),
 {
@@ -390,26 +377,28 @@ pub fn render_op_buttons<F, C>(
 
             let icon_size = vec2(18.0, 18.0);
 
-            let icon1_pos = pos2(
-                animated_rect1.center().x - (icon_size.y / 2.0),
-                animated_rect1.center().y - (icon_size.y / 2.0),
-            );
-            let icon1_rect = Rect::from_min_size(icon1_pos, icon_size);
+            // revisar esto más tarde
 
-            let icon2_pos = pos2(
-                animated_rect2.center().x - (icon_size.y / 2.0),
-                animated_rect2.center().y - (icon_size.y / 2.0),
-            );
+            // let icon1_pos = pos2(
+            //     animated_rect1.center().x - (icon_size.y / 2.0),
+            //     animated_rect1.center().y - (icon_size.y / 2.0),
+            // );
+            //let icon1_rect = Rect::from_min_size(icon1_pos, icon_size);
 
-            let icon2_rect = Rect::from_min_size(icon2_pos, icon_size);
+            // let icon2_pos = pos2(
+            //     animated_rect2.center().x - (icon_size.y / 2.0),
+            //     animated_rect2.center().y - (icon_size.y / 2.0),
+            // );
 
-            let mut animated_icon_rect1 = icon1_rect;
-            let mut animated_icon_rect2 = icon2_rect;
+            //let icon2_rect = Rect::from_min_size(icon2_pos, icon_size);
+
+            // let mut animated_icon_rect1 = icon1_rect;
+            // let mut animated_icon_rect2 = icon2_rect;
 
             if resp1.hovered() {
                 ui.set_cursor_icon(CursorIcon::PointingHand);
                 animated_rect1 = container_rect.scale_from_center(scale);
-                animated_icon_rect1 = icon1_rect.scale_from_center(scale);
+                // animated_icon_rect1 = icon1_rect.scale_from_center(scale);
             }
 
             if resp1.clicked() {
@@ -419,7 +408,7 @@ pub fn render_op_buttons<F, C>(
             if resp2.hovered() {
                 ui.set_cursor_icon(CursorIcon::PointingHand);
                 animated_rect2 = second_container.scale_from_center(scale);
-                animated_icon_rect2 = icon2_rect.scale_from_center(scale);
+                // animated_icon_rect2 = icon2_rect.scale_from_center(scale);
             }
 
             if resp2.clicked() {
@@ -450,27 +439,15 @@ pub fn render_op_buttons<F, C>(
                 StrokeKind::Middle,
             );
 
-            let icon_edit = ui_state
-                .icon_cache
-                .get_or_load(ui, "edit", ICON_EDIT, accent1, icon_size);
+            ui.draw_icon(("edit", ICON_EDIT))
+                .size(icon_size)
+                .tint(accent1)
+                .show();
 
-            ui.painter().image(
-                icon_edit.id(),
-                animated_icon_rect1,
-                Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
-                Color32::WHITE,
-            );
-
-            let icon_trash = ui_state
-                .icon_cache
-                .get_or_load(ui, "trash", ICON_TRASH, accent2, icon_size);
-
-            ui.painter().image(
-                icon_trash.id(),
-                animated_icon_rect2,
-                Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
-                Color32::WHITE,
-            );
+            ui.draw_icon(("trash", ICON_TRASH))
+                .size(icon_size)
+                .tint(accent2)
+                .show();
         });
     });
 }

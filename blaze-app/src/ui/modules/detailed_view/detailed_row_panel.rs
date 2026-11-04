@@ -159,7 +159,7 @@ pub fn detailed_row_panel_frame(
         })
         .stroke(Stroke {
             width: 0.5,
-            color: current_theme.main_area.border(),
+            color: current_theme.main_area.panel_border(),
         })
         .show(ui, |ui| {
             let original_clip = ui.clip_rect();

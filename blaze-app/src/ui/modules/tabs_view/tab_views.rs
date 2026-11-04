@@ -61,13 +61,13 @@ pub fn render_label(
         );
         let (icon_n, icon_b) = ("folder-open", icons::ICON_FOLDER_OPEN);
 
-        let icon = ui_state.icon_cache.get_or_load(
-            ui,
-            icon_n,
-            icon_b,
-            current_theme.top_bar.accent(),
-            vec2(icon_size, icon_size),
-        );
+        //revisar esto más tarde
+
+        let icon =
+            ui_state
+                .icon_cache
+                .lock()
+                .get_or_load(ui, icon_n, icon_b, vec2(icon_size, icon_size));
 
         let rounded_rect = Rect::from_min_max(
             pos2(t_icon_rect.min.x.round(), t_icon_rect.min.y.round()),
@@ -78,7 +78,7 @@ pub fn render_label(
             icon.id(),
             rounded_rect,
             Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
-            Color32::WHITE,
+            current_theme.top_bar.accent(),
         );
     }
 
@@ -125,13 +125,12 @@ pub fn render_label(
 
         let (icon_n, icon_b) = ("x", icons::ICON_X);
 
-        let icon = ui_state.icon_cache.get_or_load(
-            ui,
-            icon_n,
-            icon_b,
-            Color32::WHITE,
-            vec2(icon_size, icon_size),
-        );
+        //revisar esto más tarde
+        let icon =
+            ui_state
+                .icon_cache
+                .lock()
+                .get_or_load(ui, icon_n, icon_b, vec2(icon_size, icon_size));
 
         let rounded_rect = Rect::from_min_max(
             pos2(x_rect.min.x.round(), x_rect.min.y.round()),
@@ -222,12 +221,12 @@ pub fn tabs(
                                 let b = current_theme.top_bar.bg_hover();
                                 (
                                     Color32::from_rgba_unmultiplied(b.r(), b.g(), b.b(), 80),
-                                    current_theme.top_bar.border(),
+                                    current_theme.top_bar.panel_border(),
                                 )
                             } else {
                                 (
                                     current_theme.top_bar.bg_panel(),
-                                    current_theme.top_bar.border(),
+                                    current_theme.top_bar.panel_border(),
                                 )
                             };
 
@@ -300,7 +299,7 @@ pub fn tabs(
     let painter = ui.painter().with_clip_rect(clip);
 
     let bg = current_theme.top_bar.bg_panel();
-    let stc = current_theme.top_bar.border();
+    let stc = current_theme.top_bar.panel_border();
 
     match visible_tab {
         Some(tab) => {

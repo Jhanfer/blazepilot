@@ -2,7 +2,6 @@ use crate::core::bootstrap::configs::config_manager::with_configs;
 use crate::ui::custom_components::UiExt;
 use crate::ui::dialog_manager::dialogs::config_dialog::configs_dialog::ConfigDialog;
 use crate::ui::examples::examples_components::{ExamplesUiState, render_examples_ui};
-use crate::ui::icons_cache::icon_cache::IconCache;
 use crate::ui::icons_cache::icons;
 use crate::ui::themes::theme_manager::with_theme;
 use egui::scroll_area::ScrollSource;
@@ -24,7 +23,7 @@ macro_rules! color_field {
 
             if ui.color_picker(&mut color, ($label, stringify!($($path)*)))
                 .background_color($c_theme.main_area.bg_panel())
-                .show(ui)
+                .show()
                 .changed() {
                 with_theme(|t| {
                     t.update_theme(
@@ -43,12 +42,7 @@ macro_rules! color_field {
     }};
 }
 
-pub(crate) fn render_appearance_settings(
-    c_dialog: &mut ConfigDialog,
-    ui: &mut Ui,
-    _query: &str,
-    icon_cache: &mut IconCache,
-) {
+pub(crate) fn render_appearance_settings(c_dialog: &mut ConfigDialog, ui: &mut Ui, _query: &str) {
     let i18n = with_configs(|c| c.get_i18n());
     let (available_themes, current_theme) =
         with_theme(|t| (t.get_available_themes_names(), t.current().clone()));
@@ -72,13 +66,13 @@ pub(crate) fn render_appearance_settings(
 
         // i18n.t("configs_appearance.selection")
         ui.horizontal(|ui| {
-            ui.blaze_combobox(Some(icon_cache))
+            ui.blaze_combobox()
                 .selected_text(&*current_theme.meta.name)
                 .text_color(current_theme.global.text_primary())
                 .size((150.0, 30.0))
                 .background_color(current_theme.sidebar_left.bg_elevated())
                 .hover_background_color(current_theme.sidebar_left.bg_hover())
-                .show(ui, |ui| {
+                .show(|ui| {
                     let w = ui.available_width();
 
                     for (i, theme) in available_themes.iter().enumerate() {
@@ -97,14 +91,14 @@ pub(crate) fn render_appearance_settings(
                         };
 
                         if ui
-                            .blaze_button(label, None)
+                            .blaze_button(label)
                             .id(format!("theme_btn_{i}"))
                             .size((w, 20.0))
                             .background_color(bg)
                             .hover_background_color(hover_bg)
                             .stroke_color(Color32::TRANSPARENT)
                             .radius(20)
-                            .show(ui)
+                            .show()
                             .clicked()
                         {
                             with_configs(|c| c.set_current_theme_name(theme));
@@ -115,7 +109,7 @@ pub(crate) fn render_appearance_settings(
 
             // Recargar
             if ui
-                .blaze_button("", Some(icon_cache))
+                .blaze_button("")
                 .id("reload_theme")
                 .size((30.0, 30.0))
                 .background_color(current_theme.sidebar_left.bg_elevated())
@@ -125,7 +119,7 @@ pub(crate) fn render_appearance_settings(
                 .icon("reset", icons::ICON_RESTORE)
                 .icon_color(current_theme.sidebar_left.accent())
                 .stroke_width(current_theme.global.components_stroke_width)
-                .show(ui)
+                .show()
                 .clicked()
             {
                 with_theme(|t| match t.reload() {
@@ -229,7 +223,7 @@ pub(crate) fn render_appearance_settings(
                                                         current_theme.main_area.bg_panel(),
                                                     )
                                                     .accent(current_theme.main_area.accent())
-                                                    .show(ui)
+                                                    .show()
                                                     .changed()
                                                 {
                                                     with_theme(|t| {
@@ -253,7 +247,7 @@ pub(crate) fn render_appearance_settings(
                                                         current_theme.main_area.bg_panel(),
                                                     )
                                                     .accent(current_theme.main_area.accent())
-                                                    .show(ui)
+                                                    .show()
                                                     .changed()
                                                 {
                                                     with_theme(|t| {
@@ -392,10 +386,73 @@ pub(crate) fn render_appearance_settings(
                                                     ui,
                                                     "Borde",
                                                     current_theme,
-                                                    sidebar_left.border
+                                                    sidebar_left.panel_border
+                                                );
+                                                color_field!(
+                                                    ui,
+                                                    "Borde componente",
+                                                    current_theme,
+                                                    sidebar_left.component_border
                                                 );
                                             },
                                         );
+
+                                        CollapsingHeader::new("Barra superior").show(ui, |ui| {
+                                            color_field!(
+                                                ui,
+                                                "Fondo del Panel",
+                                                current_theme,
+                                                top_bar.bg_panel
+                                            );
+                                            color_field!(
+                                                ui,
+                                                "Fondo Elevado",
+                                                current_theme,
+                                                top_bar.bg_elevated
+                                            );
+                                            color_field!(
+                                                ui,
+                                                "Fondo Hover",
+                                                current_theme,
+                                                top_bar.bg_hover
+                                            );
+                                            color_field!(
+                                                ui,
+                                                "Fondo Activo",
+                                                current_theme,
+                                                top_bar.bg_active
+                                            );
+                                            color_field!(
+                                                ui,
+                                                "Icono Principal",
+                                                current_theme,
+                                                top_bar.icon_primary
+                                            );
+                                            color_field!(
+                                                ui,
+                                                "Icono Secundario",
+                                                current_theme,
+                                                top_bar.icon_secondary
+                                            );
+                                            color_field!(
+                                                ui,
+                                                "Acento",
+                                                current_theme,
+                                                top_bar.accent
+                                            );
+                                            color_field!(
+                                                ui,
+                                                "Borde",
+                                                current_theme,
+                                                top_bar.panel_border
+                                            );
+                                            color_field!(
+                                                ui,
+                                                "Borde componente",
+                                                current_theme,
+                                                top_bar.component_border
+                                            );
+                                        });
 
                                         CollapsingHeader::new("Panel central").show(ui, |ui| {
                                             color_field!(
@@ -444,7 +501,13 @@ pub(crate) fn render_appearance_settings(
                                                 ui,
                                                 "Borde",
                                                 current_theme,
-                                                main_area.border
+                                                main_area.panel_border
+                                            );
+                                            color_field!(
+                                                ui,
+                                                "Borde componente",
+                                                current_theme,
+                                                main_area.component_border
                                             );
                                         });
 
@@ -497,7 +560,13 @@ pub(crate) fn render_appearance_settings(
                                                     ui,
                                                     "Borde",
                                                     current_theme,
-                                                    sidebar_right.border
+                                                    sidebar_right.panel_border
+                                                );
+                                                color_field!(
+                                                    ui,
+                                                    "Borde componente",
+                                                    current_theme,
+                                                    sidebar_right.component_border
                                                 );
                                             },
                                         );
@@ -549,7 +618,13 @@ pub(crate) fn render_appearance_settings(
                                                 ui,
                                                 "Borde",
                                                 current_theme,
-                                                context_menu.border
+                                                context_menu.panel_border
+                                            );
+                                            color_field!(
+                                                ui,
+                                                "Borde componente",
+                                                current_theme,
+                                                context_menu.component_border
                                             );
                                         });
                                     });
@@ -565,7 +640,7 @@ pub(crate) fn render_appearance_settings(
                                     });
 
                                     ScrollArea::vertical().show(ui, |ui| {
-                                        render_examples_ui(ui, &mut examples_state, icon_cache);
+                                        render_examples_ui(ui, &mut examples_state);
                                     });
 
                                     ui.data_mut(|d| {
@@ -582,21 +657,16 @@ pub(crate) fn render_appearance_settings(
 
         ui.horizontal(|ui| {
             // Input para nombre de tema personalizado
-            ui.blaze_input(
-                "save",
-                None,
-                &mut c_dialog.custom_theme_name,
-                Some(icon_cache),
-            )
-            .id("save_theme_placeholder")
-            .size((200.0, 30.0))
-            .radius(20)
-            .text_color(current_theme.global.text_secondary())
-            .background_color(current_theme.sidebar_left.bg_elevated())
-            .stroke_color(Color32::TRANSPARENT)
-            .x_color(current_theme.sidebar_left.accent())
-            .stroke_width(current_theme.global.components_stroke_width)
-            .show(ui, || {});
+            ui.blaze_input("save", None, &mut c_dialog.custom_theme_name)
+                .id("save_theme_placeholder")
+                .size((200.0, 30.0))
+                .radius(20)
+                .text_color(current_theme.global.text_secondary())
+                .background_color(current_theme.sidebar_left.bg_elevated())
+                .stroke_color(Color32::TRANSPARENT)
+                .x_color(current_theme.sidebar_left.accent())
+                .stroke_width(current_theme.global.components_stroke_width)
+                .show(|| {});
 
             ui.add_space(8.0);
 
@@ -604,7 +674,7 @@ pub(crate) fn render_appearance_settings(
             let bg = current_theme.sidebar_left.bg_elevated();
 
             if ui
-                .blaze_button("", Some(icon_cache))
+                .blaze_button("")
                 .id("save_btn")
                 .size((30.0, 30.0))
                 .background_color(bg)
@@ -613,7 +683,7 @@ pub(crate) fn render_appearance_settings(
                 .radius(20)
                 .icon("server", icons::ICON_SERVER)
                 .icon_color(current_theme.sidebar_left.accent())
-                .show(ui)
+                .show()
                 .clicked()
             {
                 if !c_dialog.custom_theme_name.trim().is_empty() {
@@ -633,7 +703,7 @@ pub(crate) fn render_appearance_settings(
             let c = Color32::from_rgba_unmultiplied(255, 0, 0, 120);
             let hover = Color32::from_rgba_unmultiplied(255, 0, 0, 160);
             if ui
-                .blaze_button("", Some(icon_cache))
+                .blaze_button("")
                 .id("reset_btn")
                 .size((30.0, 30.0))
                 .background_color(c)
@@ -642,7 +712,7 @@ pub(crate) fn render_appearance_settings(
                 .radius(20)
                 .icon("reset", icons::ICON_RESTORE)
                 .icon_color(Color32::RED)
-                .show(ui)
+                .show()
                 .clicked()
             {
                 with_theme(|t| match t.reset_to_default() {

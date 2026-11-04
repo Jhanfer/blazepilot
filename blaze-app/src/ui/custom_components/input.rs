@@ -13,10 +13,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::sync::Arc;
+
 use egui::{
     Color32, CornerRadius, CursorIcon, FontId, Id, Rect, Response, Sense, Stroke, StrokeKind, Ui,
     Vec2, pos2, vec2,
 };
+use parking_lot::Mutex;
 
 use crate::ui::{
     custom_components::text_edit::BlazeTextEdit,
@@ -28,6 +31,7 @@ use crate::ui::{
 /// de limpieza
 pub(crate) struct BlazeInput<'a> {
     id: Id,
+    ui: &'a mut Ui,
     input: &'a mut String,
     input_hint_text: &'a str,
     hint_text: Option<&'a str>,
@@ -48,7 +52,7 @@ pub(crate) struct BlazeInput<'a> {
     icon_color: Color32,
     hover_icon_color: Option<Color32>,
     icon_size: f32,
-    icon_cache: Option<&'a mut IconCache>,
+    icon_cache: Option<Arc<Mutex<IconCache>>>,
 }
 
 impl<'a> BlazeInput<'a> {
@@ -60,14 +64,15 @@ impl<'a> BlazeInput<'a> {
     /// - `hint_text`: Texto explicativo que se renderiza dentro del input cuando está vacío
     /// - `icon_cache`: Pool de caché opcional para registrar o recuperar texturas de iconos y evitar rasterizar imágenes repetidas
     pub(crate) fn new<T: Into<&'a mut String>>(
-        ui: &mut Ui,
+        ui: &'a mut Ui,
         input: T,
         input_hint_text: &'a str,
         hint_text: Option<&'a str>,
-        icon_cache: Option<&'a mut IconCache>,
+        icon_cache: Option<Arc<Mutex<IconCache>>>,
     ) -> Self {
         Self {
             id: ui.id().with("input"),
+            ui,
             input: input.into(),
             input_hint_text,
             hint_text,
@@ -197,7 +202,7 @@ impl<'a> BlazeInput<'a> {
     }
 
     /// Renderiza el campo entrada, calcula la distribución del contenido (iconos, texto, sugerencias) y gestiona eventos de borrado
-    pub fn show<F: FnMut()>(&mut self, ui: &mut Ui, mut callback: F) -> Response {
+    pub fn show<F: FnMut()>(&mut self, mut callback: F) -> Response {
         let icon_size = self.icon_size;
         let gap = 6.0;
         let padding_x = 10_f32;
@@ -206,7 +211,7 @@ impl<'a> BlazeInput<'a> {
         let input_id = self.id;
 
         // registra el id de la instancia en la memoria temporal para el reastro de entradas
-        ui.data_mut(|data| {
+        self.ui.data_mut(|data| {
             let mut ids: Vec<Id> = data.get_temp(list_id).unwrap_or_default();
             if !ids.contains(&input_id) {
                 ids.push(input_id);
@@ -215,11 +220,11 @@ impl<'a> BlazeInput<'a> {
         });
 
         let size = vec2(self.width, self.height);
-        let (rect, resp) = ui.allocate_exact_size(size, Sense::click());
+        let (rect, resp) = self.ui.allocate_exact_size(size, Sense::click());
 
         // determina la paleta de colores según el estado de interacción
         let (bg, st_c, ic_c) = if resp.hovered() {
-            ui.set_cursor_icon(CursorIcon::Text);
+            self.ui.set_cursor_icon(CursorIcon::Text);
             (
                 self.hover_background_color.unwrap_or(self.background_color),
                 self.hover_stroke_color.unwrap_or(self.stroke_color),
@@ -229,7 +234,7 @@ impl<'a> BlazeInput<'a> {
             (self.background_color, self.stroke_color, self.icon_color)
         };
 
-        ui.painter().rect(
+        self.ui.painter().rect(
             rect,
             self.corner_radius,
             bg,
@@ -241,7 +246,7 @@ impl<'a> BlazeInput<'a> {
 
         // dibuja el icono inicial si se ha aportado
         if let Some((name, bytes)) = self.icon
-            && let Some(icon_cache) = self.icon_cache.as_deref_mut()
+            && let Some(icon_cache) = &mut self.icon_cache
         {
             let icon_rect = Rect::from_min_size(
                 pos2(cursor_x, rect.center().y - icon_size / 2.0),
@@ -254,13 +259,15 @@ impl<'a> BlazeInput<'a> {
                 pos2(icon_rect.max.x.round(), icon_rect.max.y.round()),
             );
 
-            let icon = icon_cache.get_or_load(ui, name, bytes, ic_c, Vec2::splat(icon_size));
+            let icon = icon_cache
+                .lock()
+                .get_or_load(self.ui, name, bytes, Vec2::splat(icon_size));
 
-            ui.painter().image(
+            self.ui.painter().image(
                 icon.id(),
                 rounded_rect,
                 Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
-                Color32::WHITE,
+                ic_c,
             );
 
             cursor_x = icon_rect.max.x + gap;
@@ -290,7 +297,7 @@ impl<'a> BlazeInput<'a> {
                 _ => (Color32::WHITE, Color32::GRAY, Color32::LIGHT_GRAY),
             };
 
-            let hint_galley = ui.painter().layout_no_wrap(
+            let hint_galley = self.ui.painter().layout_no_wrap(
                 hint.to_string(),
                 FontId::proportional(10.0),
                 ensure_min_lightness(hint_color),
@@ -312,7 +319,7 @@ impl<'a> BlazeInput<'a> {
             pos2(text_right, rect.max.y - padding_y),
         );
 
-        let response = ui.place(
+        let response = self.ui.place(
             text_rect,
             BlazeTextEdit::singleline(self.input)
                 .hint_text(self.input_hint_text)
@@ -330,7 +337,7 @@ impl<'a> BlazeInput<'a> {
                 badge_size,
             );
 
-            ui.painter().rect(
+            self.ui.painter().rect(
                 hint_rect,
                 3.0,
                 hint_bg,
@@ -339,12 +346,13 @@ impl<'a> BlazeInput<'a> {
             );
 
             let hint_pos = hint_rect.min + vec2(8.0, 2.0);
-            ui.painter()
+            self.ui
+                .painter()
                 .galley(hint_pos, hint_galley, Color32::DARK_GREEN);
         }
 
         // renderizado del botón de limpieza de contenido
-        if show_clear && let Some(icon_cache) = self.icon_cache.as_deref_mut() {
+        if show_clear && let Some(icon_cache) = &mut self.icon_cache {
             let c = self.background_color;
             let color = Color32::from_rgba_unmultiplied(
                 c.r().saturating_add(50),
@@ -361,7 +369,9 @@ impl<'a> BlazeInput<'a> {
                 vec2(clear_w, clear_w),
             );
 
-            let btn = ui.interact(btn_rect, ui.id().with("clear_input"), Sense::click());
+            let btn = self
+                .ui
+                .interact(btn_rect, self.ui.id().with("clear_input"), Sense::click());
 
             let icon_size = 16.0;
 
@@ -378,24 +388,27 @@ impl<'a> BlazeInput<'a> {
                 pos2(icon_rect.max.x.round(), icon_rect.max.y.round()),
             );
 
-            let icon = icon_cache.get_or_load(ui, "x", icons::ICON_X, ic_c, Vec2::splat(icon_size));
+            let icon =
+                icon_cache
+                    .lock()
+                    .get_or_load(self.ui, "x", icons::ICON_X, Vec2::splat(icon_size));
 
-            ui.painter().image(
+            self.ui.painter().image(
                 icon.id(),
                 rounded_rect,
                 Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
-                self.x_color,
+                ic_c,
             );
 
-            ui.painter().rect_filled(btn_rect, 20, color);
+            self.ui.painter().rect_filled(btn_rect, 20, color);
 
             if btn.hovered() {
-                ui.set_cursor_icon(CursorIcon::PointingHand);
+                self.ui.set_cursor_icon(CursorIcon::PointingHand);
             }
 
             if btn.clicked() {
                 self.input.clear();
-                ui.memory_mut(|m| m.request_focus(self.id));
+                self.ui.memory_mut(|m| m.request_focus(self.id));
                 callback()
             }
         }

@@ -73,7 +73,7 @@ fn render_expanded_panel(
                 .corner_radius(CornerRadius::same(20))
                 .stroke(Stroke {
                     width: 0.5,
-                    color: current_theme.sidebar_right.border(),
+                    color: current_theme.sidebar_right.panel_border(),
                 })
                 .show(ui, |ui| {
                     let bg = current_theme.sidebar_right.bg_elevated();
@@ -104,12 +104,7 @@ fn render_expanded_panel(
                     let mut search = state.current_search_filter().to_string();
 
                     let response = ui
-                        .blaze_input(
-                            &i18n.t("search.placeholder"),
-                            Some("Ctrl + K"),
-                            &mut search,
-                            Some(&mut ui_state.icon_cache),
-                        )
+                        .blaze_input(&i18n.t("search.placeholder"), Some("Ctrl + K"), &mut search)
                         .id(search_id)
                         .hint_background_color(c)
                         .hint_stroke_color(hint_stroke_color)
@@ -123,7 +118,7 @@ fn render_expanded_panel(
                         .icon(icon_name, icon_bytes)
                         .icon_color(search_color)
                         .stroke_width(current_theme.global.components_stroke_width)
-                        .show(ui, || {
+                        .show(|| {
                             state.clean_search();
                         });
 
@@ -140,7 +135,7 @@ fn render_expanded_panel(
                             .fill(current_theme.sidebar_right.bg_elevated())
                             .stroke(Stroke::new(
                                 current_theme.global.panel_stroke_width,
-                                current_theme.sidebar_right.border(),
+                                current_theme.sidebar_right.panel_border(),
                             ))
                             .corner_radius(CornerRadius::same(99))
                             .inner_margin(Margin::symmetric(10, 6))
@@ -346,7 +341,7 @@ fn render_collapsed_tab(
                         .fill(current_theme.sidebar_right.bg_panel())
                         .stroke(Stroke::new(
                             current_theme.global.panel_stroke_width,
-                            current_theme.sidebar_right.border(),
+                            current_theme.sidebar_right.panel_border(),
                         ))
                         .corner_radius(CornerRadius::same(20))
                         .show(ui, |ui| {
@@ -361,11 +356,12 @@ fn render_collapsed_tab(
                                 Rect::from_center_size(area_center, vec2(icon_size, icon_size));
                             let (icon_n, icon_b) = ("right_sidebar", icons::ICON_SIDEBAR_RIGHT);
 
-                            let icon = ui_state.icon_cache.get_or_load(
+                            //revisar esto más tarde
+
+                            let icon = ui_state.icon_cache.lock().get_or_load(
                                 ui,
                                 icon_n,
                                 icon_b,
-                                Color32::GRAY,
                                 vec2(icon_size, icon_size),
                             );
 

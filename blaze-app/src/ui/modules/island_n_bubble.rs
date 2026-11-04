@@ -43,7 +43,7 @@ where
                 .fill(current_theme.main_area.bg_panel())
                 .stroke(Stroke::new(
                     current_theme.global.panel_stroke_width,
-                    current_theme.main_area.border(),
+                    current_theme.main_area.panel_border(),
                 ))
                 .corner_radius(CornerRadius::same(20))
                 .show(ui, |ui| {
@@ -85,19 +85,19 @@ pub fn render_island_bubble(
                 pos2(icon_rect.min.x.round(), icon_rect.min.y.round()),
                 pos2(icon_rect.max.x.round(), icon_rect.max.y.round()),
             );
-            let icon = ui_state.icon_cache.get_or_load(
-                ui,
-                icon_name,
-                icon_bytes,
-                Color32::GRAY,
-                icon_size,
-            );
+
+            // revisar más tarde
+
+            let icon = ui_state
+                .icon_cache
+                .lock()
+                .get_or_load(ui, icon_name, icon_bytes, icon_size);
 
             ui.painter().image(
                 icon.id(),
                 rounded_rect,
                 Rect::from_min_max(egui::pos2(0.0, 0.0), pos2(1.0, 1.0)),
-                Color32::WHITE,
+                Color32::GRAY,
             );
 
             ui.add_space(1.0);
@@ -113,19 +113,19 @@ pub fn render_island_bubble(
                 pos2(icon_rect.max.x.round(), icon_rect.max.y.round()),
             );
             let (icon_name, icon_bytes) = ("list", icons::ICON_LIST);
-            let icon = ui_state.icon_cache.get_or_load(
-                ui,
-                icon_name,
-                icon_bytes,
-                Color32::GRAY,
-                icon_size,
-            );
+
+            // revisar más tarde
+
+            let icon = ui_state
+                .icon_cache
+                .lock()
+                .get_or_load(ui, icon_name, icon_bytes, icon_size);
 
             ui.painter().image(
                 icon.id(),
                 rounded_rect,
                 Rect::from_min_max(egui::pos2(0.0, 0.0), pos2(1.0, 1.0)),
-                Color32::WHITE,
+                Color32::GRAY,
             );
 
             ui.add_space(1.0);
@@ -159,19 +159,19 @@ pub fn render_island_bubble(
                 pos2(icon_rect.min.x.round(), icon_rect.min.y.round()),
                 pos2(icon_rect.max.x.round(), icon_rect.max.y.round()),
             );
-            let icon = ui_state.icon_cache.get_or_load(
-                ui,
-                icon_name,
-                icon_bytes,
-                Color32::GRAY,
-                icon_size,
-            );
+
+            // revisar más tarde
+
+            let icon = ui_state
+                .icon_cache
+                .lock()
+                .get_or_load(ui, icon_name, icon_bytes, icon_size);
 
             ui.painter().image(
                 icon.id(),
                 _rect,
                 Rect::from_min_max(egui::pos2(0.0, 0.0), pos2(1.0, 1.0)),
-                Color32::WHITE,
+                Color32::GRAY,
             );
 
             ui.add_space(1.0);
@@ -205,7 +205,7 @@ pub fn render_island_bubble(
                 .fill(current_theme.main_area.bg_panel())
                 .stroke(Stroke::new(
                     current_theme.global.panel_stroke_width,
-                    current_theme.main_area.border(),
+                    current_theme.main_area.panel_border(),
                 ))
                 .corner_radius(CornerRadius::same(20))
                 .show(ui, |ui| {
@@ -291,19 +291,19 @@ pub fn render_tags_island_bubble(
                 pos2(icon_rect.min.x.round(), icon_rect.min.y.round()),
                 pos2(icon_rect.max.x.round(), icon_rect.max.y.round()),
             );
-            let icon = ui_state.icon_cache.get_or_load(
-                ui,
-                icon_name,
-                icon_bytes,
-                Color32::GRAY,
-                icon_size,
-            );
+
+            // revisar más tarde
+
+            let icon = ui_state
+                .icon_cache
+                .lock()
+                .get_or_load(ui, icon_name, icon_bytes, icon_size);
 
             ui.painter().image(
                 icon.id(),
                 rounded_rect,
                 Rect::from_min_max(egui::pos2(0.0, 0.0), pos2(1.0, 1.0)),
-                Color32::WHITE,
+                Color32::GRAY,
             );
 
             ui.add_space(1.0);
@@ -319,19 +319,19 @@ pub fn render_tags_island_bubble(
                 pos2(icon_rect.min.x.round(), icon_rect.min.y.round()),
                 pos2(icon_rect.max.x.round(), icon_rect.max.y.round()),
             );
-            let icon = ui_state.icon_cache.get_or_load(
-                ui,
-                icon_name,
-                icon_bytes,
-                Color32::GRAY,
-                icon_size,
-            );
+
+            // revisar más tarde
+
+            let icon = ui_state
+                .icon_cache
+                .lock()
+                .get_or_load(ui, icon_name, icon_bytes, icon_size);
 
             ui.painter().image(
                 icon.id(),
                 rounded_rect,
                 Rect::from_min_max(egui::pos2(0.0, 0.0), pos2(1.0, 1.0)),
-                Color32::WHITE,
+                Color32::GRAY,
             );
 
             ui.add_space(1.0);

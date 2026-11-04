@@ -1,7 +1,6 @@
 use crate::{
     core::{
-        blaze_state::BlazeCoreState,
-        blaze_state::state_structs::NewItemType,
+        blaze_state::{BlazeCoreState, state_structs::NewItemType},
         bootstrap::configs::config_manager::with_configs,
         files::blaze_motor::motor_structs::FileEntry,
         runtime::{
@@ -15,7 +14,7 @@ use crate::{
     },
     ui::{
         blaze_ui_state::BlazeUiState,
-        custom_components::text_edit::BlazeTextEdit,
+        custom_components::{UiExt, text_edit::BlazeTextEdit},
         icons_cache::thumbnails::thumbnails_manager::Thumbnail,
         modules::{
             custom_context_menu::context_state::ContextMenuKind,
@@ -27,17 +26,12 @@ use crate::{
 };
 use egui::{
     Color32, ColorImage, CursorIcon, FontId, Id, Key, Modifiers, PointerButton, Rect, ScrollArea,
-    Sense, Stroke, StrokeKind, TextureOptions, Ui, pos2, scroll_area::ScrollSource, vec2,
+    Sense, Stroke, StrokeKind, TextureOptions, Ui, Vec2, pos2, scroll_area::ScrollSource, vec2,
 };
 use std::{borrow::Cow, collections::HashMap, path::Path, sync::Arc};
 use tracing::info;
 
-fn grid_file_creation(
-    state: &mut BlazeCoreState,
-    ui: &mut Ui,
-    available_width: f32,
-    ui_state: &mut BlazeUiState,
-) {
+fn grid_file_creation(state: &mut BlazeCoreState, ui: &mut Ui, available_width: f32) {
     if let Some(item_type) = state.creating_new.clone() {
         let icon_size = state.grid_view.base.icon_size;
         let cell_size = state.grid_view.cell_size;
@@ -66,24 +60,10 @@ fn grid_file_creation(
         let icon_x = rect.min.x + (cell_size - icon_size) / 2.0;
         let icon_rect = Rect::from_min_size(pos2(icon_x, icon_top), vec2(icon_size, icon_size));
 
-        let rounded_rect = Rect::from_min_max(
-            pos2(icon_rect.min.x.round(), icon_rect.min.y.round()),
-            pos2(icon_rect.max.x.round(), icon_rect.max.y.round()),
-        );
-
-        let icon = ui_state.icon_cache.get_or_load(
-            ui,
-            &icon_name,
-            icon_bytes,
-            color,
-            vec2(icon_size, icon_size),
-        );
-        ui.painter().image(
-            icon.id(),
-            rounded_rect,
-            Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
-            Color32::WHITE,
-        );
+        ui.draw_icon((&icon_name, icon_bytes))
+            .size(Vec2::splat(icon_size))
+            .tint(color)
+            .show();
 
         let creating_new_id = Id::new("creating_new");
 
@@ -348,7 +328,7 @@ pub fn render_grid_scrollview(
 
     let scroll_output = scroll_area.show_rows(ui, row_height, total_rows, |ui, row_range| {
         // --- Creación de carpeta/archivo nuevo ---
-        grid_file_creation(state, ui, available_width, ui_state);
+        grid_file_creation(state, ui, available_width);
 
         let mut should_repaint = false;
 
@@ -615,26 +595,12 @@ pub fn render_grid_scrollview(
 
                     let (icon_name, icon_bytes, color) = resolve_icon(file, snapshot_color);
 
-                    let rounded_rect = Rect::from_min_max(
-                        pos2(icon_rect.min.x.round(), icon_rect.min.y.round()),
-                        pos2(icon_rect.max.x.round(), icon_rect.max.y.round()),
-                    );
-
                     let normalized_color = ensure_min_lightness(color);
 
-                    let icon = ui_state.icon_cache.get_or_load(
-                        ui,
-                        &icon_name,
-                        icon_bytes,
-                        normalized_color,
-                        vec2(icon_size, icon_size),
-                    );
-                    ui.painter().image(
-                        icon.id(),
-                        rounded_rect,
-                        Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
-                        icon_tint,
-                    );
+                    ui.draw_icon((&icon_name, icon_bytes))
+                        .size(Vec2::splat(icon_size))
+                        .tint(normalized_color)
+                        .show();
                 }
 
                 if let Some(dot) = dot_color {

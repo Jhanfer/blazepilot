@@ -65,7 +65,7 @@ pub fn tag_views(
         })
         .stroke(Stroke {
             width: 0.5,
-            color: current_theme.main_area.border(),
+            color: current_theme.main_area.panel_border(),
         })
         .show(ui, |ui| {
             ScrollArea::vertical().id_salt("all_tags").show(ui, |ui| {
@@ -274,7 +274,6 @@ pub fn tag_views(
 
                                     render_op_buttons(
                                         ui,
-                                        ui_state,
                                         color,
                                         || {
                                             dispatcher

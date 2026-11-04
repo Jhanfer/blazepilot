@@ -47,7 +47,10 @@ pub(crate) fn render_animated_section(
 
         let animated_stroke = Stroke::new(
             (current_theme.global.panel_stroke_width * anim).clamp(0.0, 0.5),
-            current_theme.sidebar_right.border().linear_multiply(anim),
+            current_theme
+                .sidebar_right
+                .panel_border()
+                .linear_multiply(anim),
         );
 
         let animated_radius = CornerRadius::same((20.0 * anim) as u8);
@@ -140,20 +143,18 @@ pub(crate) fn render_animated_section(
                             );
 
                             let normalized_color = ensure_min_lightness(color);
+                            //revisar esto más tarde
 
-                            let icon = ui_state.icon_cache.get_or_load(
-                                ui,
-                                &icon_name,
-                                icon_bytes,
-                                normalized_color,
-                                icon_size,
-                            );
+                            let icon = ui_state
+                                .icon_cache
+                                .lock()
+                                .get_or_load(ui, &icon_name, icon_bytes, icon_size);
 
                             ui.painter().image(
                                 icon.id(),
                                 rounded_rect,
                                 Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
-                                Color32::WHITE,
+                                normalized_color,
                             );
                         }
 

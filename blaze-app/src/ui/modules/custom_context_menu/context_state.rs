@@ -11,8 +11,8 @@ use crate::{
         system::disk_reader::disk::Disk,
     },
     ui::{
-        blaze_ui_state::BlazeUiState, modules::utilities::ensure_min_lightness,
-        themes::theme_manager::with_theme,
+        blaze_ui_state::BlazeUiState, custom_components::UiExt,
+        modules::utilities::ensure_min_lightness, themes::theme_manager::with_theme,
     },
 };
 
@@ -140,7 +140,7 @@ impl ContextMenuState {
                     .corner_radius(12.0)
                     .stroke(Stroke::new(
                         current_theme.global.panel_stroke_width,
-                        current_theme.context_menu.border(),
+                        current_theme.context_menu.panel_border(),
                     ))
                     .inner_margin(8.0)
                     .show(ui, |ui| {
@@ -204,7 +204,7 @@ impl ContextMenuState {
                     .fill(current_theme.context_menu.bg_panel())
                     .stroke(Stroke::new(
                         current_theme.global.panel_stroke_width,
-                        current_theme.context_menu.border(),
+                        current_theme.context_menu.panel_border(),
                     ))
                     .show(ui, |ui| {
                         ui.set_min_size(popup_size);
@@ -275,30 +275,19 @@ impl ContextMenuState {
         ui.painter().rect_filled(paint_rect, 12.0, bg_color);
 
         let icon_size = vec2(16.0, 16.0);
+        // necesito revisar esto más tarde...
         let padding = 8.0;
 
-        let icon_pos = rect.left_top() + vec2(padding, (rect.height() - icon_size.x) / 2.0);
-        let icon_rect = Rect::from_min_size(icon_pos, icon_size);
+        // let icon_pos = rect.left_top() + vec2(padding, (rect.height() - icon_size.x) / 2.0);
 
-        let rounded_rect = Rect::from_min_max(
-            pos2(icon_rect.min.x.round(), icon_rect.min.y.round()),
-            pos2(icon_rect.max.x.round(), icon_rect.max.y.round()),
-        );
+        let icon_rect = ui
+            .draw_icon((icon.0, icon.1))
+            .size(icon_size)
+            .tint(icon_color)
+            .show()
+            .rect;
 
-        let icon = ui_state
-            .icon_cache
-            .get_or_load(ui, icon.0, icon.1, icon_color, icon_size);
-
-        let painter = ui.painter();
-
-        painter.image(
-            icon.id(),
-            rounded_rect,
-            Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
-            Color32::WHITE,
-        );
-
-        let text_pos = pos2(rounded_rect.right() + 6.0, rect.center().y);
+        let text_pos = pos2(icon_rect.right() + 6.0, rect.center().y);
 
         ui.painter().text(
             text_pos,

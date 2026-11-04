@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use egui::Id;
 use egui_winit::winit::event::StartCause;
 use egui_winit::winit::event_loop::ControlFlow;
 use egui_winit::winit::{
@@ -199,6 +200,9 @@ impl ApplicationHandler for BlazeEventLoop {
                 blazeapp.raw_input_hook(&self.egui_context, &mut raw_input);
 
                 let full_output = self.egui_context.run_ui(raw_input, |ctx| {
+                    ctx.data_mut(|d| {
+                        d.insert_temp(Id::new("icon_cache"), blazeapp.ui_state.icon_cache.clone())
+                    });
                     blazeapp.ui(ctx);
                 });
 

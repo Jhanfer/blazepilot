@@ -170,7 +170,8 @@ impl From<LegacyTheme> for BlazeAppTheme {
                 icon_primary: old.components.sidebar_item.icon_idle.into(),
                 icon_secondary: old.semantic.text_muted.into(),
                 accent: old.semantic.accent.clone().into(),
-                border: old.components.panel.border.clone().into(),
+                panel_border: old.components.panel.border.clone().into(),
+                component_border: old.components.panel.border.clone().into(),
             },
 
             top_bar: SectionTheme {
@@ -181,7 +182,8 @@ impl From<LegacyTheme> for BlazeAppTheme {
                 icon_primary: old.semantic.text_primary.clone().into(),
                 icon_secondary: old.components.button.label_inactive.into(),
                 accent: old.semantic.accent.clone().into(),
-                border: old.components.panel.border.clone().into(),
+                panel_border: old.components.panel.border.clone().into(),
+                component_border: old.components.panel.border.clone().into(),
             },
 
             main_area: SectionTheme {
@@ -192,7 +194,8 @@ impl From<LegacyTheme> for BlazeAppTheme {
                 icon_primary: old.semantic.text_primary.clone().into(),
                 icon_secondary: old.semantic.text_secondary.clone().into(),
                 accent: old.semantic.accent.clone().into(),
-                border: old.semantic.separator.clone().into(),
+                panel_border: old.components.panel.border.clone().into(),
+                component_border: old.components.panel.border.clone().into(),
             },
 
             sidebar_right: SectionTheme {
@@ -203,7 +206,8 @@ impl From<LegacyTheme> for BlazeAppTheme {
                 icon_primary: old.semantic.text_primary.clone().into(),
                 icon_secondary: old.components.tools.label_inactive.into(),
                 accent: old.semantic.accent.clone().into(),
-                border: old.components.panel.border.into(),
+                panel_border: old.components.panel.border.clone().into(),
+                component_border: old.components.panel.border.clone().into(),
             },
 
             context_menu: SectionTheme {
@@ -214,7 +218,8 @@ impl From<LegacyTheme> for BlazeAppTheme {
                 icon_primary: old.semantic.text_primary.into(),
                 icon_secondary: old.semantic.text_secondary.into(),
                 accent: old.semantic.accent.into(),
-                border: old.semantic.separator.into(),
+                panel_border: old.components.panel.border.clone().into(),
+                component_border: old.components.panel.border.clone().into(),
             },
         }
     }
@@ -380,7 +385,8 @@ pub struct SectionTheme {
     pub icon_primary: Box<str>,
     pub icon_secondary: Box<str>,
     pub accent: Box<str>,
-    pub border: Box<str>,
+    pub panel_border: Box<str>,
+    pub component_border: Box<str>,
 }
 
 impl SectionTheme {
@@ -421,6 +427,7 @@ impl SectionTheme {
     }
 
     /// Color secundario para el icono
+    #[allow(unused)]
     pub fn icon_secondary(&self) -> Color32 {
         as_color_unwrap(self.icon_secondary.as_color())
     }
@@ -451,8 +458,13 @@ impl SectionTheme {
     }
 
     /// Color de los bordes del panel o separadores
-    pub fn border(&self) -> Color32 {
-        as_color_unwrap(self.border.as_color())
+    pub fn panel_border(&self) -> Color32 {
+        as_color_unwrap(self.panel_border.as_color())
+    }
+
+    /// Color de los bordes de componente
+    pub fn component_border(&self) -> Color32 {
+        as_color_unwrap(self.component_border.as_color())
     }
 }
 

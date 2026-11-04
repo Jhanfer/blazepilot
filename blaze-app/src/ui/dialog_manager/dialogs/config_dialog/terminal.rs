@@ -5,7 +5,6 @@ use crate::core::system::{
 };
 use crate::ui::custom_components::UiExt;
 use crate::ui::dialog_manager::dialogs::config_dialog::configs_dialog::ConfigDialog;
-use crate::ui::icons_cache::icon_cache::IconCache;
 use crate::ui::themes::theme_manager::with_theme;
 use egui::{Color32, Label, RichText, Ui};
 use std::time::Duration;
@@ -33,12 +32,7 @@ fn reset_terminal_loading_state(c_dialog: &mut ConfigDialog) {
     c_dialog.terminal_rx = None;
 }
 
-pub(crate) fn render_terminal_settings(
-    c_dialog: &mut ConfigDialog,
-    ui: &mut Ui,
-    _query: &str,
-    icon_cache: &mut IconCache,
-) {
+pub(crate) fn render_terminal_settings(c_dialog: &mut ConfigDialog, ui: &mut Ui, _query: &str) {
     let current_theme = with_theme(|t| t.current());
     let i18n = with_configs(|c| c.get_i18n());
 
@@ -181,7 +175,7 @@ pub(crate) fn render_terminal_settings(
         ui.label_ns(i18n.t("configs_terminal.combo_box_label"));
 
         ui.horizontal(|ui| {
-            ui.blaze_combobox(Some(icon_cache))
+            ui.blaze_combobox()
                 .selected_text(get_selected_terminal_text(
                     &i18n.t("configs_terminal.selection"),
                 ))
@@ -189,7 +183,7 @@ pub(crate) fn render_terminal_settings(
                 .size((150.0, 30.0))
                 .background_color(current_theme.sidebar_left.bg_elevated())
                 .hover_background_color(current_theme.sidebar_left.bg_hover())
-                .show(ui, |ui| {
+                .show(|ui| {
                     let w = ui.available_width();
                     for (i, term) in c_dialog.available_terminals.iter().enumerate() {
                         let is_selected = is_terminal_selected(term);
@@ -208,7 +202,7 @@ pub(crate) fn render_terminal_settings(
                         };
 
                         if ui
-                            .blaze_button(label, None)
+                            .blaze_button(label)
                             .id(format!("terminal{i}"))
                             .size((w, 20.0))
                             .background_color(bg)
@@ -216,7 +210,7 @@ pub(crate) fn render_terminal_settings(
                             .stroke_color(Color32::TRANSPARENT)
                             .radius(20)
                             .stroke_width(current_theme.global.components_stroke_width)
-                            .show(ui)
+                            .show()
                             .clicked()
                         {
                             with_configs(|c| {

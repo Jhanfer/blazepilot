@@ -14,6 +14,7 @@ use crate::{
     },
     ui::{
         blaze_ui_state::BlazeUiState,
+        custom_components::UiExt,
         icons_cache::icons,
         modules::{
             custom_context_menu::context_state::ContextMenuKind,
@@ -25,8 +26,8 @@ use crate::{
     },
 };
 use egui::{
-    Align, Area, Color32, CornerRadius, Frame, Id, Label, Layout, Margin, Panel, Rect, RichText,
-    ScrollArea, Sense, Stroke, Ui, pos2, scroll_area::ScrollBarVisibility, vec2,
+    Align, Area, CornerRadius, Frame, Id, Label, Layout, Margin, Panel, Rect, RichText, ScrollArea,
+    Sense, Stroke, Ui, Vec2, pos2, scroll_area::ScrollBarVisibility, vec2,
 };
 
 use crate::ui::modules::sidebar_left_component::leftbar_state::{
@@ -66,31 +67,11 @@ fn render_expanded_panel(
                         let (blaze_icon, bytes) = ("blaze-logo", icons::LOGO_BLAZEPILOT);
 
                         let icon_size = vec2(25.0, 25.0);
-                        let (icon_rect, resp) = ui.allocate_exact_size(icon_size, Sense::click());
-                        let rounded_rect = Rect::from_min_max(
-                            pos2(icon_rect.min.x.round(), icon_rect.min.y.round()),
-                            pos2(icon_rect.max.x.round(), icon_rect.max.y.round()),
-                        );
 
-                        let color = if resp.hovered() {
-                            current_theme.sidebar_left.color_hover_on_color(
-                                current_theme.global.text_primary(),
-                                current_theme.global.bg_main(),
-                            )
-                        } else {
-                            current_theme.global.text_primary()
-                        };
-
-                        let icon = ui_state
-                            .icon_cache
-                            .get_or_load(ui, blaze_icon, bytes, color, icon_size);
-
-                        ui.painter().image(
-                            icon.id(),
-                            rounded_rect,
-                            Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
-                            Color32::WHITE,
-                        );
+                        ui.draw_icon((blaze_icon, bytes))
+                            .size(icon_size)
+                            .tint(current_theme.sidebar_left.accent())
+                            .show();
 
                         ui.add(
                             Label::new(
@@ -109,8 +90,8 @@ fn render_expanded_panel(
                 .fill(current_theme.sidebar_left.bg_panel())
                 .corner_radius(CornerRadius::same(20))
                 .stroke(Stroke {
-                    width: 0.5,
-                    color: current_theme.sidebar_left.border(),
+                    width: current_theme.global.panel_stroke_width,
+                    color: current_theme.sidebar_left.panel_border(),
                 })
                 .show(ui, |ui| {
                     ui.set_height(ui.available_height());
@@ -118,12 +99,7 @@ fn render_expanded_panel(
                     ScrollArea::vertical()
                         .scroll_bar_visibility(ScrollBarVisibility::AlwaysHidden)
                         .show(ui, |ui| {
-                            render_header_text(
-                                "locals",
-                                &i18n.t("left_sidebar.locals"),
-                                ui,
-                                ui_state,
-                            );
+                            render_header_text(&i18n.t("left_sidebar.locals"), ui);
 
                             ui.add_space(10.0);
 
@@ -140,15 +116,7 @@ fn render_expanded_panel(
 
                             for (key, label, path) in dirs {
                                 if path.exists() {
-                                    render_local_buttons(
-                                        key,
-                                        &label,
-                                        path.to_owned(),
-                                        state,
-                                        ui,
-                                        ui_state,
-                                    );
-                                    ui.add_space(2.0);
+                                    render_local_buttons(key, &label, path.to_owned(), state, ui);
                                 }
                             }
 
@@ -156,12 +124,7 @@ fn render_expanded_panel(
                             ui.separator();
 
                             ui.add_space(10.0);
-                            render_header_text(
-                                "disks",
-                                &i18n.t("left_sidebar.disks"),
-                                ui,
-                                ui_state,
-                            );
+                            render_header_text(&i18n.t("left_sidebar.disks"), ui);
                             ui.add_space(10.0);
 
                             let manager = state.motor.borrow_mut().disk_manager.clone();
@@ -189,7 +152,7 @@ fn render_expanded_panel(
         })
         .response;
 
-    let new_width = left_response.rect.width();
+    let new_width = left_response.rect.width() - 3.0 * current_theme.global.panel_stroke_width;
 
     if new_width < MIN_PANEL_WIDTH_TOLERANCE
         && current_order.leftpanel_state.width >= MIN_PANEL_WIDTH_TOLERANCE
@@ -208,11 +171,7 @@ fn render_expanded_panel(
     }
 }
 
-fn render_collapsed_tab(
-    ui: &mut Ui,
-    ui_state: &mut BlazeUiState,
-    current_theme: Arc<BlazeAppTheme>,
-) {
+fn render_collapsed_tab(ui: &mut Ui, current_theme: Arc<BlazeAppTheme>) {
     let area_id = Id::new("left_tab");
     let hover_state_id = Id::new("left_tab_hover_state");
 
@@ -232,7 +191,7 @@ fn render_collapsed_tab(
                 .fixed_pos(visual_pos)
                 .sense(Sense::all())
                 .show(ui, |ui| {
-                    let area_rect = ui.max_rect();
+                    //let area_rect = ui.max_rect();
                     let frame_width = if is_hovered { 20.0 } else { 5.0 };
 
                     Frame::NONE
@@ -240,40 +199,25 @@ fn render_collapsed_tab(
                         .fill(current_theme.sidebar_left.bg_panel())
                         .stroke(Stroke::new(
                             current_theme.global.panel_stroke_width,
-                            current_theme.sidebar_left.border(),
+                            current_theme.sidebar_left.panel_border(),
                         ))
                         .corner_radius(CornerRadius::same(20))
                         .show(ui, |ui| {
                             ui.set_width(frame_width);
                             ui.set_height(area_height / 2.0);
 
-                            let area_center = area_rect.center();
-
                             let icon_size = 18.0;
 
-                            let t_icon_rect =
-                                Rect::from_center_size(area_center, vec2(icon_size, icon_size));
+                            // revisar esto más tarde
+                            // let area_center = area_rect.center();
+                            // let t_icon_rect =
+                            //     Rect::from_center_size(area_center, vec2(icon_size, icon_size));
                             let (icon_n, icon_b) = ("left_sidebar", icons::ICON_SIDEBAR_LEFT);
 
-                            let icon = ui_state.icon_cache.get_or_load(
-                                ui,
-                                icon_n,
-                                icon_b,
-                                Color32::GRAY,
-                                vec2(icon_size, icon_size),
-                            );
-
-                            let rounded_rect = Rect::from_min_max(
-                                pos2(t_icon_rect.min.x.round(), t_icon_rect.min.y.round()),
-                                pos2(t_icon_rect.max.x.round(), t_icon_rect.max.y.round()),
-                            );
-
-                            ui.painter().image(
-                                icon.id(),
-                                rounded_rect,
-                                Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
-                                Color32::WHITE,
-                            );
+                            ui.draw_icon((icon_n, icon_b))
+                                .size(Vec2::splat(icon_size))
+                                .tint(current_theme.global.text_secondary())
+                                .show();
                         });
                 })
                 .response;
@@ -306,7 +250,7 @@ pub fn sidebar_left_component(
     let current_order = with_configs(|c| c.get_ordering_mode());
 
     if current_order.leftpanel_state.collapsed {
-        render_collapsed_tab(ui, ui_state, current_theme);
+        render_collapsed_tab(ui, current_theme);
     } else {
         render_expanded_panel(ui, state, ui_state, current_order);
     }

@@ -168,12 +168,7 @@ impl ContextMenuState {
             let mut search = state.current_search_filter().to_string();
 
             let response = ui
-                .blaze_input(
-                    &i18n.t("search.placeholder"),
-                    None,
-                    &mut search,
-                    Some(&mut ui_state.icon_cache),
-                )
+                .blaze_input(&i18n.t("search.placeholder"), None, &mut search)
                 .id(search_id)
                 .hint_background_color(c)
                 .hint_stroke_color(hint_stroke_color)
@@ -187,7 +182,7 @@ impl ContextMenuState {
                 .icon(icon_name, icon_bytes)
                 .icon_color(search_color)
                 .stroke_width(current_theme.global.components_stroke_width)
-                .show(ui, || {
+                .show(|| {
                     state.clean_search();
                 });
 

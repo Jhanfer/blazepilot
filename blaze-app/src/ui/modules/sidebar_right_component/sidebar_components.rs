@@ -3,7 +3,7 @@ use crate::core::bootstrap::configs::platform::linux::conf_structs::{
 };
 use crate::ui::blaze_ui_state::BlazeUiState;
 use crate::ui::themes::theme_manager::with_theme;
-use egui::{Color32, CursorIcon, Rect, Sense, Ui, pos2, vec2};
+use egui::{CursorIcon, Rect, Sense, Ui, pos2, vec2};
 
 pub fn render_ordering_btn<F>(
     ui: &mut Ui,
@@ -50,14 +50,17 @@ pub fn render_ordering_btn<F>(
         pos2(icon_rect.min.x.round(), icon_rect.min.y.round()),
         pos2(icon_rect.max.x.round(), icon_rect.max.y.round()),
     );
+
+    //revisar esto más tarde
     let icon = ui_state
         .icon_cache
-        .get_or_load(ui, &icon_name, icon_bytes, color, icon_size);
+        .lock()
+        .get_or_load(ui, &icon_name, icon_bytes, icon_size);
 
     ui.painter().image(
         icon.id(),
         rounded_rect,
         Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
-        Color32::WHITE,
+        color,
     );
 }

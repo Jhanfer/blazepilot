@@ -20,7 +20,6 @@ use crate::ui::dialog_manager::dialogs::config_dialog::general::render_general_s
 use crate::ui::dialog_manager::dialogs::config_dialog::language::render_language_settings;
 use crate::ui::dialog_manager::dialogs::config_dialog::terminal::render_terminal_settings;
 use crate::ui::dialog_manager::manager::ModalDialog;
-use crate::ui::icons_cache::icon_cache::IconCache;
 use crate::ui::themes::theme_manager::with_theme;
 use egui::{
     Align2, CentralPanel, Color32, CornerRadius, Frame, Id, Key, Margin, Order, Panel, RichText,
@@ -162,8 +161,8 @@ impl ModalDialog for ConfigDialog {
     fn close(&mut self) {
         self.close()
     }
-    fn render(&mut self, ui: &mut Ui, icon_cache: &mut IconCache) -> bool {
-        self.render_dialog(ui, icon_cache)
+    fn render(&mut self, ui: &mut Ui) -> bool {
+        self.render_dialog(ui)
     }
 }
 
@@ -193,7 +192,7 @@ impl ConfigDialog {
         self.show_modal = true;
     }
 
-    fn render_config_sidebar(&mut self, ui: &mut Ui, icon_cache: &mut IconCache) {
+    fn render_config_sidebar(&mut self, ui: &mut Ui) {
         let current_theme = with_theme(|t| t.current());
         ui.add_space(10.0);
 
@@ -202,7 +201,7 @@ impl ConfigDialog {
         let w = ui.available_width();
 
         let resp = ui
-            .blaze_input("Buscar...", None, &mut self.config_search, Some(icon_cache))
+            .blaze_input("Buscar...", None, &mut self.config_search)
             .id(search_id)
             .size((w, 30.0))
             .radius(20)
@@ -210,7 +209,7 @@ impl ConfigDialog {
             .background_color(current_theme.sidebar_left.bg_elevated())
             .stroke_color(Color32::TRANSPARENT)
             .x_color(current_theme.sidebar_left.accent())
-            .show(ui, || {});
+            .show(|| {});
 
         if resp.clicked() || resp.gained_focus() {
             ui.memory_mut(|mem| {
@@ -257,14 +256,14 @@ impl ConfigDialog {
             };
 
             if ui
-                .blaze_button(label, Some(icon_cache))
+                .blaze_button(label)
                 .size((w, 20.0))
                 .background_color(bg)
                 .hover_background_color(hover_bg)
                 .stroke_color(Color32::TRANSPARENT)
                 .radius(20)
                 .stroke_width(current_theme.global.components_stroke_width)
-                .show(ui)
+                .show()
                 .clicked()
             {
                 self.current_config_tab = *tab;
@@ -283,7 +282,7 @@ impl ConfigDialog {
         }
     }
 
-    pub fn render_dialog(&mut self, ui: &mut Ui, icon_cache: &mut IconCache) -> bool {
+    pub fn render_dialog(&mut self, ui: &mut Ui) -> bool {
         let current_theme = with_theme(|t| t.current());
         let i18n = with_configs(|c| c.get_i18n());
 
@@ -298,7 +297,7 @@ impl ConfigDialog {
             .fill(current_theme.sidebar_left.bg_panel())
             .stroke(Stroke::new(
                 current_theme.global.panel_stroke_width,
-                current_theme.sidebar_left.border(),
+                current_theme.sidebar_left.panel_border(),
             ))
             .corner_radius(CornerRadius::same(15))
             .inner_margin(Margin::same(5));
@@ -333,7 +332,7 @@ impl ConfigDialog {
                     .exact_size(160.0)
                     .resizable(false)
                     .show(ui, |ui| {
-                        self.render_config_sidebar(ui, icon_cache);
+                        self.render_config_sidebar(ui);
                     });
 
                 CentralPanel::default().show(ui, |ui| {
@@ -341,19 +340,13 @@ impl ConfigDialog {
 
                     match self.current_config_tab {
                         CurrentConfigTab::General => render_general_settings(ui, &query),
-                        CurrentConfigTab::Terminal => {
-                            render_terminal_settings(self, ui, &query, icon_cache)
-                        }
-                        CurrentConfigTab::Backend => {
-                            render_backend_settings(ui, &query, icon_cache)
-                        }
+                        CurrentConfigTab::Terminal => render_terminal_settings(self, ui, &query),
+                        CurrentConfigTab::Backend => render_backend_settings(ui, &query),
                         CurrentConfigTab::Appearance => {
-                            render_appearance_settings(self, ui, &query, icon_cache)
+                            render_appearance_settings(self, ui, &query)
                         }
                         CurrentConfigTab::Behavior => {}
-                        CurrentConfigTab::Language => {
-                            render_language_settings(ui, &query, icon_cache)
-                        }
+                        CurrentConfigTab::Language => render_language_settings(ui, &query),
                     }
                 });
             });

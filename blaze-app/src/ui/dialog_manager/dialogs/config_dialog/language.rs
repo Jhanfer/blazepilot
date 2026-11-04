@@ -1,9 +1,8 @@
-use crate::ui::icons_cache::icon_cache::IconCache;
 use crate::ui::themes::theme_manager::with_theme;
 use crate::{core::bootstrap::configs::config_manager::with_configs, ui::custom_components::UiExt};
 use egui::{Color32, Label, RichText, Ui};
 
-pub(crate) fn render_language_settings(ui: &mut Ui, _query: &str, icon_cache: &mut IconCache) {
+pub(crate) fn render_language_settings(ui: &mut Ui, _query: &str) {
     let current_theme = with_theme(|t| t.current());
     let i18n = with_configs(|c| c.get_i18n());
 
@@ -29,13 +28,13 @@ pub(crate) fn render_language_settings(ui: &mut Ui, _query: &str, icon_cache: &m
         ui.label_ns(i18n.t("configs_language.selection"));
 
         ui.horizontal(|ui| {
-            ui.blaze_combobox(Some(icon_cache))
+            ui.blaze_combobox()
                 .selected_text(&current)
                 .text_color(current_theme.global.text_primary())
                 .size((150.0, 30.0))
                 .background_color(current_theme.sidebar_left.bg_elevated())
                 .hover_background_color(current_theme.sidebar_left.bg_hover())
-                .show(ui, |ui| {
+                .show(|ui| {
                     let w = ui.available_width();
 
                     for (i, lang) in languages.iter().enumerate() {
@@ -56,7 +55,7 @@ pub(crate) fn render_language_settings(ui: &mut Ui, _query: &str, icon_cache: &m
                         };
 
                         if ui
-                            .blaze_button(label, None)
+                            .blaze_button(label)
                             .id(format!("lang_{i}"))
                             .size((w, 20.0))
                             .background_color(bg)
@@ -64,7 +63,7 @@ pub(crate) fn render_language_settings(ui: &mut Ui, _query: &str, icon_cache: &m
                             .stroke_color(Color32::TRANSPARENT)
                             .radius(20)
                             .stroke_width(current_theme.global.components_stroke_width)
-                            .show(ui)
+                            .show()
                             .clicked()
                         {
                             with_configs(|c| {

@@ -105,7 +105,8 @@ impl BlazeAppTheme {
                 icon_primary: "#BA6EFF".into(),
                 icon_secondary: "#9482A3".into(),
                 accent: "#8C4BF7".into(),
-                border: "#BA6EFF".into(),
+                panel_border: "#BA6EFF".into(),
+                component_border: "#BA6EFF".into(),
             },
             top_bar: SectionTheme {
                 bg_panel: "#251731".into(),
@@ -115,7 +116,8 @@ impl BlazeAppTheme {
                 icon_primary: "#FFFFFF".into(),
                 icon_secondary: "#858585".into(),
                 accent: "#8C4BF7".into(),
-                border: "#BA6EFF".into(),
+                panel_border: "#BA6EFF".into(),
+                component_border: "#BA6EFF".into(),
             },
             main_area: SectionTheme {
                 bg_panel: "#0D0614".into(),
@@ -125,7 +127,8 @@ impl BlazeAppTheme {
                 icon_primary: "#FFFFFF".into(),
                 icon_secondary: "#E2D5ED".into(),
                 accent: "#8C4BF7".into(),
-                border: "#574069".into(),
+                panel_border: "#574069".into(),
+                component_border: "".into(),
             },
             sidebar_right: SectionTheme {
                 bg_panel: "#2C1E38".into(),
@@ -135,7 +138,8 @@ impl BlazeAppTheme {
                 icon_primary: "#FFFFFF".into(),
                 icon_secondary: "#9482A3".into(),
                 accent: "#8C4BF7".into(),
-                border: "#BA6EFF".into(),
+                panel_border: "#BA6EFF".into(),
+                component_border: "#BA6EFF".into(),
             },
             context_menu: SectionTheme {
                 bg_panel: "#0D0614".into(),
@@ -145,7 +149,8 @@ impl BlazeAppTheme {
                 icon_primary: "#FFFFFF".into(),
                 icon_secondary: "#E2D5ED".into(),
                 accent: "#8C4BF7".into(),
-                border: "#574069".into(),
+                panel_border: "#574069".into(),
+                component_border: "#BA6EFF".into(),
             },
         }
     }
@@ -178,7 +183,8 @@ impl BlazeAppTheme {
                 icon_primary: "#E84A6C".into(),
                 icon_secondary: "#8C6C74".into(),
                 accent: "#E84A6C".into(),
-                border: "#FFD1DC".into(),
+                panel_border: "#FFD1DC".into(),
+                component_border: "#FFD1DC".into(),
             },
             top_bar: SectionTheme {
                 bg_panel: "#FFE3E9".into(),
@@ -188,7 +194,8 @@ impl BlazeAppTheme {
                 icon_primary: "#291218".into(),
                 icon_secondary: "#A3858D".into(),
                 accent: "#E84A6C".into(),
-                border: "#FFD1DC".into(),
+                panel_border: "#FFD1DC".into(),
+                component_border: "#FFD1DC".into(),
             },
             main_area: SectionTheme {
                 bg_panel: "#FFF5F7".into(),
@@ -198,7 +205,8 @@ impl BlazeAppTheme {
                 icon_primary: "#291218".into(),
                 icon_secondary: "#5E3B44".into(),
                 accent: "#E84A6C".into(),
-                border: "#FFD1DC".into(),
+                panel_border: "#FFD1DC".into(),
+                component_border: "#FFD1DC".into(),
             },
             sidebar_right: SectionTheme {
                 bg_panel: "#FFFFFF".into(),
@@ -208,7 +216,8 @@ impl BlazeAppTheme {
                 icon_primary: "#291218".into(),
                 icon_secondary: "#8C6C74".into(),
                 accent: "#E84A6C".into(),
-                border: "#FFD1DC".into(),
+                panel_border: "#FFD1DC".into(),
+                component_border: "#FFD1DC".into(),
             },
             context_menu: SectionTheme {
                 bg_panel: "#FFF5F7".into(),
@@ -218,7 +227,8 @@ impl BlazeAppTheme {
                 icon_primary: "#291218".into(),
                 icon_secondary: "#5E3B44".into(),
                 accent: "#E84A6C".into(),
-                border: "#FFD1DC".into(),
+                panel_border: "#FFD1DC".into(),
+                component_border: "#FFD1DC".into(),
             },
         }
     }
@@ -251,7 +261,8 @@ impl BlazeAppTheme {
                 icon_primary: "#007ACC".into(),
                 icon_secondary: "#808080".into(),
                 accent: "#007ACC".into(),
-                border: "#3C3C3C".into(),
+                panel_border: "#3C3C3C".into(),
+                component_border: "#3C3C3C".into(),
             },
             top_bar: SectionTheme {
                 bg_panel: "#2D2D2D".into(),
@@ -261,7 +272,8 @@ impl BlazeAppTheme {
                 icon_primary: "#D4D4D4".into(),
                 icon_secondary: "#808080".into(),
                 accent: "#007ACC".into(),
-                border: "#3C3C3C".into(),
+                panel_border: "#3C3C3C".into(),
+                component_border: "#3C3C3C".into(),
             },
             main_area: SectionTheme {
                 bg_panel: "#1E1E1E".into(),
@@ -271,7 +283,8 @@ impl BlazeAppTheme {
                 icon_primary: "#D4D4D4".into(),
                 icon_secondary: "#A6A6A6".into(),
                 accent: "#007ACC".into(),
-                border: "#454545".into(),
+                panel_border: "#454545".into(),
+                component_border: "#3C3C3C".into(),
             },
             sidebar_right: SectionTheme {
                 bg_panel: "#252526".into(),
@@ -281,7 +294,8 @@ impl BlazeAppTheme {
                 icon_primary: "#D4D4D4".into(),
                 icon_secondary: "#808080".into(),
                 accent: "#007ACC".into(),
-                border: "#3C3C3C".into(),
+                panel_border: "#3C3C3C".into(),
+                component_border: "#3C3C3C".into(),
             },
             context_menu: SectionTheme {
                 bg_panel: "#1E1E1E".into(),
@@ -291,7 +305,8 @@ impl BlazeAppTheme {
                 icon_primary: "#D4D4D4".into(),
                 icon_secondary: "#A6A6A6".into(),
                 accent: "#007ACC".into(),
-                border: "#454545".into(),
+                panel_border: "#454545".into(),
+                component_border: "#3C3C3C".into(),
             },
         }
     }
@@ -324,7 +339,8 @@ impl BlazeAppTheme {
                 icon_primary: "#007ACC".into(),
                 icon_secondary: "#767676".into(),
                 accent: "#007ACC".into(),
-                border: "#E4E4E4".into(),
+                panel_border: "#E4E4E4".into(),
+                component_border: "#E4E4E4".into(),
             },
             top_bar: SectionTheme {
                 bg_panel: "#FFFFFF".into(),
@@ -334,7 +350,8 @@ impl BlazeAppTheme {
                 icon_primary: "#333333".into(),
                 icon_secondary: "#767676".into(),
                 accent: "#007ACC".into(),
-                border: "#E4E4E4".into(),
+                panel_border: "#E4E4E4".into(),
+                component_border: "#E4E4E4".into(),
             },
             main_area: SectionTheme {
                 bg_panel: "#F3F3F3".into(),
@@ -344,7 +361,8 @@ impl BlazeAppTheme {
                 icon_primary: "#333333".into(),
                 icon_secondary: "#616161".into(),
                 accent: "#007ACC".into(),
-                border: "#E4E4E4".into(),
+                panel_border: "#E4E4E4".into(),
+                component_border: "#E4E4E4".into(),
             },
             sidebar_right: SectionTheme {
                 bg_panel: "#FFFFFF".into(),
@@ -354,7 +372,8 @@ impl BlazeAppTheme {
                 icon_primary: "#333333".into(),
                 icon_secondary: "#767676".into(),
                 accent: "#007ACC".into(),
-                border: "#E4E4E4".into(),
+                panel_border: "#E4E4E4".into(),
+                component_border: "#E4E4E4".into(),
             },
             context_menu: SectionTheme {
                 bg_panel: "#F3F3F3".into(),
@@ -364,7 +383,8 @@ impl BlazeAppTheme {
                 icon_primary: "#333333".into(),
                 icon_secondary: "#616161".into(),
                 accent: "#007ACC".into(),
-                border: "#E4E4E4".into(),
+                panel_border: "#E4E4E4".into(),
+                component_border: "#E4E4E4".into(),
             },
         }
     }

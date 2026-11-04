@@ -13,10 +13,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::sync::Arc;
+
 use egui::{
     Align, Color32, CornerRadius, Id, Key, LayerId, Layout, Order, Rect, Response, ScrollArea,
     Sense, Shape, TextWrapMode, Ui, UiBuilder, Vec2, WidgetText, emath, lerp, pos2, vec2,
 };
+use parking_lot::Mutex;
 
 use crate::ui::{
     custom_components::UiExt,
@@ -27,20 +30,22 @@ use crate::ui::{
 /// soporte de iconos de estado
 pub(crate) struct BlazeComboBox<'a> {
     id: Id,
+    ui: &'a mut Ui,
     selected_text: WidgetText,
     width: f32,
     height: f32,
     text_color: Color32,
     background_color: Color32,
     hover_background_color: Option<Color32>,
-    icon_cache: Option<&'a mut IconCache>,
+    icon_cache: Option<Arc<Mutex<IconCache>>>,
 }
 
 impl<'a> BlazeComboBox<'a> {
     /// Crea una instancia de [`BlazeComboBox`] con valores por defecto
-    pub(crate) fn new(ui: &mut Ui, icon_cache: Option<&'a mut IconCache>) -> Self {
+    pub(crate) fn new(ui: &'a mut Ui, icon_cache: Option<Arc<Mutex<IconCache>>>) -> Self {
         Self {
             id: ui.id().with("combo_box"),
+            ui,
             selected_text: Default::default(),
             width: 80.0,
             height: 20.0,
@@ -97,15 +102,19 @@ impl<'a> BlazeComboBox<'a> {
     ///
     /// # Retorno
     /// Devuelve un [`Response`] correspondiente al botón de activación principal
-    pub fn show<R>(&mut self, ui: &mut Ui, menu_contents: impl FnOnce(&mut Ui) -> R) -> Response {
+    pub fn show<R>(&mut self, menu_contents: impl FnOnce(&mut Ui) -> R) -> Response {
         // recupera el estado de apertura previo almacenado en la memoria temporal
-        let mut open = ui.data(|data| data.get_temp::<bool>(self.id).unwrap_or(false));
+        let mut open = self
+            .ui
+            .data(|data| data.get_temp::<bool>(self.id).unwrap_or(false));
 
-        let previous_rect = ui.data(|data| data.get_temp::<Rect>(self.id.with("button_rect")));
+        let previous_rect = self
+            .ui
+            .data(|data| data.get_temp::<Rect>(self.id.with("button_rect")));
 
         // alterna el estado de apertura si se detecta un click primario dentro del rectángulo
         if let Some(rect) = previous_rect {
-            let clicked = ui.input(|i| {
+            let clicked = self.ui.input(|i| {
                 i.pointer.button_clicked(egui::PointerButton::Primary)
                     && i.pointer.interact_pos().is_some_and(|p| rect.contains(p))
             });
@@ -116,7 +125,9 @@ impl<'a> BlazeComboBox<'a> {
         }
 
         // animación de trasición de estado
-        let linear_t = ui.animate_bool_with_time(self.id.with("open_anim"), open, 0.15);
+        let linear_t = self
+            .ui
+            .animate_bool_with_time(self.id.with("open_anim"), open, 0.15);
 
         let hover = self.hover_background_color.unwrap_or(self.background_color);
 
@@ -124,8 +135,9 @@ impl<'a> BlazeComboBox<'a> {
         let radius_t = emath::easing::cubic_out((linear_t / 0.35).min(1.0));
         let radius = (20.0 * (1.0 - radius_t)).round() as u8;
 
-        let resp = ui
-            .blaze_button(self.selected_text.clone(), None)
+        let resp = self
+            .ui
+            .blaze_button(self.selected_text.clone())
             .text_color(self.text_color)
             .background_color(self.background_color)
             .hover_background_color(hover)
@@ -137,12 +149,12 @@ impl<'a> BlazeComboBox<'a> {
                 sw: radius,
                 se: radius,
             })
-            .show(ui);
+            .show();
 
         let rect = resp.rect;
 
         // dibuja y anima la rotación del indicador tipo chevron
-        if let Some(icon_cache) = self.icon_cache.as_deref_mut() {
+        if let Some(icon_cache) = &mut self.icon_cache {
             let icon_size = 16.0;
 
             let center = pos2(rect.max.x - icon_size / 2.0 - 10.0, rect.center().y);
@@ -155,11 +167,10 @@ impl<'a> BlazeComboBox<'a> {
                 pos2(icon_rect.max.x.round(), icon_rect.max.y.round()),
             );
 
-            let icon = icon_cache.get_or_load(
-                ui,
+            let icon = icon_cache.lock().get_or_load(
+                self.ui,
                 "chevron-up",
                 icons::ICON_CHEVRON_UP,
-                Color32::WHITE,
                 Vec2::splat(icon_size),
             );
 
@@ -181,7 +192,8 @@ impl<'a> BlazeComboBox<'a> {
                 Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0))
             };
 
-            ui.painter()
+            self.ui
+                .painter()
                 .image(icon.id(), animated_rect, uv, Color32::WHITE);
         }
 
@@ -189,14 +201,14 @@ impl<'a> BlazeComboBox<'a> {
         let slide = (1.0 - emath::easing::cubic_out(linear_t)) * 6.0;
         let pos = pos2(rect.min.x, rect.max.y - slide);
 
-        let screen = ui.content_rect();
+        let screen = self.ui.content_rect();
 
         let available_height = screen.max.y - rect.min.y;
         let max_dropdown_height = 200.0_f32.min(available_height);
         let animated_height = lerp(0.0..=max_dropdown_height, radius_t);
 
         let fill = self.background_color.linear_multiply(radius_t);
-        let mut scroll_offset = ui.data(|data| {
+        let mut scroll_offset = self.ui.data(|data| {
             data.get_temp::<f32>(self.id.with("scroll_y"))
                 .unwrap_or(0.0)
         });
@@ -208,7 +220,7 @@ impl<'a> BlazeComboBox<'a> {
             let dropdown_rect = Rect::from_min_size(pos, vec2(rect.width(), animated_height));
 
             // captura el desplazamiento vertical del puntero cuando está sobre el menú desplegable
-            let delta = ui.input_mut(|i| {
+            let delta = self.ui.input_mut(|i| {
                 let over = i
                     .pointer
                     .latest_pos()
@@ -224,7 +236,7 @@ impl<'a> BlazeComboBox<'a> {
 
             scroll_offset = (scroll_offset - delta).max(0.0);
 
-            let painter = ui.layer_painter(layer);
+            let painter = self.ui.layer_painter(layer);
 
             let content_rect = Rect::from_min_max(
                 dropdown_rect.min + vec2(8.0, 0.0),
@@ -234,9 +246,9 @@ impl<'a> BlazeComboBox<'a> {
                 ),
             );
 
-            ui.move_to_top(layer);
+            self.ui.move_to_top(layer);
 
-            let mut dd_ui = ui.new_child(
+            let mut dd_ui = self.ui.new_child(
                 UiBuilder::new()
                     .layer_id(layer)
                     .max_rect(content_rect)
@@ -289,7 +301,7 @@ impl<'a> BlazeComboBox<'a> {
             scroll_offset = scroll_offset.min(max);
 
             // cierra el menú desplegable si se presiona "Esc" o se hace clck fuera
-            let clicked_outside = ui.input(|i| {
+            let clicked_outside = self.ui.input(|i| {
                 let any = i.pointer.primary_clicked() || i.pointer.secondary_clicked();
                 any && i
                     .pointer
@@ -298,13 +310,13 @@ impl<'a> BlazeComboBox<'a> {
                     .unwrap_or(true)
             });
 
-            if open && (clicked_outside || ui.input(|i| i.key_pressed(Key::Escape))) {
+            if open && (clicked_outside || self.ui.input(|i| i.key_pressed(Key::Escape))) {
                 open = false;
             }
         }
 
         // guarda el estado del componente para el próximo frame
-        ui.data_mut(|data| {
+        self.ui.data_mut(|data| {
             data.insert_temp(self.id.with("button_rect"), resp.rect);
             data.insert_temp(self.id, open);
             data.insert_temp(self.id.with("scroll_y"), scroll_offset);

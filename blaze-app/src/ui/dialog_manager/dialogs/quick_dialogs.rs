@@ -22,7 +22,6 @@ use crate::{
     ui::{
         custom_components::{UiExt, text_edit::BlazeTextEdit},
         dialog_manager::manager::ModalDialog,
-        icons_cache::icon_cache::IconCache,
         themes::theme_manager::with_theme,
     },
 };
@@ -43,8 +42,8 @@ impl ModalDialog for QuickAccDialog {
     fn close(&mut self) {
         self.close()
     }
-    fn render(&mut self, ui: &mut Ui, icon_cache: &mut IconCache) -> bool {
-        self.process_events(ui, icon_cache)
+    fn render(&mut self, ui: &mut Ui) -> bool {
+        self.process_events(ui)
     }
 }
 
@@ -77,7 +76,7 @@ impl QuickAccDialog {
         });
     }
 
-    fn process_events(&mut self, ui: &mut Ui, icon_cache: &mut IconCache) -> bool {
+    fn process_events(&mut self, ui: &mut Ui) -> bool {
         let Some(event) = self.event.take() else {
             return false;
         };
@@ -108,13 +107,13 @@ impl QuickAccDialog {
                             ui.label_ns(i18n.t("quick_dialog_quick_to_tag.select_tag"));
 
                             ui.horizontal(|ui| {
-                                ui.blaze_combobox(Some(icon_cache))
+                                ui.blaze_combobox()
                                     .selected_text(&*current_theme.meta.name)
                                     .text_color(current_theme.global.text_primary())
                                     .size((150.0, 30.0))
                                     .background_color(current_theme.main_area.bg_elevated())
                                     .hover_background_color(current_theme.main_area.bg_hover())
-                                    .show(ui, |ui| {
+                                    .show(|ui| {
                                         let w = ui.available_width();
 
                                         for (i, tag) in tags.iter().enumerate() {
@@ -134,7 +133,7 @@ impl QuickAccDialog {
                                             };
 
                                             if ui
-                                                .blaze_button(label, None)
+                                                .blaze_button(label)
                                                 .id(format!("quick_tag{i}"))
                                                 .size((w, 20.0))
                                                 .background_color(bg)
@@ -144,7 +143,7 @@ impl QuickAccDialog {
                                                 .stroke_width(
                                                     current_theme.global.components_stroke_width,
                                                 )
-                                                .show(ui)
+                                                .show()
                                                 .clicked()
                                             {
                                                 selected_index = i;

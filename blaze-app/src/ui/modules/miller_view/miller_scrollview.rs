@@ -14,7 +14,7 @@ use crate::{
     },
     ui::{
         blaze_ui_state::BlazeUiState,
-        custom_components::text_edit::BlazeTextEdit,
+        custom_components::{UiExt, text_edit::BlazeTextEdit},
         icons_cache::thumbnails::thumbnails_manager::Thumbnail,
         modules::{
             custom_context_menu::context_state::ContextMenuKind,
@@ -25,8 +25,8 @@ use crate::{
 };
 use egui::{
     Align, Align2, Color32, ColorImage, CursorIcon, FontId, Id, Key, Layout, Modifiers,
-    PointerButton, Rect, ScrollArea, Sense, TextureOptions, Ui, pos2, scroll_area::ScrollSource,
-    vec2,
+    PointerButton, Rect, ScrollArea, Sense, TextureOptions, Ui, Vec2, pos2,
+    scroll_area::ScrollSource, vec2,
 };
 use std::{borrow::Cow, collections::HashMap, path::Path, sync::Arc};
 use tracing::info;
@@ -538,27 +538,13 @@ pub fn render_miller_scrollview(
                                 .copied();
 
                             let (icon_name, icon_bytes, color) = resolve_icon(file, snapshot_color);
-                            let rounded_rect = Rect::from_min_max(
-                                pos2(icon_rect.min.x.round(), icon_rect.min.y.round()),
-                                pos2(icon_rect.max.x.round(), icon_rect.max.y.round()),
-                            );
 
                             let normalized_color = ensure_min_lightness(color);
 
-                            let icon = ui_state.icon_cache.get_or_load(
-                                ui,
-                                &icon_name,
-                                icon_bytes,
-                                normalized_color,
-                                vec2(icon_size, icon_size),
-                            );
-
-                            ui.painter().image(
-                                icon.id(),
-                                rounded_rect,
-                                Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
-                                icon_tint,
-                            );
+                            ui.draw_icon((&icon_name, icon_bytes))
+                                .size(Vec2::splat(icon_size))
+                                .tint(normalized_color)
+                                .show();
                         }
 
                         if let Some(dot) = dot_color {

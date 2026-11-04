@@ -19,7 +19,7 @@ use crate::{
     },
     ui::{
         custom_components::UiExt, dialog_manager::manager::ModalDialog,
-        icons_cache::icon_cache::IconCache, themes::theme_manager::with_theme,
+        themes::theme_manager::with_theme,
     },
 };
 use egui::{CornerRadius, Frame, Margin, Order, Ui, Window};
@@ -39,7 +39,7 @@ impl ModalDialog for UpdateDialog {
     fn close(&mut self) {
         self.close()
     }
-    fn render(&mut self, ui: &mut Ui, _icon_cache: &mut IconCache) -> bool {
+    fn render(&mut self, ui: &mut Ui) -> bool {
         self.render_dialog(ui)
     }
 }

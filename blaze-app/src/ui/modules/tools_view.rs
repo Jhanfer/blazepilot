@@ -147,13 +147,14 @@ fn render_tag_button(ui: &mut Ui, state: &mut BlazeCoreState, ui_state: &mut Bla
 
         let icon = ui_state
             .icon_cache
-            .get_or_load(ui, name, bytes, color, icon_size);
+            .lock()
+            .get_or_load(ui, name, bytes, icon_size);
 
         ui.painter().image(
             icon.id(),
             rect,
             Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
-            Color32::WHITE,
+            color,
         );
     }
 }
@@ -198,13 +199,10 @@ fn render_views_mode(ui: &mut Ui, state: &mut BlazeCoreState, ui_state: &mut Bla
                 (*name, *bytes)
             };
 
-            let icon = ui_state.icon_cache.get_or_load(
-                ui,
-                new_name,
-                new_bytes,
-                ensure_min_lightness(base_color),
-                icon_size,
-            );
+            let icon = ui_state
+                .icon_cache
+                .lock()
+                .get_or_load(ui, new_name, new_bytes, icon_size);
 
             let (rect, response) =
                 ui.allocate_exact_size(icon_size + vec2(6.0, 6.0), Sense::click());
@@ -231,7 +229,7 @@ fn render_views_mode(ui: &mut Ui, state: &mut BlazeCoreState, ui_state: &mut Bla
                 icon.id(),
                 rounded_rect,
                 Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
-                Color32::WHITE,
+                ensure_min_lightness(base_color),
             );
 
             if response.clicked() {
@@ -279,7 +277,7 @@ pub fn tools(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, ui: &mut U
         })
         .stroke(Stroke {
             width: 0.5,
-            color: current_theme.main_area.border(),
+            color: current_theme.main_area.panel_border(),
         })
         .show(ui, |ui| {
             let toolbar_height = 25.0;
@@ -309,11 +307,10 @@ pub fn tools(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, ui: &mut U
                         current_theme.main_area.icon_primary()
                     };
 
-                    let icon = ui_state.icon_cache.get_or_load(
+                    let icon = ui_state.icon_cache.lock().get_or_load(
                         ui,
                         icon_plus_fol,
                         icon_bytes_plus_fol,
-                        ensure_min_lightness(plus_color),
                         icon_size,
                     );
 
@@ -321,7 +318,7 @@ pub fn tools(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, ui: &mut U
                         icon.id(),
                         rounded_rect,
                         Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
-                        Color32::WHITE,
+                        ensure_min_lightness(plus_color),
                     );
 
                     if new_fol.clicked() {
@@ -346,11 +343,10 @@ pub fn tools(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, ui: &mut U
                         current_theme.main_area.icon_primary()
                     };
 
-                    let icon = ui_state.icon_cache.get_or_load(
+                    let icon = ui_state.icon_cache.lock().get_or_load(
                         ui,
                         icon_plus_file,
                         icon_bytes_plus_file,
-                        ensure_min_lightness(plus_color),
                         icon_size,
                     );
 
@@ -358,7 +354,7 @@ pub fn tools(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, ui: &mut U
                         icon.id(),
                         rounded_rect,
                         Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
-                        Color32::WHITE,
+                        ensure_min_lightness(plus_color),
                     );
 
                     if new_file.clicked() {
@@ -404,19 +400,17 @@ pub fn tools(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, ui: &mut U
                     current_theme.main_area.icon_primary()
                 };
 
-                let icon = ui_state.icon_cache.get_or_load(
-                    ui,
-                    icon_cut,
-                    icon_bytes_cut,
-                    ensure_min_lightness(sissors_color),
-                    icon_size,
-                );
+                let icon =
+                    ui_state
+                        .icon_cache
+                        .lock()
+                        .get_or_load(ui, icon_cut, icon_bytes_cut, icon_size);
 
                 ui.painter().image(
                     icon.id(),
                     rounded_rect,
                     Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
-                    Color32::WHITE,
+                    ensure_min_lightness(sissors_color),
                 );
 
                 if cut_resp.clicked() && has_selection {
@@ -444,11 +438,10 @@ pub fn tools(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, ui: &mut U
                     current_theme.main_area.icon_primary()
                 };
 
-                let icon = ui_state.icon_cache.get_or_load(
+                let icon = ui_state.icon_cache.lock().get_or_load(
                     ui,
                     icon_copy,
                     icon_bytes_copy,
-                    ensure_min_lightness(clip_color),
                     icon_size,
                 );
 
@@ -456,7 +449,7 @@ pub fn tools(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, ui: &mut U
                     icon.id(),
                     rounded_rect,
                     Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
-                    Color32::WHITE,
+                    ensure_min_lightness(clip_color),
                 );
 
                 if cop_resp.clicked() && has_selection {
@@ -484,11 +477,10 @@ pub fn tools(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, ui: &mut U
                     current_theme.main_area.icon_primary()
                 };
 
-                let icon = ui_state.icon_cache.get_or_load(
+                let icon = ui_state.icon_cache.lock().get_or_load(
                     ui,
                     icon_paste,
                     icon_bytes_paste,
-                    ensure_min_lightness(pas_color),
                     icon_size,
                 );
 
@@ -496,7 +488,7 @@ pub fn tools(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, ui: &mut U
                     icon.id(),
                     rounded_rect,
                     Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
-                    Color32::WHITE,
+                    ensure_min_lightness(pas_color),
                 );
 
                 if pas_resp.clicked() && has_clipboard {
@@ -525,11 +517,10 @@ pub fn tools(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, ui: &mut U
                     current_theme.main_area.icon_primary()
                 };
 
-                let icon = ui_state.icon_cache.get_or_load(
+                let icon = ui_state.icon_cache.lock().get_or_load(
                     ui,
                     icon_trash,
                     icon_bytes_trash,
-                    ensure_min_lightness(del_color),
                     icon_size,
                 );
 
@@ -537,7 +528,7 @@ pub fn tools(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, ui: &mut U
                     icon.id(),
                     rounded_rect,
                     Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
-                    Color32::WHITE,
+                    ensure_min_lightness(del_color),
                 );
 
                 if del_resp.clicked() && has_selection {
@@ -590,19 +581,16 @@ pub fn tools(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, ui: &mut U
                     current_theme.main_area.icon_primary()
                 };
 
-                let icon = ui_state.icon_cache.get_or_load(
-                    ui,
-                    icon_name,
-                    icon_bytes,
-                    ensure_min_lightness(sel_color),
-                    icon_size,
-                );
+                let icon = ui_state
+                    .icon_cache
+                    .lock()
+                    .get_or_load(ui, icon_name, icon_bytes, icon_size);
 
                 ui.painter().image(
                     icon.id(),
                     rounded_rect,
                     Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
-                    Color32::WHITE,
+                    ensure_min_lightness(sel_color),
                 );
 
                 if select_resp.clicked() {
@@ -628,11 +616,10 @@ pub fn tools(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, ui: &mut U
                     current_theme.main_area.icon_primary()
                 };
 
-                let icon = ui_state.icon_cache.get_or_load(
+                let icon = ui_state.icon_cache.lock().get_or_load(
                     ui,
                     icon_refresh,
                     icon_bytes_refresh,
-                    ensure_min_lightness(ref_color),
                     icon_size,
                 );
 
@@ -640,7 +627,7 @@ pub fn tools(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, ui: &mut U
                     icon.id(),
                     rounded_rect,
                     Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
-                    Color32::WHITE,
+                    ensure_min_lightness(ref_color),
                 );
 
                 if refresh_resp.clicked() {
@@ -687,11 +674,10 @@ pub fn tools(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, ui: &mut U
                         current_theme.main_area.icon_primary()
                     };
 
-                    let icon = ui_state.icon_cache.get_or_load(
+                    let icon = ui_state.icon_cache.lock().get_or_load(
                         ui,
                         icon_refresh,
                         icon_bytes_refresh,
-                        ensure_min_lightness(hidd_color),
                         icon_size,
                     );
 
@@ -699,7 +685,7 @@ pub fn tools(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, ui: &mut U
                         icon.id(),
                         rounded_rect,
                         Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
-                        Color32::WHITE,
+                        ensure_min_lightness(hidd_color),
                     );
 
                     if hidd_resp.clicked() {

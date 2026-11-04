@@ -14,8 +14,8 @@
 
 use crate::ui::{custom_components::UiExt, themes::platform::structs::AsColor};
 use egui::{
-    Color32, Id, Layout, Mesh, Rect, Response, Sense, Shape, Stroke, StrokeKind, Ui, lerp, pos2,
-    vec2,
+    Color32, Id, Layout, Mesh, Rect, Response, Sense, Shape, Stroke, StrokeKind, Ui, UiBuilder,
+    lerp, pos2, vec2,
 };
 use std::fmt::Debug;
 
@@ -152,6 +152,7 @@ struct PickerState {
 /// área SV y entrada HEX
 pub(crate) struct BlazeColorSelector<'a> {
     id: Id,
+    ui: &'a mut Ui,
     rgba: &'a mut Color32,
     bg_color: Color32,
 }
@@ -159,13 +160,14 @@ pub(crate) struct BlazeColorSelector<'a> {
 impl<'a> BlazeColorSelector<'a> {
     /// Instancia un nuevo selector de color
     pub(crate) fn new<T: Into<&'a mut Color32>>(
-        ui: &mut Ui,
+        ui: &'a mut Ui,
         rgba: T,
         id_source: impl std::hash::Hash + Debug,
     ) -> Self {
         let rgba = rgba.into();
         Self {
             id: ui.id().with(id_source),
+            ui,
             rgba,
             bg_color: Color32::LIGHT_GRAY,
         }
@@ -188,7 +190,7 @@ impl<'a> BlazeColorSelector<'a> {
     }
 
     /// Renderiza el botón indicador de color y gestiona la ventana emergente
-    pub fn show(&mut self, ui: &mut Ui) -> Response {
+    pub fn show(&mut self) -> Response {
         let memory_id = self.id.with("picker_state");
         let enter: Color32 = *self.rgba;
 
@@ -202,7 +204,8 @@ impl<'a> BlazeColorSelector<'a> {
         };
 
         // carga o inicializa el estado del selector desde la memoria temporal
-        let mut ps: PickerState = ui
+        let mut ps: PickerState = self
+            .ui
             .data(|d| d.get_temp::<PickerState>(memory_id))
             .unwrap_or_else(|| from_color(enter));
 
@@ -238,23 +241,35 @@ impl<'a> BlazeColorSelector<'a> {
 
         // renderizado el botón de los colores
         let size = vec2(40.0, 20.0);
-        let (rect, btn_resp) = ui.allocate_exact_size(size, Sense::click());
+        let (rect, btn_resp) = self.ui.allocate_exact_size(size, Sense::click());
 
-        ui.painter().rect_filled(rect, 20.0, enter);
+        self.ui.painter().rect_filled(rect, 20.0, enter);
 
         let mut sv_response: Response = btn_resp.clone();
         let mut hex_applied = false;
 
-        let popup_id = ui.auto_id_with("popup");
-        let popup_result = ui
+        let popup_id = self.ui.auto_id_with("popup");
+        let layer_id = self.ui.layer_id();
+        let id = self.ui.id().with("nuevo_ui_fantasma");
+        let max_rect = self.ui.max_rect();
+
+        let mut child_ui = self.ui.new_child(
+            UiBuilder::new()
+                .id(id)
+                .layer_id(layer_id)
+                .max_rect(max_rect),
+        );
+
+        let popup_result = child_ui
             .blaze_popup()
             .id(popup_id)
+            .background_color(self.bg_color)
             .toggle(&btn_resp)
             .pos(rect.left_bottom())
             .inner_margin(10.0)
             .size(vec2(255.0, 295.0))
-            .show(ui, |ui| {
-                let available = ui.available_size();
+            .show(|ui| {
+                let available = self.ui.available_size();
 
                 ui.allocate_ui_with_layout(
                     available,
@@ -264,11 +279,11 @@ impl<'a> BlazeColorSelector<'a> {
 
                         ui.horizontal(|ui| {
                             let hex_resp = ui
-                                .blaze_input("hex", None, &mut ps.hex, None)
+                                .blaze_input("hex", None, &mut ps.hex)
                                 .background_color(Color32::BLACK)
                                 .radius(20)
                                 .size((100.0, 30.0))
-                                .show(ui, || {});
+                                .show(|| {});
 
                             if hex_resp.changed() {
                                 let text = self.normalize_hex(&ps.hex);
@@ -381,7 +396,7 @@ impl<'a> BlazeColorSelector<'a> {
             ps.hex_focused = false;
         }
 
-        ui.data_mut(|data| {
+        self.ui.data_mut(|data| {
             data.insert_temp(memory_id, ps.clone());
         });
 

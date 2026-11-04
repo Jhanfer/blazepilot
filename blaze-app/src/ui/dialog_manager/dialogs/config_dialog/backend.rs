@@ -2,11 +2,10 @@ use crate::core::bootstrap::configs::{
     config_manager::with_configs, platform::linux::conf_structs::DisplayBackend,
 };
 use crate::ui::custom_components::UiExt;
-use crate::ui::icons_cache::icon_cache::IconCache;
 use crate::ui::themes::theme_manager::with_theme;
 use egui::{Color32, Label, RichText, Ui};
 
-pub(crate) fn render_backend_settings(ui: &mut Ui, _query: &str, icon_cache: &mut IconCache) {
+pub(crate) fn render_backend_settings(ui: &mut Ui, _query: &str) {
     let current_theme = with_theme(|t| t.current());
     let i18n = with_configs(|c| c.get_i18n());
 
@@ -31,13 +30,13 @@ pub(crate) fn render_backend_settings(ui: &mut Ui, _query: &str, icon_cache: &mu
         ui.label_ns(i18n.t("configs_backend.selection"));
 
         ui.horizontal(|ui| {
-            ui.blaze_combobox(Some(icon_cache))
+            ui.blaze_combobox()
                 .selected_text(current.name())
                 .text_color(current_theme.global.text_primary())
                 .size((150.0, 30.0))
                 .background_color(current_theme.sidebar_left.bg_elevated())
                 .hover_background_color(current_theme.sidebar_left.bg_hover())
-                .show(ui, |ui| {
+                .show(|ui| {
                     let w = ui.available_width();
 
                     for (i, (name, backend)) in [
@@ -63,7 +62,7 @@ pub(crate) fn render_backend_settings(ui: &mut Ui, _query: &str, icon_cache: &mu
                         };
 
                         if ui
-                            .blaze_button(label, None)
+                            .blaze_button(label)
                             .id(format!("backend_{i}"))
                             .size((w, 20.0))
                             .background_color(bg)
@@ -71,7 +70,7 @@ pub(crate) fn render_backend_settings(ui: &mut Ui, _query: &str, icon_cache: &mu
                             .stroke_color(Color32::TRANSPARENT)
                             .radius(20)
                             .stroke_width(current_theme.global.components_stroke_width)
-                            .show(ui)
+                            .show()
                             .clicked()
                         {
                             with_configs(|c| {

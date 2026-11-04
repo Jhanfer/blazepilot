@@ -5,6 +5,7 @@ use crate::{
         modules::custom_context_menu::context_state::ContextMenuKind,
         themes::theme_manager::with_theme,
     },
+    utils::formating::format_size,
 };
 use egui::{Align2, Color32, FontId, PointerButton, Rect, Sense, Ui, pos2, vec2};
 use std::{
@@ -27,66 +28,17 @@ fn get_folder_icon(key: &str) -> (&'static str, &'static [u8]) {
     }
 }
 
-fn get_header_icon(key: &str) -> (&'static str, &'static [u8]) {
-    match key {
-        "locals" => ("locales", ICON_USER),
-        "favorites" => ("favorites", ICON_STAR),
-        "disks" => ("disks", ICON_SERVER),
-        _ => ("default", ICON_HOME),
-    }
-}
-
-pub fn render_icon(
-    ui: &mut Ui,
-    ui_state: &mut BlazeUiState,
-    icon_name: &str,
-    color: Color32,
-    icon_bytes: &[u8],
-    rect: Rect,
-) {
-    let icon_size = vec2(16.0, 16.0);
-    let icon_pos = rect.left_center() - vec2(-10.0, icon_size.y / 2.0);
-    let icon_rect = Rect::from_min_size(icon_pos, icon_size);
-
-    let rounded_rect = Rect::from_min_max(
-        pos2(icon_rect.min.x.round(), icon_rect.min.y.round()),
-        pos2(icon_rect.max.x.round(), icon_rect.max.y.round()),
-    );
-
-    let icon: &egui::TextureHandle = &ui_state
-        .icon_cache
-        .get_or_load(ui, icon_name, icon_bytes, color, icon_size);
-
-    ui.painter().image(
-        icon.id(),
-        rounded_rect,
-        Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
-        Color32::WHITE,
-    );
-}
-
-pub fn render_header_text(icon_key: &str, label: &str, ui: &mut Ui, ui_state: &mut BlazeUiState) {
+pub fn render_header_text(label: &str, ui: &mut Ui) {
     let current_theme = with_theme(|t| t.current());
 
-    let (rect, _resp) = ui.allocate_exact_size(vec2(ui.available_width(), 24.0), Sense::hover());
-
-    let (icon_name, icon_bytes) = get_header_icon(icon_key);
-
-    render_icon(
-        ui,
-        ui_state,
-        icon_name,
-        current_theme.global.text_primary(),
-        icon_bytes,
-        rect,
-    );
+    let (rect, _) = ui.allocate_exact_size(vec2(ui.available_width(), 24.0), Sense::empty());
 
     ui.painter().text(
-        rect.left_center() + vec2(34.0, 0.0),
+        rect.left_center() + vec2(10.0, 0.0),
         Align2::LEFT_CENTER,
         label,
-        FontId::proportional(20.0),
-        current_theme.global.text_primary(),
+        FontId::proportional(15.0),
+        current_theme.global.text_secondary(),
     );
 }
 
@@ -96,7 +48,6 @@ pub fn render_local_buttons(
     path: Arc<Path>,
     state: &mut BlazeCoreState,
     ui: &mut Ui,
-    ui_state: &mut BlazeUiState,
 ) {
     let current_theme = with_theme(|t| t.current());
     let (icon_name, icon_bytes) = get_folder_icon(icon_key);
@@ -108,14 +59,15 @@ pub fn render_local_buttons(
     let hover_icon = current_theme.sidebar_left.icon_hover_on_color(hover_bg);
 
     let btn_id = ui.id().with(label);
+    let available_w = ui.available_width();
     let btn_resp = ui
-        .blaze_button(label, Some(&mut ui_state.icon_cache))
+        .blaze_button(label)
         .id(btn_id)
-        .size((ui.available_width(), 35.0))
+        .size((available_w, 35.0))
         .background_color(bg)
         .hover_background_color(hover_bg)
         .radius(20)
-        .stroke_color(Color32::TRANSPARENT)
+        .stroke_color(current_theme.sidebar_left.component_border())
         .hover_stroke_color(hover_icon)
         .icon(icon_name, icon_bytes)
         .icon_color(icon_color)
@@ -123,7 +75,7 @@ pub fn render_local_buttons(
         .icon_size(16_f32)
         .text_color(current_theme.global.text_primary())
         .stroke_width(current_theme.global.components_stroke_width)
-        .show(ui);
+        .show();
 
     let middle_clicked = ui.input(|i| {
         i.pointer.button_pressed(PointerButton::Middle)
@@ -156,7 +108,7 @@ pub fn render_drives_button(
 
     let used = drive.used_percent / 100.0;
     let is_mounted = drive.mountpoint.is_some();
-    let used_percentage = format!("Usado {}%", drive.used_percent as i32);
+    let used_percentage = format!("Used {}%", drive.used_percent as i32);
     let is_removable = drive.is_removable;
     let is_system = drive.is_system;
 
@@ -181,35 +133,40 @@ pub fn render_drives_button(
     let hover_icon = current_theme.sidebar_left.icon_hover_on_color(hover_bg);
 
     let btn_id = ui.id().with(&display_name);
+    let available_w = ui.available_width();
     let btn_resp = ui
-        .blaze_button(&display_name, Some(&mut ui_state.icon_cache))
+        .blaze_button(&display_name)
         .id(btn_id)
-        .size((ui.available_width(), if is_mounted { 50.0 } else { 35.0 }))
+        .size((available_w, if is_mounted { 68.0 } else { 35.0 }))
         .background_color(bg)
         .hover_background_color(hover_bg)
         .radius(20)
-        .stroke_color(Color32::TRANSPARENT)
+        .stroke_color(current_theme.sidebar_left.component_border())
         .hover_stroke_color(hover_icon)
         .icon(icon_name, icon_bytes)
         .icon_color(icon_color)
         .hover_icon_color(hover_icon)
         .icon_size(16_f32)
         .text_color(current_theme.global.text_primary())
-        .content_offset_y(if is_mounted { -8.0 } else { 0.0 })
+        .content_offset_y(if is_mounted { -15.0 } else { 0.0 })
         .stroke_width(current_theme.global.components_stroke_width)
-        .show(ui);
+        .show();
 
     if is_mounted {
-        let padding_x = 34.0;
-        let padding_y = 10.0;
+        let padding_x = 10.0;
+        let padding_y = 28.0;
         let height = 6.0;
+        let text_padding = 2.0;
 
         let progress_rect = Rect::from_min_size(
             pos2(
                 btn_resp.rect.min.x + padding_x,
                 btn_resp.rect.min.y - height + btn_resp.rect.height() - padding_y,
             ),
-            vec2(btn_resp.rect.width() - (padding_x * 2.0), height),
+            vec2(
+                btn_resp.rect.width() - (padding_x * 2.0) + text_padding,
+                height,
+            ),
         );
 
         //Fondo de la barra
@@ -228,6 +185,17 @@ pub fn render_drives_button(
         //relleno
         ui.painter()
             .rect_filled(filled_rect, 10.0, current_theme.sidebar_left.accent());
+
+        let used_bytes = drive.total.saturating_sub(drive.available);
+        let label = format!("{} / {}", format_size(used_bytes), format_size(drive.total));
+
+        ui.painter().text(
+            pos2(progress_rect.min.x, progress_rect.max.y + 3.0),
+            Align2::LEFT_TOP,
+            label,
+            FontId::proportional(12.0),
+            current_theme.global.text_secondary(),
+        );
     }
 
     if btn_resp.clicked() && is_mounted {
