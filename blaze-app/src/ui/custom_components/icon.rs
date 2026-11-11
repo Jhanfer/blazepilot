@@ -4,7 +4,7 @@ use parking_lot::Mutex;
 use std::sync::Arc;
 
 /// Widget builder para renderizar iconos
-/// 
+///
 /// Encapsula la configuración de renderizado (tamaño, tinte, id)
 /// y delega la carga, reutilización de la textura a [`IconCache`] compartido
 pub(crate) struct BlazeIcon<'a> {
@@ -19,13 +19,13 @@ pub(crate) struct BlazeIcon<'a> {
 
 impl<'a> BlazeIcon<'a> {
     /// Crea una nueva instancia para un icono
-    /// 
+    ///
     /// Genera un [`Id`] por defecto basado en los datos del icono (bytes y nombre)
-    /// 
+    ///
     /// # Parámetros:
     /// - `ui`: referencia mutable al contexto de renderizado de egui
     /// - `icon_data`: tupla con el nombre y los bytes del archivo de imagen
-    /// - `icon_cache`: referencia compartida `thread-safe` a la caché de iconos 
+    /// - `icon_cache`: referencia compartida `thread-safe` a la caché de iconos
     pub(crate) fn new(
         ui: &'a mut Ui,
         icon_data: (&'a str, impl Into<&'a [u8]>),

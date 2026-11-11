@@ -12,7 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::ui::{custom_components::UiExt, themes::platform::structs::AsColor};
+use crate::{
+    core::system::clipboard_text::text_clipboard::with_text_clipboard,
+    ui::{custom_components::UiExt, icons_cache::icons, themes::platform::structs::AsColor},
+};
 use egui::{
     Color32, Id, Layout, Mesh, Rect, Response, Sense, Shape, Stroke, StrokeKind, Ui, UiBuilder,
     lerp, pos2, vec2,
@@ -312,6 +315,24 @@ impl<'a> BlazeColorSelector<'a> {
                             }
 
                             ps.hex_focused = hex_resp.has_focus();
+
+                            if ui
+                                .blaze_button("")
+                                .size((20.0, 20.0))
+                                .icon("clipboard", icons::ICON_CLIPBOARD)
+                                .icon_size(13.0_f32)
+                                .hover_icon_color(Color32::GRAY)
+                                .text_color(Color32::TRANSPARENT)
+                                .background_color(Color32::TRANSPARENT)
+                                .stroke_color(Color32::TRANSPARENT)
+                                .radius(25.0)
+                                .show()
+                                .clicked()
+                            {
+                                with_text_clipboard(|c| {
+                                    c.copy(ps.hex.clone());
+                                });
+                            }
 
                             let (rect, _) = ui.allocate_exact_size(
                                 vec2(ui.available_width(), 30.0),
