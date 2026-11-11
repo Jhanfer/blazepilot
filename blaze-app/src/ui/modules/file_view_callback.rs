@@ -22,7 +22,7 @@ pub fn render_views(ui: &mut Ui, state: &mut BlazeCoreState, ui_state: &mut Blaz
     // -------------------------------
     //  Toolbar
     // -------------------------------
-    crate::ui::modules::toolbar::toolbar_component(ui, state, ui_state);
+    crate::ui::modules::toolbar::toolbar_component(ui, state);
 
     // -------------------------------
     //  sidebar right
@@ -196,7 +196,7 @@ pub fn render_views(ui: &mut Ui, state: &mut BlazeCoreState, ui_state: &mut Blaz
     CentralPanel::default().frame(custom_frame).show(ui, |ui| {
         ui.spacing_mut().item_spacing.y = 0.0;
 
-        tools(state, ui_state, ui);
+        tools(state, ui);
 
         match &state.view_mode {
             ViewMode::Normal(layout) => match layout.to_owned() {

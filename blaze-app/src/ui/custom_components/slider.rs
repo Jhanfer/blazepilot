@@ -28,6 +28,8 @@ pub(crate) struct BlazeSlider<'a, Num: Numeric> {
     width: f32,
     bg_color: Color32,
     accent: Color32,
+    handle_color: Color32,
+    handle_stroke_color: Color32,
 }
 
 impl<'a, Num: Numeric> BlazeSlider<'a, Num> {
@@ -43,7 +45,7 @@ impl<'a, Num: Numeric> BlazeSlider<'a, Num> {
         range: impl Into<RangeInclusive<Num>>,
     ) -> Self {
         Self {
-            id: ui.id().with("Slider"),
+            id: ui.next_auto_id(),
             ui,
             value,
             range: range.into(),
@@ -51,6 +53,8 @@ impl<'a, Num: Numeric> BlazeSlider<'a, Num> {
             width: 80.0,
             bg_color: Color32::GRAY,
             accent: Color32::LIGHT_GRAY,
+            handle_color: Color32::WHITE,
+            handle_stroke_color: Color32::BLACK,
         }
     }
 
@@ -71,6 +75,18 @@ impl<'a, Num: Numeric> BlazeSlider<'a, Num> {
     /// Establece el color de acento de la barra
     pub fn accent(mut self, color: Color32) -> Self {
         self.accent = color;
+        self
+    }
+
+    /// Establece el color del indicador
+    pub fn handle_color(mut self, color: Color32) -> Self {
+        self.handle_color = color;
+        self
+    }
+
+    /// Establece el color del borde del indicador
+    pub fn handle_stroke_color(mut self, color: Color32) -> Self {
+        self.handle_stroke_color = color;
         self
     }
 
@@ -117,14 +133,13 @@ impl<'a, Num: Numeric> BlazeSlider<'a, Num> {
             .allocate_exact_size(vec2(self.width, self.height), Sense::click_and_drag());
 
         response.id = self.id;
-
-        let handle_radius = self.height / 2.0;
+        let handle_radius = self.height / 2.5;
         let position_range = self.handle_position_range(&rect, handle_radius);
 
+        let active = response.is_pointer_button_down_on();
+
         // actualiza el valor mutable cuando el usuario arrastra o hace click sobre el slider
-        if (response.dragged() || response.clicked())
-            && let Some(pos) = response.interact_pointer_pos()
-        {
+        if active && let Some(pos) = response.interact_pointer_pos() {
             let new_val = self.value_from_x(pos.x, position_range.clone());
             if *self.value != new_val {
                 *self.value = new_val;
@@ -133,17 +148,16 @@ impl<'a, Num: Numeric> BlazeSlider<'a, Num> {
         }
 
         let target_x = self.x_from_value(position_range);
-        let animation_time = if response.dragged() { 0.0 } else { 0.5 };
+        let animation_time = if active { 0.0 } else { 0.5 };
 
-        // usa como clave dinámica "target_x" para reaccionar ante cambios bruscos de valor
         let animated_x = self.ui.animate_value_with_time(
-            self.id.with(format!("slider_animated_{target_x}")),
+            self.id.with("slider_animated"),
             target_x,
             animation_time,
         );
 
         if self.ui.is_rect_visible(rect) {
-            let radius = self.height / 2.5;
+            let radius = handle_radius;
 
             let progress_rect = Rect::from_min_size(
                 pos2(rect.min.x, rect.min.y + (rect.height() - self.height) / 2.0),
@@ -170,10 +184,12 @@ impl<'a, Num: Numeric> BlazeSlider<'a, Num> {
             // renderiza el indicador o botón circular del deslizador
             self.ui
                 .painter()
-                .circle_filled(center, radius, Color32::WHITE);
-            self.ui
-                .painter()
-                .circle_stroke(center, radius, Stroke::new(1.5, Color32::BLACK));
+                .circle_filled(center, radius, self.handle_color);
+            self.ui.painter().circle_stroke(
+                center,
+                radius,
+                Stroke::new(1.5, self.handle_stroke_color),
+            );
         }
 
         response

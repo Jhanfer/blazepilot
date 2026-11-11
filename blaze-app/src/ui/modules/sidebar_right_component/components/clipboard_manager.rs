@@ -4,7 +4,7 @@ use crate::ui::blaze_ui_state::BlazeUiState;
 use crate::ui::custom_components::UiExt;
 use crate::ui::icons_cache::icons;
 use crate::ui::modules::utilities::ensure_min_lightness;
-use crate::ui::themes::platform::structs::BlazeAppTheme;
+use crate::ui::themes::platform::{color_ops, structs::BlazeAppTheme};
 use crate::utils::easing::ease_in_out_bounce;
 use egui::scroll_area::ScrollSource;
 use egui::{
@@ -175,21 +175,15 @@ pub fn render_clipboard_menu(
                     }
 
                     let hint = "Ctrl + B";
-                    let c = current_theme.sidebar_right.accent();
+                    let palette = current_theme.sidebar_right.palette(&current_theme.global);
+                    let hint_bg = palette.bg_panel;
 
-                    let hint_stroke_color = Color32::from_rgba_unmultiplied(
-                        c.r().saturating_add(20),
-                        c.g().saturating_add(20),
-                        c.b().saturating_add(20),
-                        120 * presence as u8,
-                    );
+                    let hint_stroke_rgb = color_ops::mix(hint_bg, palette.accent_text, 0.45);
+                    let hint_stroke_color =
+                        color_ops::with_alpha(hint_stroke_rgb, (120.0 * presence) as u8);
 
-                    let hint_color = Color32::from_rgba_unmultiplied(
-                        c.r().saturating_add(60),
-                        c.g().saturating_add(60),
-                        c.b().saturating_add(60),
-                        160 * presence as u8,
-                    );
+                    let hint_rgb = color_ops::ensure_contrast(palette.accent_text, hint_bg, 3.0);
+                    let hint_color = color_ops::with_alpha(hint_rgb, (160.0 * presence) as u8);
 
                     let hint_galley = ui.painter().layout_no_wrap(
                         hint.to_string(),

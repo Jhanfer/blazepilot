@@ -13,8 +13,8 @@
 // limitations under the License.
 
 use egui::{
-    Area, Color32, CornerRadius, Id, Key, Order, Pos2, Response, Sense, Stroke, StrokeKind, Ui,
-    UiBuilder, pos2, vec2,
+    Area, Color32, CornerRadius, Frame, Id, Key, Order, Pos2, Response, Sense, Stroke, StrokeKind,
+    Ui, UiBuilder, pos2, vec2,
 };
 
 /// Ventana o menú emergente flotante con posición editable, reestrición al marco
@@ -29,6 +29,12 @@ pub(crate) struct BlazePopup<'a> {
     position: Pos2,
     bg_color: Color32,
     stroke_color: Color32,
+    stroke_width: f32,
+    /// Capa en la que se dibuja el popup
+    order: Order,
+    /// Si es `true`, el tamaño se ajusta al contenido en lugar de usar
+    /// `width`/`height`
+    auto_size: bool,
     toggle_requested: bool,
 }
 
@@ -46,6 +52,9 @@ impl<'a> BlazePopup<'a> {
             position: pos2(0.0, 0.0),
             bg_color: Color32::LIGHT_GRAY,
             stroke_color: Color32::GRAY,
+            stroke_width: 0.5,
+            order: Order::Foreground,
+            auto_size: false,
             toggle_requested: false,
         }
     }
@@ -59,6 +68,38 @@ impl<'a> BlazePopup<'a> {
     /// Establece el color de fondo del widget
     pub fn background_color(mut self, color: impl Into<Color32>) -> Self {
         self.bg_color = color.into();
+        self
+    }
+
+    /// Establece el color del borde del widget
+    pub fn stroke_color(mut self, color: impl Into<Color32>) -> Self {
+        self.stroke_color = color.into();
+        self
+    }
+
+    /// Establece el grosor del borde del widget
+    pub fn stroke_width(mut self, width: f32) -> Self {
+        self.stroke_width = width;
+        self
+    }
+
+    /// Establece el radio de las esquinas del widget
+    pub fn radius(mut self, radius: impl Into<CornerRadius>) -> Self {
+        self.radius = radius.into();
+        self
+    }
+
+    /// Establece la capa de dibujado del popup
+    pub fn order(mut self, order: Order) -> Self {
+        self.order = order;
+        self
+    }
+
+    /// Hace que el widget se ajuste al tamaño de su contenido.
+    ///
+    /// Cuando está activo se ignora el tamaño definido con [`Self::size`].
+    pub fn auto_size(mut self, enabled: bool) -> Self {
+        self.auto_size = enabled;
         self
     }
 
@@ -130,26 +171,37 @@ impl<'a> BlazePopup<'a> {
 
         // renderizado en una capa encima de los widgets, restringida a los límites visibles del componente
         let a_resp = Area::new(self.id)
-            .order(Order::Foreground)
+            .order(self.order)
             .fixed_pos(pos)
             .constrain_to(screen)
             .show(self.ui, |ui| {
-                let (rect, _) = ui.allocate_exact_size(vec2(self.width, self.height), Sense::all());
-                ui.painter().rect(
-                    rect,
-                    self.radius,
-                    self.bg_color,
-                    Stroke::new(0.5, self.stroke_color),
-                    StrokeKind::Middle,
-                );
-                let inner_rect = rect.shrink(self.inner_margin);
-                let mut child_ui = ui.new_child(
-                    UiBuilder::new()
-                        .max_rect(inner_rect)
-                        .layer_id(ui.layer_id()),
-                );
+                if self.auto_size {
+                    Frame::NONE
+                        .inner_margin(self.inner_margin)
+                        .fill(self.bg_color)
+                        .corner_radius(self.radius)
+                        .stroke(Stroke::new(self.stroke_width, self.stroke_color))
+                        .show(ui, |ui| callback(ui))
+                        .inner
+                } else {
+                    let (rect, _) =
+                        ui.allocate_exact_size(vec2(self.width, self.height), Sense::all());
+                    ui.painter().rect(
+                        rect,
+                        self.radius,
+                        self.bg_color,
+                        Stroke::new(self.stroke_width, self.stroke_color),
+                        StrokeKind::Middle,
+                    );
+                    let inner_rect = rect.shrink(self.inner_margin);
+                    let mut child_ui = ui.new_child(
+                        UiBuilder::new()
+                            .max_rect(inner_rect)
+                            .layer_id(ui.layer_id()),
+                    );
 
-                callback(&mut child_ui)
+                    callback(&mut child_ui)
+                }
             });
 
         // detecta interacciones de cierre con clicks fuera del componente o tecla de esc

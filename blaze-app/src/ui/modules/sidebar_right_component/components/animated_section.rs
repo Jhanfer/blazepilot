@@ -79,8 +79,6 @@ pub(crate) fn render_animated_section(
                     ui.vertical_centered(|ui| {
                         ui.add_space(10.0);
 
-                        let mut should_repaint = false;
-
                         let slide = (1.0 - anim) * -15.0;
                         if slide.abs() > 0.5 {
                             ui.add_space(slide);
@@ -108,8 +106,6 @@ pub(crate) fn render_animated_section(
                                         &thumb.pixels,
                                     );
 
-                                    should_repaint = true;
-
                                     ui.load_texture(
                                         format!("thumb:{}", path.to_string_lossy()),
                                         color_image,
@@ -123,11 +119,6 @@ pub(crate) fn render_animated_section(
                                 Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
                                 Color32::WHITE,
                             );
-                        } else if ui_state
-                            .newly_calculated_thumbnails
-                            .contains(&file.full_path)
-                        {
-                            should_repaint = true;
                         } else {
                             let snapshot_color = file
                                 .unique_id
@@ -137,25 +128,12 @@ pub(crate) fn render_animated_section(
 
                             let (icon_name, icon_bytes, color) = resolve_icon(file, snapshot_color);
 
-                            let rounded_rect = Rect::from_min_max(
-                                pos2(icon_rect.min.x.round(), icon_rect.min.y.round()),
-                                pos2(icon_rect.max.x.round(), icon_rect.max.y.round()),
-                            );
-
                             let normalized_color = ensure_min_lightness(color);
-                            //revisar esto más tarde
 
-                            let icon = ui_state
-                                .icon_cache
-                                .lock()
-                                .get_or_load(ui, &icon_name, icon_bytes, icon_size);
-
-                            ui.painter().image(
-                                icon.id(),
-                                rounded_rect,
-                                Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
-                                normalized_color,
-                            );
+                            ui.draw_icon((&icon_name, icon_bytes))
+                                .size(icon_size)
+                                .tint(normalized_color)
+                                .show_at(icon_rect);
                         }
 
                         ui.allocate_ui_with_layout(
@@ -173,8 +151,6 @@ pub(crate) fn render_animated_section(
                         );
 
                         ui.add_space(10.0);
-
-                        if should_repaint {}
                     });
 
                     Grid::new("file_info_grid")

@@ -23,7 +23,7 @@ use crate::{
             custom_context_menu::context_state::ContextMenuKind,
             utilities::{ensure_min_lightness, git_dot_color, resolve_icon, text_color_for_git},
         },
-        themes::theme_manager::with_theme,
+        themes::{platform::color_ops, theme_manager::with_theme},
     },
     utils::formating::{format_date, format_size},
 };
@@ -249,6 +249,7 @@ pub fn new_render_scrollview(
     content_rect: Rect,
 ) {
     let current_theme = with_theme(|t| t.current());
+    let palette = current_theme.main_area.palette(&current_theme.global);
 
     let icon_size = state.row_view.icon_size;
 
@@ -298,9 +299,9 @@ pub fn new_render_scrollview(
             Button::new(
                 RichText::new(name_label)
                     .size(11.0)
-                    .color(current_theme.global.text_primary()),
+                    .color(palette.fg_primary),
             )
-            .fill(current_theme.global.bg_main())
+            .fill(palette.bg_panel)
             .stroke(Stroke::NONE)
             .frame(true),
         )
@@ -340,9 +341,9 @@ pub fn new_render_scrollview(
             Button::new(
                 RichText::new(date_label)
                     .size(11.0)
-                    .color(current_theme.global.text_primary()),
+                    .color(palette.fg_primary),
             )
-            .fill(current_theme.global.bg_main())
+            .fill(palette.bg_panel)
             .stroke(Stroke::NONE)
             .frame(true),
         )
@@ -382,9 +383,9 @@ pub fn new_render_scrollview(
             Button::new(
                 RichText::new(size_label)
                     .size(11.0)
-                    .color(current_theme.global.text_primary()),
+                    .color(palette.fg_primary),
             )
-            .fill(current_theme.global.bg_main())
+            .fill(palette.bg_panel)
             .stroke(Stroke::NONE)
             .frame(true),
         )
@@ -419,9 +420,9 @@ pub fn new_render_scrollview(
 
         if handle_response.hovered() || handle_response.dragged() {
             ui.set_cursor_icon(CursorIcon::ResizeColumn);
-            painter.rect_filled(handle_rect, 0.0, current_theme.main_area.accent());
+            painter.rect_filled(handle_rect, 0.0, palette.accent);
         } else {
-            painter.rect_filled(handle_rect, 0.0, current_theme.global.text_secondary());
+            painter.rect_filled(handle_rect, 0.0, palette.fg_secondary);
         }
 
         if handle_response.dragged() {
@@ -541,17 +542,12 @@ pub fn new_render_scrollview(
                 // --- Selección y hover ---
                 if response.hovered() {
                     ui.set_cursor_icon(CursorIcon::PointingHand);
-                    ui.painter()
-                        .rect_filled(rect, 5.0, current_theme.main_area.bg_hover());
+                    ui.painter().rect_filled(rect, 5.0, palette.bg_hover);
                 }
 
                 if state.is_selected(i) {
-                    let c = current_theme.main_area.accent();
-                    ui.painter().rect_filled(
-                        rect,
-                        8.0,
-                        Color32::from_rgba_unmultiplied(c.r(), c.g(), c.b(), 60),
-                    );
+                    let selection = color_ops::with_alpha(palette.accent, 60);
+                    ui.painter().rect_filled(rect, 8.0, selection);
                 }
 
                 // Drop target highlight
@@ -560,7 +556,10 @@ pub fn new_render_scrollview(
                         ui.painter().rect_stroke(
                             rect,
                             5.0,
-                            Stroke::new(2.0, Color32::from_rgb(150, 150, 255)),
+                            Stroke::new(
+                                current_theme.global.components_stroke_width,
+                                current_theme.global.success(),
+                            ),
                             StrokeKind::Middle,
                         );
                     }
@@ -570,7 +569,10 @@ pub fn new_render_scrollview(
                     ui.painter().rect_stroke(
                         rect,
                         5.0,
-                        Stroke::new(2.0, Color32::from_rgb(255, 150, 150)),
+                        Stroke::new(
+                            current_theme.global.components_stroke_width,
+                            current_theme.global.error(),
+                        ),
                         StrokeKind::Middle,
                     );
                 }
@@ -704,13 +706,13 @@ pub fn new_render_scrollview(
                         .copied();
 
                     let (icon_name, icon_bytes, color) = resolve_icon(file, snapshot_color);
-
                     let normalized_color = ensure_min_lightness(color);
 
                     ui.draw_icon((&icon_name, icon_bytes))
+                        .id(format!("icon_{i}"))
                         .size(Vec2::splat(icon_size))
                         .tint(normalized_color)
-                        .show();
+                        .show_at(icon_rect);
                 }
 
                 // Dot git
@@ -776,7 +778,7 @@ pub fn new_render_scrollview(
                     f.layout_no_wrap(
                         format_date(file.modified).to_string(),
                         FontId::proportional(date_font_size),
-                        current_theme.global.text_primary(),
+                        palette.fg_primary,
                     )
                 });
                 ui.painter().with_clip_rect(date_rect).galley(
@@ -815,7 +817,7 @@ pub fn new_render_scrollview(
                     f.layout_no_wrap(
                         size_text,
                         FontId::proportional(size_font_size),
-                        current_theme.global.text_primary(),
+                        palette.fg_primary,
                     )
                 });
                 ui.painter().with_clip_rect(size_rect).galley(
@@ -831,10 +833,8 @@ pub fn new_render_scrollview(
             // Context menu
             let mut ctx_menu = std::mem::take(&mut ui_state.context_menu_state);
             match ctx_menu.kind {
-                ContextMenuKind::FileNormal => ctx_menu.file_context_menu(ui, state, ui_state),
-                ContextMenuKind::FileTrash => {
-                    ctx_menu.file_context_menu_in_trash(ui, state, ui_state)
-                }
+                ContextMenuKind::FileNormal => ctx_menu.file_context_menu(ui, state),
+                ContextMenuKind::FileTrash => ctx_menu.file_context_menu_in_trash(ui, state),
                 _ => {}
             }
             ui_state.context_menu_state = ctx_menu;

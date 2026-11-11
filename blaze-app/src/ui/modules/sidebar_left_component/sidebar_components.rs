@@ -13,6 +13,12 @@ use std::{
     sync::Arc,
 };
 
+/// Separador que respeta el tema de la sección (a diferencia de `ui.separator()`).
+pub fn render_separator(ui: &mut Ui, color: Color32) {
+    let (rect, _) = ui.allocate_exact_size(vec2(ui.available_width(), 1.0), Sense::empty());
+    ui.painter().rect_filled(rect, 0.0, color);
+}
+
 fn get_folder_icon(key: &str) -> (&'static str, &'static [u8]) {
     match key {
         "home" => ("home", ICON_HOME),
@@ -30,6 +36,7 @@ fn get_folder_icon(key: &str) -> (&'static str, &'static [u8]) {
 
 pub fn render_header_text(label: &str, ui: &mut Ui) {
     let current_theme = with_theme(|t| t.current());
+    let palette = current_theme.sidebar_left.palette(&current_theme.global);
 
     let (rect, _) = ui.allocate_exact_size(vec2(ui.available_width(), 24.0), Sense::empty());
 
@@ -38,7 +45,7 @@ pub fn render_header_text(label: &str, ui: &mut Ui) {
         Align2::LEFT_CENTER,
         label,
         FontId::proportional(15.0),
-        current_theme.global.text_secondary(),
+        palette.fg_secondary,
     );
 }
 
@@ -50,13 +57,8 @@ pub fn render_local_buttons(
     ui: &mut Ui,
 ) {
     let current_theme = with_theme(|t| t.current());
+    let palette = current_theme.sidebar_left.palette(&current_theme.global);
     let (icon_name, icon_bytes) = get_folder_icon(icon_key);
-
-    let hover_bg = current_theme.sidebar_left.bg_hover();
-    let bg = current_theme.sidebar_left.bg_elevated();
-
-    let icon_color = current_theme.sidebar_left.icon_primary();
-    let hover_icon = current_theme.sidebar_left.icon_hover_on_color(hover_bg);
 
     let btn_id = ui.id().with(label);
     let available_w = ui.available_width();
@@ -64,16 +66,16 @@ pub fn render_local_buttons(
         .blaze_button(label)
         .id(btn_id)
         .size((available_w, 35.0))
-        .background_color(bg)
-        .hover_background_color(hover_bg)
+        .background_color(palette.bg_elevated)
+        .hover_background_color(palette.bg_hover)
         .radius(20)
-        .stroke_color(current_theme.sidebar_left.component_border())
-        .hover_stroke_color(hover_icon)
+        .stroke_color(palette.border_component)
+        .hover_stroke_color(palette.border_focus)
         .icon(icon_name, icon_bytes)
-        .icon_color(icon_color)
-        .hover_icon_color(hover_icon)
+        .icon_color(palette.icon_primary)
+        .hover_icon_color(palette.icon_hover)
         .icon_size(16_f32)
-        .text_color(current_theme.global.text_primary())
+        .text_color(palette.fg_primary)
         .stroke_width(current_theme.global.components_stroke_width)
         .show();
 
@@ -105,6 +107,7 @@ pub fn render_drives_button(
     ui_state: &mut BlazeUiState,
 ) {
     let current_theme = with_theme(|t| t.current());
+    let palette = current_theme.sidebar_left.palette(&current_theme.global);
 
     let used = drive.used_percent / 100.0;
     let is_mounted = drive.mountpoint.is_some();
@@ -126,30 +129,24 @@ pub fn render_drives_button(
         ("server", ICON_SERVER)
     };
 
-    let hover_bg = current_theme.sidebar_left.bg_hover();
-    let bg = current_theme.sidebar_left.bg_elevated();
-
-    let icon_color = current_theme.sidebar_left.icon_primary();
-    let hover_icon = current_theme.sidebar_left.icon_hover_on_color(hover_bg);
-
     let btn_id = ui.id().with(&display_name);
     let available_w = ui.available_width();
     let btn_resp = ui
         .blaze_button(&display_name)
         .id(btn_id)
         .size((available_w, if is_mounted { 68.0 } else { 35.0 }))
-        .background_color(bg)
-        .hover_background_color(hover_bg)
+        .background_color(palette.bg_elevated)
+        .hover_background_color(palette.bg_hover)
         .radius(20)
-        .stroke_color(current_theme.sidebar_left.component_border())
-        .hover_stroke_color(hover_icon)
+        .stroke_color(palette.border_component)
+        .hover_stroke_color(palette.border_focus)
         .icon(icon_name, icon_bytes)
-        .icon_color(icon_color)
-        .hover_icon_color(hover_icon)
+        .icon_color(palette.icon_primary)
+        .hover_icon_color(palette.icon_hover)
         .icon_size(16_f32)
-        .text_color(current_theme.global.text_primary())
-        .content_offset_y(if is_mounted { -15.0 } else { 0.0 })
+        .text_color(palette.fg_primary)
         .stroke_width(current_theme.global.components_stroke_width)
+        .content_offset_y(if is_mounted { -15.0 } else { 0.0 })
         .show();
 
     if is_mounted {
@@ -170,11 +167,8 @@ pub fn render_drives_button(
         );
 
         //Fondo de la barra
-        ui.painter().rect_filled(
-            progress_rect,
-            10.0,
-            Color32::from_rgba_unmultiplied(255, 255, 255, 30),
-        );
+        ui.painter()
+            .rect_filled(progress_rect, 10.0, palette.bg_hover);
 
         let filled_width = progress_rect.width() * used.clamp(0.0, 1.0);
         let filled_rect = Rect::from_min_size(
@@ -183,8 +177,7 @@ pub fn render_drives_button(
         );
 
         //relleno
-        ui.painter()
-            .rect_filled(filled_rect, 10.0, current_theme.sidebar_left.accent());
+        ui.painter().rect_filled(filled_rect, 10.0, palette.accent);
 
         let used_bytes = drive.total.saturating_sub(drive.available);
         let label = format!("{} / {}", format_size(used_bytes), format_size(drive.total));
@@ -194,7 +187,7 @@ pub fn render_drives_button(
             Align2::LEFT_TOP,
             label,
             FontId::proportional(12.0),
-            current_theme.global.text_secondary(),
+            palette.fg_secondary,
         );
     }
 

@@ -11,7 +11,7 @@ use crate::{
         blaze_ui_state::BlazeUiState,
         custom_components::UiExt,
         icons_cache::{icons::*, thumbnails::thumbnails_manager::Thumbnail},
-        themes::theme_manager::with_theme,
+        themes::{platform::color_ops, theme_manager::with_theme},
     },
 };
 use egui::{
@@ -111,17 +111,7 @@ pub fn git_dot_color(git: Option<&GitStatus>) -> Option<Color32> {
 }
 
 pub fn contrats_to_text_color(color: Color32) -> Color32 {
-    let r = color.r() as f32 / 255.0;
-    let g = color.g() as f32 / 255.0;
-    let b = color.b() as f32 / 255.0;
-
-    let luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-
-    if luminance > 0.5 {
-        Color32::from_rgb(30, 30, 30)
-    } else {
-        Color32::WHITE
-    }
+    color_ops::contrast_color(color)
 }
 
 pub fn ensure_min_lightness(color: Color32) -> Color32 {
@@ -130,62 +120,11 @@ pub fn ensure_min_lightness(color: Color32) -> Color32 {
 }
 
 pub fn ensure_min_lightness_with_luminance(color: Color32, min_lightness: f32) -> Color32 {
-    let r = color.r() as f32 / 255.0;
-    let g = color.g() as f32 / 255.0;
-    let b = color.b() as f32 / 255.0;
-
-    let max = r.max(g).max(b);
-    let min = r.min(g).min(b);
-    let l = (max + min) / 2.0;
-
-    if l >= min_lightness {
-        return color;
-    }
-
-    let delta = max - min;
-    let s = if delta < 1e-6 {
-        0.0
-    } else {
-        delta / (1.0 - (2.0 * l - 1.0).abs())
-    };
-
-    let h = if delta < 1e-6 {
-        0.0
-    } else if max == r {
-        60.0 * (((g - b) / delta) % 6.0)
-    } else if max == g {
-        60.0 * (((b - r) / delta) + 2.0)
-    } else {
-        60.0 * (((r - g) / delta) + 4.0)
-    };
-
-    let new_l = min_lightness;
-    let c = (1.0_f32 - (2.0_f32 * new_l - 1.0_f32).abs()) * s;
-    let x = c * (1.0 - ((h / 60.0) % 2.0 - 1.0).abs());
-    let m = new_l - c / 2.0;
-
-    let (r1, g1, b1) = match h {
-        0.0..=59.0 => (c, x, 0.0),
-        60.0..=119.0 => (x, c, 0.0),
-        120.0..=179.0 => (0.0, c, x),
-        180.0..=239.0 => (0.0, x, c),
-        240.0..=299.0 => (x, 0.0, c),
-        _ => (c, 0.0, x),
-    };
-
-    Color32::from_rgb(
-        ((r1 + m) * 255.0) as u8,
-        ((g1 + m) * 255.0) as u8,
-        ((b1 + m) * 255.0) as u8,
-    )
+    color_ops::ensure_min_lightness_hsl(color, min_lightness)
 }
 
 pub fn shade_color(c: Color32) -> Color32 {
-    let r = (c.r() as f32 * 0.70) as u8;
-    let g = (c.g() as f32 * 0.70) as u8;
-    let b = (c.b() as f32 * 0.70) as u8;
-
-    Color32::from_rgba_unmultiplied(r, g, b, c.a())
+    color_ops::shade(c)
 }
 
 ///----------- Componentes --------------
@@ -377,28 +316,26 @@ where
 
             let icon_size = vec2(18.0, 18.0);
 
-            // revisar esto más tarde
+            let icon1_pos = pos2(
+                animated_rect1.center().x - (icon_size.y / 2.0),
+                animated_rect1.center().y - (icon_size.y / 2.0),
+            );
+            let icon1_rect = Rect::from_min_size(icon1_pos, icon_size);
 
-            // let icon1_pos = pos2(
-            //     animated_rect1.center().x - (icon_size.y / 2.0),
-            //     animated_rect1.center().y - (icon_size.y / 2.0),
-            // );
-            //let icon1_rect = Rect::from_min_size(icon1_pos, icon_size);
+            let icon2_pos = pos2(
+                animated_rect2.center().x - (icon_size.y / 2.0),
+                animated_rect2.center().y - (icon_size.y / 2.0),
+            );
 
-            // let icon2_pos = pos2(
-            //     animated_rect2.center().x - (icon_size.y / 2.0),
-            //     animated_rect2.center().y - (icon_size.y / 2.0),
-            // );
+            let icon2_rect = Rect::from_min_size(icon2_pos, icon_size);
 
-            //let icon2_rect = Rect::from_min_size(icon2_pos, icon_size);
-
-            // let mut animated_icon_rect1 = icon1_rect;
-            // let mut animated_icon_rect2 = icon2_rect;
+            let mut animated_icon_rect1 = icon1_rect;
+            let mut animated_icon_rect2 = icon2_rect;
 
             if resp1.hovered() {
                 ui.set_cursor_icon(CursorIcon::PointingHand);
                 animated_rect1 = container_rect.scale_from_center(scale);
-                // animated_icon_rect1 = icon1_rect.scale_from_center(scale);
+                animated_icon_rect1 = icon1_rect.scale_from_center(scale);
             }
 
             if resp1.clicked() {
@@ -408,7 +345,7 @@ where
             if resp2.hovered() {
                 ui.set_cursor_icon(CursorIcon::PointingHand);
                 animated_rect2 = second_container.scale_from_center(scale);
-                // animated_icon_rect2 = icon2_rect.scale_from_center(scale);
+                animated_icon_rect2 = icon2_rect.scale_from_center(scale);
             }
 
             if resp2.clicked() {
@@ -442,12 +379,12 @@ where
             ui.draw_icon(("edit", ICON_EDIT))
                 .size(icon_size)
                 .tint(accent1)
-                .show();
+                .show_at(animated_icon_rect1);
 
             ui.draw_icon(("trash", ICON_TRASH))
                 .size(icon_size)
                 .tint(accent2)
-                .show();
+                .show_at(animated_icon_rect2);
         });
     });
 }

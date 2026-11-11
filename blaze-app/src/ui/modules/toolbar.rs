@@ -20,7 +20,6 @@ use crate::{
         system::clipboard_text::text_clipboard::with_text_clipboard,
     },
     ui::{
-        blaze_ui_state::BlazeUiState,
         custom_components::{UiExt, text_edit::BlazeTextEdit},
         icons_cache::icons::{self},
         modules::tabs_view::tab_views::tabs,
@@ -36,8 +35,9 @@ use std::{
     sync::Arc,
 };
 
-pub fn toolbar_component(ui: &mut Ui, state: &mut BlazeCoreState, ui_state: &mut BlazeUiState) {
+pub fn toolbar_component(ui: &mut Ui, state: &mut BlazeCoreState) {
     let current_theme = with_theme(|t| t.current());
+    let palette = current_theme.top_bar.palette(&current_theme.global);
     let i18n = with_configs(|c| c.get_i18n());
 
     Panel::top("toolbar")
@@ -56,12 +56,22 @@ pub fn toolbar_component(ui: &mut Ui, state: &mut BlazeCoreState, ui_state: &mut
             ui.spacing_mut().item_spacing.y = 0.0;
             ui.add_space(5.0);
 
-            let bar_width = ui.available_width();
+            let horizontal_padding = 5.0;
+            let full_rect = ui.available_rect_before_wrap();
+            let tabs_rect = Rect::from_min_max(
+                full_rect.min + vec2(horizontal_padding, 0.0),
+                full_rect.max - vec2(horizontal_padding, 0.0),
+            );
+            let tab_width = tabs_rect.width();
 
-            // ----------------------
-            // Tabs
-            // ----------------------
-            let bar_rect = tabs(ui, state, ui_state, bar_width);
+            let bar_rect = ui
+                .scope_builder(UiBuilder::new().max_rect(tabs_rect), |ui| {
+                    // ----------------------
+                    // Tabs
+                    // ----------------------
+                    tabs(ui, state, tab_width)
+                })
+                .inner;
 
             let route_h = 35.0;
             let horizontal_padding = 10.0;
@@ -95,18 +105,14 @@ pub fn toolbar_component(ui: &mut Ui, state: &mut BlazeCoreState, ui_state: &mut
                     if ui
                         .blaze_button("")
                         .id("back_btn")
+                        .icon("<", icons::ICON_ARROW_LEFT)
                         .set_is_active(back_active)
                         .size((route_h, route_h))
-                        .icon_color(current_theme.top_bar.icon_primary())
-                        .hover_icon_color(
-                            current_theme
-                                .top_bar
-                                .icon_hover_on_color(current_theme.top_bar.bg_elevated()),
-                        )
-                        .icon("<", icons::ICON_ARROW_LEFT)
-                        .text_color(current_theme.global.text_secondary())
-                        .background_color(current_theme.top_bar.bg_elevated())
-                        .stroke_color(current_theme.top_bar.component_border())
+                        .icon_color(palette.icon_primary)
+                        .hover_icon_color(palette.icon_hover)
+                        .text_color(palette.fg_secondary)
+                        .background_color(palette.bg_elevated)
+                        .stroke_color(palette.border_component)
                         .stroke_width(current_theme.global.components_stroke_width)
                         .radius(25.0)
                         .show()
@@ -120,13 +126,14 @@ pub fn toolbar_component(ui: &mut Ui, state: &mut BlazeCoreState, ui_state: &mut
                     if ui
                         .blaze_button("")
                         .id("forward_btn")
+                        .icon(">", icons::ICON_ARROW_RIGHT)
                         .set_is_active(forward_active)
                         .size((route_h, route_h))
-                        .icon_color(current_theme.top_bar.icon_primary())
-                        .icon(">", icons::ICON_ARROW_RIGHT)
-                        .text_color(current_theme.global.text_secondary())
-                        .background_color(current_theme.top_bar.bg_elevated())
-                        .stroke_color(current_theme.top_bar.component_border())
+                        .icon_color(palette.icon_primary)
+                        .hover_icon_color(palette.icon_hover)
+                        .text_color(palette.fg_secondary)
+                        .background_color(palette.bg_elevated)
+                        .stroke_color(palette.border_component)
                         .stroke_width(current_theme.global.components_stroke_width)
                         .radius(25.0)
                         .show()
@@ -140,13 +147,14 @@ pub fn toolbar_component(ui: &mut Ui, state: &mut BlazeCoreState, ui_state: &mut
                     if ui
                         .blaze_button("")
                         .id("up_btn")
+                        .icon("UP", icons::ICON_ARROW_UP)
                         .set_is_active(up_active)
                         .size((route_h, route_h))
-                        .icon_color(current_theme.top_bar.icon_primary())
-                        .icon("UP", icons::ICON_ARROW_UP)
-                        .text_color(current_theme.global.text_secondary())
-                        .background_color(current_theme.top_bar.bg_elevated())
-                        .stroke_color(current_theme.top_bar.component_border())
+                        .icon_color(palette.icon_primary)
+                        .hover_icon_color(palette.icon_hover)
+                        .text_color(palette.fg_secondary)
+                        .background_color(palette.bg_elevated)
+                        .stroke_color(palette.border_component)
                         .stroke_width(current_theme.global.components_stroke_width)
                         .radius(25.0)
                         .show()
@@ -158,12 +166,13 @@ pub fn toolbar_component(ui: &mut Ui, state: &mut BlazeCoreState, ui_state: &mut
                     if ui
                         .blaze_button("")
                         .id("settings_btn")
-                        .size((route_h, route_h))
-                        .icon_color(current_theme.top_bar.icon_primary())
                         .icon("settings", icons::ICON_SETTINGS)
-                        .text_color(current_theme.global.text_secondary())
-                        .background_color(current_theme.top_bar.bg_elevated())
-                        .stroke_color(current_theme.top_bar.component_border())
+                        .size((route_h, route_h))
+                        .icon_color(palette.icon_primary)
+                        .hover_icon_color(palette.icon_hover)
+                        .text_color(palette.fg_secondary)
+                        .background_color(palette.bg_elevated)
+                        .stroke_color(palette.border_component)
                         .stroke_width(current_theme.global.components_stroke_width)
                         .radius(25.0)
                         .show()
@@ -176,7 +185,7 @@ pub fn toolbar_component(ui: &mut Ui, state: &mut BlazeCoreState, ui_state: &mut
 
                     let cwd = state.cwd();
                     Frame::new()
-                        .fill(current_theme.top_bar.bg_elevated())
+                        .fill(palette.bg_elevated)
                         .corner_radius(CornerRadius::same(20))
                         .inner_margin(0)
                         .show(ui, |ui| {
@@ -238,7 +247,7 @@ pub fn toolbar_component(ui: &mut Ui, state: &mut BlazeCoreState, ui_state: &mut
                                         (ui.available_width() - reserve_for_clipboard).max(0.0);
 
                                     let sep_font = FontId::proportional(16.0);
-                                    let sep_color = current_theme.global.text_secondary();
+                                    let sep_color = palette.fg_secondary;
                                     let sep_w = ui
                                         .painter()
                                         .layout_no_wrap(">".to_owned(), sep_font, sep_color)
@@ -263,7 +272,7 @@ pub fn toolbar_component(ui: &mut Ui, state: &mut BlazeCoreState, ui_state: &mut
                                             .layout_no_wrap(
                                                 name.clone(),
                                                 crumb_font.clone(),
-                                                current_theme.global.text_primary(),
+                                                palette.fg_primary,
                                             )
                                             .rect
                                             .width()
@@ -298,7 +307,7 @@ pub fn toolbar_component(ui: &mut Ui, state: &mut BlazeCoreState, ui_state: &mut
                                             .layout_no_wrap(
                                                 "...".to_owned(),
                                                 crumb_font.clone(),
-                                                current_theme.global.text_primary(),
+                                                palette.fg_primary,
                                             )
                                             .rect
                                             .width()
@@ -329,7 +338,7 @@ pub fn toolbar_component(ui: &mut Ui, state: &mut BlazeCoreState, ui_state: &mut
                                     if visible_from > 0 {
                                         ui.label_ns(
                                             RichText::new("...")
-                                                .color(current_theme.global.text_secondary())
+                                                .color(palette.fg_secondary)
                                                 .size(16.0),
                                         );
                                     }
@@ -367,12 +376,12 @@ pub fn toolbar_component(ui: &mut Ui, state: &mut BlazeCoreState, ui_state: &mut
                                             .blaze_button(&display_name)
                                             .size((*w, 28.0))
                                             .text_color(if is_last {
-                                                current_theme.global.text_primary()
+                                                palette.fg_primary
                                             } else {
-                                                current_theme.global.text_secondary()
+                                                palette.fg_secondary
                                             })
                                             .background_color(if is_last {
-                                                current_theme.top_bar.accent()
+                                                palette.accent
                                             } else {
                                                 Color32::TRANSPARENT
                                             })
@@ -399,7 +408,7 @@ pub fn toolbar_component(ui: &mut Ui, state: &mut BlazeCoreState, ui_state: &mut
                                         if !is_last {
                                             ui.label_ns(
                                                 RichText::new("›")
-                                                    .color(current_theme.global.text_secondary())
+                                                    .color(palette.fg_secondary)
                                                     .size(16.0),
                                             );
                                         }
@@ -424,8 +433,9 @@ pub fn toolbar_component(ui: &mut Ui, state: &mut BlazeCoreState, ui_state: &mut
                                 .size((20.0, 20.0))
                                 .icon("clipboard", icons::ICON_CLIPBOARD)
                                 .icon_size(13.0_f32)
-                                .text_color(current_theme.global.text_secondary())
-                                .background_color(current_theme.top_bar.bg_panel())
+                                .hover_icon_color(palette.icon_hover)
+                                .text_color(palette.fg_secondary)
+                                .background_color(palette.bg_panel)
                                 .stroke_color(Color32::TRANSPARENT)
                                 .radius(25.0)
                                 .show()

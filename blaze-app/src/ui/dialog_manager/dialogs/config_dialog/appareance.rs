@@ -223,6 +223,10 @@ pub(crate) fn render_appearance_settings(c_dialog: &mut ConfigDialog, ui: &mut U
                                                         current_theme.main_area.bg_panel(),
                                                     )
                                                     .accent(current_theme.main_area.accent())
+                                                    .handle_color(current_theme.main_area.accent())
+                                                    .handle_stroke_color(
+                                                        current_theme.main_area.bg_panel(),
+                                                    )
                                                     .show()
                                                     .changed()
                                                 {
@@ -247,6 +251,10 @@ pub(crate) fn render_appearance_settings(c_dialog: &mut ConfigDialog, ui: &mut U
                                                         current_theme.main_area.bg_panel(),
                                                     )
                                                     .accent(current_theme.main_area.accent())
+                                                    .handle_color(current_theme.main_area.accent())
+                                                    .handle_stroke_color(
+                                                        current_theme.main_area.bg_panel(),
+                                                    )
                                                     .show()
                                                     .changed()
                                                 {

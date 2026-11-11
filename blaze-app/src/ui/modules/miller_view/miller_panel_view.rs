@@ -116,10 +116,8 @@ fn background_response_logic(
 
     let mut ctx_menu = std::mem::take(&mut ui_state.context_menu_state);
     match ctx_menu.kind {
-        ContextMenuKind::BackgroundNormal => ctx_menu.background_context_menu(ui, state, ui_state),
-        ContextMenuKind::BackgroundTrash => {
-            ctx_menu.background_context_menu_in_trash(ui, state, ui_state)
-        }
+        ContextMenuKind::BackgroundNormal => ctx_menu.background_context_menu(ui, state),
+        ContextMenuKind::BackgroundTrash => ctx_menu.background_context_menu_in_trash(ui, state),
         _ => {}
     }
     ui_state.context_menu_state = ctx_menu;
@@ -136,6 +134,7 @@ pub fn miller_panel_frame(
     bottom_padding: i8,
 ) {
     let current_theme = with_theme(|t| t.current());
+    let palette = current_theme.main_area.palette(&current_theme.global);
 
     ScrollArea::horizontal()
         .id_salt("miller_horizontal")
@@ -166,7 +165,7 @@ pub fn miller_panel_frame(
                             top: 0,
                             bottom: 5,
                         })
-                        .fill(current_theme.main_area.bg_panel())
+                        .fill(palette.bg_panel)
                         .corner_radius(CornerRadius {
                             nw: 0,
                             ne: 0,
@@ -176,9 +175,9 @@ pub fn miller_panel_frame(
                         .stroke(Stroke {
                             width: 0.5,
                             color: if is_focused {
-                                current_theme.main_area.accent()
+                                palette.border_focus
                             } else {
-                                current_theme.main_area.bg_panel()
+                                palette.bg_panel
                             },
                         })
                         .show(ui, |ui| {
@@ -337,7 +336,7 @@ pub fn miller_panel_frame(
                 {
                     let files: &[Arc<FileEntry>] = &state.get_files_for(&focused);
                     //Isla y burbuja y las tabs
-                    render_island_bubble(ui, state, ui_state, files, bottom_padding);
+                    render_island_bubble(ui, state, files, bottom_padding);
                 }
             });
         });

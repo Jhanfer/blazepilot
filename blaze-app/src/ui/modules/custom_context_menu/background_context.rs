@@ -1,6 +1,6 @@
 use std::{cell::Cell, path::PathBuf, sync::Arc};
 
-use egui::{Color32, Id, Ui};
+use egui::{Id, Ui};
 use tracing::warn;
 
 use crate::{
@@ -10,22 +10,14 @@ use crate::{
         files::blaze_motor::motor_structs::FileEntry,
         runtime::bus_structs::{FileOperation, SureTo, UiEvent},
     },
-    ui::{
-        blaze_ui_state::BlazeUiState, custom_components::UiExt, icons_cache::icons,
-        themes::theme_manager::with_theme,
-    },
+    ui::{custom_components::UiExt, icons_cache::icons, themes::theme_manager::with_theme},
 };
 
 use crate::ui::modules::custom_context_menu::context_state::ContextMenuState;
 
 impl ContextMenuState {
     //Menús del fondo
-    pub fn background_context_menu_in_trash(
-        &mut self,
-        ui: &mut Ui,
-        state: &mut BlazeCoreState,
-        ui_state: &mut BlazeUiState,
-    ) {
+    pub fn background_context_menu_in_trash(&mut self, ui: &mut Ui, state: &mut BlazeCoreState) {
         let i18n = with_configs(|c| c.get_i18n());
 
         if !self.open {
@@ -66,7 +58,6 @@ impl ContextMenuState {
 
                 Self::render_context_button(
                     ui,
-                    ui_state,
                     &label,
                     hint,
                     icon,
@@ -74,7 +65,7 @@ impl ContextMenuState {
                     || {
                         action.set(Some(0));
                     },
-                    None::<fn(&mut Ui, &mut BlazeUiState)>,
+                    None::<fn(&mut Ui)>,
                 );
 
                 if let Some(0) = action.get() {
@@ -97,7 +88,6 @@ impl ContextMenuState {
 
                 Self::render_context_button(
                     ui,
-                    ui_state,
                     &label,
                     hint,
                     icon,
@@ -105,7 +95,7 @@ impl ContextMenuState {
                     || {
                         action.set(Some(0));
                     },
-                    None::<fn(&mut Ui, &mut BlazeUiState)>,
+                    None::<fn(&mut Ui)>,
                 );
 
                 if let Some(0) = action.get() {
@@ -121,74 +111,53 @@ impl ContextMenuState {
         });
     }
 
-    pub fn background_context_menu(
-        &mut self,
-        ui: &mut Ui,
-        state: &mut BlazeCoreState,
-        ui_state: &mut BlazeUiState,
-    ) {
+    pub fn background_context_menu(&mut self, ui: &mut Ui, state: &mut BlazeCoreState) {
         let i18n = with_configs(|c| c.get_i18n());
         let current_theme = with_theme(|f| f.current());
+        let palette = current_theme.context_menu.palette(&current_theme.global);
 
         if !self.open {
             return;
         }
 
         let mut should_close = false;
-        let mut just_opened = Cell::new(self.just_opened);
         self.show_menu(ui, "custom_ctx_menu_background", |ui| {
             let w = ui.available_width();
             let search_id = Id::new("search_ctx_menu");
             let has_focus = ui.memory(|mem| mem.has_focus(search_id));
 
-            let bg = current_theme.context_menu.bg_elevated();
-            let c = current_theme.context_menu.accent();
-
             let search_color = if has_focus {
-                current_theme.context_menu.color_hover_on_color(c, bg)
+                palette.border_focus
             } else {
-                bg
+                palette.border_component
             };
 
             let (icon_name, icon_bytes) = ("search", icons::ICON_SEARCH);
-            let hint_stroke_color = Color32::from_rgba_unmultiplied(
-                c.r().saturating_add(20),
-                c.g().saturating_add(20),
-                c.b().saturating_add(20),
-                120,
-            );
-
-            let hint_color = Color32::from_rgba_unmultiplied(
-                c.r().saturating_add(60),
-                c.g().saturating_add(60),
-                c.b().saturating_add(60),
-                160,
-            );
 
             let mut search = state.current_search_filter().to_string();
 
             let response = ui
                 .blaze_input(&i18n.t("search.placeholder"), None, &mut search)
                 .id(search_id)
-                .hint_background_color(c)
-                .hint_stroke_color(hint_stroke_color)
-                .hint_text_color(hint_color)
+                .hint_background_color(palette.accent_soft)
+                .hint_stroke_color(palette.accent_text)
+                .hint_text_color(palette.accent_text)
                 .size((w, 30.0))
                 .radius(20)
-                .text_color(current_theme.global.text_primary())
-                .background_color(bg)
+                .text_color(palette.fg_primary)
+                .background_color(palette.bg_elevated)
                 .stroke_color(search_color)
-                .x_color(c)
+                .x_color(palette.accent_text)
                 .icon(icon_name, icon_bytes)
-                .icon_color(search_color)
+                .icon_color(if has_focus {
+                    palette.accent_text
+                } else {
+                    palette.icon_secondary
+                })
                 .stroke_width(current_theme.global.components_stroke_width)
                 .show(|| {
                     state.clean_search();
                 });
-
-            if response.clicked() {
-                just_opened = true.into();
-            }
 
             if response.changed() {
                 state.set_search(search);
@@ -207,7 +176,6 @@ impl ContextMenuState {
 
                 Self::render_context_button(
                     ui,
-                    ui_state,
                     &label,
                     hint,
                     icon,
@@ -215,7 +183,7 @@ impl ContextMenuState {
                     || {
                         action.set(Some(0));
                     },
-                    None::<fn(&mut Ui, &mut BlazeUiState)>,
+                    None::<fn(&mut Ui)>,
                 );
 
                 if let Some(0) = action.get() {
@@ -248,7 +216,6 @@ impl ContextMenuState {
 
                 Self::render_context_button(
                     ui,
-                    ui_state,
                     &label,
                     hint,
                     icon,
@@ -256,7 +223,7 @@ impl ContextMenuState {
                     || {
                         action.set(Some(0));
                     },
-                    None::<fn(&mut Ui, &mut BlazeUiState)>,
+                    None::<fn(&mut Ui)>,
                 );
 
                 if let Some(0) = action.get() {
@@ -278,7 +245,6 @@ impl ContextMenuState {
 
                 Self::render_context_button(
                     ui,
-                    ui_state,
                     &label,
                     hint,
                     icon,
@@ -286,7 +252,7 @@ impl ContextMenuState {
                     || {
                         action.set(Some(0));
                     },
-                    None::<fn(&mut Ui, &mut BlazeUiState)>,
+                    None::<fn(&mut Ui)>,
                 );
 
                 if let Some(0) = action.get() {
@@ -306,7 +272,6 @@ impl ContextMenuState {
 
                 Self::render_context_button(
                     ui,
-                    ui_state,
                     &label,
                     hint,
                     icon,
@@ -314,7 +279,7 @@ impl ContextMenuState {
                     || {
                         action.set(Some(0));
                     },
-                    None::<fn(&mut Ui, &mut BlazeUiState)>,
+                    None::<fn(&mut Ui)>,
                 );
 
                 if let Some(0) = action.get() {
@@ -334,7 +299,6 @@ impl ContextMenuState {
 
                 Self::render_context_button(
                     ui,
-                    ui_state,
                     &label,
                     hint,
                     icon,
@@ -342,7 +306,7 @@ impl ContextMenuState {
                     || {
                         action.set(Some(0));
                     },
-                    None::<fn(&mut Ui, &mut BlazeUiState)>,
+                    None::<fn(&mut Ui)>,
                 );
 
                 if let Some(0) = action.get() {
@@ -356,7 +320,5 @@ impl ContextMenuState {
         if should_close {
             self.close();
         }
-
-        self.just_opened = just_opened.get();
     }
 }

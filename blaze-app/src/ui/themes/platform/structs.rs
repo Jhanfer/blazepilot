@@ -1,4 +1,4 @@
-use egui::{Color32, Rgba, ecolor::ParseHexColorError, epaint::Hsva};
+use egui::{Color32, ecolor::ParseHexColorError};
 use serde::{Deserialize, Serialize};
 
 //Traits
@@ -211,6 +211,18 @@ impl From<LegacyTheme> for BlazeAppTheme {
             },
 
             context_menu: SectionTheme {
+                bg_panel: old.semantic.bg_main.clone().into(),
+                bg_elevated: old.semantic.bg_container.clone().into(),
+                bg_hover: old.components.list_item.bg_hover.clone().into(),
+                bg_active: old.components.list_item.bg_selected.clone().into(),
+                icon_primary: old.semantic.text_primary.clone().into(),
+                icon_secondary: old.semantic.text_secondary.clone().into(),
+                accent: old.semantic.accent.clone().into(),
+                panel_border: old.components.panel.border.clone().into(),
+                component_border: old.components.panel.border.clone().into(),
+            },
+
+            dialogs: SectionTheme {
                 bg_panel: old.semantic.bg_main.into(),
                 bg_elevated: old.semantic.bg_container.into(),
                 bg_hover: old.components.list_item.bg_hover.into(),
@@ -390,44 +402,12 @@ pub struct SectionTheme {
 }
 
 impl SectionTheme {
-    /// Detecta según la luminosidad si el fondo es oscuro
-    fn is_dark_bg(&self, bg_color: Color32) -> bool {
-        let rgb = Rgba::from(bg_color);
-        // fórmula de luminancia relativa básica
-        let luminance = rgb.r() * 0.299 + rgb.g() * 0.587 + rgb.b() * 0.114;
-        luminance < 0.5
-    }
-
-    fn shift_to_hover(&self, target_c: impl AsColor, bg: impl AsColor) -> Color32 {
-        let target_c = as_color_unwrap(target_c.as_color());
-        let mut hsva = Hsva::from(target_c);
-
-        if self.is_dark_bg(as_color_unwrap(bg.as_color())) {
-            hsva.v = (hsva.v + 0.15).min(1.0); // aclara el color
-            hsva.s = (hsva.s - 0.1).max(0.0); // reducir la saturación
-        } else {
-            hsva.v = (hsva.v - 0.15).max(0.0); // oscurece el color
-            hsva.s = (hsva.s + 0.1).min(1.0); // aumentar la saturación
-        }
-
-        hsva.into()
-    }
-
-    pub fn icon_hover_on_color(&self, bg: Color32) -> Color32 {
-        self.shift_to_hover(&*self.icon_primary, bg)
-    }
-
-    pub fn color_hover_on_color(&self, color: Color32, bg: Color32) -> Color32 {
-        self.shift_to_hover(color, bg)
-    }
-
     /// Color primario para el icono
     pub fn icon_primary(&self) -> Color32 {
         as_color_unwrap(self.icon_primary.as_color())
     }
 
     /// Color secundario para el icono
-    #[allow(unused)]
     pub fn icon_secondary(&self) -> Color32 {
         as_color_unwrap(self.icon_secondary.as_color())
     }
@@ -479,4 +459,5 @@ pub struct BlazeAppTheme {
     pub main_area: SectionTheme,
     pub context_menu: SectionTheme,
     pub top_bar: SectionTheme,
+    pub dialogs: SectionTheme,
 }

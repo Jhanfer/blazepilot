@@ -553,7 +553,7 @@ pub fn tag_views(
                 });
             });
 
-            render_tags_island_bubble(ui, state, ui_state, bottom_padding, tag_len);
+            render_tags_island_bubble(ui, state, bottom_padding, tag_len);
         });
 
     //Tags

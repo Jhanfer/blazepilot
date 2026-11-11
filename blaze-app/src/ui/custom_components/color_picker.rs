@@ -269,7 +269,7 @@ impl<'a> BlazeColorSelector<'a> {
             .inner_margin(10.0)
             .size(vec2(255.0, 295.0))
             .show(|ui| {
-                let available = self.ui.available_size();
+                let available = ui.available_size();
 
                 ui.allocate_ui_with_layout(
                     available,
@@ -344,7 +344,7 @@ impl<'a> BlazeColorSelector<'a> {
                         let (rect, mut response) =
                             ui.allocate_exact_size(size, Sense::click_and_drag());
 
-                        if (response.dragged() || response.clicked())
+                        if response.is_pointer_button_down_on()
                             && let Some(pointer_pos) = response.interact_pointer_pos()
                         {
                             ps.hsva.s =
@@ -416,7 +416,7 @@ impl<'a> BlazeColorSelector<'a> {
         let (rect, mut response) =
             ui.allocate_exact_size(vec2(240.0, 16.0), Sense::click_and_drag());
 
-        if (response.dragged() || response.clicked())
+        if response.is_pointer_button_down_on()
             && let Some(pos) = response.interact_pointer_pos()
         {
             *alpha = ((pos.x - rect.left()) / rect.width()).clamp(0.0, 1.0);
@@ -476,7 +476,7 @@ impl<'a> BlazeColorSelector<'a> {
         let (rect, mut response) =
             ui.allocate_exact_size(vec2(240.0, 16.0), Sense::click_and_drag());
 
-        if (response.dragged() || response.clicked())
+        if response.is_pointer_button_down_on()
             && let Some(pos) = response.interact_pointer_pos()
         {
             *hue = ((pos.x - rect.left()) / rect.width()).clamp(0.0, 1.0);

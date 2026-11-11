@@ -19,7 +19,7 @@ use crate::{
         modules::{
             custom_context_menu::context_state::ContextMenuKind,
             sidebar_left_component::sidebar_components::{
-                render_drives_button, render_header_text, render_local_buttons,
+                render_drives_button, render_header_text, render_local_buttons, render_separator,
             },
         },
         themes::{platform::structs::BlazeAppTheme, theme_manager::with_theme},
@@ -27,7 +27,7 @@ use crate::{
 };
 use egui::{
     Align, Area, CornerRadius, Frame, Id, Label, Layout, Margin, Panel, Rect, RichText, ScrollArea,
-    Sense, Stroke, Ui, Vec2, pos2, scroll_area::ScrollBarVisibility, vec2,
+    Sense, Stroke, Ui, pos2, scroll_area::ScrollBarVisibility, vec2,
 };
 
 use crate::ui::modules::sidebar_left_component::leftbar_state::{
@@ -41,6 +41,7 @@ fn render_expanded_panel(
     current_order: OrderingMode,
 ) {
     let current_theme = with_theme(|t| t.current());
+    let palette = current_theme.sidebar_left.palette(&current_theme.global);
     let i18n = with_configs(|c| c.get_i18n());
 
     let custom_frame = Frame::NONE
@@ -91,7 +92,7 @@ fn render_expanded_panel(
                 .corner_radius(CornerRadius::same(20))
                 .stroke(Stroke {
                     width: current_theme.global.panel_stroke_width,
-                    color: current_theme.sidebar_left.panel_border(),
+                    color: palette.border_panel,
                 })
                 .show(ui, |ui| {
                     ui.set_height(ui.available_height());
@@ -121,7 +122,7 @@ fn render_expanded_panel(
                             }
 
                             ui.add_space(20.0);
-                            ui.separator();
+                            render_separator(ui, palette.border_panel);
 
                             ui.add_space(10.0);
                             render_header_text(&i18n.t("left_sidebar.disks"), ui);
@@ -143,7 +144,7 @@ fn render_expanded_panel(
                             let mut ctx_menu = std::mem::take(&mut ui_state.context_menu_state);
 
                             if ctx_menu.kind == ContextMenuKind::DrivesPanel {
-                                ctx_menu.render_drives_context(ui, state, ui_state)
+                                ctx_menu.render_drives_context(ui, state)
                             }
 
                             ui_state.context_menu_state = ctx_menu;
@@ -152,26 +153,42 @@ fn render_expanded_panel(
         })
         .response;
 
-    let new_width = left_response.rect.width() - 3.0 * current_theme.global.panel_stroke_width;
+    let stroke_total = 3.0 * current_theme.global.panel_stroke_width;
 
-    if new_width < MIN_PANEL_WIDTH_TOLERANCE
-        && current_order.leftpanel_state.width >= MIN_PANEL_WIDTH_TOLERANCE
-    {
+    let min_width = MIN_PANEL_WIDTH_TOLERANCE + stroke_total;
+
+    let rect_width = left_response.rect.width();
+    let prev_width = current_order.leftpanel_state.width;
+    let was_open = prev_width >= min_width;
+    let is_growing = rect_width > prev_width;
+
+    if rect_width < min_width {
+        if was_open && !is_growing {
+            with_configs(|c| {
+                let mut o = c.get_ordering_mode();
+                o.leftpanel_state.collapsed = true;
+                c.set_ordering_mode(o);
+            });
+        } else if is_growing {
+            with_configs(|c| {
+                let mut o = c.get_ordering_mode();
+                o.leftpanel_state.collapsed = false;
+                o.leftpanel_state.width = min_width;
+                c.set_ordering_mode(o);
+            })
+        }
+    } else {
         with_configs(|c| {
-            let mut current_ordering = c.get_ordering_mode();
-            current_ordering.leftpanel_state.collapsed = true;
-            c.set_ordering_mode(current_ordering);
-        });
-    } else if new_width >= MIN_PANEL_WIDTH_TOLERANCE {
-        with_configs(|c| {
-            let mut current_ordering = c.get_ordering_mode();
-            current_ordering.leftpanel_state.width = new_width;
-            c.set_ordering_mode(current_ordering);
+            let mut o = c.get_ordering_mode();
+            o.leftpanel_state.width = rect_width;
+            o.leftpanel_state.collapsed = false;
+            c.set_ordering_mode(o);
         });
     }
 }
 
 fn render_collapsed_tab(ui: &mut Ui, current_theme: Arc<BlazeAppTheme>) {
+    let palette = current_theme.sidebar_left.palette(&current_theme.global);
     let area_id = Id::new("left_tab");
     let hover_state_id = Id::new("left_tab_hover_state");
 
@@ -191,33 +208,39 @@ fn render_collapsed_tab(ui: &mut Ui, current_theme: Arc<BlazeAppTheme>) {
                 .fixed_pos(visual_pos)
                 .sense(Sense::all())
                 .show(ui, |ui| {
-                    //let area_rect = ui.max_rect();
+                    let area_rect = ui.max_rect();
                     let frame_width = if is_hovered { 20.0 } else { 5.0 };
 
                     Frame::NONE
                         .inner_margin(Margin::same(10))
-                        .fill(current_theme.sidebar_left.bg_panel())
+                        .fill(if is_hovered {
+                            palette.bg_hover
+                        } else {
+                            palette.bg_panel
+                        })
                         .stroke(Stroke::new(
                             current_theme.global.panel_stroke_width,
-                            current_theme.sidebar_left.panel_border(),
+                            palette.border_panel,
                         ))
                         .corner_radius(CornerRadius::same(20))
                         .show(ui, |ui| {
                             ui.set_width(frame_width);
                             ui.set_height(area_height / 2.0);
 
-                            let icon_size = 18.0;
+                            let area_center = area_rect.center();
+                            let icon_size = vec2(18.0, 18.0);
+                            let t_icon_rect = Rect::from_center_size(area_center, icon_size);
 
-                            // revisar esto más tarde
-                            // let area_center = area_rect.center();
-                            // let t_icon_rect =
-                            //     Rect::from_center_size(area_center, vec2(icon_size, icon_size));
                             let (icon_n, icon_b) = ("left_sidebar", icons::ICON_SIDEBAR_LEFT);
 
                             ui.draw_icon((icon_n, icon_b))
-                                .size(Vec2::splat(icon_size))
-                                .tint(current_theme.global.text_secondary())
-                                .show();
+                                .size(icon_size)
+                                .tint(if is_hovered {
+                                    palette.icon_hover
+                                } else {
+                                    palette.icon_secondary
+                                })
+                                .show_at(t_icon_rect);
                         });
                 })
                 .response;

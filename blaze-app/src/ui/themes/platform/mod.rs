@@ -1,5 +1,7 @@
+pub mod color_ops;
 pub mod colors_trait;
 pub mod defaults;
+pub mod palette;
 pub mod structs;
 
 pub use crate::ui::themes::platform::colors_trait::ColorsTrait;

@@ -120,10 +120,8 @@ fn background_response_logic(
 
     let mut ctx_menu = std::mem::take(&mut ui_state.context_menu_state);
     match ctx_menu.kind {
-        ContextMenuKind::BackgroundNormal => ctx_menu.background_context_menu(ui, state, ui_state),
-        ContextMenuKind::BackgroundTrash => {
-            ctx_menu.background_context_menu_in_trash(ui, state, ui_state)
-        }
+        ContextMenuKind::BackgroundNormal => ctx_menu.background_context_menu(ui, state),
+        ContextMenuKind::BackgroundTrash => ctx_menu.background_context_menu_in_trash(ui, state),
         _ => {}
     }
     ui_state.context_menu_state = ctx_menu;
@@ -144,6 +142,7 @@ pub fn grid_panel_frame(
     state.resize_selection(files.len());
 
     let current_theme = with_theme(|t| t.current());
+    let palette = current_theme.main_area.palette(&current_theme.global);
 
     Frame::NONE
         .inner_margin(Margin {
@@ -152,7 +151,7 @@ pub fn grid_panel_frame(
             top: 0,
             bottom: 10,
         })
-        .fill(current_theme.main_area.bg_panel())
+        .fill(palette.bg_panel)
         .corner_radius(CornerRadius {
             nw: 0,
             ne: 0,
@@ -161,7 +160,7 @@ pub fn grid_panel_frame(
         })
         .stroke(Stroke {
             width: 0.5,
-            color: current_theme.main_area.panel_border(),
+            color: palette.border_panel,
         })
         .show(ui, |ui| {
             let original_clip = ui.clip_rect();
@@ -296,7 +295,7 @@ pub fn grid_panel_frame(
             }
 
             //Isla y burbuja y las tabs
-            render_island_bubble(ui, state, ui_state, files, bottom_padding);
+            render_island_bubble(ui, state, files, bottom_padding);
 
             //hotkeys
             hot_keys_logic(state, ui_state, files, ui);

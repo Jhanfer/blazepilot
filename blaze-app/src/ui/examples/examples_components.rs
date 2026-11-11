@@ -11,7 +11,7 @@ use crate::{
         custom_components::UiExt,
         icons_cache::icons,
         modules::utilities::{contrats_to_text_color, ensure_min_lightness, resolve_icon},
-        themes::theme_manager::with_theme,
+        themes::{platform::color_ops, theme_manager::with_theme},
     },
     utils::formating::{format_date, format_size},
 };
@@ -161,19 +161,9 @@ pub fn render_examples_ui(ui: &mut Ui, state: &mut ExamplesUiState) {
             );
 
             let c = current_theme.main_area.accent();
-            let hint_stroke_color = Color32::from_rgba_unmultiplied(
-                c.r().saturating_add(20),
-                c.g().saturating_add(20),
-                c.b().saturating_add(20),
-                120,
-            );
-
-            let hint_color = Color32::from_rgba_unmultiplied(
-                c.r().saturating_add(60),
-                c.g().saturating_add(60),
-                c.b().saturating_add(60),
-                160,
-            );
+            let hint_bg = current_theme.main_area.bg_elevated();
+            let hint_stroke_color = color_ops::mix(hint_bg, c, 0.45);
+            let hint_color = color_ops::ensure_contrast(c, hint_bg, 3.0);
 
             let (icon_name, icon_bytes) = ("search", icons::ICON_SEARCH);
             let mut test = String::new();
@@ -366,15 +356,18 @@ pub fn render_examples_ui(ui: &mut Ui, state: &mut ExamplesUiState) {
 
                         // --- Icono ---
                         let icon_size = 16.0;
+                        let left_padding = icon_size / 6.0;
+                        let icon_rect = Rect::from_min_size(
+                            pos2(rect.min.x + left_padding, rect.center().y - icon_size / 2.0),
+                            vec2(icon_size, icon_size),
+                        );
 
                         let (icon_name, icon_bytes, color) = resolve_icon(file, Some(text_color));
 
-                        let icon_rect = ui
-                            .draw_icon((&icon_name, icon_bytes))
+                        ui.draw_icon((&icon_name, icon_bytes))
                             .size(Vec2::splat(icon_size))
                             .tint(color)
-                            .show()
-                            .rect;
+                            .show_at(icon_rect);
 
                         // --- Nombre ---
 

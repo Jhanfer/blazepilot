@@ -66,8 +66,6 @@ pub trait UiExt<'a> {
     ) -> BlazeInput<'a>;
 
     /// Instancia un menú desplegable  [`BlazeComboBox`]
-    ///
-    /// # Parámetros:
     fn blaze_combobox(&'a mut self) -> BlazeComboBox<'a>;
 
     /// Inicia la construcción de la base para ventanas o menús emergentes [`BlazePopup`]
@@ -84,6 +82,13 @@ pub trait UiExt<'a> {
         range: impl Into<std::ops::RangeInclusive<Num>>,
     ) -> BlazeSlider<'a, Num>;
 
+    /// Crea un builder de [`BlazeIcon`] reutilizando la caché de iconos
+    ///
+    /// Permite configurar parámetros visuales (como el tamaño o el tinte) antes de
+    /// renderizar el icono en la interfaz
+    ///
+    /// # Parámetros
+    /// - `icon_data`: Tupla con el identificador o nombre del icono y los bytes de la imagen
     fn draw_icon(&'a mut self, icon_data: (&'a str, impl Into<&'a [u8]>)) -> BlazeIcon<'a>;
 }
 

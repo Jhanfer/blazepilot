@@ -30,6 +30,28 @@ pub struct OrderingMode {
     pub leftpanel_state: LeftPanelState,
 }
 
+impl OrderingMode {
+    pub fn toggle(&self, target_kind: OrderingKind) -> Self {
+        if self.kind == target_kind {
+            let direction = match self.direction {
+                OrderingDirection::Asc => OrderingDirection::Desc,
+                OrderingDirection::Desc => OrderingDirection::Asc,
+            };
+
+            Self {
+                direction,
+                ..Default::default()
+            }
+        } else {
+            Self {
+                kind: target_kind,
+                direction: OrderingDirection::Asc,
+                ..*self
+            }
+        }
+    }
+}
+
 //--__--__--__--__ Backends  __--__--__--__--__--__--__
 #[derive(Serialize, Deserialize, Debug, Default, Clone, PartialEq)]
 pub enum DisplayBackend {

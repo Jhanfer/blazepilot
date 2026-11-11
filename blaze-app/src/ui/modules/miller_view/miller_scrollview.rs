@@ -20,7 +20,7 @@ use crate::{
             custom_context_menu::context_state::ContextMenuKind,
             utilities::{ensure_min_lightness, git_dot_color, resolve_icon, text_color_for_git},
         },
-        themes::theme_manager::with_theme,
+        themes::{platform::color_ops, theme_manager::with_theme},
     },
 };
 use egui::{
@@ -257,6 +257,7 @@ pub fn render_miller_scrollview(
     ui_state.enforce_texture_cache_limit(500);
 
     let current_theme = with_theme(|t| t.current());
+    let palette = current_theme.main_area.palette(&current_theme.global);
     let i18n = with_configs(|c| c.get_i18n());
     let col_id = ui.id().with(("miller_col", col_index));
 
@@ -438,13 +439,11 @@ pub fn render_miller_scrollview(
 
                         let is_selected = state.is_selected_for(&col_path, i);
 
-                        // painter de la selección y directorio abierto
-                        let mut c = current_theme.main_area.accent();
                         if is_opened || is_selected {
                             let color = if is_opened {
-                                Color32::from_rgba_unmultiplied(c.r(), c.g(), c.b(), 200)
+                                color_ops::with_alpha(palette.accent, 200)
                             } else {
-                                Color32::from_rgba_unmultiplied(c.r(), c.g(), c.b(), 60)
+                                color_ops::with_alpha(palette.accent, 60)
                             };
 
                             ui.painter().rect_filled(rect, 5.0, color);
@@ -453,9 +452,7 @@ pub fn render_miller_scrollview(
                         // painter del hover
                         if resp.hovered() {
                             ui.set_cursor_icon(CursorIcon::PointingHand);
-                            c = Color32::from_rgba_unmultiplied(c.r(), c.g(), c.b(), 60);
-
-                            ui.painter().rect_filled(rect, 5.0, c);
+                            ui.painter().rect_filled(rect, 5.0, palette.bg_hover);
                         }
 
                         // interacción por cada row
@@ -542,9 +539,10 @@ pub fn render_miller_scrollview(
                             let normalized_color = ensure_min_lightness(color);
 
                             ui.draw_icon((&icon_name, icon_bytes))
+                                .id(format!("icon_{i}"))
                                 .size(Vec2::splat(icon_size))
                                 .tint(normalized_color)
-                                .show();
+                                .show_at(icon_rect);
                         }
 
                         if let Some(dot) = dot_color {
@@ -616,7 +614,7 @@ pub fn render_miller_scrollview(
                                 Align2::RIGHT_CENTER,
                                 "›",
                                 FontId::proportional(14.0),
-                                current_theme.global.text_primary(),
+                                palette.fg_primary,
                             );
                         }
                     }
@@ -626,11 +624,11 @@ pub fn render_miller_scrollview(
                     match ctx_menu.kind {
                         ContextMenuKind::FileNormal => {
                             if ctx_menu.target_col == Some(col_index) {
-                                ctx_menu.file_context_menu(ui, state, ui_state);
+                                ctx_menu.file_context_menu(ui, state);
                             }
                         }
                         ContextMenuKind::FileTrash => {
-                            ctx_menu.file_context_menu_in_trash(ui, state, ui_state)
+                            ctx_menu.file_context_menu_in_trash(ui, state)
                         }
                         _ => {}
                     }

@@ -24,6 +24,7 @@ use parking_lot::Mutex;
 use crate::ui::{
     custom_components::UiExt,
     icons_cache::{icon_cache::IconCache, icons},
+    themes::platform::color_ops,
 };
 
 /// Componente de lista desplegable personalizado con animaciones,
@@ -37,6 +38,8 @@ pub(crate) struct BlazeComboBox<'a> {
     text_color: Color32,
     background_color: Color32,
     hover_background_color: Option<Color32>,
+    dropdown_background_color: Option<Color32>,
+    icon_color: Option<Color32>,
     icon_cache: Option<Arc<Mutex<IconCache>>>,
 }
 
@@ -52,6 +55,8 @@ impl<'a> BlazeComboBox<'a> {
             text_color: Color32::WHITE,
             background_color: Color32::GRAY,
             hover_background_color: None,
+            dropdown_background_color: None,
+            icon_color: None,
             icon_cache,
         }
     }
@@ -91,6 +96,18 @@ impl<'a> BlazeComboBox<'a> {
     /// Establece el color del texto
     pub fn text_color(mut self, color: impl Into<Color32>) -> Self {
         self.text_color = color.into();
+        self
+    }
+
+    /// Establece el color del fondo del desplegable
+    pub fn dropdown_background_color(mut self, color: impl Into<Color32>) -> Self {
+        self.dropdown_background_color = Some(color.into());
+        self
+    }
+
+    /// Establece el color del icono (chevron). Por defecto usa el color del texto
+    pub fn icon_color(mut self, color: impl Into<Color32>) -> Self {
+        self.icon_color = Some(color.into());
         self
     }
 
@@ -192,9 +209,12 @@ impl<'a> BlazeComboBox<'a> {
                 Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0))
             };
 
-            self.ui
-                .painter()
-                .image(icon.id(), animated_rect, uv, Color32::WHITE);
+            self.ui.painter().image(
+                icon.id(),
+                animated_rect,
+                uv,
+                self.icon_color.unwrap_or(self.text_color),
+            );
         }
 
         // calcula el desplazamiento y la altura máxima disponible en pantalla
@@ -207,7 +227,10 @@ impl<'a> BlazeComboBox<'a> {
         let max_dropdown_height = 200.0_f32.min(available_height);
         let animated_height = lerp(0.0..=max_dropdown_height, radius_t);
 
-        let fill = self.background_color.linear_multiply(radius_t);
+        let dropdown_bg = self
+            .dropdown_background_color
+            .unwrap_or(self.background_color);
+        let fill = color_ops::scale_alpha(dropdown_bg, radius_t);
         let mut scroll_offset = self.ui.data(|data| {
             data.get_temp::<f32>(self.id.with("scroll_y"))
                 .unwrap_or(0.0)

@@ -20,7 +20,7 @@ use crate::{
             custom_context_menu::context_state::ContextMenuKind,
             utilities::{ensure_min_lightness, git_dot_color, resolve_icon, text_color_for_git},
         },
-        themes::theme_manager::with_theme,
+        themes::{platform::color_ops, theme_manager::with_theme},
     },
     utils::formating::{format_date, format_size},
 };
@@ -278,6 +278,7 @@ pub fn render_grid_scrollview(
     content_rect: Rect,
 ) {
     let current_theme = with_theme(|t| t.current());
+    let palette = current_theme.main_area.palette(&current_theme.global);
 
     let i18n = with_configs(|c| c.get_i18n());
 
@@ -429,11 +430,8 @@ pub fn render_grid_scrollview(
                         pos2(rect.max.x - margin, rect.max.y - margin),
                     );
 
-                    ui.painter().rect_filled(
-                        selection_rect,
-                        8.0,
-                        current_theme.main_area.bg_hover(),
-                    );
+                    ui.painter()
+                        .rect_filled(selection_rect, 8.0, palette.bg_hover);
                 }
 
                 if state.is_selected(i) {
@@ -443,12 +441,8 @@ pub fn render_grid_scrollview(
                         pos2(rect.max.x - margin, rect.max.y - margin),
                     );
 
-                    let c = current_theme.main_area.accent();
-                    ui.painter().rect_filled(
-                        selection_rect,
-                        8.0,
-                        Color32::from_rgba_unmultiplied(c.r(), c.g(), c.b(), 60),
-                    );
+                    let selection = color_ops::with_alpha(palette.accent, 60);
+                    ui.painter().rect_filled(selection_rect, 8.0, selection);
                 }
 
                 // Drop target highlight
@@ -457,7 +451,10 @@ pub fn render_grid_scrollview(
                         ui.painter().rect_stroke(
                             rect,
                             8.0,
-                            Stroke::new(2.0, Color32::from_rgb(150, 150, 255)),
+                            Stroke::new(
+                                current_theme.global.components_stroke_width,
+                                current_theme.global.success(),
+                            ),
                             StrokeKind::Middle,
                         );
                     }
@@ -468,7 +465,10 @@ pub fn render_grid_scrollview(
                     ui.painter().rect_stroke(
                         rect,
                         8.0,
-                        Stroke::new(2.0, Color32::from_rgb(255, 150, 150)),
+                        Stroke::new(
+                            current_theme.global.components_stroke_width,
+                            current_theme.global.error(),
+                        ),
                         StrokeKind::Middle,
                     );
                 }
@@ -598,9 +598,10 @@ pub fn render_grid_scrollview(
                     let normalized_color = ensure_min_lightness(color);
 
                     ui.draw_icon((&icon_name, icon_bytes))
+                        .id(format!("icon_{i}"))
                         .size(Vec2::splat(icon_size))
                         .tint(normalized_color)
-                        .show();
+                        .show_at(icon_rect);
                 }
 
                 if let Some(dot) = dot_color {
@@ -754,8 +755,8 @@ pub fn render_grid_scrollview(
 
         let mut ctx_menu = std::mem::take(&mut ui_state.context_menu_state);
         match ctx_menu.kind {
-            ContextMenuKind::FileNormal => ctx_menu.file_context_menu(ui, state, ui_state),
-            ContextMenuKind::FileTrash => ctx_menu.file_context_menu_in_trash(ui, state, ui_state),
+            ContextMenuKind::FileNormal => ctx_menu.file_context_menu(ui, state),
+            ContextMenuKind::FileTrash => ctx_menu.file_context_menu_in_trash(ui, state),
             _ => {}
         }
         ui_state.context_menu_state = ctx_menu;

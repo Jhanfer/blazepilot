@@ -25,6 +25,7 @@ use crate::ui::{
     custom_components::text_edit::BlazeTextEdit,
     icons_cache::{icon_cache::IconCache, icons},
     modules::utilities::ensure_min_lightness,
+    themes::platform::color_ops,
 };
 
 /// Entrada de texto con soporte para icono, etiqueta de sugerencias y botón
@@ -307,7 +308,7 @@ impl<'a> BlazeInput<'a> {
 
             // reestringe el margen derecho del área de edición para no solapar la etiqueta de sugerencia
             text_right -= badge_size.x + gap_edit;
-            hint_data = Some((hint_galley, badge_size, hint_bg, hint_stc));
+            hint_data = Some((hint_galley, badge_size, hint_bg, hint_stc, hint_color));
         }
 
         if show_clear {
@@ -328,7 +329,7 @@ impl<'a> BlazeInput<'a> {
         );
 
         // Renderizado de la etiqueta de la sugerencia sobre el margen derecho disponible
-        if let Some((hint_galley, badge_size, hint_bg, hint_stc)) = hint_data {
+        if let Some((hint_galley, badge_size, hint_bg, hint_stc, hint_color)) = hint_data {
             let hint_rect = Rect::from_min_size(
                 pos2(
                     right_edge - badge_size.x,
@@ -346,20 +347,15 @@ impl<'a> BlazeInput<'a> {
             );
 
             let hint_pos = hint_rect.min + vec2(8.0, 2.0);
-            self.ui
-                .painter()
-                .galley(hint_pos, hint_galley, Color32::DARK_GREEN);
+            self.ui.painter().galley(hint_pos, hint_galley, hint_color);
         }
 
         // renderizado del botón de limpieza de contenido
         if show_clear && let Some(icon_cache) = &mut self.icon_cache {
-            let c = self.background_color;
-            let color = Color32::from_rgba_unmultiplied(
-                c.r().saturating_add(50),
-                c.g().saturating_add(50),
-                c.b().saturating_add(50),
-                80,
-            );
+            // El fondo del botón se deriva del fondo del input y del color del
+            // propio botón, ya no se suman valores RGB a mano
+            let clear_bg = color_ops::mix(self.background_color, self.x_color, 0.18);
+            let clear_icon_color = color_ops::ensure_contrast(self.x_color, clear_bg, 3.0);
 
             let btn_rect = Rect::from_min_size(
                 pos2(
@@ -393,14 +389,15 @@ impl<'a> BlazeInput<'a> {
                     .lock()
                     .get_or_load(self.ui, "x", icons::ICON_X, Vec2::splat(icon_size));
 
+            // Primero el fondo y después el icono para que este no quede tapado
+            self.ui.painter().rect_filled(btn_rect, 20, clear_bg);
+
             self.ui.painter().image(
                 icon.id(),
                 rounded_rect,
                 Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
-                ic_c,
+                clear_icon_color,
             );
-
-            self.ui.painter().rect_filled(btn_rect, 20, color);
 
             if btn.hovered() {
                 self.ui.set_cursor_icon(CursorIcon::PointingHand);
