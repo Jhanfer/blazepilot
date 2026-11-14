@@ -73,7 +73,7 @@ pub struct AudioPlayer {
 }
 
 impl AudioPlayer {
-    pub fn init(clock: Arc<Mutex<PlaybackClock>>, seek_epoch: Arc<AtomicU64>) -> Self {
+    pub fn init(clock: Arc<Mutex<PlaybackClock>>) -> Self {
         Self {
             streamer: None,
             audio_rx: None,
@@ -84,7 +84,7 @@ impl AudioPlayer {
             volume: 1.0,
             audio_path: None,
             generation: Arc::new(AtomicU64::new(0)),
-            seek_epoch,
+            seek_epoch: Arc::new(AtomicU64::new(0)),
             buffer_fill_handle: None,
             should_run: None,
         }
@@ -140,9 +140,21 @@ impl AudioPlayer {
 
         let host = cpal::default_host();
         let device = host.default_output_device().ok_or(AudioError::NoDevice)?;
-        let config = device
+        let default_cfg = device
             .default_output_config()
             .map_err(AudioError::CpalError)?;
+
+        let config = if default_cfg.sample_format() == cpal::SampleFormat::F32 {
+            default_cfg
+        } else {
+            device
+                .supported_output_configs()
+                .ok()
+                .and_then(|mut it| it.find(|c| c.sample_format() == cpal::SampleFormat::F32))
+                .map(|c| c.with_max_sample_rate())
+                .unwrap_or(default_cfg)
+        };
+
         let sample_rate = config.sample_rate();
 
         debug!("El path de audio es: {:?}", self.audio_path);
@@ -169,21 +181,12 @@ impl AudioPlayer {
     }
 
     pub fn reset(&mut self) -> AudioResult<()> {
-        self.streamer = None;
+        self.stop()?;
         self.audio_path = None;
-        self.seek(0.0);
-        self.buffer.lock().clear();
-
-        if let Some(rx) = self.audio_rx.take() {
-            info!("Llamado dropeo de audio rx");
-            drop(rx);
-        }
-
         Ok(())
     }
 
     pub fn stop(&mut self) -> AudioResult<()> {
-        info!("Llamado stop de AudioPlayer");
         self.generation.fetch_add(1, Ordering::SeqCst);
 
         if let Some(run) = self.should_run.as_ref() {
@@ -225,23 +228,12 @@ impl AudioPlayer {
         unsafe {
             libmimalloc_sys::mi_collect(true);
         }
-
-        info!("stop() fin");
-
         Ok(())
     }
 
     pub fn pause(&mut self) -> AudioResult<()> {
         self.clock.lock().pause();
-
-        if let Some(stream) = &self.device_stream {
-            stream.pause().map_err(AudioError::CpalError)?;
-        }
-
-        if let Some(s) = &self.streamer {
-            s.send(AudioDecoderCommand::Pause);
-        }
-
+        self.halt();
         Ok(())
     }
 
@@ -249,17 +241,16 @@ impl AudioPlayer {
         if !self.clock.lock().is_paused() {
             return Ok(());
         }
-
         self.clock.lock().play();
-
-        if let Some(stream) = &self.device_stream {
-            stream.play().map_err(AudioError::CpalError)?;
-        }
 
         if let Some(s) = &self.streamer {
             s.send(AudioDecoderCommand::Resume);
         }
-
+        if let Some(stream) = &self.device_stream
+            && let Err(e) = stream.play()
+        {
+            warn!("No se ha podido reanudar el stream de audio: {e}");
+        }
         Ok(())
     }
 
@@ -278,17 +269,31 @@ impl AudioPlayer {
             .store(f32::to_bits(clamped), Ordering::Relaxed);
     }
 
+    pub fn halt(&mut self) {
+        if let Some(s) = &self.streamer {
+            s.send(AudioDecoderCommand::Pause);
+        }
+        if let Some(stream) = &self.device_stream
+            && let Err(e) = stream.pause()
+        {
+            warn!("No se ha podido pausar el stream de audio: {e}");
+        }
+    }
+
     pub fn start_audio_stream(
         &mut self,
         device: Device,
         config: SupportedStreamConfig,
     ) -> AudioResult<()> {
         debug!("Se incia audio stream");
+        let mut stream_config: cpal::StreamConfig = config.into();
+        stream_config.channels = 2;
+
         let buffer = self.buffer.clone();
         let volume_bits = self.volume_bits.clone();
         let stream = device
             .build_output_stream(
-                config.into(),
+                stream_config,
                 move |data: &mut [f32], _: &cpal::OutputCallbackInfo| {
                     let mut buf = buffer.lock();
                     let len = data.len().min(buf.len());
@@ -417,6 +422,32 @@ impl AudioStreamer {
         let _ = self.command_tx.send(cmd);
     }
 
+    #[allow(clippy::too_many_arguments)]
+    fn apply_seek(
+        ictx: &mut ffmpeg_next::format::context::Input,
+        decoder: &mut ffmpeg_next::decoder::Audio,
+        resampler: &mut ffmpeg_next::software::resampling::Context,
+        source_layout: ChannelLayout,
+        target_format: Sample,
+        target_layout: ChannelLayout,
+        sample_rate: u32,
+        secs: f32,
+    ) -> AudioResult<()> {
+        let ts = (secs * ffmpeg_next::ffi::AV_TIME_BASE as f32) as i64;
+        ictx.seek(ts, ..ts).map_err(AudioError::FfmpegError)?;
+        decoder.flush();
+        *resampler = ffmpeg_next::software::resampling::Context::get(
+            decoder.format(),
+            source_layout,
+            decoder.rate(),
+            target_format,
+            target_layout,
+            sample_rate,
+        )
+        .map_err(AudioError::FfmpegError)?;
+        Ok(())
+    }
+
     fn decode_loop(
         path: &Path,
         tx: &Sender<OutputAudioFrame>,
@@ -491,62 +522,68 @@ impl AudioStreamer {
         let mut paused = false;
         let mut did_seek = false;
         let mut seek_target_secs: f32 = 0.0;
-
         let mut packects_in_buff = 0;
 
-        loop {
+        'main: loop {
             if generation.load(Ordering::Acquire) != my_generation {
                 return Ok("Audio generation no es igual, saliendo".into());
+            }
+
+            loop {
+                let cmd = if paused {
+                    match commands.recv_timeout(Duration::from_millis(50)) {
+                        Ok(c) => c,
+                        Err(RecvTimeoutError::Timeout) => {
+                            if generation.load(Ordering::Acquire) != my_generation {
+                                return Ok("Audio generation no es igual, saliendo".into());
+                            }
+                            continue;
+                        }
+                        Err(RecvTimeoutError::Disconnected) => {
+                            return Ok("Command channel cerrado".into());
+                        }
+                    }
+                } else {
+                    match commands.try_recv() {
+                        Ok(c) => c,
+                        Err(TryRecvError::Empty) => break,
+                        Err(TryRecvError::Disconnected) => {
+                            return Ok("Command channel cerrado".into());
+                        }
+                    }
+                };
+
+                match cmd {
+                    AudioDecoderCommand::Stop => return Ok("Stop".into()),
+                    AudioDecoderCommand::Pause => paused = true,
+                    AudioDecoderCommand::Resume => paused = false,
+                    AudioDecoderCommand::SeekTo(secs) => {
+                        Self::apply_seek(
+                            &mut ictx,
+                            &mut decoder,
+                            &mut resampler,
+                            source_layout,
+                            target_format,
+                            target_channel_layout,
+                            sample_rate,
+                            secs,
+                        )?;
+                        seek_target_secs = secs;
+                        did_seek = true;
+                        packects_in_buff = 0;
+                        seek_epoch.fetch_add(1, Ordering::Release);
+                    }
+                }
             }
 
             while packects_in_buff >= Self::MAX_PACKETS_BUFF || tx.len() >= 4 {
                 if generation.load(Ordering::Acquire) != my_generation {
                     return Ok("Audio generation no es igual, saliendo".into());
                 }
-
-                match commands.try_recv() {
-                    Ok(AudioDecoderCommand::Stop) => return Ok("Stop".into()),
-
-                    Ok(AudioDecoderCommand::Pause) => paused = true,
-
-                    Ok(AudioDecoderCommand::Resume) => paused = false,
-
-                    Ok(AudioDecoderCommand::SeekTo(secs)) => {
-                        let timestamp = (secs * ffmpeg_next::ffi::AV_TIME_BASE as f32) as i64;
-                        ictx.seek(timestamp, ..timestamp)
-                            .map_err(AudioError::FfmpegError)?;
-                        decoder.flush();
-
-                        resampler = ffmpeg_next::software::resampling::Context::get(
-                            decoder.format(),
-                            source_layout,
-                            decoder.rate(),
-                            target_format,
-                            target_channel_layout,
-                            sample_rate,
-                        )
-                        .map_err(AudioError::FfmpegError)?;
-                        seek_target_secs = secs;
-                        did_seek = true;
-                        seek_epoch.fetch_add(1, Ordering::Release);
-                    }
-
-                    Err(TryRecvError::Empty) => {}
-
-                    Err(TryRecvError::Disconnected) => {
-                        return Ok("Command channel cerrado".into());
-                    }
+                if !commands.is_empty() {
+                    continue 'main;
                 }
-
-                if paused {
-                    break;
-                }
-
                 std::thread::sleep(Duration::from_millis(5));
-            }
-
-            if paused {
-                continue;
             }
 
             let mut packet = Packet::empty();
@@ -672,31 +709,26 @@ impl AudioStreamer {
                 }
 
                 Err(ffmpeg_next::Error::Eof) => loop {
-                    debug!("EOF alcanzado, esperando comandos...");
                     match commands.recv_timeout(Duration::from_millis(50)) {
                         Err(RecvTimeoutError::Timeout) => {
                             if generation.load(Ordering::Acquire) != my_generation {
                                 return Ok("Audio generation no es igual, saliendo".into());
                             }
                         }
-
                         Ok(AudioDecoderCommand::SeekTo(secs)) => {
-                            let timestamp = (secs * ffmpeg_next::ffi::AV_TIME_BASE as f32) as i64;
-                            ictx.seek(timestamp, ..timestamp)
-                                .map_err(AudioError::FfmpegError)?;
-                            decoder.flush();
-
-                            resampler = ffmpeg_next::software::resampling::Context::get(
-                                decoder.format(),
-                                decoder.channel_layout(),
-                                decoder.rate(),
+                            Self::apply_seek(
+                                &mut ictx,
+                                &mut decoder,
+                                &mut resampler,
+                                source_layout,
                                 target_format,
                                 target_channel_layout,
                                 sample_rate,
-                            )
-                            .map_err(AudioError::FfmpegError)?;
+                                secs,
+                            )?;
                             seek_target_secs = secs;
                             did_seek = true;
+                            packects_in_buff = 0;
                             seek_epoch.fetch_add(1, Ordering::Release);
                             break;
                         }
@@ -706,10 +738,7 @@ impl AudioStreamer {
                     }
                 },
 
-                Err(ffmpeg_next::Error::Exit) => {
-                    return Ok("Interrumpido por señal".into());
-                }
-
+                Err(ffmpeg_next::Error::Exit) => return Ok("Interrumpido por señal".into()),
                 Err(e) => return Err(AudioError::FfmpegError(e)),
             }
         }

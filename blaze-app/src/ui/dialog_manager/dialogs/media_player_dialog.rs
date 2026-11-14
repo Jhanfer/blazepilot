@@ -77,6 +77,7 @@ impl MediaPlayerDialog {
         self.show_modal = false;
         self.media_player.stop();
         self.has_started = false;
+        self.media_path = None;
     }
 
     pub fn open(&mut self, media_path: Arc<Path>, media_name: Box<str>, is_audio_only: bool) {
