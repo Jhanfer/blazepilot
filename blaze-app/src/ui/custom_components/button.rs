@@ -14,13 +14,22 @@
 
 use std::sync::Arc;
 
+use crate::ui::icons_cache::icon_cache::IconCache;
 use egui::{
     Color32, CornerRadius, CursorIcon, Id, Rect, Response, Sense, Stroke, StrokeKind, TextStyle,
     TextWrapMode, Ui, Vec2, WidgetText, pos2, vec2,
 };
 use parking_lot::Mutex;
 
-use crate::ui::icons_cache::icon_cache::IconCache;
+/// Estado de alineación del texto dentro del botón (inicio, centro, final)
+#[allow(unused)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum ContentAlign {
+    #[default]
+    Start,
+    Center,
+    End,
+}
 
 /// Botón personalizable con texto e icono
 ///
@@ -38,6 +47,7 @@ pub(crate) struct BlazeButton<'a> {
     width: f32,
     height: f32,
     content_offset_y: f32,
+    content_align: ContentAlign,
     corner_radius: CornerRadius,
     stroke_width: f32,
     text_color: Color32,
@@ -69,6 +79,7 @@ impl<'a> BlazeButton<'a> {
             width: 20.0,
             height: 15.0,
             content_offset_y: 0.0,
+            content_align: ContentAlign::Start,
             corner_radius: CornerRadius::same(5),
             stroke_width: 0.8,
             background_color: Color32::GRAY,
@@ -87,6 +98,12 @@ impl<'a> BlazeButton<'a> {
     /// Establece el identificador del botón
     pub fn id(mut self, id: impl Into<Id>) -> Self {
         self.id = id.into();
+        self
+    }
+
+    /// Establece la alineación del texto
+    pub fn content_align(mut self, align: ContentAlign) -> Self {
+        self.content_align = align;
         self
     }
 
@@ -261,7 +278,14 @@ impl<'a> BlazeButton<'a> {
             StrokeKind::Middle,
         );
 
-        let mut cursor_x = rect.min.x + if has_text { padding_x } else { 0.0 };
+        let total_content = icon_w + text_size.x;
+        let content_min_x = match self.content_align {
+            ContentAlign::Start => rect.min.x + padding_x,
+            ContentAlign::Center => rect.center().x - total_content / 2.0,
+            ContentAlign::End => rect.max.x - padding_x - total_content,
+        };
+
+        let mut cursor_x = content_min_x;
 
         if let Some((name, bytes)) = self.icon
             && let Some(ref icon_cache) = self.icon_cache

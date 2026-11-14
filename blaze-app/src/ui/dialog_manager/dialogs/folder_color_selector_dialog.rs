@@ -14,9 +14,15 @@
 
 use crate::core::bootstrap::configs::config_manager::with_configs;
 use crate::core::system::{cache::cache_manager, clipboard::global_clipboard::TOKIO_RUNTIME};
-use crate::ui::dialog_manager::manager::ModalDialog;
+use crate::ui::custom_components::UiExt;
+use crate::ui::dialog_manager::{
+    dialogs::{
+        DialogButtonKind, dialog_button, dialog_button_sized, dialog_button_spacing, dialog_frame,
+    },
+    manager::ModalDialog,
+};
 use crate::ui::themes::theme_manager::with_theme;
-use egui::{Color32, CornerRadius, Frame, Margin, Order, Ui, Window};
+use egui::{Color32, Order, RichText, Ui, Window};
 use file_id::FileId;
 
 pub struct FolderColorSelector {
@@ -61,6 +67,7 @@ impl FolderColorSelector {
 
     pub fn render_dialog(&mut self, ui: &mut Ui) -> bool {
         let current_theme = with_theme(|t| t.current());
+        let palette = current_theme.dialogs.palette(&current_theme.global);
         let i18n = with_configs(|c| c.get_i18n());
 
         let mut should_close = false;
@@ -68,73 +75,92 @@ impl FolderColorSelector {
         let Some(folder_id) = self.folder_id.as_ref() else {
             return false;
         };
-        let Some(temp_color) = &mut self.temp_color else {
+        let Some(temp_color) = self.temp_color.as_mut() else {
             return false;
         };
 
-        let custom_frame = Frame::NONE
-            .fill(current_theme.main_area.bg_elevated())
-            .corner_radius(CornerRadius::same(10))
-            .inner_margin(Margin::same(10));
+        Window::new(
+            RichText::new(i18n.t("select_folder_color_dialog.title")).color(palette.fg_primary),
+        )
+        .frame(dialog_frame(
+            &palette,
+            current_theme.global.panel_stroke_width,
+        ))
+        .order(Order::Foreground)
+        .collapsible(false)
+        .resizable(false)
+        .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
+        .open(&mut self.show_modal)
+        .show(ui, |ui| {
+            ui.set_min_width(250.0);
+            ui.set_max_width(300.0);
+            ui.set_min_height(100.0);
 
-        Window::new(i18n.t("select_folder_color_dialog.title"))
-            .frame(custom_frame)
-            .order(Order::Foreground)
-            .collapsible(false)
-            .resizable(false)
-            .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
-            .open(&mut self.show_modal)
-            .show(ui, |ui| {
-                ui.set_min_width(250.0);
-                ui.set_min_height(100.0);
+            ui.vertical_centered(|ui| {
+                ui.color_picker(&mut *temp_color, "folder_color")
+                    .background_color(palette.bg_elevated)
+                    .show();
 
-                let mut rgb: [f32; 3] = [
-                    temp_color.r() as f32 / 255.0,
-                    temp_color.g() as f32 / 255.0,
-                    temp_color.b() as f32 / 255.0,
-                ];
+                ui.add_space(20.0);
 
-                ui.color_edit_button_rgb(&mut rgb);
-
-                *temp_color = Color32::from_rgb(
-                    (rgb[0] * 255.0) as u8,
-                    (rgb[1] * 255.0) as u8,
-                    (rgb[2] * 255.0) as u8,
-                );
-
-                ui.add_space(50.0);
-
-                ui.horizontal(|ui| {
-                    let width = ui.available_width();
-                    let button_width = 110.0;
-                    let spacing = (width - button_width * 3.0) / 4.0;
-
-                    ui.add_space(spacing);
-
-                    if ui
-                        .button(i18n.t("select_folder_color_dialog.reset_pred"))
-                        .clicked()
-                    {
-                        *temp_color = Color32::YELLOW;
-                    }
-
-                    if ui.button(i18n.t("general_dialog.cancel")).clicked() {
-                        should_close = true;
-                    }
-
-                    if ui.button(i18n.t("general_dialog.accept")).clicked() {
-                        let cm = cache_manager::CacheManager::global();
-                        let (folder_id, temp_color) = (*folder_id, *temp_color);
-
-                        TOKIO_RUNTIME.spawn(async move {
-                            cm.update_color_cache(folder_id, temp_color).await;
-                            cm.save_color_cache().await;
-                        });
-
-                        should_close = true;
-                    }
-                });
+                if dialog_button_sized(
+                    ui,
+                    i18n.t("select_folder_color_dialog.reset_pred"),
+                    &palette,
+                    DialogButtonKind::Secondary,
+                    (190.0, 30.0),
+                )
+                .show()
+                .clicked()
+                {
+                    *temp_color = Color32::YELLOW;
+                }
             });
+
+            ui.add_space(8.0);
+
+            ui.horizontal(|ui| {
+                let spacing = dialog_button_spacing(ui, 2);
+
+                ui.add_space(spacing);
+
+                if dialog_button(
+                    ui,
+                    i18n.t("general_dialog.accept"),
+                    &palette,
+                    DialogButtonKind::Primary,
+                )
+                .show()
+                .clicked()
+                {
+                    let cm = cache_manager::CacheManager::global();
+                    let (folder_id, temp_color) = (*folder_id, *temp_color);
+
+                    TOKIO_RUNTIME.spawn(async move {
+                        cm.update_color_cache(folder_id, temp_color).await;
+                        cm.save_color_cache().await;
+                    });
+
+                    should_close = true;
+                }
+
+                ui.add_space(spacing);
+
+                if dialog_button(
+                    ui,
+                    i18n.t("general_dialog.cancel"),
+                    &palette,
+                    DialogButtonKind::Secondary,
+                )
+                .show()
+                .clicked()
+                {
+                    should_close = true;
+                }
+
+                ui.add_space(spacing);
+            });
+        });
 
         should_close
     }

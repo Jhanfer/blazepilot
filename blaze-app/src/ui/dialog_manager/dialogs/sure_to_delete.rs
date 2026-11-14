@@ -17,9 +17,12 @@ use std::{path::Path, sync::Arc};
 use crate::core::bootstrap::configs::config_manager::with_configs;
 use crate::core::runtime::{bus_structs::FileOperation, event_bus::Dispatcher};
 use crate::ui::custom_components::UiExt;
-use crate::ui::dialog_manager::manager::ModalDialog;
+use crate::ui::dialog_manager::{
+    dialogs::{DialogButtonKind, dialog_button, dialog_button_spacing, dialog_frame},
+    manager::ModalDialog,
+};
 use crate::ui::themes::theme_manager::with_theme;
-use egui::{CornerRadius, Frame, Margin, Order, RichText, Ui, Window};
+use egui::{Order, RichText, Ui, Window};
 use uuid::Uuid;
 
 pub struct SureToDeleteDialog {
@@ -62,19 +65,18 @@ impl SureToDeleteDialog {
     pub fn render_dialog(&mut self, ui: &mut Ui) -> bool {
         let i18n = with_configs(|c| c.get_i18n());
         let current_theme = with_theme(|t| t.current());
+        let palette = current_theme.dialogs.palette(&current_theme.global);
         let mut should_close = false;
 
         let (Some(sources), Some(_)) = (self.sources.as_ref(), self.tab_id.as_ref()) else {
             return false;
         };
 
-        let custom_frame = Frame::NONE
-            .fill(current_theme.main_area.bg_elevated())
-            .corner_radius(CornerRadius::same(10))
-            .inner_margin(Margin::same(10));
-
         Window::new("")
-            .frame(custom_frame)
+            .frame(dialog_frame(
+                &palette,
+                current_theme.global.panel_stroke_width,
+            ))
             .order(Order::Foreground)
             .collapsible(false)
             .resizable(false)
@@ -82,16 +84,26 @@ impl SureToDeleteDialog {
             .open(&mut self.show_modal)
             .show(ui, |ui| {
                 ui.set_min_width(250.0);
+                ui.set_max_width(300.0);
                 ui.set_min_height(100.0);
 
-                ui.heading(i18n.t("sure_to_delete_dialog.title"));
+                ui.vertical_centered(|ui| {
+                    ui.label_ns(
+                        RichText::new(i18n.t("sure_to_delete_dialog.title"))
+                            .color(palette.fg_primary)
+                            .size(18.0),
+                    );
+                });
 
                 const MAX_SHOWN: usize = 5;
                 let total = sources.len();
 
                 for (file_name, _) in sources.iter().take(MAX_SHOWN) {
                     ui.label_ns(
-                        i18n.t_args("sure_to_delete_dialog.file_dot", &[("query", file_name)]),
+                        RichText::new(
+                            i18n.t_args("sure_to_delete_dialog.file_dot", &[("query", file_name)]),
+                        )
+                        .color(palette.fg_primary),
                     );
                 }
 
@@ -101,34 +113,51 @@ impl SureToDeleteDialog {
                             "sure_to_delete_dialog.and_more",
                             &[("query", &(total - MAX_SHOWN).to_string())],
                         ))
-                        .color(current_theme.global.text_primary())
+                        .color(palette.fg_secondary)
                         .weak()
                         .italics(),
                     );
                 }
 
-                ui.add_space(50.0);
+                ui.add_space(20.0);
 
                 ui.horizontal(|ui| {
-                    let width = ui.available_width();
-                    let button_width = 120.0;
-                    let spacing = (width - button_width * 2.0) / 3.0;
+                    let spacing = dialog_button_spacing(ui, 2);
 
                     ui.add_space(spacing);
-                    if ui.button(i18n.t("general_dialog.cancel")).clicked() {
-                        should_close = true;
-                    }
 
-                    ui.add_space(spacing);
-                    if ui.button(i18n.t("general_dialog.accept")).clicked() {
+                    if dialog_button(
+                        ui,
+                        i18n.t("general_dialog.accept"),
+                        &palette,
+                        DialogButtonKind::Danger,
+                    )
+                    .show()
+                    .clicked()
+                    {
                         Dispatcher::current()
                             .send(FileOperation::Trash {
                                 files: sources.to_vec(),
                             })
                             .ok();
-
                         should_close = true;
                     }
+
+                    ui.add_space(spacing);
+
+                    if dialog_button(
+                        ui,
+                        i18n.t("general_dialog.cancel"),
+                        &palette,
+                        DialogButtonKind::Secondary,
+                    )
+                    .show()
+                    .clicked()
+                    {
+                        should_close = true;
+                    }
+
+                    ui.add_space(spacing);
                 });
             });
 

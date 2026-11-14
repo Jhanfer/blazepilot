@@ -13,8 +13,7 @@
 // limitations under the License.
 
 use egui::{
-    ColorImage, Frame, Image, Margin, Order, RichText, ScrollArea, TextureHandle, TextureOptions,
-    Ui, Window,
+    ColorImage, Image, Order, RichText, ScrollArea, TextureHandle, TextureOptions, Ui, Window,
 };
 use fast_image_resize as fr;
 use parking_lot::Mutex;
@@ -36,8 +35,12 @@ use crate::{
         },
     },
     ui::{
-        custom_components::UiExt, dialog_manager::manager::ModalDialog,
-        themes::theme_manager::with_theme,
+        custom_components::UiExt,
+        dialog_manager::{
+            dialogs::{DialogButtonKind, dialog_button, dialog_button_spacing, dialog_frame},
+            manager::ModalDialog,
+        },
+        themes::{platform::palette::SectionPalette, theme_manager::with_theme},
     },
 };
 
@@ -244,6 +247,7 @@ impl AppSelectorDialog {
         app: &AppInfo,
         data: &SelectorData,
         index: usize,
+        palette: &SectionPalette,
     ) -> bool {
         let i18n = with_configs(|c| c.get_i18n());
 
@@ -257,7 +261,16 @@ impl AppSelectorDialog {
                 ui.label_ns("🖼");
             }
 
-            let br = ui.button(&app.name);
+            let button_width = ui.available_width();
+            let br = ui
+                .blaze_button(&*app.name)
+                .size((button_width, 24.0))
+                .text_color(palette.fg_primary)
+                .background_color(palette.bg_elevated)
+                .hover_background_color(palette.bg_hover)
+                .stroke_color(egui::Color32::TRANSPARENT)
+                .radius(8)
+                .show();
 
             if br.clicked() {
                 let app_id = app.id.clone();
@@ -318,16 +331,45 @@ impl AppSelectorDialog {
         match &self.state {
             None => false,
             Some(SelectorState::Loading) => {
-                ui.spinner();
-                ui.label_ns(i18n.t("selector_dialog.searching_apps"));
-                false
+                let current_theme = with_theme(|t| t.current());
+                let palette = current_theme.dialogs.palette(&current_theme.global);
+                let mut open = self.show_modal;
+
+                Window::new(
+                    RichText::new(i18n.t("selector_dialog.select_app")).color(palette.fg_primary),
+                )
+                .frame(dialog_frame(
+                    &palette,
+                    current_theme.global.panel_stroke_width,
+                ))
+                .order(Order::Foreground)
+                .collapsible(false)
+                .resizable(false)
+                .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
+                .open(&mut open)
+                .show(ui, |ui| {
+                    ui.set_min_width(250.0);
+                    ui.set_max_width(300.0);
+                    ui.set_min_height(100.0);
+
+                    ui.vertical_centered(|ui| {
+                        ui.add_space(10.0);
+                        ui.spinner();
+                        ui.add_space(10.0);
+                        ui.label_ns(
+                            RichText::new(i18n.t("selector_dialog.searching_apps"))
+                                .color(palette.fg_primary),
+                        );
+                    });
+                });
+
+                self.show_modal = open;
+                !open
             }
             Some(SelectorState::Ready(data)) => {
                 let current_theme = with_theme(|t| t.current());
+                let palette = current_theme.dialogs.palette(&current_theme.global);
 
-                let custom_frame = Frame::NONE
-                    .fill(current_theme.main_area.bg_elevated())
-                    .inner_margin(Margin::same(20));
                 let file_name = data
                     .path
                     .file_name()
@@ -336,62 +378,88 @@ impl AppSelectorDialog {
 
                 let mut close_requested = false;
 
-                Window::new(i18n.t_args("selector_dialog.open_with", &[("query", &file_name)]))
-                    .frame(custom_frame)
-                    .order(Order::Foreground)
-                    .collapsible(false)
-                    .resizable(false)
-                    .default_size([480.0, 520.0])
-                    .min_size([400.0, 300.0])
-                    .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
-                    .open(&mut should_close)
-                    .show(ui, |ui| {
-                        ui.heading(i18n.t("selector_dialog.select_app"));
+                Window::new(
+                    RichText::new(
+                        i18n.t_args("selector_dialog.open_with", &[("query", &file_name)]),
+                    )
+                    .color(palette.fg_primary),
+                )
+                .frame(dialog_frame(
+                    &palette,
+                    current_theme.global.panel_stroke_width,
+                ))
+                .order(Order::Foreground)
+                .collapsible(false)
+                .resizable(false)
+                .default_size([480.0, 520.0])
+                .min_size([400.0, 300.0])
+                .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
+                .open(&mut should_close)
+                .show(ui, |ui| {
+                    ui.label_ns(
+                        RichText::new(i18n.t("selector_dialog.select_app"))
+                            .color(palette.fg_primary)
+                            .size(18.0),
+                    );
+                    ui.separator();
+
+                    let height = 320.0;
+
+                    ScrollArea::vertical().max_height(height).show(ui, |ui| {
+                        ui.label_ns(
+                            RichText::new(i18n.t("selector_dialog.recomends"))
+                                .color(palette.fg_primary)
+                                .strong(),
+                        );
+                        ui.add_space(6.0);
+
+                        for (i, app) in data.apps.iter().enumerate() {
+                            if app.is_recommended {
+                                close_requested |=
+                                    Self::render_selector_button(ui, app, data, i, &palette);
+                            }
+                        }
+
+                        ui.add_space(12.0);
                         ui.separator();
+                        ui.add_space(12.0);
 
-                        let height = 320.0;
+                        ui.label_ns(
+                            RichText::new(i18n.t("selector_dialog.all_apps"))
+                                .color(palette.fg_primary)
+                                .strong(),
+                        );
+                        ui.add_space(6.0);
 
-                        ScrollArea::vertical().max_height(height).show(ui, |ui| {
-                            ui.label_ns(
-                                RichText::new(i18n.t("selector_dialog.recomends"))
-                                    .color(current_theme.global.text_primary())
-                                    .strong(),
-                            );
-                            ui.add_space(6.0);
-
-                            for (i, app) in data.apps.iter().enumerate() {
-                                if app.is_recommended {
-                                    close_requested |=
-                                        Self::render_selector_button(ui, app, data, i);
-                                }
+                        for (i, app) in data.apps.iter().enumerate() {
+                            if !app.is_recommended {
+                                close_requested |=
+                                    Self::render_selector_button(ui, app, data, i, &palette);
                             }
-
-                            ui.add_space(12.0);
-                            ui.separator();
-                            ui.add_space(12.0);
-
-                            ui.label_ns(
-                                RichText::new(i18n.t("selector_dialog.all_apps"))
-                                    .color(current_theme.global.text_primary())
-                                    .strong(),
-                            );
-                            ui.add_space(6.0);
-
-                            for (i, app) in data.apps.iter().enumerate() {
-                                if !app.is_recommended {
-                                    close_requested |=
-                                        Self::render_selector_button(ui, app, data, i);
-                                }
-                            }
-                        });
-
-                        ui.separator();
-                        ui.horizontal(|ui| {
-                            if ui.button(i18n.t("general_dialog.cancel")).clicked() {
-                                close_requested = true;
-                            }
-                        });
+                        }
                     });
+
+                    ui.separator();
+                    ui.horizontal(|ui| {
+                        let spacing = dialog_button_spacing(ui, 1);
+
+                        ui.add_space(spacing);
+
+                        if dialog_button(
+                            ui,
+                            i18n.t("general_dialog.cancel"),
+                            &palette,
+                            DialogButtonKind::Secondary,
+                        )
+                        .show()
+                        .clicked()
+                        {
+                            close_requested = true;
+                        }
+
+                        ui.add_space(spacing);
+                    });
+                });
 
                 self.show_modal = should_close;
                 close_requested

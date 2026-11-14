@@ -14,12 +14,14 @@
 
 use crate::core::bootstrap::configs::config_manager::with_configs;
 use crate::ui::custom_components::UiExt;
-use crate::ui::dialog_manager::manager::ModalDialog;
+use crate::ui::dialog_manager::{
+    dialogs::{DialogButtonKind, dialog_button_sized, dialog_frame},
+    manager::ModalDialog,
+};
 use crate::ui::image_preview::image_preview_handler::ImagePreviewState;
-use crate::ui::themes::theme_manager::with_theme;
+use crate::ui::themes::{platform::palette::SectionPalette, theme_manager::with_theme};
 use egui::{
-    Button, Color32, CornerRadius, Frame, Key, Margin, Order, Rect, Sense, Stroke, Ui, Vec2,
-    Window, pos2, vec2,
+    Color32, Frame, Id, Key, Order, Rect, RichText, Sense, Stroke, Ui, Vec2, Window, pos2, vec2,
 };
 
 pub struct ImagePreviewDialog {
@@ -64,6 +66,7 @@ impl ImagePreviewDialog {
         preview: &mut ImagePreviewState,
         needs_initial_load: &mut bool,
         should_close: &mut bool,
+        palette: &SectionPalette,
     ) {
         if *needs_initial_load {
             preview.initial_load(ui);
@@ -177,17 +180,34 @@ impl ImagePreviewDialog {
         ui.horizontal_centered(|ui| {
             ui.spacing_mut().item_spacing.x = 12.0;
 
-            if ui.button("-").clicked() {
+            if dialog_button_sized(ui, "-", palette, DialogButtonKind::Secondary, (40.0, 28.0))
+                .show()
+                .clicked()
+            {
                 preview.zoom = (preview.zoom * 0.75).max(min_zoom);
             }
 
-            ui.label_ns(format!("{:.0}%", preview.zoom * 100.0));
+            ui.label_ns(
+                RichText::new(format!("{:.0}%", preview.zoom * 100.0)).color(palette.fg_secondary),
+            );
 
-            if ui.button("+").clicked() {
+            if dialog_button_sized(ui, "+", palette, DialogButtonKind::Secondary, (40.0, 28.0))
+                .show()
+                .clicked()
+            {
                 preview.zoom = (preview.zoom * 1.3).min(max_zoom);
             }
 
-            if ui.button("Reset").clicked() {
+            if dialog_button_sized(
+                ui,
+                "Reset",
+                palette,
+                DialogButtonKind::Secondary,
+                (70.0, 28.0),
+            )
+            .show()
+            .clicked()
+            {
                 preview.zoom = fit_zoom;
                 preview.offset = Vec2::ZERO;
             }
@@ -211,22 +231,22 @@ impl ImagePreviewDialog {
 
     pub fn render_dialog(&mut self, ui: &mut Ui) -> bool {
         let current_theme = with_theme(|t| t.current());
+        let palette = current_theme.dialogs.palette(&current_theme.global);
 
         let mut should_close = false;
         let Some(pvw) = self.preview.as_mut() else {
             return false;
         };
 
-        let custom_frame = Frame::NONE
-            .fill(Color32::TRANSPARENT)
-            .corner_radius(CornerRadius::same(10))
-            .inner_margin(Margin::same(10));
-
         let screen_size = ui.content_rect().size();
         let max_window_size = vec2(screen_size.x * 0.9, screen_size.y * 0.9);
 
-        let window = Window::new(pvw.current_name())
-            .frame(custom_frame)
+        let window = Window::new(RichText::new(pvw.current_name()).color(palette.fg_primary))
+            .id(Id::new("image_preview_window"))
+            .frame(dialog_frame(
+                &palette,
+                current_theme.global.panel_stroke_width,
+            ))
             .order(Order::Foreground)
             .collapsible(false)
             .resizable(true)
@@ -242,10 +262,10 @@ impl ImagePreviewDialog {
             let preview_height = (available_height * 0.7).max(200.0);
 
             Frame::NONE
-                .fill(pvw.background_color.linear_multiply(0.8))
+                .fill(palette.bg_panel)
                 .stroke(Stroke::new(
                     current_theme.global.panel_stroke_width,
-                    current_theme.main_area.accent(),
+                    palette.border_panel,
                 ))
                 .corner_radius(8.0)
                 .inner_margin(10.0)
@@ -260,6 +280,7 @@ impl ImagePreviewDialog {
                                 pvw,
                                 &mut self.needs_initial_load,
                                 &mut should_close,
+                                &palette,
                             );
                         });
                     });
@@ -275,18 +296,30 @@ impl ImagePreviewDialog {
 
                         ui.add_space(spacing.max(0.0));
 
-                        if ui
-                            .add(Button::new("◀").min_size(vec2(button_width, 30.0)))
-                            .clicked()
+                        if dialog_button_sized(
+                            ui,
+                            "◀",
+                            &palette,
+                            DialogButtonKind::Secondary,
+                            (button_width, 30.0),
+                        )
+                        .show()
+                        .clicked()
                         {
                             pvw.zoom = 0.0;
                             pvw.offset = Vec2::ZERO;
                             pvw.prev(ui);
                         }
 
-                        if ui
-                            .add(Button::new("▶").min_size(vec2(button_width, 30.0)))
-                            .clicked()
+                        if dialog_button_sized(
+                            ui,
+                            "▶",
+                            &palette,
+                            DialogButtonKind::Secondary,
+                            (button_width, 30.0),
+                        )
+                        .show()
+                        .clicked()
                         {
                             pvw.zoom = 0.0;
                             pvw.offset = Vec2::ZERO;

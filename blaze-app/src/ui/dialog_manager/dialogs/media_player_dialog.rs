@@ -18,13 +18,13 @@ use std::path::Path;
 use std::sync::Arc;
 
 use crate::core::files::file_extension::{FileExtension, sniff_magic_bytes};
-use crate::ui::dialog_manager::manager::ModalDialog;
+use crate::ui::dialog_manager::{dialogs::dialog_frame, manager::ModalDialog};
 use crate::ui::media_player::media_player_backend::MediaPlayer;
 use crate::ui::themes::theme_manager::with_theme;
 use crate::utils::formating::format_hms;
 use egui::{
-    Align2, Color32, CornerRadius, Frame, Key, Margin, Order, Rect, Sense, Slider, SliderClamping,
-    Stroke, Ui, Vec2, Window, pos2, vec2,
+    Align2, Color32, Frame, Key, Order, Rect, RichText, Sense, Slider, SliderClamping, Stroke, Ui,
+    Vec2, Window, pos2, vec2,
 };
 use tracing::{debug, warn};
 
@@ -108,6 +108,9 @@ impl MediaPlayerDialog {
     }
 
     fn render_preview(&mut self, ui: &mut Ui, path: Arc<Path>, should_close: &mut bool) {
+        let current_theme = with_theme(|t| t.current());
+        let palette = current_theme.dialogs.palette(&current_theme.global);
+
         if !self.has_started {
             self.media_player.load_path(path);
 
@@ -184,7 +187,7 @@ impl MediaPlayerDialog {
                 ui.add_space(10.0);
 
                 ui.colored_label(
-                    egui::Color32::RED,
+                    palette.fg_secondary,
                     format!(
                         "{} / {}",
                         format_hms(elapse as u32),
@@ -225,16 +228,12 @@ impl MediaPlayerDialog {
 
     pub fn render_dialog(&mut self, ui: &mut Ui) -> bool {
         let current_theme = with_theme(|t| t.current());
+        let palette = current_theme.dialogs.palette(&current_theme.global);
 
         let (Some(path), Some(media_name)) = (self.media_path.as_ref(), self.media_name.as_ref())
         else {
             return false;
         };
-
-        let custom_frame = Frame::NONE
-            .fill(Color32::TRANSPARENT)
-            .corner_radius(CornerRadius::same(10))
-            .inner_margin(Margin::same(10));
 
         let screen_size = ui.content_rect().size();
         let max_window_size = vec2(screen_size.x * 0.9, screen_size.y * 0.9);
@@ -243,8 +242,11 @@ impl MediaPlayerDialog {
         let mut show_modal = was_open;
         let mut should_close = false;
 
-        let window = Window::new(media_name)
-            .frame(custom_frame)
+        let window = Window::new(RichText::new(media_name.to_string()).color(palette.fg_primary))
+            .frame(dialog_frame(
+                &palette,
+                current_theme.global.panel_stroke_width,
+            ))
             .order(Order::Foreground)
             .collapsible(false)
             .resizable(true)
@@ -259,10 +261,10 @@ impl MediaPlayerDialog {
             let preview_height = (available_height * 0.9).max(200.0);
 
             Frame::NONE
-                .fill(current_theme.main_area.bg_elevated())
+                .fill(palette.bg_elevated)
                 .stroke(Stroke::new(
                     current_theme.global.panel_stroke_width,
-                    current_theme.main_area.accent(),
+                    palette.border_panel,
                 ))
                 .corner_radius(8.0)
                 .inner_margin(10.0)

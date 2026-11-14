@@ -15,11 +15,15 @@
 use crate::{
     core::bootstrap::configs::config_manager::with_configs,
     ui::{
-        custom_components::UiExt, dialog_manager::manager::ModalDialog,
+        custom_components::UiExt,
+        dialog_manager::{
+            dialogs::{DialogButtonKind, dialog_button, dialog_button_spacing, dialog_frame},
+            manager::ModalDialog,
+        },
         themes::theme_manager::with_theme,
     },
 };
-use egui::{CornerRadius, Frame, Margin, Order, Ui, Window};
+use egui::{Order, RichText, Ui, Window};
 
 pub struct ShowGenericDialog {
     pub title: Option<Box<str>>,
@@ -60,22 +64,19 @@ impl ShowGenericDialog {
 
     pub fn render_dialog(&mut self, ui: &mut Ui) -> bool {
         let i18n = with_configs(|c| c.get_i18n());
-
         let current_theme = with_theme(|t| t.current());
-
+        let palette = current_theme.dialogs.palette(&current_theme.global);
         let mut should_close = false;
 
         let (Some(title), Some(message)) = (self.title.as_ref(), self.message.as_ref()) else {
             return false;
         };
 
-        let custom_frame = Frame::NONE
-            .fill(current_theme.main_area.bg_elevated())
-            .corner_radius(CornerRadius::same(10))
-            .inner_margin(Margin::same(10));
-
-        Window::new(title)
-            .frame(custom_frame)
+        Window::new(RichText::new(title.to_string()).color(palette.fg_primary))
+            .frame(dialog_frame(
+                &palette,
+                current_theme.global.panel_stroke_width,
+            ))
             .order(Order::Foreground)
             .collapsible(false)
             .resizable(false)
@@ -83,24 +84,34 @@ impl ShowGenericDialog {
             .open(&mut self.show_modal)
             .show(ui, |ui| {
                 ui.set_min_width(250.0);
+                ui.set_max_width(300.0);
                 ui.set_min_height(100.0);
 
                 ui.vertical_centered(|ui| {
-                    ui.label_ns(message);
+                    ui.label_ns(RichText::new(message.to_string()).color(palette.fg_primary));
                     ui.add_space(8.0);
                 });
 
-                ui.add_space(50.0);
+                ui.add_space(20.0);
 
                 ui.horizontal(|ui| {
-                    let width = ui.available_width();
-                    let button_width = 120.0;
-                    let spacing = (width - button_width * 2.0) / 2.0;
+                    let spacing = dialog_button_spacing(ui, 1);
 
                     ui.add_space(spacing);
-                    if ui.button(i18n.t("general_dialog.cancel")).clicked() {
+
+                    if dialog_button(
+                        ui,
+                        i18n.t("general_dialog.accept"),
+                        &palette,
+                        DialogButtonKind::Primary,
+                    )
+                    .show()
+                    .clicked()
+                    {
                         should_close = true;
                     }
+
+                    ui.add_space(spacing);
                 });
             });
 

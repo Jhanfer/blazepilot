@@ -19,12 +19,10 @@ use crate::ui::dialog_manager::dialogs::config_dialog::backend::render_backend_s
 use crate::ui::dialog_manager::dialogs::config_dialog::general::render_general_settings;
 use crate::ui::dialog_manager::dialogs::config_dialog::language::render_language_settings;
 use crate::ui::dialog_manager::dialogs::config_dialog::terminal::render_terminal_settings;
-use crate::ui::dialog_manager::manager::ModalDialog;
+use crate::ui::dialog_manager::{dialogs::dialog_frame, manager::ModalDialog};
+use crate::ui::icons_cache::icons;
 use crate::ui::themes::theme_manager::with_theme;
-use egui::{
-    Align2, CentralPanel, Color32, CornerRadius, Frame, Id, Key, Margin, Order, Panel, RichText,
-    Stroke, Ui, Vec2, Window,
-};
+use egui::{Align2, CentralPanel, Color32, Id, Key, Order, Panel, RichText, Ui, Vec2, Window};
 
 #[derive(PartialEq, Clone, Copy)]
 enum CurrentConfigTab {
@@ -137,6 +135,17 @@ impl CurrentConfigTab {
 
         name_matches || content_matches
     }
+
+    fn icon_for_tab(&self) -> (&'static str, &'static [u8]) {
+        match self {
+            CurrentConfigTab::General => ("settings", icons::ICON_SETTINGS),
+            CurrentConfigTab::Terminal => ("terminal", icons::ICON_TERMINAL),
+            CurrentConfigTab::Backend => ("server", icons::ICON_SERVER),
+            CurrentConfigTab::Appearance => ("palette", icons::ICON_PALETTE),
+            CurrentConfigTab::Behavior => ("contract", icons::ICON_CONTRACT),
+            CurrentConfigTab::Language => ("language", icons::ICON_LANGUAGE),
+        }
+    }
 }
 
 pub struct ConfigDialog {
@@ -194,6 +203,8 @@ impl ConfigDialog {
 
     fn render_config_sidebar(&mut self, ui: &mut Ui) {
         let current_theme = with_theme(|t| t.current());
+        let palette = current_theme.dialogs.palette(&current_theme.global);
+        let i18n = with_configs(|c| c.get_i18n());
         ui.add_space(10.0);
 
         let search_id = egui::Id::new("config_search_bar");
@@ -201,14 +212,14 @@ impl ConfigDialog {
         let w = ui.available_width();
 
         let resp = ui
-            .blaze_input("Buscar...", None, &mut self.config_search)
+            .blaze_input(&i18n.t("search.placeholder"), None, &mut self.config_search)
             .id(search_id)
             .size((w, 30.0))
             .radius(20)
-            .text_color(current_theme.global.text_primary())
-            .background_color(current_theme.sidebar_left.bg_elevated())
+            .text_color(palette.fg_primary)
+            .background_color(palette.bg_elevated)
             .stroke_color(Color32::TRANSPARENT)
-            .x_color(current_theme.sidebar_left.accent())
+            .x_color(palette.accent)
             .show(|| {});
 
         if resp.clicked() || resp.gained_focus() {
@@ -242,24 +253,28 @@ impl ConfigDialog {
             let is_selected = self.current_config_tab == *tab;
 
             let text_color = if is_selected {
-                current_theme.global.text_primary()
+                palette.fg_primary
             } else {
-                current_theme.global.text_secondary()
+                palette.fg_secondary
             };
             let label = RichText::new(tab.name()).color(text_color);
 
-            let hover_bg = current_theme.sidebar_left.bg_hover();
             let bg = if is_selected {
-                current_theme.sidebar_left.bg_active()
+                palette.bg_selected
             } else {
-                current_theme.sidebar_left.bg_elevated()
+                palette.bg_elevated
             };
+
+            let (name, bytes) = tab.icon_for_tab();
 
             if ui
                 .blaze_button(label)
-                .size((w, 20.0))
+                .size((w, 24.0))
+                .icon(name, bytes)
+                .icon_color(palette.icon_primary)
+                .hover_icon_color(palette.icon_hover)
                 .background_color(bg)
-                .hover_background_color(hover_bg)
+                .hover_background_color(palette.bg_hover)
                 .stroke_color(Color32::TRANSPARENT)
                 .radius(20)
                 .stroke_width(current_theme.global.components_stroke_width)
@@ -274,9 +289,11 @@ impl ConfigDialog {
             ui.vertical_centered(|ui| {
                 ui.add_space(20.0);
                 ui.label_ns(
-                    RichText::new("No se encontraron resultados")
-                        .weak()
-                        .color(current_theme.global.text_secondary()),
+                    RichText::new(
+                        i18n.t_args("search.no_results", &[("query", self.config_search.trim())]),
+                    )
+                    .weak()
+                    .color(palette.fg_secondary),
                 );
             });
         }
@@ -293,64 +310,62 @@ impl ConfigDialog {
             return false;
         }
 
-        let custom_frame = Frame::NONE
-            .fill(current_theme.sidebar_left.bg_panel())
-            .stroke(Stroke::new(
-                current_theme.global.panel_stroke_width,
-                current_theme.sidebar_left.panel_border(),
-            ))
-            .corner_radius(CornerRadius::same(15))
-            .inner_margin(Margin::same(5));
+        let palette = current_theme.dialogs.palette(&current_theme.global);
 
         let screen_rect = ui.viewport_rect();
         let desired_width = screen_rect.width() * 0.88;
         let desired_height = screen_rect.height() * 0.85;
 
-        Window::new(
-            RichText::new(i18n.t("configs.title")).color(current_theme.global.text_primary()),
-        )
-        .id(Id::new("config_modal_window"))
-        .frame(custom_frame)
-        .order(Order::Foreground)
-        .default_size([desired_width, desired_height])
-        .min_size([300.0, 200.0])
-        .max_size([screen_rect.width() * 0.9, screen_rect.height() * 0.9])
-        .collapsible(false)
-        .resizable(false)
-        .anchor(Align2::CENTER_CENTER, Vec2::ZERO)
-        .open(&mut is_open)
-        .show(ui, |ui| {
-            let h = ui.available_height();
-            ui.set_width(ui.available_width());
-            ui.set_height(h);
+        Window::new(RichText::new(i18n.t("configs.title")).color(palette.fg_primary))
+            .id(Id::new("config_modal_window"))
+            .frame(dialog_frame(
+                &palette,
+                current_theme.global.panel_stroke_width,
+            ))
+            .order(Order::Foreground)
+            .default_size([desired_width, desired_height])
+            .min_size([300.0, 200.0])
+            .max_size([screen_rect.width() * 0.9, screen_rect.height() * 0.9])
+            .collapsible(false)
+            .resizable(false)
+            .anchor(Align2::CENTER_CENTER, Vec2::ZERO)
+            .open(&mut is_open)
+            .show(ui, |ui| {
+                ui.style_mut().visuals.panel_fill = palette.bg_panel;
 
-            ui.horizontal(|ui| {
+                let h = ui.available_height();
                 ui.set_width(ui.available_width());
                 ui.set_height(h);
 
-                Panel::left("configs_sidebar")
-                    .exact_size(160.0)
-                    .resizable(false)
-                    .show(ui, |ui| {
-                        self.render_config_sidebar(ui);
-                    });
+                ui.horizontal(|ui| {
+                    ui.set_width(ui.available_width());
+                    ui.set_height(h);
 
-                CentralPanel::default().show(ui, |ui| {
-                    let query = self.config_search.trim().to_lowercase();
+                    Panel::left("configs_sidebar")
+                        .exact_size(160.0)
+                        .resizable(false)
+                        .show(ui, |ui| {
+                            self.render_config_sidebar(ui);
+                        });
 
-                    match self.current_config_tab {
-                        CurrentConfigTab::General => render_general_settings(ui, &query),
-                        CurrentConfigTab::Terminal => render_terminal_settings(self, ui, &query),
-                        CurrentConfigTab::Backend => render_backend_settings(ui, &query),
-                        CurrentConfigTab::Appearance => {
-                            render_appearance_settings(self, ui, &query)
+                    CentralPanel::default().show(ui, |ui| {
+                        let query = self.config_search.trim().to_lowercase();
+
+                        match self.current_config_tab {
+                            CurrentConfigTab::General => render_general_settings(ui, &query),
+                            CurrentConfigTab::Terminal => {
+                                render_terminal_settings(self, ui, &query)
+                            }
+                            CurrentConfigTab::Backend => render_backend_settings(ui, &query),
+                            CurrentConfigTab::Appearance => {
+                                render_appearance_settings(self, ui, &query)
+                            }
+                            CurrentConfigTab::Behavior => {}
+                            CurrentConfigTab::Language => render_language_settings(ui, &query),
                         }
-                        CurrentConfigTab::Behavior => {}
-                        CurrentConfigTab::Language => render_language_settings(ui, &query),
-                    }
+                    });
                 });
             });
-        });
 
         if !is_open {
             should_close = true;
