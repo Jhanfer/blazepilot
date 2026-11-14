@@ -1,6 +1,7 @@
 pub mod blaze_ui_state;
 pub mod custom_components;
 pub mod dialog_manager;
+pub mod examples;
 pub mod fonts;
 pub mod icons_cache;
 pub mod image_preview;

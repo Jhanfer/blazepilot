@@ -14,20 +14,20 @@ use crate::{
     },
     ui::{
         blaze_ui_state::BlazeUiState,
+        custom_components::UiExt,
         icons_cache::icons,
         modules::{
             custom_context_menu::context_state::ContextMenuKind,
             sidebar_left_component::sidebar_components::{
-                render_drives_button, render_header_text, render_local_buttons,
+                render_drives_button, render_header_text, render_local_buttons, render_separator,
             },
-            utilities::ensure_min_lightness,
         },
-        themes::{platform::structs::ToColor, theme_manager::with_theme},
+        themes::{platform::structs::BlazeAppTheme, theme_manager::with_theme},
     },
 };
 use egui::{
-    Align, Area, Color32, CornerRadius, Frame, Id, Label, Layout, Margin, Panel, Rect, RichText,
-    ScrollArea, Sense, Stroke, Ui, pos2, scroll_area::ScrollBarVisibility, vec2,
+    Align, Area, CornerRadius, Frame, Id, Label, Layout, Margin, Panel, Rect, RichText, ScrollArea,
+    Sense, Stroke, Ui, pos2, scroll_area::ScrollBarVisibility, vec2,
 };
 
 use crate::ui::modules::sidebar_left_component::leftbar_state::{
@@ -41,10 +41,11 @@ fn render_expanded_panel(
     current_order: OrderingMode,
 ) {
     let current_theme = with_theme(|t| t.current());
+    let palette = current_theme.sidebar_left.palette(&current_theme.global);
     let i18n = with_configs(|c| c.get_i18n());
 
     let custom_frame = Frame::NONE
-        .fill(current_theme.semantic.bg_main.to_color())
+        .fill(current_theme.global.bg_main())
         .inner_margin(Margin {
             left: 15,
             right: 0,
@@ -64,44 +65,21 @@ fn render_expanded_panel(
                 Frame::new()
                     .inner_margin(Margin::symmetric(10, 4))
                     .show(ui, |ui| {
-                        let (icon_plus_fol, icon_bytes_plus_fol) =
-                            ("blaze-logo", icons::LOGO_BLAZEPILOT);
+                        let (blaze_icon, bytes) = ("blaze-logo", icons::LOGO_BLAZEPILOT);
 
                         let icon_size = vec2(25.0, 25.0);
-                        let (icon_rect, new_fol) =
-                            ui.allocate_exact_size(icon_size, Sense::click());
-                        let rounded_rect = Rect::from_min_max(
-                            pos2(icon_rect.min.x.round(), icon_rect.min.y.round()),
-                            pos2(icon_rect.max.x.round(), icon_rect.max.y.round()),
-                        );
 
-                        let plus_color = if new_fol.hovered() {
-                            current_theme.components.tools.label_hover.to_color()
-                        } else {
-                            current_theme.components.tools.label_active.to_color()
-                        };
-
-                        let icon = ui_state.icon_cache.get_or_load(
-                            ui,
-                            icon_plus_fol,
-                            icon_bytes_plus_fol,
-                            ensure_min_lightness(plus_color),
-                            icon_size,
-                        );
-
-                        ui.painter().image(
-                            icon.id(),
-                            rounded_rect,
-                            Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
-                            Color32::WHITE,
-                        );
+                        ui.draw_icon((blaze_icon, bytes))
+                            .size(icon_size)
+                            .tint(current_theme.sidebar_left.accent())
+                            .show();
 
                         ui.add(
                             Label::new(
                                 RichText::new("BlazePilot")
                                     .strong()
                                     .size(18.0)
-                                    .color(current_theme.semantic.text_primary.to_color()),
+                                    .color(current_theme.global.text_primary()),
                             )
                             .selectable(false),
                         );
@@ -110,11 +88,11 @@ fn render_expanded_panel(
 
             Frame::NONE
                 .inner_margin(egui::Margin::same(10))
-                .fill(current_theme.components.panel.bg.to_color())
+                .fill(current_theme.sidebar_left.bg_panel())
                 .corner_radius(CornerRadius::same(20))
                 .stroke(Stroke {
-                    width: 0.5,
-                    color: current_theme.components.panel.border.to_color(),
+                    width: current_theme.global.panel_stroke_width,
+                    color: palette.border_panel,
                 })
                 .show(ui, |ui| {
                     ui.set_height(ui.available_height());
@@ -122,12 +100,7 @@ fn render_expanded_panel(
                     ScrollArea::vertical()
                         .scroll_bar_visibility(ScrollBarVisibility::AlwaysHidden)
                         .show(ui, |ui| {
-                            render_header_text(
-                                "locals",
-                                &i18n.t("left_sidebar.locals"),
-                                ui,
-                                ui_state,
-                            );
+                            render_header_text(&i18n.t("left_sidebar.locals"), ui);
 
                             ui.add_space(10.0);
 
@@ -144,28 +117,15 @@ fn render_expanded_panel(
 
                             for (key, label, path) in dirs {
                                 if path.exists() {
-                                    render_local_buttons(
-                                        key,
-                                        &label,
-                                        path.to_owned(),
-                                        state,
-                                        ui,
-                                        ui_state,
-                                    );
-                                    ui.add_space(2.0);
+                                    render_local_buttons(key, &label, path.to_owned(), state, ui);
                                 }
                             }
 
                             ui.add_space(20.0);
-                            ui.separator();
+                            render_separator(ui, palette.border_panel);
 
                             ui.add_space(10.0);
-                            render_header_text(
-                                "disks",
-                                &i18n.t("left_sidebar.disks"),
-                                ui,
-                                ui_state,
-                            );
+                            render_header_text(&i18n.t("left_sidebar.disks"), ui);
                             ui.add_space(10.0);
 
                             let manager = state.motor.borrow_mut().disk_manager.clone();
@@ -184,7 +144,7 @@ fn render_expanded_panel(
                             let mut ctx_menu = std::mem::take(&mut ui_state.context_menu_state);
 
                             if ctx_menu.kind == ContextMenuKind::DrivesPanel {
-                                ctx_menu.render_drives_context(ui, state, ui_state)
+                                ctx_menu.render_drives_context(ui, state)
                             }
 
                             ui_state.context_menu_state = ctx_menu;
@@ -193,30 +153,42 @@ fn render_expanded_panel(
         })
         .response;
 
-    let new_width = left_response.rect.width();
+    let stroke_total = 3.0 * current_theme.global.panel_stroke_width;
 
-    if new_width < MIN_PANEL_WIDTH_TOLERANCE
-        && current_order.leftpanel_state.width >= MIN_PANEL_WIDTH_TOLERANCE
-    {
+    let min_width = MIN_PANEL_WIDTH_TOLERANCE + stroke_total;
+
+    let rect_width = left_response.rect.width();
+    let prev_width = current_order.leftpanel_state.width;
+    let was_open = prev_width >= min_width;
+    let is_growing = rect_width > prev_width;
+
+    if rect_width < min_width {
+        if was_open && !is_growing {
+            with_configs(|c| {
+                let mut o = c.get_ordering_mode();
+                o.leftpanel_state.collapsed = true;
+                c.set_ordering_mode(o);
+            });
+        } else if is_growing {
+            with_configs(|c| {
+                let mut o = c.get_ordering_mode();
+                o.leftpanel_state.collapsed = false;
+                o.leftpanel_state.width = min_width;
+                c.set_ordering_mode(o);
+            })
+        }
+    } else {
         with_configs(|c| {
-            let mut current_ordering = c.get_ordering_mode();
-            current_ordering.leftpanel_state.collapsed = true;
-            c.set_ordering_mode(current_ordering);
-        });
-    } else if new_width >= MIN_PANEL_WIDTH_TOLERANCE {
-        with_configs(|c| {
-            let mut current_ordering = c.get_ordering_mode();
-            current_ordering.leftpanel_state.width = new_width;
-            c.set_ordering_mode(current_ordering);
+            let mut o = c.get_ordering_mode();
+            o.leftpanel_state.width = rect_width;
+            o.leftpanel_state.collapsed = false;
+            c.set_ordering_mode(o);
         });
     }
 }
 
-fn render_collapsed_tab(
-    ui: &mut Ui,
-    ui_state: &mut BlazeUiState,
-    current_theme: Arc<crate::ui::themes::platform::structs::NewTheme>,
-) {
+fn render_collapsed_tab(ui: &mut Ui, current_theme: Arc<BlazeAppTheme>) {
+    let palette = current_theme.sidebar_left.palette(&current_theme.global);
     let area_id = Id::new("left_tab");
     let hover_state_id = Id::new("left_tab_hover_state");
 
@@ -241,10 +213,14 @@ fn render_collapsed_tab(
 
                     Frame::NONE
                         .inner_margin(Margin::same(10))
-                        .fill(current_theme.components.panel.bg.to_color())
+                        .fill(if is_hovered {
+                            palette.bg_hover
+                        } else {
+                            palette.bg_panel
+                        })
                         .stroke(Stroke::new(
-                            0.5,
-                            current_theme.components.panel.border.to_color(),
+                            current_theme.global.panel_stroke_width,
+                            palette.border_panel,
                         ))
                         .corner_radius(CornerRadius::same(20))
                         .show(ui, |ui| {
@@ -252,32 +228,19 @@ fn render_collapsed_tab(
                             ui.set_height(area_height / 2.0);
 
                             let area_center = area_rect.center();
+                            let icon_size = vec2(18.0, 18.0);
+                            let t_icon_rect = Rect::from_center_size(area_center, icon_size);
 
-                            let icon_size = 18.0;
-
-                            let t_icon_rect =
-                                Rect::from_center_size(area_center, vec2(icon_size, icon_size));
                             let (icon_n, icon_b) = ("left_sidebar", icons::ICON_SIDEBAR_LEFT);
 
-                            let icon = ui_state.icon_cache.get_or_load(
-                                ui,
-                                icon_n,
-                                icon_b,
-                                Color32::GRAY,
-                                vec2(icon_size, icon_size),
-                            );
-
-                            let rounded_rect = Rect::from_min_max(
-                                pos2(t_icon_rect.min.x.round(), t_icon_rect.min.y.round()),
-                                pos2(t_icon_rect.max.x.round(), t_icon_rect.max.y.round()),
-                            );
-
-                            ui.painter().image(
-                                icon.id(),
-                                rounded_rect,
-                                Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
-                                Color32::WHITE,
-                            );
+                            ui.draw_icon((icon_n, icon_b))
+                                .size(icon_size)
+                                .tint(if is_hovered {
+                                    palette.icon_hover
+                                } else {
+                                    palette.icon_secondary
+                                })
+                                .show_at(t_icon_rect);
                         });
                 })
                 .response;
@@ -297,7 +260,6 @@ fn render_collapsed_tab(
                 ui.data_mut(|data| {
                     data.insert_temp(hover_state_id, is_hovered);
                 });
-                ui.request_repaint();
             }
         });
 }
@@ -311,7 +273,7 @@ pub fn sidebar_left_component(
     let current_order = with_configs(|c| c.get_ordering_mode());
 
     if current_order.leftpanel_state.collapsed {
-        render_collapsed_tab(ui, ui_state, current_theme);
+        render_collapsed_tab(ui, current_theme);
     } else {
         render_expanded_panel(ui, state, ui_state, current_order);
     }

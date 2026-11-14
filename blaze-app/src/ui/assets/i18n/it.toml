@@ -289,6 +289,7 @@ title = "Nuova versione disponibile!"
 message = "È disponibile un aggiornamento per Blazepilot."
 current_version = "Versione attuale: \"{query}\""
 new_version = "Vuoi aggiornare alla versione \"{query}\"?"
+changelog = "Registro delle modifiche"
 
 [move_to_dialog]
 title = "Sposta..."

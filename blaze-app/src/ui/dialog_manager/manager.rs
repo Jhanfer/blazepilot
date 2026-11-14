@@ -8,7 +8,7 @@ use crate::{
     core::runtime::bus_structs::QuickTagEvent,
     ui::{
         dialog_manager::dialogs::{
-            configs_dialog::ConfigDialog, error_dialog::ErrorDialog,
+            config_dialog::configs_dialog::ConfigDialog, error_dialog::ErrorDialog,
             folder_color_selector_dialog::FolderColorSelector,
             image_preview_dialog::ImagePreviewDialog, media_player_dialog::MediaPlayerDialog,
             quick_dialogs::QuickAccDialog, selector_dialog::AppSelectorDialog,

@@ -6,7 +6,7 @@ use crate::ui::blaze_ui_state::BlazeUiState;
 use crate::ui::custom_components::UiExt;
 use crate::ui::icons_cache::thumbnails::thumbnails_manager::Thumbnail;
 use crate::ui::modules::utilities::{ensure_min_lightness, resolve_icon};
-use crate::ui::themes::platform::structs::ToColor;
+use crate::ui::themes::platform::structs::BlazeAppTheme;
 use crate::utils::formating::{format_date, format_size};
 use egui::{
     Align, Color32, ColorImage, CornerRadius, Frame, Grid, Label, Layout, Margin, Rect, RichText,
@@ -21,7 +21,7 @@ pub(crate) fn render_animated_section(
     ui: &mut Ui,
     state: &mut BlazeCoreState,
     ui_state: &mut BlazeUiState,
-    current_theme: Arc<crate::ui::themes::platform::structs::NewTheme>,
+    current_theme: Arc<BlazeAppTheme>,
 ) {
     ui.add_space(10.0);
 
@@ -36,10 +36,6 @@ pub(crate) fn render_animated_section(
     let anim = ui.animate_value_with_time(anim_id, target, 0.10);
 
     if anim > 0.001 {
-        if anim != target {
-            ui.request_repaint();
-        }
-
         let max_height = 350.0;
         let current_height = max_height * anim;
 
@@ -50,12 +46,10 @@ pub(crate) fn render_animated_section(
         ui.set_clip_rect(clip_rect);
 
         let animated_stroke = Stroke::new(
-            (0.5 * anim).clamp(0.0, 0.5),
+            (current_theme.global.panel_stroke_width * anim).clamp(0.0, 0.5),
             current_theme
-                .components
-                .panel
-                .border
-                .to_color()
+                .sidebar_right
+                .panel_border()
                 .linear_multiply(anim),
         );
 
@@ -66,20 +60,16 @@ pub(crate) fn render_animated_section(
                 .outer_margin(Margin::symmetric(1, 1))
                 .inner_margin(Margin::same(10))
                 .stroke(animated_stroke)
-                .fill(current_theme.semantic.bg_main.to_color())
+                .fill(current_theme.global.bg_main())
                 .corner_radius(animated_radius)
                 .show(ui, |ui| {
                     let file = &files[first_selected_idx];
 
                     ui.add(
                         Label::new(
-                            RichText::new(i18n.t("right_sidebar.info")).heading().color(
-                                current_theme
-                                    .semantic
-                                    .text_primary
-                                    .to_color()
-                                    .linear_multiply(anim),
-                            ),
+                            RichText::new(i18n.t("right_sidebar.info"))
+                                .heading()
+                                .color(current_theme.global.text_primary()),
                         )
                         .selectable(false),
                     );
@@ -88,8 +78,6 @@ pub(crate) fn render_animated_section(
 
                     ui.vertical_centered(|ui| {
                         ui.add_space(10.0);
-
-                        let mut should_repaint = false;
 
                         let slide = (1.0 - anim) * -15.0;
                         if slide.abs() > 0.5 {
@@ -118,8 +106,6 @@ pub(crate) fn render_animated_section(
                                         &thumb.pixels,
                                     );
 
-                                    should_repaint = true;
-
                                     ui.load_texture(
                                         format!("thumb:{}", path.to_string_lossy()),
                                         color_image,
@@ -133,11 +119,6 @@ pub(crate) fn render_animated_section(
                                 Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
                                 Color32::WHITE,
                             );
-                        } else if ui_state
-                            .newly_calculated_thumbnails
-                            .contains(&file.full_path)
-                        {
-                            should_repaint = true;
                         } else {
                             let snapshot_color = file
                                 .unique_id
@@ -147,27 +128,12 @@ pub(crate) fn render_animated_section(
 
                             let (icon_name, icon_bytes, color) = resolve_icon(file, snapshot_color);
 
-                            let rounded_rect = Rect::from_min_max(
-                                pos2(icon_rect.min.x.round(), icon_rect.min.y.round()),
-                                pos2(icon_rect.max.x.round(), icon_rect.max.y.round()),
-                            );
-
                             let normalized_color = ensure_min_lightness(color);
 
-                            let icon = ui_state.icon_cache.get_or_load(
-                                ui,
-                                &icon_name,
-                                icon_bytes,
-                                normalized_color,
-                                icon_size,
-                            );
-
-                            ui.painter().image(
-                                icon.id(),
-                                rounded_rect,
-                                Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
-                                Color32::WHITE,
-                            );
+                            ui.draw_icon((&icon_name, icon_bytes))
+                                .size(icon_size)
+                                .tint(normalized_color)
+                                .show_at(icon_rect);
                         }
 
                         ui.allocate_ui_with_layout(
@@ -175,15 +141,9 @@ pub(crate) fn render_animated_section(
                             Layout::top_down(Align::Center),
                             |ui| {
                                 ui.add(
-                                    Label::new(
-                                        RichText::new(file.name.clone()).color(
-                                            current_theme
-                                                .semantic
-                                                .text_primary
-                                                .to_color()
-                                                .linear_multiply(anim),
-                                        ),
-                                    )
+                                    Label::new(RichText::new(file.name.clone()).color(
+                                        current_theme.global.text_primary().linear_multiply(anim),
+                                    ))
                                     .wrap()
                                     .selectable(false),
                                 );
@@ -191,10 +151,6 @@ pub(crate) fn render_animated_section(
                         );
 
                         ui.add_space(10.0);
-
-                        if should_repaint {
-                            ui.request_repaint();
-                        }
                     });
 
                     Grid::new("file_info_grid")

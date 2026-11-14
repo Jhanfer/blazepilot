@@ -1,7 +1,6 @@
 use crate::{
     core::{
-        blaze_state::BlazeCoreState,
-        blaze_state::state_structs::NewItemType,
+        blaze_state::{BlazeCoreState, state_structs::NewItemType},
         bootstrap::configs::config_manager::with_configs,
         files::blaze_motor::motor_structs::FileEntry,
         runtime::{
@@ -15,29 +14,24 @@ use crate::{
     },
     ui::{
         blaze_ui_state::BlazeUiState,
-        custom_components::text_edit::BlazeTextEdit,
+        custom_components::{UiExt, text_edit::BlazeTextEdit},
         icons_cache::thumbnails::thumbnails_manager::Thumbnail,
         modules::{
             custom_context_menu::context_state::ContextMenuKind,
             utilities::{ensure_min_lightness, git_dot_color, resolve_icon, text_color_for_git},
         },
-        themes::{platform::structs::ToColor, theme_manager::with_theme},
+        themes::{platform::color_ops, theme_manager::with_theme},
     },
     utils::formating::{format_date, format_size},
 };
 use egui::{
     Color32, ColorImage, CursorIcon, FontId, Id, Key, Modifiers, PointerButton, Rect, ScrollArea,
-    Sense, Stroke, StrokeKind, TextureOptions, Ui, pos2, scroll_area::ScrollSource, vec2,
+    Sense, Stroke, StrokeKind, TextureOptions, Ui, Vec2, pos2, scroll_area::ScrollSource, vec2,
 };
 use std::{borrow::Cow, collections::HashMap, path::Path, sync::Arc};
 use tracing::info;
 
-fn grid_file_creation(
-    state: &mut BlazeCoreState,
-    ui: &mut Ui,
-    available_width: f32,
-    ui_state: &mut BlazeUiState,
-) {
+fn grid_file_creation(state: &mut BlazeCoreState, ui: &mut Ui, available_width: f32) {
     if let Some(item_type) = state.creating_new.clone() {
         let icon_size = state.grid_view.base.icon_size;
         let cell_size = state.grid_view.cell_size;
@@ -66,24 +60,10 @@ fn grid_file_creation(
         let icon_x = rect.min.x + (cell_size - icon_size) / 2.0;
         let icon_rect = Rect::from_min_size(pos2(icon_x, icon_top), vec2(icon_size, icon_size));
 
-        let rounded_rect = Rect::from_min_max(
-            pos2(icon_rect.min.x.round(), icon_rect.min.y.round()),
-            pos2(icon_rect.max.x.round(), icon_rect.max.y.round()),
-        );
-
-        let icon = ui_state.icon_cache.get_or_load(
-            ui,
-            &icon_name,
-            icon_bytes,
-            color,
-            vec2(icon_size, icon_size),
-        );
-        ui.painter().image(
-            icon.id(),
-            rounded_rect,
-            Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
-            Color32::WHITE,
-        );
+        ui.draw_icon((&icon_name, icon_bytes))
+            .size(Vec2::splat(icon_size))
+            .tint(color)
+            .show();
 
         let creating_new_id = Id::new("creating_new");
 
@@ -298,6 +278,7 @@ pub fn render_grid_scrollview(
     content_rect: Rect,
 ) {
     let current_theme = with_theme(|t| t.current());
+    let palette = current_theme.main_area.palette(&current_theme.global);
 
     let i18n = with_configs(|c| c.get_i18n());
 
@@ -348,7 +329,7 @@ pub fn render_grid_scrollview(
 
     let scroll_output = scroll_area.show_rows(ui, row_height, total_rows, |ui, row_range| {
         // --- Creación de carpeta/archivo nuevo ---
-        grid_file_creation(state, ui, available_width, ui_state);
+        grid_file_creation(state, ui, available_width);
 
         let mut should_repaint = false;
 
@@ -449,11 +430,8 @@ pub fn render_grid_scrollview(
                         pos2(rect.max.x - margin, rect.max.y - margin),
                     );
 
-                    ui.painter().rect_filled(
-                        selection_rect,
-                        8.0,
-                        current_theme.components.list_item.bg_hover.to_color(),
-                    );
+                    ui.painter()
+                        .rect_filled(selection_rect, 8.0, palette.bg_hover);
                 }
 
                 if state.is_selected(i) {
@@ -463,31 +441,8 @@ pub fn render_grid_scrollview(
                         pos2(rect.max.x - margin, rect.max.y - margin),
                     );
 
-                    ui.painter().rect_filled(
-                        selection_rect,
-                        8.0,
-                        Color32::from_rgba_unmultiplied(
-                            current_theme
-                                .components
-                                .list_item
-                                .bg_selected
-                                .to_color()
-                                .r(),
-                            current_theme
-                                .components
-                                .list_item
-                                .bg_selected
-                                .to_color()
-                                .g(),
-                            current_theme
-                                .components
-                                .list_item
-                                .bg_selected
-                                .to_color()
-                                .b(),
-                            60,
-                        ),
-                    );
+                    let selection = color_ops::with_alpha(palette.accent, 60);
+                    ui.painter().rect_filled(selection_rect, 8.0, selection);
                 }
 
                 // Drop target highlight
@@ -496,8 +451,11 @@ pub fn render_grid_scrollview(
                         ui.painter().rect_stroke(
                             rect,
                             8.0,
-                            Stroke::new(2.0, Color32::from_rgb(150, 150, 255)),
-                            StrokeKind::Outside,
+                            Stroke::new(
+                                current_theme.global.components_stroke_width,
+                                current_theme.global.success(),
+                            ),
+                            StrokeKind::Middle,
                         );
                     }
                 } else if let Some(ref target_invalid) =
@@ -507,8 +465,11 @@ pub fn render_grid_scrollview(
                     ui.painter().rect_stroke(
                         rect,
                         8.0,
-                        Stroke::new(2.0, Color32::from_rgb(255, 150, 150)),
-                        StrokeKind::Outside,
+                        Stroke::new(
+                            current_theme.global.components_stroke_width,
+                            current_theme.global.error(),
+                        ),
+                        StrokeKind::Middle,
                     );
                 }
 
@@ -634,26 +595,13 @@ pub fn render_grid_scrollview(
 
                     let (icon_name, icon_bytes, color) = resolve_icon(file, snapshot_color);
 
-                    let rounded_rect = Rect::from_min_max(
-                        pos2(icon_rect.min.x.round(), icon_rect.min.y.round()),
-                        pos2(icon_rect.max.x.round(), icon_rect.max.y.round()),
-                    );
-
                     let normalized_color = ensure_min_lightness(color);
 
-                    let icon = ui_state.icon_cache.get_or_load(
-                        ui,
-                        &icon_name,
-                        icon_bytes,
-                        normalized_color,
-                        vec2(icon_size, icon_size),
-                    );
-                    ui.painter().image(
-                        icon.id(),
-                        rounded_rect,
-                        Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
-                        icon_tint,
-                    );
+                    ui.draw_icon((&icon_name, icon_bytes))
+                        .id(format!("icon_{i}"))
+                        .size(Vec2::splat(icon_size))
+                        .tint(normalized_color)
+                        .show_at(icon_rect);
                 }
 
                 if let Some(dot) = dot_color {
@@ -807,8 +755,8 @@ pub fn render_grid_scrollview(
 
         let mut ctx_menu = std::mem::take(&mut ui_state.context_menu_state);
         match ctx_menu.kind {
-            ContextMenuKind::FileNormal => ctx_menu.file_context_menu(ui, state, ui_state),
-            ContextMenuKind::FileTrash => ctx_menu.file_context_menu_in_trash(ui, state, ui_state),
+            ContextMenuKind::FileNormal => ctx_menu.file_context_menu(ui, state),
+            ContextMenuKind::FileTrash => ctx_menu.file_context_menu_in_trash(ui, state),
             _ => {}
         }
         ui_state.context_menu_state = ctx_menu;

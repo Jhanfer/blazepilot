@@ -20,92 +20,30 @@ use crate::{
         system::clipboard_text::text_clipboard::with_text_clipboard,
     },
     ui::{
-        blaze_ui_state::BlazeUiState,
         custom_components::{UiExt, text_edit::BlazeTextEdit},
         icons_cache::icons::{self},
-        modules::{tabs_view::tab_views::tabs, utilities::ensure_min_lightness},
-        themes::{platform::structs::ToColor, theme_manager::with_theme},
+        modules::tabs_view::tab_views::tabs,
+        themes::theme_manager::with_theme,
     },
 };
 use egui::{
-    Button, Color32, CornerRadius, CursorIcon, Frame, Id, Key, Layout, Margin, Panel, Rect,
-    RichText, Sense, Stroke, Ui, UiBuilder, pos2, vec2,
+    Color32, CornerRadius, CursorIcon, FontId, Frame, Id, Key, Layout, Margin, Panel, Rect,
+    RichText, Sense, Ui, UiBuilder, vec2,
 };
 use std::{
     path::{Path, PathBuf},
     sync::Arc,
 };
 
-fn render_bar_button<F>(
-    ui: &mut Ui,
-    total_height: f32,
-    label: &'static str,
-    bytes: &[u8],
-    ui_state: &mut BlazeUiState,
-    active: bool,
-    mut callback: F,
-) where
-    F: FnMut(),
-{
+pub fn toolbar_component(ui: &mut Ui, state: &mut BlazeCoreState) {
     let current_theme = with_theme(|t| t.current());
-
-    let ball_size = 35.0;
-    Frame::new()
-        .fill(current_theme.components.button.bg.to_color())
-        .stroke(Stroke::new(0.5, current_theme.semantic.accent.to_color()))
-        .corner_radius(CornerRadius::same((ball_size / 1.5) as u8))
-        .show(ui, |ui| {
-            ui.set_width(ball_size);
-            ui.set_height(total_height);
-            let icon_size = vec2(16.0, 16.0);
-            let (rect, resp) =
-                ui.allocate_exact_size(vec2(ball_size, total_height), Sense::click());
-
-            let icon_pos = rect.left_center() - vec2(-10.0, icon_size.y / 2.0);
-            let icon_rect = Rect::from_min_size(icon_pos, icon_size);
-
-            let rounded_rect = Rect::from_min_max(
-                pos2(icon_rect.min.x.round(), icon_rect.min.y.round()),
-                pos2(icon_rect.max.x.round(), icon_rect.max.y.round()),
-            );
-
-            let color = if resp.hovered() && active {
-                ensure_min_lightness(current_theme.components.button.label_hover.to_color())
-            } else if !active {
-                current_theme.components.button.label_inactive.to_color()
-            } else {
-                current_theme.components.button.label_active.to_color()
-            };
-
-            let icon = ui_state
-                .icon_cache
-                .get_or_load(ui, label, bytes, color, icon_size);
-
-            ui.painter().image(
-                icon.id(),
-                rounded_rect,
-                Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
-                Color32::WHITE,
-            );
-
-            if resp.clicked() && active {
-                callback();
-            }
-
-            if resp.hovered() && active {
-                ui.set_cursor_icon(egui::CursorIcon::PointingHand);
-            }
-        });
-}
-
-pub fn toolbar_component(ui: &mut Ui, state: &mut BlazeCoreState, ui_state: &mut BlazeUiState) {
-    let current_theme = with_theme(|t| t.current());
+    let palette = current_theme.top_bar.palette(&current_theme.global);
     let i18n = with_configs(|c| c.get_i18n());
 
     Panel::top("toolbar")
         .frame(
             Frame::new()
-                .fill(current_theme.semantic.bg_main.to_color())
+                .fill(current_theme.global.bg_main())
                 .inner_margin(Margin {
                     left: 10,
                     right: 10,
@@ -118,12 +56,22 @@ pub fn toolbar_component(ui: &mut Ui, state: &mut BlazeCoreState, ui_state: &mut
             ui.spacing_mut().item_spacing.y = 0.0;
             ui.add_space(5.0);
 
-            let bar_width = ui.available_width();
+            let horizontal_padding = 5.0;
+            let full_rect = ui.available_rect_before_wrap();
+            let tabs_rect = Rect::from_min_max(
+                full_rect.min + vec2(horizontal_padding, 0.0),
+                full_rect.max - vec2(horizontal_padding, 0.0),
+            );
+            let tab_width = tabs_rect.width();
 
-            // ----------------------
-            // Tabs
-            // ----------------------
-            let bar_rect = tabs(ui, state, ui_state, bar_width);
+            let bar_rect = ui
+                .scope_builder(UiBuilder::new().max_rect(tabs_rect), |ui| {
+                    // ----------------------
+                    // Tabs
+                    // ----------------------
+                    tabs(ui, state, tab_width)
+                })
+                .inner;
 
             let route_h = 35.0;
             let horizontal_padding = 10.0;
@@ -151,62 +99,93 @@ pub fn toolbar_component(ui: &mut Ui, state: &mut BlazeCoreState, ui_state: &mut
                 inner_size,
                 Layout::left_to_right(egui::Align::Center),
                 |ui| {
+                    ui.add_space(1.0);
                     let back_active = state.can_go_back();
-                    render_bar_button(
-                        ui,
-                        route_h,
-                        "<",
-                        icons::ICON_ARROW_LEFT,
-                        ui_state,
-                        back_active,
-                        || state.back(),
-                    );
+
+                    if ui
+                        .blaze_button("")
+                        .id("back_btn")
+                        .icon("<", icons::ICON_ARROW_LEFT)
+                        .set_is_active(back_active)
+                        .size((route_h, route_h))
+                        .icon_color(palette.icon_primary)
+                        .hover_icon_color(palette.icon_hover)
+                        .text_color(palette.fg_secondary)
+                        .background_color(palette.bg_elevated)
+                        .stroke_color(palette.border_component)
+                        .stroke_width(current_theme.global.components_stroke_width)
+                        .radius(25.0)
+                        .show()
+                        .clicked()
+                    {
+                        state.back()
+                    }
 
                     let forward_active = state.can_go_forward();
 
-                    render_bar_button(
-                        ui,
-                        route_h,
-                        ">",
-                        icons::ICON_ARROW_RIGHT,
-                        ui_state,
-                        forward_active,
-                        || state.forward(),
-                    );
+                    if ui
+                        .blaze_button("")
+                        .id("forward_btn")
+                        .icon(">", icons::ICON_ARROW_RIGHT)
+                        .set_is_active(forward_active)
+                        .size((route_h, route_h))
+                        .icon_color(palette.icon_primary)
+                        .hover_icon_color(palette.icon_hover)
+                        .text_color(palette.fg_secondary)
+                        .background_color(palette.bg_elevated)
+                        .stroke_color(palette.border_component)
+                        .stroke_width(current_theme.global.components_stroke_width)
+                        .radius(25.0)
+                        .show()
+                        .clicked()
+                    {
+                        state.forward()
+                    }
 
                     let up_active = state.can_go_up();
 
-                    render_bar_button(
-                        ui,
-                        route_h,
-                        "UP",
-                        icons::ICON_ARROW_UP,
-                        ui_state,
-                        up_active,
-                        || state.up(),
-                    );
+                    if ui
+                        .blaze_button("")
+                        .id("up_btn")
+                        .icon("UP", icons::ICON_ARROW_UP)
+                        .set_is_active(up_active)
+                        .size((route_h, route_h))
+                        .icon_color(palette.icon_primary)
+                        .hover_icon_color(palette.icon_hover)
+                        .text_color(palette.fg_secondary)
+                        .background_color(palette.bg_elevated)
+                        .stroke_color(palette.border_component)
+                        .stroke_width(current_theme.global.components_stroke_width)
+                        .radius(25.0)
+                        .show()
+                        .clicked()
+                    {
+                        state.up()
+                    }
 
-                    render_bar_button(
-                        ui,
-                        route_h,
-                        "⚙️",
-                        icons::ICON_SETTINGS,
-                        ui_state,
-                        true,
-                        || {
-                            let tab_id = state.active_id();
-                            let dispatcher = with_event_bus(|e| e.dispatcher(tab_id));
-                            dispatcher.send(UiEvent::OpenConfigs).ok();
-                        },
-                    );
+                    if ui
+                        .blaze_button("")
+                        .id("settings_btn")
+                        .icon("settings", icons::ICON_SETTINGS)
+                        .size((route_h, route_h))
+                        .icon_color(palette.icon_primary)
+                        .hover_icon_color(palette.icon_hover)
+                        .text_color(palette.fg_secondary)
+                        .background_color(palette.bg_elevated)
+                        .stroke_color(palette.border_component)
+                        .stroke_width(current_theme.global.components_stroke_width)
+                        .radius(25.0)
+                        .show()
+                        .clicked()
+                    {
+                        let tab_id = state.active_id();
+                        let dispatcher = with_event_bus(|e| e.dispatcher(tab_id));
+                        dispatcher.send(UiEvent::OpenConfigs).ok();
+                    }
 
                     let cwd = state.cwd();
                     Frame::new()
-                        .fill(current_theme.components.input.bg.to_color())
-                        .stroke(Stroke::new(
-                            0.5,
-                            current_theme.components.input.border_idle.to_color(),
-                        ))
+                        .fill(palette.bg_elevated)
                         .corner_radius(CornerRadius::same(20))
                         .inner_margin(0)
                         .show(ui, |ui| {
@@ -263,39 +242,156 @@ pub fn toolbar_component(ui: &mut Ui, state: &mut BlazeCoreState, ui_state: &mut
 
                                     let components: Vec<_> = cwd.components().collect();
 
-                                    let mut current_path = PathBuf::new();
+                                    let reserve_for_clipboard = 40.0;
+                                    let buget =
+                                        (ui.available_width() - reserve_for_clipboard).max(0.0);
 
-                                    for (i, component) in components.iter().enumerate() {
-                                        let name =
-                                            component.as_os_str().to_string_lossy().to_string();
+                                    let sep_font = FontId::proportional(16.0);
+                                    let sep_color = palette.fg_secondary;
+                                    let sep_w = ui
+                                        .painter()
+                                        .layout_no_wrap(">".to_owned(), sep_font, sep_color)
+                                        .rect
+                                        .width()
+                                        + ui.spacing().item_spacing.x;
+
+                                    let crumb_font = FontId::proportional(14.0);
+                                    let crumb_extra = 20.0;
+
+                                    let per_crumb_max = f32::INFINITY;
+
+                                    let mut crumbs: Vec<(usize, String, f32)> = vec![];
+                                    for (i, c) in components.iter().enumerate() {
+                                        let name = c.as_os_str().to_string_lossy().to_string();
                                         if name.is_empty() {
                                             continue;
                                         }
 
-                                        current_path.push(component);
+                                        let w = ui
+                                            .painter()
+                                            .layout_no_wrap(
+                                                name.clone(),
+                                                crumb_font.clone(),
+                                                palette.fg_primary,
+                                            )
+                                            .rect
+                                            .width()
+                                            + crumb_extra;
 
-                                        let is_last = i == components.len() - 1;
+                                        crumbs.push((i, name, w));
+                                    }
 
-                                        let button = Button::new(
-                                            RichText::new(name)
-                                                .color(if is_last {
-                                                    current_theme.semantic.text_primary.to_color()
-                                                } else {
-                                                    current_theme.semantic.text_secondary.to_color()
-                                                })
-                                                .strong(),
-                                        )
-                                        .frame(true)
-                                        .fill(if is_last {
-                                            current_theme.semantic.accent_glow.to_color()
+                                    if crumbs.is_empty() {
+                                        return;
+                                    }
+
+                                    let n = crumbs.len();
+
+                                    let mut visible_from = 0_usize;
+                                    {
+                                        let mut total = 0.0_f32;
+                                        for k in (0..n).rev() {
+                                            let (_, _, w) = &crumbs[k];
+                                            let need = *w + if k < n - 1 { sep_w } else { 0.0 };
+                                            if total + need > buget && k != n - 1 {
+                                                break;
+                                            }
+                                            total += need;
+                                            visible_from = k;
+                                        }
+                                    }
+
+                                    if visible_from > 0 {
+                                        let ellipsis_w = ui
+                                            .painter()
+                                            .layout_no_wrap(
+                                                "...".to_owned(),
+                                                crumb_font.clone(),
+                                                palette.fg_primary,
+                                            )
+                                            .rect
+                                            .width()
+                                            + crumb_extra
+                                            + sep_w;
+
+                                        let mut total = ellipsis_w;
+                                        for (k, _) in
+                                            crumbs.iter().enumerate().take(n).skip(visible_from)
+                                        {
+                                            let (_, _, w) = &crumbs[k];
+                                            total += *w + if k < n - 1 { sep_w } else { 0.0 };
+                                        }
+
+                                        while total > buget && visible_from < n - 1 {
+                                            let (_, _, w) = &crumbs[visible_from];
+                                            total += *w + sep_w;
+                                            visible_from += 1;
+                                        }
+                                    }
+
+                                    let mut current_path = PathBuf::new();
+                                    for (k, _, _) in crumbs.iter().take(visible_from) {
+                                        let (i, _, _) = &crumbs[*k];
+                                        current_path.push(components[*i]);
+                                    }
+
+                                    if visible_from > 0 {
+                                        ui.label_ns(
+                                            RichText::new("...")
+                                                .color(palette.fg_secondary)
+                                                .size(16.0),
+                                        );
+                                    }
+
+                                    for (k, _) in
+                                        crumbs.iter().enumerate().take(n).skip(visible_from)
+                                    {
+                                        let (i, raw_name, w) = &crumbs[k];
+                                        let c = components[*i];
+                                        current_path.push(c);
+
+                                        let is_last = *i == components.len() - 1;
+
+                                        let display_name = if !is_last && *w > per_crumb_max {
+                                            let max_chars = ((per_crumb_max
+                                                / (crumb_font.size * 0.555))
+                                                as usize)
+                                                .max(3);
+
+                                            let chars: Vec<char> = raw_name.chars().collect();
+                                            if chars.len() > max_chars {
+                                                let s: String = chars
+                                                    [..max_chars.saturating_sub(1)]
+                                                    .iter()
+                                                    .collect();
+                                                format!("{s}..")
+                                            } else {
+                                                raw_name.clone()
+                                            }
                                         } else {
-                                            Color32::TRANSPARENT
-                                        })
-                                        .stroke(Stroke::NONE)
-                                        .corner_radius(CornerRadius::same(6.0 as u8))
-                                        .min_size(egui::vec2(0.0, 28.0));
+                                            raw_name.clone()
+                                        };
 
-                                        let response = ui.add(button);
+                                        let mut response = ui
+                                            .blaze_button(&display_name)
+                                            .size((*w, 28.0))
+                                            .text_color(if is_last {
+                                                palette.fg_primary
+                                            } else {
+                                                palette.fg_secondary
+                                            })
+                                            .background_color(if is_last {
+                                                palette.accent
+                                            } else {
+                                                Color32::TRANSPARENT
+                                            })
+                                            .stroke_color(Color32::TRANSPARENT)
+                                            .radius(20.0)
+                                            .show();
+
+                                        if display_name != *raw_name {
+                                            response = response.on_hover_text(raw_name);
+                                        }
 
                                         if response.double_clicked() {
                                             state.editing_cwd = true;
@@ -309,16 +405,10 @@ pub fn toolbar_component(ui: &mut Ui, state: &mut BlazeCoreState, ui_state: &mut
                                             }
                                         }
 
-                                        // Separador ">"
                                         if !is_last {
                                             ui.label_ns(
                                                 RichText::new("›")
-                                                    .color(
-                                                        current_theme
-                                                            .semantic
-                                                            .text_secondary
-                                                            .to_color(),
-                                                    )
+                                                    .color(palette.fg_secondary)
                                                     .size(16.0),
                                             );
                                         }
@@ -338,7 +428,19 @@ pub fn toolbar_component(ui: &mut Ui, state: &mut BlazeCoreState, ui_state: &mut
                                 }
                             }
 
-                            if ui.small_button("📋").clicked() {
+                            if ui
+                                .blaze_button("")
+                                .size((20.0, 20.0))
+                                .icon("clipboard", icons::ICON_CLIPBOARD)
+                                .icon_size(13.0_f32)
+                                .hover_icon_color(palette.icon_hover)
+                                .text_color(palette.fg_secondary)
+                                .background_color(palette.bg_panel)
+                                .stroke_color(Color32::TRANSPARENT)
+                                .radius(25.0)
+                                .show()
+                                .clicked()
+                            {
                                 with_text_clipboard(|c| {
                                     c.copy(cwd.to_string_lossy().to_string());
                                 });

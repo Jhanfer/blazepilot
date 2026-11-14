@@ -9,8 +9,9 @@ use crate::{
     },
     ui::{
         blaze_ui_state::BlazeUiState,
+        custom_components::UiExt,
         icons_cache::{icons::*, thumbnails::thumbnails_manager::Thumbnail},
-        themes::{platform::structs::ToColor, theme_manager::with_theme},
+        themes::{platform::color_ops, theme_manager::with_theme},
     },
 };
 use egui::{
@@ -28,59 +29,57 @@ pub fn resolve_icon(
         (
             "folder".to_string(),
             ICON_FOLDER_OPEN,
-            snapshot_color.unwrap_or(current_theme.file_theme.folder_default.to_color()),
+            snapshot_color.unwrap_or(current_theme.file_icons.folder_default()),
         )
     } else {
         match &file.extension {
             FileExtension::Image(_) => (
                 "image".to_string(),
                 ICON_IMAGE,
-                current_theme.file_theme.image.to_color(),
+                current_theme.file_icons.image(),
             ),
-            FileExtension::Document(DocType::Pdf) => (
-                "pdf".to_string(),
-                ICON_PDF,
-                current_theme.file_theme.pdf.to_color(),
-            ),
+            FileExtension::Document(DocType::Pdf) => {
+                ("pdf".to_string(), ICON_PDF, current_theme.file_icons.pdf())
+            }
             FileExtension::Document(_) => (
                 "doc".to_string(),
                 ICON_DOC,
-                current_theme.file_theme.document.to_color(),
+                current_theme.file_icons.document(),
             ),
             FileExtension::Video(_) => (
                 "video".to_string(),
                 ICON_VIDEO,
-                current_theme.file_theme.video.to_color(),
+                current_theme.file_icons.video(),
             ),
             FileExtension::Audio(_) => (
                 "audio".to_string(),
                 ICON_FILE_AUDIO,
-                current_theme.file_theme.audio.to_color(),
+                current_theme.file_icons.audio(),
             ),
             FileExtension::Archive(_) => (
                 "archive".to_string(),
                 ICON_ARCHIVE,
-                current_theme.file_theme.archive.to_color(),
+                current_theme.file_icons.archive(),
             ),
             FileExtension::Code(_) => (
                 "code".to_string(),
                 ICON_CODE,
-                current_theme.file_theme.code.to_color(),
+                current_theme.file_icons.code(),
             ),
             FileExtension::Font(_) => (
                 "font".to_string(),
                 ICON_FONT,
-                current_theme.file_theme.font.to_color(),
+                current_theme.file_icons.font(),
             ),
             FileExtension::Executable(_) => (
                 "exe".to_string(),
                 ICON_EXE,
-                current_theme.file_theme.executable.to_color(),
+                current_theme.file_icons.executable(),
             ),
             FileExtension::Unknown => (
                 "file".to_string(),
                 ICON_FILE,
-                current_theme.file_theme.fallback.to_color(),
+                current_theme.file_icons.fallback(),
             ),
         }
     }
@@ -95,7 +94,7 @@ pub fn text_color_for_git(git: Option<&GitStatus>) -> Color32 {
         Some(GitStatus::Ignored) => Color32::from_rgb(100, 100, 100),
         Some(GitStatus::Conflict) => Color32::from_rgb(255, 80, 80),
         Some(GitStatus::Deleted) => Color32::from_rgb(255, 60, 60),
-        Some(GitStatus::Clean) | None => current_theme.semantic.text_primary.to_color(),
+        Some(GitStatus::Clean) | None => current_theme.global.text_primary(),
     }
 }
 
@@ -111,57 +110,21 @@ pub fn git_dot_color(git: Option<&GitStatus>) -> Option<Color32> {
     }
 }
 
+pub fn contrats_to_text_color(color: Color32) -> Color32 {
+    color_ops::contrast_color(color)
+}
+
 pub fn ensure_min_lightness(color: Color32) -> Color32 {
-    let min_lightness = with_theme(|t| t.current().luminance);
+    let min_lightness = with_theme(|t| t.current().meta.luminance);
+    ensure_min_lightness_with_luminance(color, min_lightness)
+}
 
-    let r = color.r() as f32 / 255.0;
-    let g = color.g() as f32 / 255.0;
-    let b = color.b() as f32 / 255.0;
+pub fn ensure_min_lightness_with_luminance(color: Color32, min_lightness: f32) -> Color32 {
+    color_ops::ensure_min_lightness_hsl(color, min_lightness)
+}
 
-    let max = r.max(g).max(b);
-    let min = r.min(g).min(b);
-    let l = (max + min) / 2.0;
-
-    if l >= min_lightness {
-        return color;
-    }
-
-    let delta = max - min;
-    let s = if delta < 1e-6 {
-        0.0
-    } else {
-        delta / (1.0 - (2.0 * l - 1.0).abs())
-    };
-
-    let h = if delta < 1e-6 {
-        0.0
-    } else if max == r {
-        60.0 * (((g - b) / delta) % 6.0)
-    } else if max == g {
-        60.0 * (((b - r) / delta) + 2.0)
-    } else {
-        60.0 * (((r - g) / delta) + 4.0)
-    };
-
-    let new_l = min_lightness;
-    let c = (1.0_f32 - (2.0_f32 * new_l - 1.0_f32).abs()) * s;
-    let x = c * (1.0 - ((h / 60.0) % 2.0 - 1.0).abs());
-    let m = new_l - c / 2.0;
-
-    let (r1, g1, b1) = match h {
-        0.0..=59.0 => (c, x, 0.0),
-        60.0..=119.0 => (x, c, 0.0),
-        120.0..=179.0 => (0.0, c, x),
-        180.0..=239.0 => (0.0, x, c),
-        240.0..=299.0 => (x, 0.0, c),
-        _ => (c, 0.0, x),
-    };
-
-    Color32::from_rgb(
-        ((r1 + m) * 255.0) as u8,
-        ((g1 + m) * 255.0) as u8,
-        ((b1 + m) * 255.0) as u8,
-    )
+pub fn shade_color(c: Color32) -> Color32 {
+    color_ops::shade(c)
 }
 
 ///----------- Componentes --------------
@@ -207,20 +170,11 @@ pub fn render_quicklink_icon(
     };
 
     let (icon_name, icon_bytes, color) = resolve_icon(&Arc::from(dummy_entry), None);
-    let rounded_rect = Rect::from_min_max(
-        pos2(icon_rect.min.x.round(), icon_rect.min.y.round()),
-        pos2(icon_rect.max.x.round(), icon_rect.max.y.round()),
-    );
-    let icon = ui_state
-        .icon_cache
-        .get_or_load(ui, &icon_name, icon_bytes, color, icon_size);
 
-    ui.painter().image(
-        icon.id(),
-        rounded_rect,
-        Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
-        Color32::WHITE,
-    );
+    ui.draw_icon((&icon_name, icon_bytes))
+        .size(icon_size)
+        .tint(color)
+        .show();
 }
 
 pub fn render_button<F, C>(
@@ -242,7 +196,7 @@ pub fn render_button<F, C>(
         f.layout_no_wrap(
             label.to_string(),
             font.clone(),
-            current_theme.semantic.text_primary.to_color(),
+            current_theme.global.text_primary(),
         )
     });
 
@@ -294,8 +248,8 @@ pub fn render_button<F, C>(
         animated_rect,
         CornerRadius::same(20),
         fill_color,
-        Stroke::new(0.9, accent_color),
-        StrokeKind::Outside,
+        Stroke::new(current_theme.global.components_stroke_width, accent_color),
+        StrokeKind::Middle,
     );
 
     ui.painter().text(
@@ -307,17 +261,13 @@ pub fn render_button<F, C>(
     );
 }
 
-pub fn render_op_buttons<F, C>(
-    ui: &mut Ui,
-    ui_state: &mut BlazeUiState,
-    tag_color: Color32,
-    editcallback: F,
-    deletecallback: C,
-) where
+pub fn render_op_buttons<F, C>(ui: &mut Ui, tag_color: Color32, editcallback: F, deletecallback: C)
+where
     F: Fn(),
     C: Fn(),
 {
     ui.with_layout(Layout::right_to_left(Align::TOP), |ui| {
+        let current_theme = with_theme(|t| t.current());
         ui.add_space(60.0);
         ui.horizontal(|ui| {
             let total_width = 40.0;
@@ -406,8 +356,8 @@ pub fn render_op_buttons<F, C>(
                 animated_rect1,
                 CornerRadius::same(20),
                 bg_color1,
-                Stroke::new(0.5, accent1),
-                StrokeKind::Outside,
+                Stroke::new(current_theme.global.components_stroke_width, accent1),
+                StrokeKind::Middle,
             );
 
             let bg_color2 = Color32::from_rgb(165, 42, 42);
@@ -422,31 +372,19 @@ pub fn render_op_buttons<F, C>(
                 animated_rect2,
                 CornerRadius::same(20),
                 bg_color2,
-                Stroke::new(0.5, accent2),
-                StrokeKind::Outside,
+                Stroke::new(current_theme.global.components_stroke_width, accent2),
+                StrokeKind::Middle,
             );
 
-            let icon_edit = ui_state
-                .icon_cache
-                .get_or_load(ui, "edit", ICON_EDIT, accent1, icon_size);
+            ui.draw_icon(("edit", ICON_EDIT))
+                .size(icon_size)
+                .tint(accent1)
+                .show_at(animated_icon_rect1);
 
-            ui.painter().image(
-                icon_edit.id(),
-                animated_icon_rect1,
-                Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
-                Color32::WHITE,
-            );
-
-            let icon_trash = ui_state
-                .icon_cache
-                .get_or_load(ui, "trash", ICON_TRASH, accent2, icon_size);
-
-            ui.painter().image(
-                icon_trash.id(),
-                animated_icon_rect2,
-                Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
-                Color32::WHITE,
-            );
+            ui.draw_icon(("trash", ICON_TRASH))
+                .size(icon_size)
+                .tint(accent2)
+                .show_at(animated_icon_rect2);
         });
     });
 }

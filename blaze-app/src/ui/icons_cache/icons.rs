@@ -91,3 +91,8 @@ pub const ICON_LAYOUT_LIST_DETAILED: &[u8] =
 pub const ICON_LAYOUT_LIST_COMPACT: &[u8] =
     include_bytes!("../assets/icons/layout-list-compact.svg");
 pub const ICON_LAYOUT_MILLER: &[u8] = include_bytes!("../assets/icons/layout-miller.svg");
+pub const ICON_CHEVRON_UP: &[u8] = include_bytes!("../assets/icons/chevron-up.svg");
+pub const ICON_GITHUB: &[u8] = include_bytes!("../assets/icons/github.svg");
+pub const ICON_BUG: &[u8] = include_bytes!("../assets/icons/bug.svg");
+pub const ICON_LANGUAGE: &[u8] = include_bytes!("../assets/icons/language.svg");
+pub const ICON_CONTRACT: &[u8] = include_bytes!("../assets/icons/contract.svg");

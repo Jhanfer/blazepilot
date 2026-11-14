@@ -4,7 +4,7 @@ use crate::ui::blaze_ui_state::BlazeUiState;
 use crate::ui::custom_components::UiExt;
 use crate::ui::icons_cache::icons;
 use crate::ui::modules::utilities::ensure_min_lightness;
-use crate::ui::themes::platform::structs::ToColor;
+use crate::ui::themes::platform::{color_ops, structs::BlazeAppTheme};
 use crate::utils::easing::ease_in_out_bounce;
 use egui::scroll_area::ScrollSource;
 use egui::{
@@ -17,7 +17,7 @@ pub fn render_clipboard_menu(
     ui: &mut Ui,
     state: &mut BlazeCoreState,
     ui_state: &mut BlazeUiState,
-    current_theme: Arc<crate::ui::themes::platform::structs::NewTheme>,
+    current_theme: Arc<BlazeAppTheme>,
 ) {
     let has_clipboard = state.clipboard.clipboard_has_files().unwrap_or(false);
 
@@ -52,10 +52,10 @@ pub fn render_clipboard_menu(
         ui.add_space(20.0);
 
         Frame::NONE
-            .fill(current_theme.components.panel.bg.to_color())
+            .fill(current_theme.sidebar_right.bg_panel())
             .stroke(Stroke::new(
-                0.5 * expansion,
-                current_theme.components.panel.border.to_color(),
+                current_theme.global.panel_stroke_width * expansion,
+                current_theme.sidebar_right.panel_border(),
             ))
             .corner_radius(CornerRadius::same(radius))
             .inner_margin(Margin::symmetric(m_h, m_v))
@@ -64,7 +64,7 @@ pub fn render_clipboard_menu(
                 ui.set_height(current_h);
 
                 let icon_size = 16.0 * expansion;
-                let c = current_theme.semantic.text_primary.to_color();
+                let c = current_theme.global.text_primary();
                 let eased_color = Color32::from_rgba_unmultiplied_const(
                     c.r(),
                     c.g(),
@@ -72,11 +72,11 @@ pub fn render_clipboard_menu(
                     (255.0 * expansion) as u8,
                 );
                 let bg = Color32::TRANSPARENT;
-                let hover_bg = current_theme.components.button.bg_hover.to_color();
+                let hover_bg = current_theme.sidebar_right.bg_hover();
 
                 if expansion > 0.0 && show {
                     let btn_resp = ui
-                        .blaze_button("Limpiar", &mut ui_state.icon_cache)
+                        .blaze_button("Limpiar")
                         .size((current_w, 14.0))
                         .radius(20)
                         .stroke_color(Color32::TRANSPARENT)
@@ -85,7 +85,8 @@ pub fn render_clipboard_menu(
                         .icon("trash", icons::ICON_TRASH)
                         .icon_size(icon_size)
                         .text_color(eased_color)
-                        .show(ui);
+                        .stroke_width(current_theme.global.components_stroke_width)
+                        .show();
 
                     if btn_resp.clicked() {
                         state.clear_clipboard();
@@ -109,7 +110,7 @@ pub fn render_clipboard_menu(
                                         Color32::from_rgba_unmultiplied(178, 34, 34, 200);
 
                                     let btn = ui
-                                        .blaze_button(item.clone(), &mut ui_state.icon_cache)
+                                        .blaze_button(item.clone())
                                         .size((current_w - 5.0, 14.0))
                                         .radius(20)
                                         .stroke_color(Color32::TRANSPARENT)
@@ -119,7 +120,8 @@ pub fn render_clipboard_menu(
                                         .icon(icon_name, icon_bytes)
                                         .hover_icon_color(hover_stroke)
                                         .text_color(eased_color)
-                                        .show(ui);
+                                        .stroke_width(current_theme.global.components_stroke_width)
+                                        .show();
 
                                     if btn.clicked() {
                                         state.delete_one_from_clipboard(item.clone());
@@ -134,7 +136,7 @@ pub fn render_clipboard_menu(
                 }
 
                 let icon_size_f = 20.0 * presence;
-                let c = current_theme.semantic.text_primary.to_color();
+                let c = current_theme.global.text_primary();
                 let eased_color = Color32::from_rgba_unmultiplied_const(
                     c.r(),
                     c.g(),
@@ -156,7 +158,7 @@ pub fn render_clipboard_menu(
 
                 if current_w > 0.8 {
                     let btn_resp = ui
-                        .blaze_button(label, &mut ui_state.icon_cache)
+                        .blaze_button(label)
                         .background_color(bg)
                         .hover_background_color(hover_bg)
                         .size((current_w, 10.0 * presence))
@@ -165,28 +167,23 @@ pub fn render_clipboard_menu(
                         .icon(icon_name, icon_bytes)
                         .icon_size(icon_size_f)
                         .text_color(eased_color)
-                        .show(ui);
+                        .stroke_width(current_theme.global.components_stroke_width)
+                        .show();
 
                     if btn_resp.clicked() {
                         ui_state.toggle_clipboard();
                     }
 
                     let hint = "Ctrl + B";
-                    let c = current_theme.semantic.accent_glow.to_color();
+                    let palette = current_theme.sidebar_right.palette(&current_theme.global);
+                    let hint_bg = palette.bg_panel;
 
-                    let hint_stroke_color = Color32::from_rgba_unmultiplied(
-                        c.r().saturating_add(20),
-                        c.g().saturating_add(20),
-                        c.b().saturating_add(20),
-                        120 * presence as u8,
-                    );
+                    let hint_stroke_rgb = color_ops::mix(hint_bg, palette.accent_text, 0.45);
+                    let hint_stroke_color =
+                        color_ops::with_alpha(hint_stroke_rgb, (120.0 * presence) as u8);
 
-                    let hint_color = Color32::from_rgba_unmultiplied(
-                        c.r().saturating_add(60),
-                        c.g().saturating_add(60),
-                        c.b().saturating_add(60),
-                        160 * presence as u8,
-                    );
+                    let hint_rgb = color_ops::ensure_contrast(palette.accent_text, hint_bg, 3.0);
+                    let hint_color = color_ops::with_alpha(hint_rgb, (160.0 * presence) as u8);
 
                     let hint_galley = ui.painter().layout_no_wrap(
                         hint.to_string(),
@@ -208,9 +205,9 @@ pub fn render_clipboard_menu(
                     ui.painter().rect(
                         hint_rect,
                         3.0,
-                        current_theme.semantic.bg_container.to_color(),
-                        Stroke::new(1.0, hint_stroke_color),
-                        StrokeKind::Outside,
+                        current_theme.sidebar_right.bg_panel(),
+                        Stroke::new(0.8, hint_stroke_color),
+                        StrokeKind::Middle,
                     );
 
                     ui.painter().galley(hint_pos, hint_galley, hint_color);

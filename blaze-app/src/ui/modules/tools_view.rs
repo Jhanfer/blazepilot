@@ -1,7 +1,9 @@
 use crate::{
     core::{
-        blaze_state::BlazeCoreState,
-        blaze_state::state_structs::{LayoutMode, NewItemType, ViewMode},
+        blaze_state::{
+            BlazeCoreState,
+            state_structs::{LayoutMode, NewItemType, ViewMode},
+        },
         bootstrap::configs::config_manager::with_configs,
         files::blaze_motor::motor_structs::FileEntry,
         runtime::{
@@ -11,10 +13,10 @@ use crate::{
         system::trash_manager::manager::get_backend,
     },
     ui::{
-        blaze_ui_state::BlazeUiState,
+        custom_components::UiExt,
         icons_cache::icons::*,
-        modules::utilities::ensure_min_lightness,
-        themes::{platform::structs::ToColor, theme_manager::with_theme},
+        modules::utilities::{ensure_min_lightness, shade_color},
+        themes::theme_manager::with_theme,
     },
 };
 use egui::{
@@ -24,8 +26,9 @@ use egui::{
 use std::sync::Arc;
 use tracing::warn;
 
-fn render_tag_button(ui: &mut Ui, state: &mut BlazeCoreState, ui_state: &mut BlazeUiState) {
+fn render_tag_button(ui: &mut Ui, state: &mut BlazeCoreState) {
     let current_theme = with_theme(|t| t.current());
+    let palette = current_theme.main_area.palette(&current_theme.global);
 
     let (container_rect, resp_toggle) = ui.allocate_exact_size(vec2(50.0, 25.0), Sense::click());
 
@@ -89,8 +92,8 @@ fn render_tag_button(ui: &mut Ui, state: &mut BlazeCoreState, ui_state: &mut Bla
     ui.painter().rect_stroke(
         capsule_rect,
         radius,
-        Stroke::new(1.0, current_theme.components.panel.border.to_color()),
-        egui::StrokeKind::Outside,
+        Stroke::new(current_theme.global.panel_stroke_width, palette.accent),
+        egui::StrokeKind::Middle,
     );
 
     let icon_size = vec2(16.0, 16.0);
@@ -133,30 +136,23 @@ fn render_tag_button(ui: &mut Ui, state: &mut BlazeCoreState, ui_state: &mut Bla
         ("tag", ICON_TAG, icon2_rect, anim == 1.0),
     ];
 
+    let color = palette.accent;
+
     for (name, bytes, rect, is_active) in icons {
-        let base_color = if is_active {
-            current_theme.components.button.label_active.to_color()
-        } else {
-            current_theme.components.button.label_inactive.to_color()
-        };
+        let base_color = if is_active { color } else { shade_color(color) };
 
         let color = ensure_min_lightness(base_color);
 
-        let icon = ui_state
-            .icon_cache
-            .get_or_load(ui, name, bytes, color, icon_size);
-
-        ui.painter().image(
-            icon.id(),
-            rect,
-            Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
-            Color32::WHITE,
-        );
+        ui.draw_icon((name, bytes))
+            .size(icon_size)
+            .tint(color)
+            .show_at(rect);
     }
 }
 
-fn render_views_mode(ui: &mut Ui, state: &mut BlazeCoreState, ui_state: &mut BlazeUiState) {
+fn render_views_mode(ui: &mut Ui, state: &mut BlazeCoreState) {
     let current_theme = with_theme(|t| t.current());
+    let palette = current_theme.main_area.palette(&current_theme.global);
 
     let layouts: &[(&str, &[u8], LayoutMode)] = &[
         ("layout-list", ICON_LAYOUT_LIST, LayoutMode::Row),
@@ -181,11 +177,9 @@ fn render_views_mode(ui: &mut Ui, state: &mut BlazeCoreState, ui_state: &mut Bla
             };
             let icon_size = vec2(18.0, 18.0);
 
-            let base_color = if is_active {
-                current_theme.components.button.label_active.to_color()
-            } else {
-                current_theme.components.button.label_inactive.to_color()
-            };
+            let color = palette.accent;
+
+            let base_color = if is_active { color } else { shade_color(color) };
 
             let (new_name, new_bytes) = if is_list_button {
                 match current_layout {
@@ -197,48 +191,24 @@ fn render_views_mode(ui: &mut Ui, state: &mut BlazeCoreState, ui_state: &mut Bla
                 (*name, *bytes)
             };
 
-            let icon = ui_state.icon_cache.get_or_load(
-                ui,
-                new_name,
-                new_bytes,
-                ensure_min_lightness(base_color),
-                icon_size,
-            );
-
             let (rect, response) =
                 ui.allocate_exact_size(icon_size + vec2(6.0, 6.0), Sense::click());
 
             if response.hovered() {
                 ui.set_cursor_icon(CursorIcon::PointingHand);
-                ui.painter()
-                    .rect_filled(rect, 4.0, current_theme.semantic.bg_container.to_color());
+                ui.painter().rect_filled(rect, 4.0, palette.bg_hover);
             }
 
             if is_active {
-                ui.painter().rect_filled(
-                    rect,
-                    4.0,
-                    current_theme
-                        .semantic
-                        .accent
-                        .to_color()
-                        .linear_multiply(0.2),
-                );
+                ui.painter().rect_filled(rect, 4.0, palette.bg_selected);
             }
 
             let icon_rect = Rect::from_center_size(rect.center(), icon_size);
 
-            let rounded_rect = Rect::from_min_max(
-                pos2(icon_rect.min.x.round(), icon_rect.min.y.round()),
-                pos2(icon_rect.max.x.round(), icon_rect.max.y.round()),
-            );
-
-            ui.painter().image(
-                icon.id(),
-                rounded_rect,
-                Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
-                Color32::WHITE,
-            );
+            ui.draw_icon((new_name, new_bytes))
+                .size(icon_size)
+                .tint(ensure_min_lightness(base_color))
+                .show_at(icon_rect);
 
             if response.clicked() {
                 let new_layout = if is_list_button {
@@ -263,14 +233,15 @@ fn render_views_mode(ui: &mut Ui, state: &mut BlazeCoreState, ui_state: &mut Bla
     });
 }
 
-pub fn tools(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, ui: &mut Ui) {
+pub fn tools(state: &mut BlazeCoreState, ui: &mut Ui) {
     let path = state.cwd();
     let files: &[Arc<FileEntry>] = &state.get_files_for(&path);
 
     let current_theme = with_theme(|t| t.current());
+    let palette = current_theme.main_area.palette(&current_theme.global);
 
     Frame::new()
-        .fill(current_theme.components.tools.bg.to_color())
+        .fill(palette.bg_elevated)
         .inner_margin(Margin {
             left: 15,
             right: 15,
@@ -283,10 +254,10 @@ pub fn tools(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, ui: &mut U
             sw: 0,
             se: 0,
         })
-        .stroke(Stroke {
-            width: 0.5,
-            color: current_theme.components.panel.border.to_color(),
-        })
+        .stroke(Stroke::new(
+            current_theme.global.panel_stroke_width,
+            palette.border_panel,
+        ))
         .show(ui, |ui| {
             let toolbar_height = 25.0;
             ui.set_min_height(toolbar_height);
@@ -298,81 +269,49 @@ pub fn tools(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, ui: &mut U
                 ui.with_layout(Layout::left_to_right(Align::Center), |ui| {
                     ui.visuals_mut().button_frame = false;
 
-                    let (icon_plus_fol, icon_bytes_plus_fol) = ("plus-folder", ICON_PLUS_FOLDER);
-
-                    let icon_size = vec2(18.0, 18.0);
-                    let (icon_rect, new_fol) = ui.allocate_exact_size(icon_size, Sense::click());
-                    let rounded_rect = Rect::from_min_max(
-                        pos2(icon_rect.min.x.round(), icon_rect.min.y.round()),
-                        pos2(icon_rect.max.x.round(), icon_rect.max.y.round()),
-                    );
-
-                    let plus_color = if new_fol.hovered() {
-                        current_theme.components.tools.label_hover.to_color()
-                    } else {
-                        current_theme.components.tools.label_active.to_color()
-                    };
-
-                    let icon = ui_state.icon_cache.get_or_load(
-                        ui,
-                        icon_plus_fol,
-                        icon_bytes_plus_fol,
-                        ensure_min_lightness(plus_color),
-                        icon_size,
-                    );
-
-                    ui.painter().image(
-                        icon.id(),
-                        rounded_rect,
-                        Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
-                        Color32::WHITE,
-                    );
-
-                    if new_fol.clicked() {
+                    let btn_name = "plus-folder";
+                    let id = ui.id().with(btn_name);
+                    if ui
+                        .blaze_button("")
+                        .id(id)
+                        .size((15.0, 15.0))
+                        .icon_size(19_f32)
+                        .radius(25)
+                        .icon(btn_name, ICON_PLUS_FOLDER)
+                        .icon_color(palette.icon_primary)
+                        .hover_icon_color(palette.icon_hover)
+                        .background_color(Color32::TRANSPARENT)
+                        .hover_background_color(Color32::TRANSPARENT)
+                        .stroke_color(Color32::TRANSPARENT)
+                        .show()
+                        .clicked()
+                    {
                         state.creating_new = Some(NewItemType::Folder);
                         state.new_item_buffer = "nueva carpeta".to_string();
                     }
 
-                    let (icon_plus_file, icon_bytes_plus_file) = ("plus-file", ICON_PLUS_FILE);
-
-                    let icon_size = vec2(18.0, 18.0);
-                    let (icon_rect, new_file) = ui.allocate_exact_size(icon_size, Sense::click());
-                    let rounded_rect = Rect::from_min_max(
-                        pos2(icon_rect.min.x.round(), icon_rect.min.y.round()),
-                        pos2(icon_rect.max.x.round(), icon_rect.max.y.round()),
-                    );
-
-                    let plus_color = if new_file.hovered() {
-                        current_theme.components.tools.label_hover.to_color()
-                    } else {
-                        current_theme.components.tools.label_active.to_color()
-                    };
-
-                    let icon = ui_state.icon_cache.get_or_load(
-                        ui,
-                        icon_plus_file,
-                        icon_bytes_plus_file,
-                        ensure_min_lightness(plus_color),
-                        icon_size,
-                    );
-
-                    ui.painter().image(
-                        icon.id(),
-                        rounded_rect,
-                        Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
-                        Color32::WHITE,
-                    );
-
-                    if new_file.clicked() {
+                    let btn_name = "plus-file";
+                    let id = ui.id().with(btn_name);
+                    if ui
+                        .blaze_button("")
+                        .id(id)
+                        .size((15.0, 15.0))
+                        .icon_size(19_f32)
+                        .radius(25)
+                        .icon(btn_name, ICON_PLUS_FILE)
+                        .icon_color(palette.icon_primary)
+                        .hover_icon_color(palette.icon_hover)
+                        .background_color(Color32::TRANSPARENT)
+                        .hover_background_color(Color32::TRANSPARENT)
+                        .stroke_color(Color32::TRANSPARENT)
+                        .show()
+                        .clicked()
+                    {
                         state.creating_new = Some(NewItemType::File);
                         state.new_item_buffer = "nuevo archivo".to_string();
                     }
 
                     ui.separator();
-
-                    if new_fol.hovered() || new_file.hovered() {
-                        ui.set_cursor_icon(CursorIcon::PointingHand);
-                    }
                 });
 
                 let has_selection = state.selected_count(files.len()) > 0;
@@ -391,35 +330,23 @@ pub fn tools(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, ui: &mut U
                     ("scissors-disable", ICON_SCISSORS_DISABLE)
                 };
 
-                let icon_size = vec2(18.0, 18.0);
-                let (icon_rect, cut_resp) = ui.allocate_exact_size(icon_size, Sense::click());
-                let rounded_rect = Rect::from_min_max(
-                    pos2(icon_rect.min.x.round(), icon_rect.min.y.round()),
-                    pos2(icon_rect.max.x.round(), icon_rect.max.y.round()),
-                );
-
-                let sissors_color = if cut_resp.hovered() && has_selection {
-                    current_theme.components.tools.label_hover.to_color()
-                } else {
-                    current_theme.components.tools.label_active.to_color()
-                };
-
-                let icon = ui_state.icon_cache.get_or_load(
-                    ui,
-                    icon_cut,
-                    icon_bytes_cut,
-                    ensure_min_lightness(sissors_color),
-                    icon_size,
-                );
-
-                ui.painter().image(
-                    icon.id(),
-                    rounded_rect,
-                    Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
-                    Color32::WHITE,
-                );
-
-                if cut_resp.clicked() && has_selection {
+                let id = ui.id().with(icon_cut);
+                if ui
+                    .blaze_button("")
+                    .id(id)
+                    .set_is_active(has_selection)
+                    .size((15.0, 15.0))
+                    .icon_size(19_f32)
+                    .radius(25)
+                    .icon(icon_cut, icon_bytes_cut)
+                    .icon_color(palette.icon_primary)
+                    .hover_icon_color(palette.icon_hover)
+                    .background_color(Color32::TRANSPARENT)
+                    .hover_background_color(Color32::TRANSPARENT)
+                    .stroke_color(Color32::TRANSPARENT)
+                    .show()
+                    .clicked()
+                {
                     state.cut(files);
                 }
 
@@ -429,35 +356,23 @@ pub fn tools(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, ui: &mut U
                     ("copy-disable", ICON_COPY_DISABLE)
                 };
 
-                let icon_size = vec2(18.0, 18.0);
-                let (icon_rect, cop_resp) = ui.allocate_exact_size(icon_size, Sense::click());
-                let rounded_rect = Rect::from_min_max(
-                    pos2(icon_rect.min.x.round(), icon_rect.min.y.round()),
-                    pos2(icon_rect.max.x.round(), icon_rect.max.y.round()),
-                );
-
-                let clip_color = if cop_resp.hovered() && has_selection {
-                    current_theme.components.tools.label_hover.to_color()
-                } else {
-                    current_theme.components.tools.label_active.to_color()
-                };
-
-                let icon = ui_state.icon_cache.get_or_load(
-                    ui,
-                    icon_copy,
-                    icon_bytes_copy,
-                    ensure_min_lightness(clip_color),
-                    icon_size,
-                );
-
-                ui.painter().image(
-                    icon.id(),
-                    rounded_rect,
-                    Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
-                    Color32::WHITE,
-                );
-
-                if cop_resp.clicked() && has_selection {
+                let id = ui.id().with(icon_copy);
+                if ui
+                    .blaze_button("")
+                    .id(id)
+                    .set_is_active(has_selection)
+                    .size((15.0, 15.0))
+                    .icon_size(19_f32)
+                    .radius(25)
+                    .icon(icon_copy, icon_bytes_copy)
+                    .icon_color(palette.icon_primary)
+                    .hover_icon_color(palette.icon_hover)
+                    .background_color(Color32::TRANSPARENT)
+                    .hover_background_color(Color32::TRANSPARENT)
+                    .stroke_color(Color32::TRANSPARENT)
+                    .show()
+                    .clicked()
+                {
                     state.copy(files);
                 }
 
@@ -467,35 +382,23 @@ pub fn tools(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, ui: &mut U
                     ("clipboard-disable", ICON_CLIPBOARD_DISABLE)
                 };
 
-                let icon_size = vec2(18.0, 18.0);
-                let (icon_rect, pas_resp) = ui.allocate_exact_size(icon_size, Sense::click());
-                let rounded_rect = Rect::from_min_max(
-                    pos2(icon_rect.min.x.round(), icon_rect.min.y.round()),
-                    pos2(icon_rect.max.x.round(), icon_rect.max.y.round()),
-                );
-
-                let pas_color = if pas_resp.hovered() && has_clipboard {
-                    current_theme.components.tools.label_hover.to_color()
-                } else {
-                    current_theme.components.tools.label_active.to_color()
-                };
-
-                let icon = ui_state.icon_cache.get_or_load(
-                    ui,
-                    icon_paste,
-                    icon_bytes_paste,
-                    ensure_min_lightness(pas_color),
-                    icon_size,
-                );
-
-                ui.painter().image(
-                    icon.id(),
-                    rounded_rect,
-                    Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
-                    Color32::WHITE,
-                );
-
-                if pas_resp.clicked() && has_clipboard {
+                let id = ui.id().with(icon_paste);
+                if ui
+                    .blaze_button("")
+                    .id(id)
+                    .set_is_active(has_clipboard)
+                    .size((15.0, 15.0))
+                    .icon_size(19_f32)
+                    .radius(25)
+                    .icon(icon_paste, icon_bytes_paste)
+                    .icon_color(palette.icon_primary)
+                    .hover_icon_color(palette.icon_hover)
+                    .background_color(Color32::TRANSPARENT)
+                    .hover_background_color(Color32::TRANSPARENT)
+                    .stroke_color(Color32::TRANSPARENT)
+                    .show()
+                    .clicked()
+                {
                     let cwd = state.cwd();
                     state.paste(cwd);
                 }
@@ -506,35 +409,23 @@ pub fn tools(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, ui: &mut U
                     ("trash-disable", ICON_TRASH_DISABLED)
                 };
 
-                let icon_size = vec2(18.0, 18.0);
-                let (icon_rect, del_resp) = ui.allocate_exact_size(icon_size, Sense::click());
-                let rounded_rect = Rect::from_min_max(
-                    pos2(icon_rect.min.x.round(), icon_rect.min.y.round()),
-                    pos2(icon_rect.max.x.round(), icon_rect.max.y.round()),
-                );
-
-                let del_color = if del_resp.hovered() && has_selection {
-                    current_theme.components.tools.label_hover.to_color()
-                } else {
-                    current_theme.components.tools.label_active.to_color()
-                };
-
-                let icon = ui_state.icon_cache.get_or_load(
-                    ui,
-                    icon_trash,
-                    icon_bytes_trash,
-                    ensure_min_lightness(del_color),
-                    icon_size,
-                );
-
-                ui.painter().image(
-                    icon.id(),
-                    rounded_rect,
-                    Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
-                    Color32::WHITE,
-                );
-
-                if del_resp.clicked() && has_selection {
+                let id = ui.id().with(icon_trash);
+                if ui
+                    .blaze_button("")
+                    .id(id)
+                    .set_is_active(has_selection)
+                    .size((15.0, 15.0))
+                    .icon_size(19_f32)
+                    .radius(25)
+                    .icon(icon_trash, icon_bytes_trash)
+                    .icon_color(palette.icon_primary)
+                    .hover_icon_color(palette.icon_hover)
+                    .background_color(Color32::TRANSPARENT)
+                    .hover_background_color(Color32::TRANSPARENT)
+                    .stroke_color(Color32::TRANSPARENT)
+                    .show()
+                    .clicked()
+                {
                     let cwd = state.cwd();
                     let is_in_trash = get_backend().etched_in_trash_path(&cwd);
 
@@ -569,35 +460,22 @@ pub fn tools(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, ui: &mut U
                     ("select-all", ICON_SELECTALL)
                 };
 
-                let icon_size = vec2(18.0, 18.0);
-                let (icon_rect, select_resp) = ui.allocate_exact_size(icon_size, Sense::click());
-                let rounded_rect = Rect::from_min_max(
-                    pos2(icon_rect.min.x.round(), icon_rect.min.y.round()),
-                    pos2(icon_rect.max.x.round(), icon_rect.max.y.round()),
-                );
-
-                let sel_color = if select_resp.hovered() {
-                    current_theme.components.tools.label_hover.to_color()
-                } else {
-                    current_theme.components.tools.label_active.to_color()
-                };
-
-                let icon = ui_state.icon_cache.get_or_load(
-                    ui,
-                    icon_name,
-                    icon_bytes,
-                    ensure_min_lightness(sel_color),
-                    icon_size,
-                );
-
-                ui.painter().image(
-                    icon.id(),
-                    rounded_rect,
-                    Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
-                    Color32::WHITE,
-                );
-
-                if select_resp.clicked() {
+                let id = ui.id().with(icon_name);
+                if ui
+                    .blaze_button("")
+                    .id(id)
+                    .size((15.0, 15.0))
+                    .icon_size(19_f32)
+                    .radius(25)
+                    .icon(icon_name, icon_bytes)
+                    .icon_color(palette.icon_primary)
+                    .hover_icon_color(palette.icon_hover)
+                    .background_color(Color32::TRANSPARENT)
+                    .hover_background_color(Color32::TRANSPARENT)
+                    .stroke_color(Color32::TRANSPARENT)
+                    .show()
+                    .clicked()
+                {
                     state.toggle_select_all(files.len());
                 }
 
@@ -605,48 +483,35 @@ pub fn tools(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, ui: &mut U
 
                 let (icon_refresh, icon_bytes_refresh) = ("refresh", ICON_REFRESH);
 
-                let icon_size = vec2(18.0, 18.0);
-                let (icon_rect, refresh_resp) = ui.allocate_exact_size(icon_size, Sense::click());
-                let rounded_rect = Rect::from_min_max(
-                    pos2(icon_rect.min.x.round(), icon_rect.min.y.round()),
-                    pos2(icon_rect.max.x.round(), icon_rect.max.y.round()),
-                );
-
-                let ref_color = if refresh_resp.hovered() {
-                    current_theme.components.tools.label_hover.to_color()
-                } else {
-                    current_theme.components.tools.label_active.to_color()
-                };
-
-                let icon = ui_state.icon_cache.get_or_load(
-                    ui,
-                    icon_refresh,
-                    icon_bytes_refresh,
-                    ensure_min_lightness(ref_color),
-                    icon_size,
-                );
-
-                ui.painter().image(
-                    icon.id(),
-                    rounded_rect,
-                    Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
-                    Color32::WHITE,
-                );
-
-                if refresh_resp.clicked() {
+                let id = ui.id().with(icon_refresh);
+                if ui
+                    .blaze_button("")
+                    .id(id)
+                    .size((15.0, 15.0))
+                    .icon_size(19_f32)
+                    .radius(25)
+                    .icon(icon_refresh, icon_bytes_refresh)
+                    .icon_color(palette.icon_primary)
+                    .hover_icon_color(palette.icon_hover)
+                    .background_color(Color32::TRANSPARENT)
+                    .hover_background_color(Color32::TRANSPARENT)
+                    .stroke_color(Color32::TRANSPARENT)
+                    .show()
+                    .clicked()
+                {
                     state.refresh();
                 }
 
                 ui.separator();
 
                 ui.vertical(|ui| {
-                    render_tag_button(ui, state, ui_state);
+                    render_tag_button(ui, state);
                 });
 
                 ui.separator();
 
                 ui.vertical(|ui| {
-                    render_views_mode(ui, state, ui_state);
+                    render_views_mode(ui, state);
                 });
 
                 ui.separator();
@@ -656,63 +521,36 @@ pub fn tools(state: &mut BlazeCoreState, ui_state: &mut BlazeUiState, ui: &mut U
 
                     let is_hidden = with_configs(|c| c.get_show_hidden_files());
 
-                    let (icon_refresh, icon_bytes_refresh) = if is_hidden {
+                    let (icon_eye, icon_bytes_eye) = if is_hidden {
                         ("eye", ICON_EYE)
                     } else {
                         ("eye-closed", ICON_EYE_CLOSED)
                     };
 
-                    let icon_size = vec2(18.0, 18.0);
-                    let (icon_rect, hidd_resp) = ui.allocate_exact_size(icon_size, Sense::click());
-                    let rounded_rect = Rect::from_min_max(
-                        pos2(icon_rect.min.x.round(), icon_rect.min.y.round()),
-                        pos2(icon_rect.max.x.round(), icon_rect.max.y.round()),
-                    );
-
-                    let hidd_color = if hidd_resp.hovered() {
-                        current_theme.components.tools.label_hover.to_color()
-                    } else {
-                        current_theme.components.tools.label_active.to_color()
-                    };
-
-                    let icon = ui_state.icon_cache.get_or_load(
-                        ui,
-                        icon_refresh,
-                        icon_bytes_refresh,
-                        ensure_min_lightness(hidd_color),
-                        icon_size,
-                    );
-
-                    ui.painter().image(
-                        icon.id(),
-                        rounded_rect,
-                        Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
-                        Color32::WHITE,
-                    );
-
-                    if hidd_resp.clicked() {
+                    let id = ui.id().with(icon_eye);
+                    if ui
+                        .blaze_button("")
+                        .id(id)
+                        .size((15.0, 15.0))
+                        .icon_size(19_f32)
+                        .radius(25)
+                        .icon(icon_eye, icon_bytes_eye)
+                        .icon_color(palette.icon_primary)
+                        .hover_icon_color(palette.icon_hover)
+                        .background_color(Color32::TRANSPARENT)
+                        .hover_background_color(Color32::TRANSPARENT)
+                        .stroke_color(Color32::TRANSPARENT)
+                        .show()
+                        .clicked()
+                    {
                         with_configs(|c| {
                             c.set_show_hidden_files(!is_hidden);
                         });
                         state.refresh();
-                    };
+                    }
 
                     ui.separator();
-
-                    if hidd_resp.hovered() {
-                        ui.set_cursor_icon(CursorIcon::PointingHand);
-                    }
                 });
-
-                let show_hand = select_resp.hovered()
-                    || refresh_resp.hovered()
-                    || (has_selection
-                        && (del_resp.hovered() || cop_resp.hovered() || cut_resp.hovered()))
-                    || (has_clipboard && pas_resp.hovered());
-
-                if show_hand {
-                    ui.set_cursor_icon(CursorIcon::PointingHand);
-                }
             });
         });
 }

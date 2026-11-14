@@ -291,6 +291,7 @@ title = "Доступна новая версия!"
 message = "Доступно обновление Blazepilot."
 current_version = "Текущая версия: \"{query}\""
 new_version = "Обновить до версии \"{query}\"?"
+changelog = "Список изменений"
 
 [move_to_dialog]
 title = "Переместить..."

@@ -7,17 +7,12 @@ use tracing::warn;
 
 use crate::{
     core::{blaze_state::BlazeCoreState, system::clipboard::global_clipboard::TOKIO_RUNTIME},
-    ui::{blaze_ui_state::BlazeUiState, icons_cache::icons},
+    ui::icons_cache::icons,
 };
 
 impl ContextMenuState {
     //Menú de los discos
-    pub fn render_drives_context(
-        &mut self,
-        ui: &mut Ui,
-        state: &mut BlazeCoreState,
-        ui_state: &mut BlazeUiState,
-    ) {
+    pub fn render_drives_context(&mut self, ui: &mut Ui, state: &mut BlazeCoreState) {
         if !self.open {
             return;
         }
@@ -45,7 +40,6 @@ impl ContextMenuState {
 
                 Self::render_context_button(
                     ui,
-                    ui_state,
                     label,
                     hint,
                     icon,
@@ -53,7 +47,7 @@ impl ContextMenuState {
                     || {
                         action.set(Some(0));
                     },
-                    None::<fn(&mut Ui, &mut BlazeUiState)>,
+                    None::<fn(&mut Ui)>,
                 );
 
                 if let Some(0) = action.get() {
@@ -87,7 +81,6 @@ impl ContextMenuState {
 
                     Self::render_context_button(
                         ui,
-                        ui_state,
                         label,
                         hint,
                         icon,
@@ -95,7 +88,7 @@ impl ContextMenuState {
                         || {
                             action.set(Some(0));
                         },
-                        None::<fn(&mut Ui, &mut BlazeUiState)>,
+                        None::<fn(&mut Ui)>,
                     );
 
                     if let Some(0) = action.get() {
@@ -119,7 +112,6 @@ impl ContextMenuState {
 
                     Self::render_context_button(
                         ui,
-                        ui_state,
                         label,
                         hint,
                         icon,
@@ -127,7 +119,7 @@ impl ContextMenuState {
                         || {
                             action.set(Some(0));
                         },
-                        None::<fn(&mut Ui, &mut BlazeUiState)>,
+                        None::<fn(&mut Ui)>,
                     );
 
                     if let Some(0) = action.get() {

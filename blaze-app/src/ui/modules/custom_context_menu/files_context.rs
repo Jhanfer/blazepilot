@@ -15,22 +15,14 @@ use crate::{
             event_bus::with_event_bus,
         },
     },
-    ui::{
-        blaze_ui_state::BlazeUiState, icons_cache::icons,
-        image_preview::image_preview_handler::ImagePreviewState,
-    },
+    ui::{icons_cache::icons, image_preview::image_preview_handler::ImagePreviewState},
 };
 
 use crate::ui::modules::custom_context_menu::context_state::ContextMenuState;
 
 impl ContextMenuState {
     ///Menus files
-    pub fn file_context_menu_in_trash(
-        &mut self,
-        ui: &mut Ui,
-        state: &mut BlazeCoreState,
-        ui_state: &mut BlazeUiState,
-    ) {
+    pub fn file_context_menu_in_trash(&mut self, ui: &mut Ui, state: &mut BlazeCoreState) {
         let i18n = with_configs(|c| c.get_i18n());
 
         if !self.open {
@@ -71,7 +63,6 @@ impl ContextMenuState {
 
                 Self::render_context_button(
                     ui,
-                    ui_state,
                     &label,
                     hint,
                     icon,
@@ -79,7 +70,7 @@ impl ContextMenuState {
                     || {
                         action.set(Some(0));
                     },
-                    None::<fn(&mut Ui, &mut BlazeUiState)>,
+                    None::<fn(&mut Ui)>,
                 );
 
                 if let Some(0) = action.get() {
@@ -106,7 +97,6 @@ impl ContextMenuState {
 
                 Self::render_context_button(
                     ui,
-                    ui_state,
                     &label,
                     hint,
                     icon,
@@ -114,7 +104,7 @@ impl ContextMenuState {
                     || {
                         action.set(Some(0));
                     },
-                    None::<fn(&mut Ui, &mut BlazeUiState)>,
+                    None::<fn(&mut Ui)>,
                 );
 
                 if let Some(0) = action.get() {
@@ -140,12 +130,7 @@ impl ContextMenuState {
         }
     }
 
-    pub fn file_context_menu(
-        &mut self,
-        ui: &mut Ui,
-        state: &mut BlazeCoreState,
-        ui_state: &mut BlazeUiState,
-    ) {
+    pub fn file_context_menu(&mut self, ui: &mut Ui, state: &mut BlazeCoreState) {
         let i18n = with_configs(|c| c.get_i18n());
 
         if !self.open {
@@ -178,7 +163,6 @@ impl ContextMenuState {
 
                     Self::render_context_button(
                         ui,
-                        ui_state,
                         &label,
                         hint,
                         icon,
@@ -186,7 +170,7 @@ impl ContextMenuState {
                         || {
                             action.set(Some(0));
                         },
-                        None::<fn(&mut Ui, &mut BlazeUiState)>,
+                        None::<fn(&mut Ui)>,
                     );
 
                     if let Some(0) = action.get() {
@@ -230,7 +214,6 @@ impl ContextMenuState {
 
                     Self::render_context_button(
                         ui,
-                        ui_state,
                         &label,
                         hint,
                         icon,
@@ -238,7 +221,7 @@ impl ContextMenuState {
                         || {
                             action.set(Some(0));
                         },
-                        None::<fn(&mut Ui, &mut BlazeUiState)>,
+                        None::<fn(&mut Ui)>,
                     );
 
                     if let Some(0) = action.get() {
@@ -269,7 +252,6 @@ impl ContextMenuState {
 
                     Self::render_context_button(
                         ui,
-                        ui_state,
                         &label,
                         hint,
                         icon,
@@ -277,14 +259,13 @@ impl ContextMenuState {
                         || {
                             action.set(Some(0));
                         },
-                        Some(|ui: &mut Ui, ui_state: &mut BlazeUiState| {
+                        Some(|ui: &mut Ui| {
                             let icon = ("external-link", icons::ICON_EXTERNAL_LINK);
                             let label = i18n.t("file_ctx_menu.open_with");
                             let hint = "";
 
                             Self::render_context_button(
                                 ui,
-                                ui_state,
                                 &label,
                                 hint,
                                 icon,
@@ -293,7 +274,7 @@ impl ContextMenuState {
                                     info!("Se ejecuta");
                                     action.set(Some(1));
                                 },
-                                None::<fn(&mut Ui, &mut BlazeUiState)>,
+                                None::<fn(&mut Ui)>,
                             );
                         }),
                     );
@@ -338,7 +319,6 @@ impl ContextMenuState {
 
                     Self::render_context_button(
                         ui,
-                        ui_state,
                         &label,
                         hint,
                         icon,
@@ -346,14 +326,13 @@ impl ContextMenuState {
                         || {
                             action.set(Some(0));
                         },
-                        Some(|ui: &mut Ui, ui_state: &mut BlazeUiState| {
+                        Some(|ui: &mut Ui| {
                             let icon = ("folder-open", icons::ICON_FOLDER_OPEN);
                             let label = i18n.t("file_ctx_menu.open_in_new_tab");
                             let hint = "";
 
                             Self::render_context_button(
                                 ui,
-                                ui_state,
                                 &label,
                                 hint,
                                 icon,
@@ -361,7 +340,7 @@ impl ContextMenuState {
                                 || {
                                     action.set(Some(1));
                                 },
-                                None::<fn(&mut Ui, &mut BlazeUiState)>,
+                                None::<fn(&mut Ui)>,
                             );
                         }),
                     );
@@ -422,7 +401,6 @@ impl ContextMenuState {
 
                 Self::render_context_button(
                     ui,
-                    ui_state,
                     &label,
                     hint,
                     icon,
@@ -430,7 +408,7 @@ impl ContextMenuState {
                     || {
                         action.set(Some(0));
                     },
-                    None::<fn(&mut Ui, &mut BlazeUiState)>,
+                    None::<fn(&mut Ui)>,
                 );
 
                 if let Some(0) = action.get() {
@@ -452,7 +430,6 @@ impl ContextMenuState {
 
                 Self::render_context_button(
                     ui,
-                    ui_state,
                     &label,
                     hint,
                     icon,
@@ -460,7 +437,7 @@ impl ContextMenuState {
                     || {
                         action.set(Some(0));
                     },
-                    None::<fn(&mut Ui, &mut BlazeUiState)>,
+                    None::<fn(&mut Ui)>,
                 );
 
                 if let Some(0) = action.get() {
@@ -482,7 +459,6 @@ impl ContextMenuState {
 
                 Self::render_context_button(
                     ui,
-                    ui_state,
                     &label,
                     hint,
                     icon,
@@ -490,7 +466,7 @@ impl ContextMenuState {
                     || {
                         action.set(Some(0));
                     },
-                    None::<fn(&mut Ui, &mut BlazeUiState)>,
+                    None::<fn(&mut Ui)>,
                 );
 
                 if let Some(0) = action.get() {
@@ -512,7 +488,6 @@ impl ContextMenuState {
 
                     Self::render_context_button(
                         ui,
-                        ui_state,
                         &label,
                         hint,
                         icon,
@@ -520,7 +495,7 @@ impl ContextMenuState {
                         || {
                             action.set(Some(0));
                         },
-                        None::<fn(&mut Ui, &mut BlazeUiState)>,
+                        None::<fn(&mut Ui)>,
                     );
 
                     if let Some(0) = action.get() {
@@ -550,7 +525,6 @@ impl ContextMenuState {
 
                     Self::render_context_button(
                         ui,
-                        ui_state,
                         &label,
                         hint,
                         icon,
@@ -558,7 +532,7 @@ impl ContextMenuState {
                         || {
                             action.set(Some(0));
                         },
-                        None::<fn(&mut Ui, &mut BlazeUiState)>,
+                        None::<fn(&mut Ui)>,
                     );
 
                     if let Some(0) = action.get() {
@@ -589,7 +563,6 @@ impl ContextMenuState {
 
                 Self::render_context_button(
                     ui,
-                    ui_state,
                     &label,
                     hint,
                     icon,
@@ -597,7 +570,7 @@ impl ContextMenuState {
                     || {
                         action.set(Some(0));
                     },
-                    None::<fn(&mut Ui, &mut BlazeUiState)>,
+                    None::<fn(&mut Ui)>,
                 );
 
                 if let Some(0) = action.get() {
@@ -631,7 +604,6 @@ impl ContextMenuState {
 
                 Self::render_context_button(
                     ui,
-                    ui_state,
                     &label,
                     hint,
                     icon,
@@ -639,7 +611,7 @@ impl ContextMenuState {
                     || {
                         action.set(Some(0));
                     },
-                    None::<fn(&mut Ui, &mut BlazeUiState)>,
+                    None::<fn(&mut Ui)>,
                 );
 
                 if let Some(0) = action.get() {
@@ -667,7 +639,6 @@ impl ContextMenuState {
 
                 Self::render_context_button(
                     ui,
-                    ui_state,
                     &label,
                     hint,
                     icon,
@@ -675,7 +646,7 @@ impl ContextMenuState {
                     || {
                         action.set(Some(0));
                     },
-                    None::<fn(&mut Ui, &mut BlazeUiState)>,
+                    None::<fn(&mut Ui)>,
                 );
 
                 if let Some(0) = action.get() {

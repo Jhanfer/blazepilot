@@ -23,10 +23,6 @@ impl BlazeCoreState {
         }
     }
 
-    pub fn is_filter_empty(&self) -> bool {
-        self.current_search_filter().is_empty()
-    }
-
     pub fn clean_search(&mut self) {
         let focused = {
             let motor = self.motor.borrow();

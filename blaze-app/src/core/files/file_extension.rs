@@ -3,8 +3,9 @@ pub trait StrExtension {
     fn extension(&self) -> &'static str;
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub enum DocType {
+    #[default]
     Pdf,
     Doc,
     Docx,
@@ -44,8 +45,9 @@ impl StrExtension for DocType {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub enum ImageType {
+    #[default]
     Png,
     Jpg,
     Webp,
@@ -73,8 +75,9 @@ impl StrExtension for ImageType {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub enum VideoType {
+    #[default]
     Mp4,
     Mkv,
     Avi,
@@ -102,8 +105,9 @@ impl StrExtension for VideoType {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub enum AudioType {
+    #[default]
     Mp3,
     Wav,
     Flac,
@@ -129,8 +133,9 @@ impl StrExtension for AudioType {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub enum ArchiveType {
+    #[default]
     Zip,
     Tar,
     TarGz,
@@ -163,8 +168,9 @@ impl StrExtension for ArchiveType {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub enum CodeType {
+    #[default]
     Rs,
     Py,
     Js,
@@ -232,8 +238,9 @@ impl StrExtension for CodeType {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub enum FontType {
+    #[default]
     Ttf,
     Otf,
     Woff,
@@ -251,9 +258,10 @@ impl StrExtension for FontType {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub enum ExecutableType {
     //Linux
+    #[default]
     AppImage,
     Deb,
     Rpm,

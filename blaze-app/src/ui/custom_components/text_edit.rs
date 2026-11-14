@@ -2,7 +2,7 @@ use crate::core::system::clipboard_text::{
     keyboard_state::{KeyboardAction, with_keyboard_state},
     text_clipboard::with_text_clipboard,
 };
-use egui::{FontSelection, Frame, Id, Margin, Response, TextEdit, Widget};
+use egui::{FontSelection, Frame, Id, Margin, Response, TextEdit, Ui, Widget};
 
 pub struct BlazeTextEdit<'a> {
     text: &'a mut String,
@@ -56,7 +56,7 @@ impl<'a> BlazeTextEdit<'a> {
 }
 
 impl Widget for BlazeTextEdit<'_> {
-    fn ui(self, ui: &mut egui::Ui) -> Response {
+    fn ui(self, ui: &mut Ui) -> Response {
         let output = TextEdit::singleline(self.text)
             .id(self.id)
             .frame(Frame::NONE)
