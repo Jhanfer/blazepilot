@@ -1,7 +1,3 @@
-[app]
-title = "BlazePilot"
-loading = "Chargement..."
-
 [left_sidebar]
 root = "Racine"
 locals = "Locaux"
@@ -13,8 +9,9 @@ pictures = "Images"
 videos = "Vidéos"
 music = "Musique"
 public = "Public"
-trash = "Corbeille" 
+trash = "Corbeille"
 disks = "Disques"
+used_percent = "Utilisé : {query} %"
 
 [right_sidebar]
 info = "Informations"
@@ -25,11 +22,15 @@ owner = "Propriétaire:"
 group_name = "Nom du groupe:"
 dimensions = "Dimensions:"
 git_status = "Statut Git:"
+modified = "Modifié :"
+folder = "Dossier"
+
+[route]
+placeholder = "Saisir un chemin"
 
 [search]
 placeholder = "Cherche"
 no_results = "Aucun résultat pour \"{query}\""
-searching = "Recherche en cours..."
 
 [bg_ctx_menu]
 new_tab = "Nouvel onglet"
@@ -49,7 +50,6 @@ add_to_tag = "Ajouter au tag"
 [file_ops]
 copy = "Copier"
 cut = "Couper"
-paste = "Coller"
 paste_here = "Coller ici"
 extract_here = "Extraire ici"
 folder_color = "Couleur du dossier"
@@ -57,12 +57,19 @@ rename = "Renommer"
 restore = "Restaurer"
 move_to_trash = "Déplacer vers la corbeille"
 delete = "Supprimer"
-delete_confirm = "Supprimer {count} fichier(s) ?"
 
 [tools]
 name = "Nom"
 modified = "Modifié"
 size = "Taille"
+extension = "Extension"
+created = "Créé"
+accessed = "Consulté"
+owner = "Propriétaire"
+group = "Groupe"
+permissions = "Permissions"
+dimensions = "Dimensions"
+symlink = "Cible du lien"
 
 [tags_quick]
 new = "Nouveau"
@@ -104,7 +111,6 @@ language = "Langue"
 gratitude = "Merci d'utiliser BlazePilot !"
 made_for = "Fait avec ❤ par Jhanfer. :D"
 report = "Signaler un bug"
-sys_info = "Informations système"
 disclaimer = "Les paramètres sont limités pour l'instant. Nous travaillons encore dessus."
 
 [configs_terminal]
@@ -117,10 +123,7 @@ max_retries_error = "❌ Impossible de trouver un terminal après plusieurs tent
 verify_terminals_message = "Veuillez vérifier qu'au moins un terminal est installé."
 suggestion_message = "💡 Conseil : Installez un terminal comme gnome-terminal, konsole ou alacritty"
 retry = "Réessayer"
-max_retries = 3
-timeout_seconds = 5
 combo_box_label = "Terminal par défaut"
-
 
 [configs_backend]
 title = "Protocole d'affichage"
@@ -133,48 +136,22 @@ X11 : Plus grande compatibilité avec les anciennes applications. Permet le glis
 """
 disclaimer = "Ces modifications nécessitent un redémarrage de l'application."
 
-
 [configs_appearance]
 title = "Changer l'apparence"
-reload_theme = "Recharger le thème"
 selection = "Sélectionner un thème"
+reload_theme = "Recharger le thème"
 message = "Vous pouvez modifier chaque thème dans ~/.config/blazepilotapp/themes"
-
 color_editor = "Éditeur de couleurs"
-
-states = "États"
+section_global = "Global"
+main_bg = "Arrière-plan principal"
+rubberband = "Bande de sélection"
+primary_text = "Texte principal"
+secondary_text = "Texte secondaire"
 error = "Erreur"
 success = "Succès"
 warn = "Avertissement"
-
-background = "Arrière-plans"
-main_bg = "Arrière-plan principal"
-panel_bg = "Arrière-plan du panneau"
-container_bg = "Arrière-plan du conteneur"
-hover_bg = "Arrière-plan au survol"
-
-border-buttons = "Bordures et boutons"
-border_panel = "Bordure du panneau"
-main_buttons = "Boutons principaux"
-
-accent = "Accents"
-accent_glow = "Lueur d'accent"
-rubberband = "Bande de sélection"
-selected_item = "Élément sélectionné"
-
-texts = "Textes"
-primary_text = "Texte principal"
-secondary_text = "Texte secondaire"
-muted_text = "Texte atténué"
-
-tools = "Outils"
-primary-tool-color = "Couleur principale de l'outil"
-secondary-tool-color = "Couleur secondaire de l'outil"
-tool-btn-active = "Bouton d'outil actif"
-tool-btn-inactive = "Bouton d'outil inactif"
-tool-btn-hovered = "Bouton d'outil au survol"
-
-files = "Fichiers"
+stroke_width = "Épaisseur du trait"
+files = "Icônes de fichier"
 folder = "Dossier"
 image = "Image"
 pdf = "PDF"
@@ -186,35 +163,24 @@ code = "Code"
 font = "Police"
 exe = "Exécutable"
 fallback = "Par défaut"
-
+section_sidebar_left = "Barre latérale gauche"
+section_top_bar = "Barre supérieure"
+section_main_area = "Panneau central"
+section_sidebar_right = "Barre latérale droite"
+section_context_menu = "Menu contextuel"
+section_dialogs = "Boîtes de dialogue"
+panel_bg = "Arrière-plan du panneau"
+bg_elevated = "Fond surélevé"
+hover_bg = "Arrière-plan au survol"
+bg_active = "Fond actif"
+icon_primary = "Icône principale"
+icon_secondary = "Icône secondaire"
+accent = "Accent"
+panel_border = "Bordure du panneau"
+component_border = "Bord du composant"
 theme-name = "Nom du thème"
 save-as-custom = "Enregistrer comme thème personnalisé"
 reset-defaults = "Rétablir les valeurs par défaut"
-separator = "Séparateur"
-panels = "Panneaux"
-panel_border = "Bordure du panneau"
-buttons = "Boutons"
-button_bg = "Arrière-plan du bouton"
-button_hover = "Arrière-plan du bouton (survol)"
-button_label_hover = "Texte du bouton (survol)"
-button_label_active = "Texte du bouton (actif)"
-button_label_inactive = "Texte du bouton (inactif)"
-input = "Champ de saisie"
-input_bg = "Arrière-plan du champ de saisie"
-input_border_idle = "Bordure du champ de saisie (repos)"
-input_border_focus = "Bordure du champ de saisie (focus)"
-sidebar = "Barre latérale"
-sidebar_hover = "Arrière-plan de la barre latérale (survol)"
-file_list = "Liste de fichiers"
-list_hover = "Arrière-plan de la liste (survol)"
-list_selected = "Arrière-plan de la liste (sélectionné)"
-tools_bg = "Arrière-plan des outils"
-tools_label_hover = "Texte de l'outil (survol)"
-tools_label_active = "Texte de l'outil (actif)"
-tools_label_inactive = "Texte de l'outil (inactif)"
-
-[configs_behavior]
-title = "En cours :D"
 
 [configs_language]
 title = "Changer de langue"
@@ -275,7 +241,7 @@ title_img = "URL de l'image"
 message_web = "Ouvrir la page dans un navigateur ?"
 message_url = "Télécharger l'image ?"
 
-[want_to_donwload_dialog]  
+[want_to_donwload_dialog]
 title = "Installer l'application ?"
 message = "Cela créera un fichier '.desktop'"
 hint = "Vous pouvez installer depuis les paramètres plus tard"
@@ -289,6 +255,7 @@ title = "Nouvelle version disponible !"
 message = "Une mise à jour de Blazepilot est disponible."
 current_version = "Version actuelle : \"{query}\""
 new_version = "Voulez-vous mettre à jour vers la version \"{query}\" ?"
+changelog = "Journal des modifications"
 
 [move_to_dialog]
 title = "Déplacer..."
@@ -300,7 +267,6 @@ to = "vers {query}"
 
 [sure_to_delete_dialog]
 title = "Supprimer définitivement ?"
-file = "Fichier"
 file_dot = "• {query}"
 and_more = "... et {query} autres fichiers"
 

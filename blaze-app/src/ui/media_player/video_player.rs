@@ -110,7 +110,7 @@ pub struct VideoPlayer {
 }
 
 impl VideoPlayer {
-    pub fn init(clock: Arc<Mutex<PlaybackClock>>, seek_epoch: Arc<AtomicU64>) -> Self {
+    pub fn init(clock: Arc<Mutex<PlaybackClock>>) -> Self {
         Self {
             streamer: None,
             frame_rx: None,
@@ -119,7 +119,7 @@ impl VideoPlayer {
             pending_frame: None,
             video_path: None,
             generation: Arc::new(AtomicU64::new(0)),
-            seek_epoch,
+            seek_epoch: Arc::new(AtomicU64::new(0)),
             video_width: 0,
             video_height: 0,
         }
@@ -150,10 +150,20 @@ impl VideoPlayer {
 
     pub fn play(&mut self) -> VideoResult<()> {
         debug!("video_path: {:?}", self.video_path);
-        if self.streamer.is_some() {
+
+        let alive = self
+            .streamer
+            .as_ref()
+            .and_then(|s| s.thread.as_ref())
+            .map(|t| !t.is_finished())
+            .unwrap_or(false);
+
+        if alive {
             self.resume();
             return Ok(());
         }
+
+        self.streamer = None;
 
         if let Some(rx) = self.frame_rx.take() {
             drop(rx);
@@ -323,7 +333,9 @@ impl VideoPlayer {
             } else if self.is_playing() {
                 let wait = Duration::from_secs_f32((frame.timestamp - elapsed).max(0.0));
                 self.pending_frame = Some(frame);
-                ui.request_repaint_after(wait);
+                if self.is_playing() {
+                    ui.request_repaint_after(wait);
+                }
             }
         }
 
@@ -385,6 +397,17 @@ impl VideoStreamer {
 
     pub fn send(&self, cmd: VideoDecoderCommand) {
         let _ = self.command_tx.send(cmd);
+    }
+
+    fn apply_seek(
+        ictx: &mut ffmpeg_next::format::context::Input,
+        decoder: &mut ffmpeg_next::decoder::Video,
+        secs: f32,
+    ) -> VideoResult<()> {
+        let ts = (secs * ffmpeg_next::ffi::AV_TIME_BASE as f32) as i64;
+        ictx.seek(ts, ..ts).map_err(VideoError::FfmpegError)?;
+        decoder.flush();
+        Ok(())
     }
 
     fn decode_loop(
@@ -463,51 +486,56 @@ impl VideoStreamer {
 
         let mut packects_in_buff = 0;
 
-        loop {
+        'main: loop {
             if generation.load(Ordering::Acquire) != my_generation {
-                debug!("Video generation no es igual: saliendo en inicio del loop");
                 return Ok("Video generation no es igual, saliendo".into());
+            }
+
+            loop {
+                let cmd = if paused {
+                    match commands.recv_timeout(Duration::from_millis(50)) {
+                        Ok(c) => c,
+                        Err(RecvTimeoutError::Timeout) => {
+                            if generation.load(Ordering::Acquire) != my_generation {
+                                return Ok("Video generation no es igual, saliendo".into());
+                            }
+                            continue;
+                        }
+                        Err(RecvTimeoutError::Disconnected) => {
+                            return Ok("Command channel cerrado".into());
+                        }
+                    }
+                } else {
+                    match commands.try_recv() {
+                        Ok(c) => c,
+                        Err(TryRecvError::Empty) => break,
+                        Err(TryRecvError::Disconnected) => {
+                            return Ok("Command channel cerrado".into());
+                        }
+                    }
+                };
+
+                match cmd {
+                    VideoDecoderCommand::Stop => return Ok("Stop".into()),
+                    VideoDecoderCommand::Pause => paused = true,
+                    VideoDecoderCommand::Resume => paused = false,
+                    VideoDecoderCommand::SeekTo(secs) => {
+                        Self::apply_seek(&mut ictx, &mut decoder, secs)?;
+                        seek_target_secs = secs;
+                        did_seek = true;
+                        packects_in_buff = 0;
+                    }
+                }
             }
 
             while packects_in_buff >= Self::MAX_PACKETS_BUFF || tx.len() >= 4 {
                 if generation.load(Ordering::Acquire) != my_generation {
-                    debug!("Video generation no es igual: saliendo en inicio del loop");
                     return Ok("Video generation no es igual, saliendo".into());
                 }
-
-                match commands.try_recv() {
-                    Ok(VideoDecoderCommand::Stop) => return Ok("Stop".into()),
-
-                    Ok(VideoDecoderCommand::Pause) => paused = true,
-
-                    Ok(VideoDecoderCommand::Resume) => paused = false,
-
-                    Ok(VideoDecoderCommand::SeekTo(secs)) => {
-                        let timestamp = (secs * ffmpeg_next::ffi::AV_TIME_BASE as f32) as i64;
-                        ictx.seek(timestamp, ..timestamp)
-                            .map_err(VideoError::FfmpegError)?;
-                        decoder.flush();
-
-                        seek_target_secs = secs;
-                        did_seek = true;
-                    }
-
-                    Err(TryRecvError::Empty) => {}
-
-                    Err(TryRecvError::Disconnected) => {
-                        return Ok("Command channel cerrado".into());
-                    }
+                if !commands.is_empty() {
+                    continue 'main;
                 }
-
-                if paused {
-                    break;
-                }
-
                 std::thread::sleep(Duration::from_millis(5));
-            }
-
-            if paused {
-                continue;
             }
 
             let mut packet = Packet::empty();
@@ -669,14 +697,10 @@ impl VideoStreamer {
                             }
                         }
                         Ok(VideoDecoderCommand::SeekTo(secs)) => {
-                            let timestamp = (secs * ffmpeg_next::ffi::AV_TIME_BASE as f32) as i64;
-                            ictx.seek(timestamp, ..timestamp)
-                                .map_err(VideoError::FfmpegError)?;
-                            decoder.flush();
-
+                            Self::apply_seek(&mut ictx, &mut decoder, secs)?;
                             seek_target_secs = secs;
                             did_seek = true;
-
+                            packects_in_buff = 0;
                             break;
                         }
                         Ok(VideoDecoderCommand::Pause) => paused = true,

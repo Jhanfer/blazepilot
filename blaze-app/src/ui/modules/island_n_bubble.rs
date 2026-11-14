@@ -6,31 +6,30 @@ use crate::{
         files::blaze_motor::motor_structs::FileEntry,
     },
     ui::{
-        blaze_ui_state::BlazeUiState,
         custom_components::UiExt,
         icons_cache::icons,
         task_manager::tasks::TaskStatus,
-        themes::{platform::structs::ToColor, theme_manager::with_theme},
+        themes::{platform::structs::BlazeAppTheme, theme_manager::with_theme},
     },
     utils::{easing::ease_in_out_bounce, formating::format_size},
 };
 use egui::{
-    Align2, Area, Color32, CornerRadius, Frame, Margin, Order, Rect, ScrollArea, Sense, Stroke, Ui,
-    pos2, vec2,
+    Align2, Area, Color32, CornerRadius, Frame, Margin, Order, Rect, RichText, ScrollArea, Sense,
+    Stroke, Ui, vec2,
 };
 
 pub fn generic_island<F>(
     ui: &mut Ui,
     state: &mut BlazeCoreState,
-    ui_state: &mut BlazeUiState,
     bottom_padding: i8,
     width: f32,
+    current_theme: Arc<BlazeAppTheme>,
     mut callback: F,
 ) -> Rect
 where
-    F: FnMut(&mut Ui, &mut BlazeUiState, &mut BlazeCoreState),
+    F: FnMut(&mut Ui, &mut BlazeCoreState),
 {
-    let current_theme = with_theme(|t| t.current());
+    let palette = current_theme.main_area.palette(&current_theme.global);
 
     const ISLAND_GAP: f32 = 30.0;
 
@@ -43,10 +42,10 @@ where
         .show(ui, |ui| {
             Frame::NONE
                 .inner_margin(egui::Margin::same(10))
-                .fill(current_theme.components.panel.bg.to_color())
+                .fill(palette.bg_panel)
                 .stroke(Stroke::new(
-                    0.5,
-                    current_theme.components.panel.border.to_color(),
+                    current_theme.global.panel_stroke_width,
+                    palette.border_panel,
                 ))
                 .corner_radius(CornerRadius::same(20))
                 .show(ui, |ui| {
@@ -56,7 +55,7 @@ where
 
                     ui.centered_and_justified(|ui| {
                         ui.horizontal_centered(|ui| {
-                            callback(ui, ui_state, state);
+                            callback(ui, state);
                         });
                     });
                 });
@@ -68,68 +67,42 @@ where
 pub fn render_island_bubble(
     ui: &mut Ui,
     state: &mut BlazeCoreState,
-    ui_state: &mut BlazeUiState,
     files: &[Arc<FileEntry>],
     bottom_padding: i8,
 ) {
     let current_theme = with_theme(|t| t.current());
+    let palette = current_theme.main_area.palette(&current_theme.global);
 
     let island_rect = generic_island(
         ui,
         state,
-        ui_state,
         bottom_padding,
         150.0,
-        |ui, ui_state, state| {
+        current_theme.clone(),
+        |ui, state| {
             let icon_size = egui::vec2(14.0, 14.0);
             let (icon_rect, _) = ui.allocate_exact_size(icon_size, Sense::hover());
             let (icon_name, icon_bytes) = ("file", icons::ICON_FILE);
-            let rounded_rect = Rect::from_min_max(
-                pos2(icon_rect.min.x.round(), icon_rect.min.y.round()),
-                pos2(icon_rect.max.x.round(), icon_rect.max.y.round()),
-            );
-            let icon = ui_state.icon_cache.get_or_load(
-                ui,
-                icon_name,
-                icon_bytes,
-                Color32::GRAY,
-                icon_size,
-            );
 
-            ui.painter().image(
-                icon.id(),
-                rounded_rect,
-                Rect::from_min_max(egui::pos2(0.0, 0.0), pos2(1.0, 1.0)),
-                Color32::WHITE,
-            );
+            ui.draw_icon((icon_name, icon_bytes))
+                .size(icon_size)
+                .tint(palette.icon_secondary)
+                .show_at(icon_rect);
 
             ui.add_space(1.0);
 
             let total = files.len();
-            ui.label_ns(format!("{}", total));
+            ui.label_ns(RichText::new(format!("{}", total)).color(palette.fg_secondary));
 
             ui.add_space(5.0);
 
             let (icon_rect, _) = ui.allocate_exact_size(icon_size, Sense::hover());
-            let rounded_rect = Rect::from_min_max(
-                pos2(icon_rect.min.x.round(), icon_rect.min.y.round()),
-                pos2(icon_rect.max.x.round(), icon_rect.max.y.round()),
-            );
             let (icon_name, icon_bytes) = ("list", icons::ICON_LIST);
-            let icon = ui_state.icon_cache.get_or_load(
-                ui,
-                icon_name,
-                icon_bytes,
-                Color32::GRAY,
-                icon_size,
-            );
 
-            ui.painter().image(
-                icon.id(),
-                rounded_rect,
-                Rect::from_min_max(egui::pos2(0.0, 0.0), pos2(1.0, 1.0)),
-                Color32::WHITE,
-            );
+            ui.draw_icon((icon_name, icon_bytes))
+                .size(icon_size)
+                .tint(palette.icon_secondary)
+                .show_at(icon_rect);
 
             ui.add_space(1.0);
 
@@ -152,34 +125,21 @@ pub fn render_island_bubble(
                 })
                 .sum();
 
-            ui.label_ns(format!("{}", selected_count));
+            ui.label_ns(RichText::new(format!("{}", selected_count)).color(palette.fg_secondary));
 
             ui.add_space(5.0);
 
             let (icon_rect, _) = ui.allocate_exact_size(icon_size, Sense::hover());
             let (icon_name, icon_bytes) = ("database", icons::ICON_DATABASE);
-            let _rect = Rect::from_min_max(
-                pos2(icon_rect.min.x.round(), icon_rect.min.y.round()),
-                pos2(icon_rect.max.x.round(), icon_rect.max.y.round()),
-            );
-            let icon = ui_state.icon_cache.get_or_load(
-                ui,
-                icon_name,
-                icon_bytes,
-                Color32::GRAY,
-                icon_size,
-            );
 
-            ui.painter().image(
-                icon.id(),
-                _rect,
-                Rect::from_min_max(egui::pos2(0.0, 0.0), pos2(1.0, 1.0)),
-                Color32::WHITE,
-            );
+            ui.draw_icon((icon_name, icon_bytes))
+                .size(icon_size)
+                .tint(palette.icon_secondary)
+                .show_at(icon_rect);
 
             ui.add_space(1.0);
 
-            ui.label_ns(format_size(selected_size));
+            ui.label_ns(RichText::new(format_size(selected_size)).color(palette.fg_secondary));
         },
     );
 
@@ -205,10 +165,10 @@ pub fn render_island_bubble(
         .show(ui, |ui| {
             Frame::NONE
                 .inner_margin(Margin::same(10))
-                .fill(current_theme.components.panel.bg.to_color())
+                .fill(palette.bg_panel)
                 .stroke(Stroke::new(
-                    0.5,
-                    current_theme.components.panel.border.to_color(),
+                    current_theme.global.panel_stroke_width,
+                    palette.border_panel,
                 ))
                 .corner_radius(CornerRadius::same(20))
                 .show(ui, |ui| {
@@ -271,17 +231,19 @@ pub fn render_island_bubble(
 pub fn render_tags_island_bubble(
     ui: &mut Ui,
     state: &mut BlazeCoreState,
-    ui_state: &mut BlazeUiState,
     bottom_padding: i8,
     tag_len: usize,
 ) {
+    let current_theme = with_theme(|t| t.current());
+    let palette = current_theme.main_area.palette(&current_theme.global);
+
     generic_island(
         ui,
         state,
-        ui_state,
         bottom_padding,
         90.0,
-        |ui, ui_state, state| {
+        current_theme.clone(),
+        |ui, state| {
             let (tag_len, items_len) = match state.tag_filter {
                 TagViewFilter::All { all_items_len } => (tag_len, all_items_len),
                 TagViewFilter::Tag { items_len, .. } => (1, items_len),
@@ -290,56 +252,30 @@ pub fn render_tags_island_bubble(
             let icon_size = vec2(14.0, 14.0);
             let (icon_rect, _) = ui.allocate_exact_size(icon_size, Sense::hover());
             let (icon_name, icon_bytes) = ("tag", icons::ICON_TAG);
-            let rounded_rect = Rect::from_min_max(
-                pos2(icon_rect.min.x.round(), icon_rect.min.y.round()),
-                pos2(icon_rect.max.x.round(), icon_rect.max.y.round()),
-            );
-            let icon = ui_state.icon_cache.get_or_load(
-                ui,
-                icon_name,
-                icon_bytes,
-                Color32::GRAY,
-                icon_size,
-            );
 
-            ui.painter().image(
-                icon.id(),
-                rounded_rect,
-                Rect::from_min_max(egui::pos2(0.0, 0.0), pos2(1.0, 1.0)),
-                Color32::WHITE,
-            );
+            ui.draw_icon((icon_name, icon_bytes))
+                .size(icon_size)
+                .tint(palette.icon_secondary)
+                .show_at(icon_rect);
 
             ui.add_space(1.0);
 
-            ui.label_ns(format!("{}", tag_len));
+            ui.label_ns(RichText::new(format!("{}", tag_len)).color(palette.fg_secondary));
 
             ui.add_space(5.0);
 
             let (icon_rect, _) = ui.allocate_exact_size(icon_size, Sense::hover());
 
             let (icon_name, icon_bytes) = ("list", icons::ICON_LIST);
-            let rounded_rect = Rect::from_min_max(
-                pos2(icon_rect.min.x.round(), icon_rect.min.y.round()),
-                pos2(icon_rect.max.x.round(), icon_rect.max.y.round()),
-            );
-            let icon = ui_state.icon_cache.get_or_load(
-                ui,
-                icon_name,
-                icon_bytes,
-                Color32::GRAY,
-                icon_size,
-            );
 
-            ui.painter().image(
-                icon.id(),
-                rounded_rect,
-                Rect::from_min_max(egui::pos2(0.0, 0.0), pos2(1.0, 1.0)),
-                Color32::WHITE,
-            );
+            ui.draw_icon((icon_name, icon_bytes))
+                .size(icon_size)
+                .tint(palette.icon_secondary)
+                .show_at(icon_rect);
 
             ui.add_space(1.0);
 
-            ui.label_ns(format!("{}", items_len));
+            ui.label_ns(RichText::new(format!("{}", items_len)).color(palette.fg_secondary));
         },
     );
 }

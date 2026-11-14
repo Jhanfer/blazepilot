@@ -11,6 +11,7 @@ use crate::{
     },
     ui::{
         blaze_ui_state::BlazeUiState,
+        custom_components::{UiExt, panel_border::OpenSide},
         fonts::fonts_manager::with_fonts,
         icons_cache::thumbnails::thumbnails_manager::ThumbnailMessages,
         modules::{
@@ -22,7 +23,7 @@ use crate::{
             hot_keys::hot_keys_logic,
             island_n_bubble::render_island_bubble,
         },
-        themes::{platform::structs::ToColor, theme_manager::with_theme},
+        themes::theme_manager::with_theme,
     },
 };
 use egui::{CornerRadius, Frame, Margin, Rect, Stroke, Ui};
@@ -120,10 +121,8 @@ fn background_response_logic(
 
     let mut ctx_menu = std::mem::take(&mut ui_state.context_menu_state);
     match ctx_menu.kind {
-        ContextMenuKind::BackgroundNormal => ctx_menu.background_context_menu(ui, state, ui_state),
-        ContextMenuKind::BackgroundTrash => {
-            ctx_menu.background_context_menu_in_trash(ui, state, ui_state)
-        }
+        ContextMenuKind::BackgroundNormal => ctx_menu.background_context_menu(ui, state),
+        ContextMenuKind::BackgroundTrash => ctx_menu.background_context_menu_in_trash(ui, state),
         _ => {}
     }
     ui_state.context_menu_state = ctx_menu;
@@ -144,25 +143,24 @@ pub fn grid_panel_frame(
     state.resize_selection(files.len());
 
     let current_theme = with_theme(|t| t.current());
+    let palette = current_theme.main_area.palette(&current_theme.global);
 
-    Frame::NONE
+    let panel_radius = CornerRadius {
+        nw: 0,
+        ne: 0,
+        sw: 20,
+        se: 20,
+    };
+
+    let frame = Frame::NONE
         .inner_margin(Margin {
             left: 10,
             right: 10,
             top: 0,
             bottom: 10,
         })
-        .fill(current_theme.components.panel.bg.to_color())
-        .corner_radius(CornerRadius {
-            nw: 0,
-            ne: 0,
-            sw: 20,
-            se: 20,
-        })
-        .stroke(Stroke {
-            width: 0.5,
-            color: current_theme.components.panel.border.to_color(),
-        })
+        .fill(palette.bg_panel)
+        .corner_radius(panel_radius)
         .show(ui, |ui| {
             let original_clip = ui.clip_rect();
             let frame_rect = ui.max_rect();
@@ -296,11 +294,20 @@ pub fn grid_panel_frame(
             }
 
             //Isla y burbuja y las tabs
-            render_island_bubble(ui, state, ui_state, files, bottom_padding);
+            render_island_bubble(ui, state, files, bottom_padding);
 
             //hotkeys
             hot_keys_logic(state, ui_state, files, ui);
 
             ui.set_clip_rect(original_clip);
         });
+
+    ui.panel_border(frame.response.rect)
+        .radius(panel_radius)
+        .open_side(Some(OpenSide::Top))
+        .stroke(Stroke::new(
+            current_theme.global.panel_stroke_width,
+            palette.border_panel,
+        ))
+        .paint_border();
 }

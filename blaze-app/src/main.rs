@@ -69,11 +69,13 @@ fn main() {
         }
         let present_mode = parse_present_mode_from_env();
         let with_trasnparency = parse_transparency_from_env();
+        let msaa_samples = parse_msaa_samples_from_env();
         let backend = parse_backend_from_env();
         let initial_path = parse_initial_path();
         let _ = init_dir_trash().map_err(|e| warn!("Error inicializando: {}", e));
 
-        let config = RendererConfig::wgpu_present(backend, present_mode, with_trasnparency);
+        let config =
+            RendererConfig::wgpu_present(backend, present_mode, with_trasnparency, msaa_samples);
         if let Err(e) = run_application(config, initial_path) {
             error!("Fallo al arrancar: {}", e);
             std::process::exit(1);
@@ -105,22 +107,25 @@ fn try_run_with_retries() -> anyhow::Result<()> {
     let backend = with_configs(|c| c.get_display_backend());
 
     let configs = [
-        (backend.clone(), PresentMode::Immediate, true),
-        (backend.clone(), PresentMode::Immediate, false),
-        (backend.clone(), PresentMode::Fifo, true),
-        (backend, PresentMode::Fifo, false),
-        (DisplayBackend::Auto, PresentMode::Fifo, true),
-        (DisplayBackend::Auto, PresentMode::Fifo, false),
+        (backend.clone(), PresentMode::Immediate, true, 4),
+        (backend.clone(), PresentMode::Immediate, false, 4),
+        (backend.clone(), PresentMode::Fifo, true, 2),
+        (backend, PresentMode::Fifo, false, 2),
+        (DisplayBackend::Auto, PresentMode::Fifo, true, 1),
+        (DisplayBackend::Auto, PresentMode::Fifo, false, 1),
     ];
 
-    for (attempt, (backend, present_mode, with_transparency)) in configs.iter().enumerate() {
+    for (attempt, (backend, present_mode, with_transparency, msaa_samples)) in
+        configs.iter().enumerate()
+    {
         debug!(
-            "Intento {}/{}: Backend={:?}, PresentMode={:?}, Transparencias={}",
+            "Intento {}/{}: Backend={:?}, PresentMode={:?}, Transparencias={}, Msaa_samples={}",
             attempt + 1,
             configs.len(),
             backend,
             present_mode,
             with_transparency,
+            msaa_samples,
         );
 
         let mut cmd = std::process::Command::new(&exe);
@@ -128,6 +133,7 @@ fn try_run_with_retries() -> anyhow::Result<()> {
             .env("BLAZE_PRESENT_MODE", format!("{:?}", present_mode))
             .env("BLAZE_BACKEND", format!("{:?}", backend))
             .env("BALZE_TRANSPARENCY", format!("{:?}", with_transparency))
+            .env("BLAZE_MSAA_SAMPLES", format!("{}", msaa_samples))
             .env("BLAZE_IS_CHILD", "1")
             .stdout(std::process::Stdio::inherit())
             .stderr(std::process::Stdio::inherit());
@@ -178,6 +184,19 @@ fn parse_present_mode_from_env() -> egui_wgpu::wgpu::PresentMode {
     match std::env::var("BLAZE_PRESENT_MODE").as_deref() {
         Ok("Immediate") => egui_wgpu::wgpu::PresentMode::Immediate,
         _ => egui_wgpu::wgpu::PresentMode::Fifo,
+    }
+}
+
+fn parse_msaa_samples_from_env() -> u32 {
+    match std::env::var("BLAZE_MSAA_SAMPLES").as_deref() {
+        Ok(sample) => match sample.parse::<u32>() {
+            Ok(num) => num,
+            Err(e) => {
+                warn!("No se ha podido parsear los msaa samples. Fallback a 1: {e}");
+                1
+            }
+        },
+        _ => 1,
     }
 }
 

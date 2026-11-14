@@ -17,25 +17,30 @@ use crate::{
     },
     ui::blaze_ui_state::BlazeUiState,
 };
-use egui::{Color32, Key, PointerButton, Ui};
+use egui::{Color32, Id, Key, PointerButton, Ui};
 use std::{path::Path, sync::Arc};
 use tracing::warn;
 
 /// Inputs que capturan el teclado. Si alguno tiene foco, las hotkeys
 /// se desactivan
 const TEXT_EDIT_IDS: &[&str] = &[
-    "search_bar",
     "search_ctx_menu",
     "creating_new",
     "rename_space",
     "quick_tag_name",
-    "save_theme_placeholder",
     "route_bar",
-    "config_search_bar",
 ];
 
 fn any_focused(ui: &mut Ui) -> bool {
-    ui.memory(|m| TEXT_EDIT_IDS.iter().any(|id| m.has_focus((*id).into())))
+    let any = ui.data(|data| {
+        data.get_temp::<Vec<Id>>(Id::new("inputs"))
+            .map(|ids| ui.memory(|m| ids.iter().any(|id| m.has_focus(*id))))
+            .unwrap_or(false)
+    });
+
+    let hardcoded = ui.memory(|m| TEXT_EDIT_IDS.iter().any(|id| m.has_focus((*id).into())));
+
+    any || hardcoded
 }
 
 pub fn hot_keys_logic(
@@ -201,7 +206,6 @@ pub fn hot_keys_logic(
             CacheManager::global().invalidate(path);
         }
 
-        ui.request_repaint();
         state.reload_all();
     }
 
@@ -282,11 +286,13 @@ pub fn hot_keys_logic(
     // Creación de items
     if cmd && mods_key.shift && input.key_pressed(Key::N) {
         state.creating_new = Some(NewItemType::Folder);
-        state.new_item_buffer = "nueva carpeta".to_string();
+        state.new_item_buffer =
+            with_configs(|c| c.get_i18n().t("bg_ctx_menu.new_folder").to_string());
     }
     if cmd && mods_key.shift && input.key_pressed(Key::F) {
         state.creating_new = Some(NewItemType::File);
-        state.new_item_buffer = "nuevo archivo".to_string();
+        state.new_item_buffer =
+            with_configs(|c| c.get_i18n().t("bg_ctx_menu.new_file").to_string());
     }
 
     // Terminal

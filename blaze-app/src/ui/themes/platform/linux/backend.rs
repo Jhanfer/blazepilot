@@ -12,12 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::{path::Path, sync::Arc};
-
-use egui::Color32;
 use serde::{Deserialize, Serialize};
+use std::{path::Path, sync::Arc};
 use tracing::{debug, info, warn};
 
+use crate::ui::themes::platform::structs::LegacyTheme;
 #[allow(deprecated)]
 use crate::{
     core::{
@@ -26,16 +25,16 @@ use crate::{
     },
     ui::themes::platform::{
         ColorsTrait,
-        structs::{NewTheme, Theme, ThemeDefault},
+        structs::{BlazeAppTheme, ThemeDefault},
     },
 };
 
 #[derive(Serialize, Deserialize)]
 pub struct LinuxTheme {
     path: Arc<Path>,
-    active_theme: Arc<NewTheme>,
+    active_theme: Arc<BlazeAppTheme>,
     available_themes_names: Vec<Box<str>>,
-    available_themes: Vec<Arc<NewTheme>>,
+    available_themes: Vec<Arc<BlazeAppTheme>>,
 }
 
 impl ColorsTrait for LinuxTheme {
@@ -43,7 +42,7 @@ impl ColorsTrait for LinuxTheme {
         Self::init_defaults()
     }
 
-    fn update_theme(&mut self, mutator: fn(&mut NewTheme, Color32), value: Color32) {
+    fn update_theme<V>(&mut self, mutator: fn(&mut BlazeAppTheme, V), value: V) {
         let theme_mutable = Arc::make_mut(&mut self.active_theme);
         mutator(theme_mutable, value);
     }
@@ -52,7 +51,7 @@ impl ColorsTrait for LinuxTheme {
         if let Some(theme) = self
             .available_themes
             .iter()
-            .find(|t| t.name.as_ref() == name)
+            .find(|t| t.meta.name.as_ref() == name)
         {
             self.active_theme = Arc::clone(theme);
         }
@@ -62,7 +61,7 @@ impl ColorsTrait for LinuxTheme {
         self.available_themes_names.clone()
     }
 
-    fn current_theme(&self) -> Arc<NewTheme> {
+    fn current_theme(&self) -> Arc<BlazeAppTheme> {
         self.active_theme.clone()
     }
 
@@ -72,7 +71,7 @@ impl ColorsTrait for LinuxTheme {
 
         let file_name = format!(
             "{}.json",
-            self.active_theme.name.to_lowercase().replace(' ', "_")
+            self.active_theme.meta.name.to_lowercase().replace(' ', "_")
         );
         let path = self.path.join(file_name);
 
@@ -92,7 +91,7 @@ impl ColorsTrait for LinuxTheme {
         if let Some(first) = self
             .available_themes
             .iter()
-            .find(|t| *t.name.as_ref() == *current_theme_config)
+            .find(|t| *t.meta.name.as_ref() == *current_theme_config)
         {
             self.active_theme = Arc::clone(first);
         } else if let Some(first) = self.available_themes.first() {
@@ -109,11 +108,11 @@ impl ColorsTrait for LinuxTheme {
     fn reload(&mut self) -> Result<(), String> {
         self.scan_themes();
 
-        let current_name = self.active_theme.name.clone();
+        let current_name = self.active_theme.meta.name.clone();
         if let Some(theme) = self
             .available_themes
             .iter()
-            .find(|t| t.name == current_name)
+            .find(|t| t.meta.name == current_name)
         {
             self.active_theme = Arc::clone(theme);
         }
@@ -122,14 +121,14 @@ impl ColorsTrait for LinuxTheme {
     }
 
     fn reset_to_default(&mut self) -> Result<(), String> {
-        let current_name = self.active_theme.name.clone();
+        let current_name = self.active_theme.meta.name.clone();
 
         let default_theme = match &*current_name {
-            "Blaze Dark" => NewTheme::default_dark(),
-            "Blaze Light" => NewTheme::default_light(),
-            "VS Code Dark" => NewTheme::default_vscode_dark(),
-            "VS Code Light" => NewTheme::default_vscode_light(),
-            _ => NewTheme::default_dark(),
+            "Blaze Dark" => BlazeAppTheme::default_dark(),
+            "Blaze Light" => BlazeAppTheme::default_light(),
+            "VS Code Dark" => BlazeAppTheme::default_vscode_dark(),
+            "VS Code Light" => BlazeAppTheme::default_vscode_light(),
+            _ => BlazeAppTheme::default_dark(),
         };
 
         self.active_theme = Arc::new(default_theme);
@@ -141,9 +140,9 @@ impl ColorsTrait for LinuxTheme {
 
     fn save_as_custom_theme(&mut self, new_name: &str) -> Result<(), String> {
         let mut custom_theme = (*self.active_theme).clone();
-        custom_theme.name = new_name.into();
-        custom_theme.autor = "CustomUser".into();
-        custom_theme.version = "1.0.0".into();
+        custom_theme.meta.name = new_name.into();
+        custom_theme.meta.autor = "CustomUser".into();
+        custom_theme.meta.version = "1.0.0".into();
 
         let json = serde_json::to_string_pretty(&custom_theme).map_err(|e| e.to_string())?;
 
@@ -184,7 +183,7 @@ impl LinuxTheme {
 
         Self {
             path: theme_path,
-            active_theme: Arc::new(NewTheme::default_dark()),
+            active_theme: Arc::new(BlazeAppTheme::default_dark()),
             available_themes: Vec::new(),
             available_themes_names: Vec::new(),
         }
@@ -192,14 +191,14 @@ impl LinuxTheme {
 
     fn write_missing_defaults(&self) -> Result<(), String> {
         let defaults = [
-            NewTheme::default_dark(),
-            NewTheme::default_light(),
-            NewTheme::default_vscode_dark(),
-            NewTheme::default_vscode_light(),
+            BlazeAppTheme::default_dark(),
+            BlazeAppTheme::default_light(),
+            BlazeAppTheme::default_vscode_dark(),
+            BlazeAppTheme::default_vscode_light(),
         ];
 
         for theme in &defaults {
-            let file_name = format!("{}.json", theme.name.to_lowercase().replace(' ', "_"));
+            let file_name = format!("{}.json", theme.meta.name.to_lowercase().replace(' ', "_"));
             let path = self.path.join(file_name);
 
             if path.exists() {
@@ -219,7 +218,7 @@ impl LinuxTheme {
             return;
         };
 
-        let mut themes: Vec<Arc<NewTheme>> = vec![];
+        let mut themes: Vec<Arc<BlazeAppTheme>> = vec![];
         let mut names: Vec<Box<str>> = vec![];
 
         for entry in entries.flatten() {
@@ -232,10 +231,10 @@ impl LinuxTheme {
                 continue;
             };
 
-            let theme = if let Ok(t) = serde_json::from_str::<NewTheme>(&content) {
+            let theme = if let Ok(t) = serde_json::from_str::<BlazeAppTheme>(&content) {
                 t
-            } else if let Ok(old) = serde_json::from_str::<Theme>(&content) {
-                let migrated = old.migrate_to_new();
+            } else if let Ok(old) = serde_json::from_str::<LegacyTheme>(&content) {
+                let migrated = BlazeAppTheme::from(old);
 
                 match serde_json::to_string_pretty(&migrated) {
                     Ok(json) => {
@@ -265,7 +264,7 @@ impl LinuxTheme {
                 continue;
             };
 
-            names.push(theme.name.clone());
+            names.push(theme.meta.name.clone());
             themes.push(Arc::new(theme));
         }
 

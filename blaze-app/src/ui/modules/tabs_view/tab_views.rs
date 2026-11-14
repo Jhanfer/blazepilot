@@ -1,27 +1,25 @@
 use crate::{
     core::blaze_state::BlazeCoreState,
     ui::{
-        blaze_ui_state::BlazeUiState,
+        custom_components::UiExt,
         icons_cache::icons,
         modules::tabs_view::tabs::{
             FLOAT_GAP, INACTIVE_MIN_VISIBLE_W, INACTIVE_TOP_INSET, MIN_VISIBLE_W, R_INACTIVE,
             R_TAB, TAB_H, TAB_MAX_WIDTH, TAB_MIN_WIDTH, TAB_SPACING, draw_tab_bar, draw_tab_merged,
         },
-        themes::{platform::structs::ToColor, theme_manager::with_theme},
+        themes::theme_manager::with_theme,
     },
 };
 use egui::{
     Align, Color32, CornerRadius, CursorIcon, FontId, Id, Layout, PointerButton, Rect, Response,
-    ScrollArea, Sense, Stroke, StrokeKind, TextFormat, Ui, pos2,
+    ScrollArea, Sense, Stroke, StrokeKind, TextFormat, Ui, Vec2, pos2,
     scroll_area::{ScrollBarVisibility, ScrollSource},
     text::{LayoutJob, TextWrapping},
     vec2,
 };
 
-#[allow(clippy::too_many_arguments)]
 pub fn render_label(
     ui: &mut Ui,
-    ui_state: &mut BlazeUiState,
     state: &mut BlazeCoreState,
     label: String,
     (tab_count, i): (usize, usize),
@@ -61,25 +59,10 @@ pub fn render_label(
         );
         let (icon_n, icon_b) = ("folder-open", icons::ICON_FOLDER_OPEN);
 
-        let icon = ui_state.icon_cache.get_or_load(
-            ui,
-            icon_n,
-            icon_b,
-            current_theme.semantic.accent_glow.to_color(),
-            vec2(icon_size, icon_size),
-        );
-
-        let rounded_rect = Rect::from_min_max(
-            pos2(t_icon_rect.min.x.round(), t_icon_rect.min.y.round()),
-            pos2(t_icon_rect.max.x.round(), t_icon_rect.max.y.round()),
-        );
-
-        ui.painter().image(
-            icon.id(),
-            rounded_rect,
-            Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
-            Color32::WHITE,
-        );
+        ui.draw_icon((icon_n, icon_b))
+            .size(Vec2::splat(icon_size))
+            .tint(current_theme.top_bar.accent())
+            .show_at(t_icon_rect);
     }
 
     let x_rect = Rect::from_min_size(
@@ -96,7 +79,7 @@ pub fn render_label(
             label,
             TextFormat {
                 font_id: FontId::default(),
-                color: current_theme.semantic.text_primary.to_color(),
+                color: current_theme.global.text_primary(),
                 ..Default::default()
             },
         );
@@ -109,7 +92,7 @@ pub fn render_label(
                 rect.center().y - galley.size().y + FLOAT_GAP / 1.5,
             ),
             galley,
-            current_theme.semantic.text_primary.to_color(),
+            current_theme.global.text_primary(),
         );
     }
 
@@ -117,36 +100,20 @@ pub fn render_label(
     if show_close && tab_count > 1 {
         let resp_x = ui.interact(x_rect, ui.id().with("tab_x").with(i), Sense::click());
 
-        let cc = current_theme.components.button.bg_hover.to_color();
+        let cc = current_theme.top_bar.bg_hover();
         let circ_color = Color32::from_rgba_unmultiplied(cc.r(), cc.g(), cc.b(), 80);
 
         ui.painter()
             .rect_filled(x_rect, CornerRadius::same(20), circ_color);
 
         let (icon_n, icon_b) = ("x", icons::ICON_X);
-
-        let icon = ui_state.icon_cache.get_or_load(
-            ui,
-            icon_n,
-            icon_b,
-            Color32::WHITE,
-            vec2(icon_size, icon_size),
-        );
-
-        let rounded_rect = Rect::from_min_max(
-            pos2(x_rect.min.x.round(), x_rect.min.y.round()),
-            pos2(x_rect.max.x.round(), x_rect.max.y.round()),
-        );
-
-        let xc = current_theme.semantic.accent_glow.to_color();
+        let xc = current_theme.top_bar.accent();
         let x_color = Color32::from_rgba_unmultiplied(xc.r(), xc.g(), xc.b(), 200);
 
-        ui.painter().image(
-            icon.id(),
-            rounded_rect,
-            Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
-            x_color,
-        );
+        ui.draw_icon((icon_n, icon_b))
+            .size(Vec2::splat(icon_size))
+            .tint(x_color)
+            .show_at(x_rect);
 
         if resp.hovered() || resp_x.hovered() {
             ui.set_cursor_icon(CursorIcon::PointingHand);
@@ -158,13 +125,9 @@ pub fn render_label(
     }
 }
 
-pub fn tabs(
-    ui: &mut Ui,
-    state: &mut BlazeCoreState,
-    ui_state: &mut BlazeUiState,
-    bar_width: f32,
-) -> Rect {
+pub fn tabs(ui: &mut Ui, state: &mut BlazeCoreState, bar_width: f32) -> Rect {
     let current_theme = with_theme(|t| t.current());
+    let palette = current_theme.top_bar.palette(&current_theme.global);
 
     let tab_count = state.motor.borrow().tabs.len();
     let tab_h = TAB_H;
@@ -219,37 +182,25 @@ pub fn tabs(
 
                             let (bg, stc) = if resp.hovered() {
                                 ui.set_cursor_icon(CursorIcon::PointingHand);
-                                let b = current_theme.components.button.bg_hover.to_color();
+                                let b = palette.bg_hover;
                                 (
                                     Color32::from_rgba_unmultiplied(b.r(), b.g(), b.b(), 80),
-                                    current_theme.components.panel.border.to_color(),
+                                    palette.border_panel,
                                 )
                             } else {
-                                (
-                                    current_theme.components.panel.bg.to_color(),
-                                    current_theme.components.panel.border.to_color(),
-                                )
+                                (palette.bg_panel, palette.border_panel)
                             };
 
                             ui.painter().rect(
                                 floating,
                                 R_INACTIVE,
                                 bg,
-                                Stroke::new(0.5, stc),
+                                Stroke::new(current_theme.global.panel_stroke_width, stc),
                                 StrokeKind::Middle,
                             );
 
                             let label = state.tab_title(i).clone();
-                            render_label(
-                                ui,
-                                ui_state,
-                                state,
-                                label,
-                                (tab_count, i),
-                                rect,
-                                &resp,
-                                visible_w,
-                            );
+                            render_label(ui, state, label, (tab_count, i), rect, &resp, visible_w);
 
                             let middle_clicked = ui.input(|i| {
                                 i.pointer.button_pressed(PointerButton::Middle)
@@ -278,7 +229,6 @@ pub fn tabs(
             })
             .inner_rect;
     });
-
     let bar_h = TAB_H + 10.0;
 
     let (bar_rect, _) = ui.allocate_exact_size(vec2(bar_width, bar_h), Sense::click());
@@ -293,18 +243,24 @@ pub fn tabs(
     });
 
     let clip = Rect::from_min_max(
-        pos2(bar_rect.left(), bar_rect.top() - TAB_H - 2.0),
-        bar_rect.max,
+        pos2(bar_rect.left() - 2.0, bar_rect.top() - TAB_H - 2.0),
+        bar_rect.max + vec2(2.0, 2.0),
     );
 
     let painter = ui.painter().with_clip_rect(clip);
 
-    let bg = current_theme.components.panel.bg.to_color();
-    let stc = current_theme.components.panel.border.to_color();
+    let bg = palette.bg_panel;
+    let stc = palette.border_panel;
 
     match visible_tab {
         Some(tab) => {
-            draw_tab_merged(&painter, bar_rect, tab, bg, Stroke::new(0.5, stc));
+            draw_tab_merged(
+                &painter,
+                bar_rect,
+                tab,
+                bg,
+                Stroke::new(current_theme.global.panel_stroke_width, stc),
+            );
 
             let resp = ui.interact(tab, ui.id().with("active_label"), Sense::all());
 
@@ -325,7 +281,6 @@ pub fn tabs(
 
             render_label(
                 ui,
-                ui_state,
                 state,
                 label,
                 (tab_count, active_tab_index),
@@ -335,7 +290,12 @@ pub fn tabs(
             );
         }
         None => {
-            draw_tab_bar(&painter, bar_rect, bg, Stroke::new(0.5, stc));
+            draw_tab_bar(
+                &painter,
+                bar_rect,
+                bg,
+                Stroke::new(current_theme.global.panel_stroke_width, stc),
+            );
         }
     }
 

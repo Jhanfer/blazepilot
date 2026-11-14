@@ -16,6 +16,7 @@ use crate::core::system::disk_reader::disk::Disk;
 use crate::core::system::disk_reader::disk_manager::DiskManager;
 use libc::statvfs64;
 use std::collections::HashMap;
+use std::num::NonZeroUsize;
 use std::sync::Arc;
 use std::{ffi::CString, path::PathBuf};
 use tokio::sync::Mutex as TokioMutex;
@@ -23,8 +24,8 @@ use tokio_stream::StreamExt;
 use tracing::{debug, info, warn};
 use udisks2::{Client, block::BlockProxy, filesystem::FilesystemProxy};
 use uzers::{get_current_gid, get_current_uid};
-use zbus::zvariant::{ObjectPath, Value};
 use zbus::{Connection, MatchRule, MessageStream};
+use zbus::{ObjectPath, Variant};
 
 pub struct LinuxDisks {
     partitions: Vec<Disk>,
@@ -268,12 +269,12 @@ impl LinuxDisks {
         let object = self.client.object(block_path)?;
         let fs: FilesystemProxy = object.filesystem().await?;
 
-        let mut options: HashMap<&str, Value<'_>> = HashMap::new();
+        let mut options: HashMap<&str, Variant<'_>> = HashMap::new();
 
-        options.insert("fstype", Value::from("auto"));
+        options.insert("fstype", Variant::from("auto"));
         options.insert(
             "options",
-            Value::Str(format!("uid={},gid={}", uid, gid).into()),
+            Variant::Str(format!("uid={},gid={}", uid, gid).into()),
         );
 
         let mount_point = fs.mount(options).await?;
@@ -297,7 +298,7 @@ impl LinuxDisks {
         let fs: FilesystemProxy = object.filesystem().await?;
 
         let mut unmount_options = HashMap::new();
-        unmount_options.insert("force", Value::Bool(true));
+        unmount_options.insert("force", Variant::Bool(true));
 
         fs.unmount(unmount_options).await?;
 
@@ -327,7 +328,7 @@ impl LinuxDisks {
 
         let mut options = HashMap::new();
 
-        options.insert("auth.no_user_interaction", Value::Bool(true));
+        options.insert("auth.no_user_interaction", Variant::Bool(true));
 
         drive.eject(options).await?;
 
@@ -345,22 +346,23 @@ impl LinuxDisks {
 
         let rule_added = MatchRule::builder()
             .msg_type(zbus::message::Type::Signal)
-            .sender("org.freedesktop.UDisks2")?
-            .interface("org.freedesktop.DBus.ObjectManager")?
-            .member("InterfacesAdded")?
-            .build();
+            .sender("org.freedesktop.UDisks2")
+            .interface("org.freedesktop.DBus.ObjectManager")
+            .member("InterfacesAdded")
+            .build()?;
 
         let rule_removed = MatchRule::builder()
             .msg_type(zbus::message::Type::Signal)
-            .sender("org.freedesktop.UDisks2")?
-            .interface("org.freedesktop.DBus.ObjectManager")?
-            .member("InterfacesRemoved")?
-            .build();
+            .sender("org.freedesktop.UDisks2")
+            .interface("org.freedesktop.DBus.ObjectManager")
+            .member("InterfacesRemoved")
+            .build()?;
 
-        let mut stream_added = MessageStream::for_match_rule(rule_added, &conn, Some(32)).await?;
+        let mut stream_added =
+            MessageStream::for_match_rule(rule_added, &conn, NonZeroUsize::new(32)).await?;
 
         let mut stream_removed =
-            MessageStream::for_match_rule(rule_removed, &conn, Some(32)).await?;
+            MessageStream::for_match_rule(rule_removed, &conn, NonZeroUsize::new(32)).await?;
 
         tokio::spawn(async move {
             loop {

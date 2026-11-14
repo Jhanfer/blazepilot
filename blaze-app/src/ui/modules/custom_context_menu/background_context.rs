@@ -1,6 +1,6 @@
 use std::{cell::Cell, path::PathBuf, sync::Arc};
 
-use egui::{Color32, FontId, Id, Rect, Sense, Ui, UiBuilder, pos2, vec2};
+use egui::{Id, Ui};
 use tracing::warn;
 
 use crate::{
@@ -10,25 +10,14 @@ use crate::{
         files::blaze_motor::motor_structs::FileEntry,
         runtime::bus_structs::{FileOperation, SureTo, UiEvent},
     },
-    ui::{
-        blaze_ui_state::BlazeUiState,
-        custom_components::text_edit::BlazeTextEdit,
-        icons_cache::icons,
-        modules::utilities::ensure_min_lightness,
-        themes::{platform::structs::ToColor, theme_manager::with_theme},
-    },
+    ui::{custom_components::UiExt, icons_cache::icons, themes::theme_manager::with_theme},
 };
 
 use crate::ui::modules::custom_context_menu::context_state::ContextMenuState;
 
 impl ContextMenuState {
     //Menús del fondo
-    pub fn background_context_menu_in_trash(
-        &mut self,
-        ui: &mut Ui,
-        state: &mut BlazeCoreState,
-        ui_state: &mut BlazeUiState,
-    ) {
+    pub fn background_context_menu_in_trash(&mut self, ui: &mut Ui, state: &mut BlazeCoreState) {
         let i18n = with_configs(|c| c.get_i18n());
 
         if !self.open {
@@ -69,7 +58,6 @@ impl ContextMenuState {
 
                 Self::render_context_button(
                     ui,
-                    ui_state,
                     &label,
                     hint,
                     icon,
@@ -77,7 +65,7 @@ impl ContextMenuState {
                     || {
                         action.set(Some(0));
                     },
-                    None::<fn(&mut Ui, &mut BlazeUiState)>,
+                    None::<fn(&mut Ui)>,
                 );
 
                 if let Some(0) = action.get() {
@@ -100,7 +88,6 @@ impl ContextMenuState {
 
                 Self::render_context_button(
                     ui,
-                    ui_state,
                     &label,
                     hint,
                     icon,
@@ -108,7 +95,7 @@ impl ContextMenuState {
                     || {
                         action.set(Some(0));
                     },
-                    None::<fn(&mut Ui, &mut BlazeUiState)>,
+                    None::<fn(&mut Ui)>,
                 );
 
                 if let Some(0) = action.get() {
@@ -124,86 +111,60 @@ impl ContextMenuState {
         });
     }
 
-    pub fn background_context_menu(
-        &mut self,
-        ui: &mut Ui,
-        state: &mut BlazeCoreState,
-        ui_state: &mut BlazeUiState,
-    ) {
+    pub fn background_context_menu(&mut self, ui: &mut Ui, state: &mut BlazeCoreState) {
         let i18n = with_configs(|c| c.get_i18n());
         let current_theme = with_theme(|f| f.current());
+        let palette = current_theme.context_menu.palette(&current_theme.global);
 
         if !self.open {
             return;
         }
 
         let mut should_close = false;
-        let mut just_opened = Cell::new(self.just_opened);
         self.show_menu(ui, "custom_ctx_menu_background", |ui| {
-            ui.horizontal(|ui| {
-                let icon = ("search", icons::ICON_ZOOM);
-                let icon_size = vec2(16.0, 16.0);
-                let padding = 8.0;
+            let w = ui.available_width();
+            let search_id = Id::new("search_ctx_menu");
+            let has_focus = ui.memory(|mem| mem.has_focus(search_id));
 
-                let (rect, _) =
-                    ui.allocate_exact_size(vec2(ui.available_width() - 2.0, 30.0), Sense::hover());
+            let search_color = if has_focus {
+                palette.border_focus
+            } else {
+                palette.border_component
+            };
 
-                let search_id = Id::new("search_ctx_menu");
-                let has_focus = ui.memory(|mem| mem.has_focus(search_id));
+            let (icon_name, icon_bytes) = ("search", icons::ICON_SEARCH);
 
-                let search_color = if has_focus {
-                    ensure_min_lightness(current_theme.components.input.border_focus.to_color())
+            let mut search = state.current_search_filter().to_string();
+
+            let response = ui
+                .blaze_input(&i18n.t("search.placeholder"), None, &mut search)
+                .id(search_id)
+                .hint_background_color(palette.accent_soft)
+                .hint_stroke_color(palette.accent_text)
+                .hint_text_color(palette.accent_text)
+                .size((w, 30.0))
+                .radius(20)
+                .text_color(palette.fg_primary)
+                .background_color(palette.bg_elevated)
+                .stroke_color(search_color)
+                .x_color(palette.accent_text)
+                .icon(icon_name, icon_bytes)
+                .icon_color(if has_focus {
+                    palette.accent_text
                 } else {
-                    ensure_min_lightness(current_theme.components.input.border_idle.to_color())
-                };
+                    palette.icon_secondary
+                })
+                .stroke_width(current_theme.global.components_stroke_width)
+                .show(|| {
+                    state.clean_search();
+                });
 
-                let paint_rect = rect.shrink2(vec2(4.0, 0.0));
-                ui.painter().rect_filled(
-                    paint_rect,
-                    12.0,
-                    current_theme.components.input.bg.to_color(),
-                );
+            if response.changed() {
+                state.set_search(search);
+                response.request_focus();
+            }
 
-                let icon_pos = rect.left_top() + vec2(padding, (rect.height() - icon_size.y) / 2.0);
-                let icon_rect = Rect::from_min_size(icon_pos, icon_size);
-
-                let rounded_rect = Rect::from_min_max(
-                    pos2(icon_rect.min.x.round(), icon_rect.min.y.round()),
-                    pos2(icon_rect.max.x.round(), icon_rect.max.y.round()),
-                );
-
-                let icon =
-                    ui_state
-                        .icon_cache
-                        .get_or_load(ui, icon.0, icon.1, search_color, icon_size);
-
-                ui.painter().image(
-                    icon.id(),
-                    rounded_rect,
-                    Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
-                    Color32::WHITE,
-                );
-
-                let text_rect = Rect::from_min_max(
-                    pos2(rounded_rect.right() + 6.0, rect.min.y + 4.0),
-                    pos2(rect.max.x - padding, rect.max.y - 4.0),
-                );
-
-                let mut child_ui = ui.new_child(UiBuilder::new().max_rect(text_rect));
-
-                let text_edit = BlazeTextEdit::singleline(&mut state.search_filter)
-                    .id(search_id)
-                    .hint_text(i18n.t("search.placeholder"))
-                    .font(FontId::proportional(13.0))
-                    .desired_width(text_rect.width());
-
-                let te_response = child_ui.add(text_edit);
-
-                if te_response.clicked() {
-                    te_response.request_focus();
-                    just_opened = true.into();
-                }
-            });
+            ui.add_space(5.0);
 
             ui.horizontal(|ui| {
                 let icon = ("tab-icon", icons::ICON_TAB_ICON);
@@ -215,7 +176,6 @@ impl ContextMenuState {
 
                 Self::render_context_button(
                     ui,
-                    ui_state,
                     &label,
                     hint,
                     icon,
@@ -223,7 +183,7 @@ impl ContextMenuState {
                     || {
                         action.set(Some(0));
                     },
-                    None::<fn(&mut Ui, &mut BlazeUiState)>,
+                    None::<fn(&mut Ui)>,
                 );
 
                 if let Some(0) = action.get() {
@@ -256,7 +216,6 @@ impl ContextMenuState {
 
                 Self::render_context_button(
                     ui,
-                    ui_state,
                     &label,
                     hint,
                     icon,
@@ -264,7 +223,7 @@ impl ContextMenuState {
                     || {
                         action.set(Some(0));
                     },
-                    None::<fn(&mut Ui, &mut BlazeUiState)>,
+                    None::<fn(&mut Ui)>,
                 );
 
                 if let Some(0) = action.get() {
@@ -286,7 +245,6 @@ impl ContextMenuState {
 
                 Self::render_context_button(
                     ui,
-                    ui_state,
                     &label,
                     hint,
                     icon,
@@ -294,7 +252,7 @@ impl ContextMenuState {
                     || {
                         action.set(Some(0));
                     },
-                    None::<fn(&mut Ui, &mut BlazeUiState)>,
+                    None::<fn(&mut Ui)>,
                 );
 
                 if let Some(0) = action.get() {
@@ -314,7 +272,6 @@ impl ContextMenuState {
 
                 Self::render_context_button(
                     ui,
-                    ui_state,
                     &label,
                     hint,
                     icon,
@@ -322,7 +279,7 @@ impl ContextMenuState {
                     || {
                         action.set(Some(0));
                     },
-                    None::<fn(&mut Ui, &mut BlazeUiState)>,
+                    None::<fn(&mut Ui)>,
                 );
 
                 if let Some(0) = action.get() {
@@ -342,7 +299,6 @@ impl ContextMenuState {
 
                 Self::render_context_button(
                     ui,
-                    ui_state,
                     &label,
                     hint,
                     icon,
@@ -350,7 +306,7 @@ impl ContextMenuState {
                     || {
                         action.set(Some(0));
                     },
-                    None::<fn(&mut Ui, &mut BlazeUiState)>,
+                    None::<fn(&mut Ui)>,
                 );
 
                 if let Some(0) = action.get() {
@@ -364,7 +320,5 @@ impl ContextMenuState {
         if should_close {
             self.close();
         }
-
-        self.just_opened = just_opened.get();
     }
 }

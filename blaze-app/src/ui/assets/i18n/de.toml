@@ -1,7 +1,3 @@
-[app]
-title = "BlazePilot"
-loading = "Wird geladen..."
-
 [left_sidebar]
 root = "Wurzel"
 locals = "Lokal"
@@ -13,8 +9,9 @@ pictures = "Bilder"
 videos = "Videos"
 music = "Musik"
 public = "Öffentlich"
-trash = "Papierkorb" 
+trash = "Papierkorb"
 disks = "Laufwerke"
+used_percent = "Belegt: {query} %"
 
 [right_sidebar]
 info = "Informationen"
@@ -25,11 +22,15 @@ owner = "Besitzer:"
 group_name = "Gruppenname:"
 dimensions = "Abmessungen:"
 git_status = "Git-Status:"
+modified = "Geändert:"
+folder = "Ordner"
+
+[route]
+placeholder = "Pfad eingeben"
 
 [search]
 placeholder = "Suchen"
 no_results = "Keine Ergebnisse für \"{query}\""
-searching = "Suche läuft..."
 
 [bg_ctx_menu]
 new_tab = "Neuer Tab"
@@ -49,7 +50,6 @@ add_to_tag = "Zum Tag hinzufügen"
 [file_ops]
 copy = "Kopieren"
 cut = "Ausschneiden"
-paste = "Einfügen"
 paste_here = "Hier einfügen"
 extract_here = "Hier extrahieren"
 folder_color = "Ordnerfarbe"
@@ -57,12 +57,19 @@ rename = "Umbenennen"
 restore = "Wiederherstellen"
 move_to_trash = "In den Papierkorb verschieben"
 delete = "Löschen"
-delete_confirm = "{count} Datei(en) löschen?"
 
 [tools]
 name = "Name"
 modified = "Geändert"
 size = "Größe"
+extension = "Erweiterung"
+created = "Erstellt"
+accessed = "Zugegriffen"
+owner = "Besitzer"
+group = "Gruppe"
+permissions = "Berechtigungen"
+dimensions = "Abmessungen"
+symlink = "Linkziel"
 
 [tags_quick]
 new = "Neu"
@@ -104,7 +111,6 @@ language = "Sprache"
 gratitude = "Danke, dass du BlazePilot verwendest!"
 made_for = "Mit ❤ von Jhanfer erstellt. :D"
 report = "Fehler melden"
-sys_info = "Systeminformationen"
 disclaimer = "Die Einstellungen sind derzeit begrenzt. Wir arbeiten noch daran."
 
 [configs_terminal]
@@ -117,10 +123,7 @@ max_retries_error = "❌ Nach mehreren Versuchen konnte kein Terminal gefunden w
 verify_terminals_message = "Bitte überprüfen Sie, ob mindestens ein Terminal installiert ist."
 suggestion_message = "💡 Tipp: Installieren Sie ein Terminal wie gnome-terminal, konsole oder alacritty"
 retry = "Erneut versuchen"
-max_retries = 3
-timeout_seconds = 5
 combo_box_label = "Standard-Terminal"
-
 
 [configs_backend]
 title = "Anzeigeprotokoll"
@@ -133,48 +136,22 @@ X11: Größere Kompatibilität mit älteren Apps. Ermöglicht Drag & Drop aus an
 """
 disclaimer = "Diese Änderungen erfordern einen Neustart der App."
 
-
 [configs_appearance]
 title = "Aussehen ändern"
-reload_theme = "Design neu laden"
 selection = "Wähle ein Design"
+reload_theme = "Design neu laden"
 message = "Du kannst jedes Design in ~/.config/blazepilotapp/themes anpassen"
-
 color_editor = "Farbeditor"
-
-states = "Zustände"
+section_global = "Global"
+main_bg = "Haupthintergrund"
+rubberband = "Auswahlrahmen"
+primary_text = "Haupttext"
+secondary_text = "Nebentext"
 error = "Fehler"
 success = "Erfolg"
 warn = "Warnung"
-
-background = "Hintergründe"
-main_bg = "Haupthintergrund"
-panel_bg = "Panel-Hintergrund"
-container_bg = "Container-Hintergrund"
-hover_bg = "Hover-Hintergrund"
-
-border-buttons = "Rahmen und Schaltflächen"
-border_panel = "Panel-Rahmen"
-main_buttons = "Hauptschaltflächen"
-
-accent = "Akzente"
-accent_glow = "Akzent-Leuchten"
-rubberband = "Auswahlrahmen"
-selected_item = "Ausgewähltes Element"
-
-texts = "Texte"
-primary_text = "Haupttext"
-secondary_text = "Nebentext"
-muted_text = "Blasser Text"
-
-tools = "Werkzeuge"
-primary-tool-color = "Primäre Werkzeugfarbe"
-secondary-tool-color = "Sekundäre Werkzeugfarbe"
-tool-btn-active = "Aktiver Werkzeugknopf"
-tool-btn-inactive = "Inaktiver Werkzeugknopf"
-tool-btn-hovered = "Werkzeugknopf beim Hover"
-
-files = "Dateien"
+stroke_width = "Rahmenstärke"
+files = "Dateisymbole"
 folder = "Ordner"
 image = "Bild"
 pdf = "PDF"
@@ -186,35 +163,24 @@ code = "Code"
 font = "Schriftart"
 exe = "Ausführbare Datei"
 fallback = "Standard"
-
+section_sidebar_left = "Linke Seitenleiste"
+section_top_bar = "Obere Leiste"
+section_main_area = "Hauptbereich"
+section_sidebar_right = "Rechte Seitenleiste"
+section_context_menu = "Kontextmenü"
+section_dialogs = "Dialoge"
+panel_bg = "Panel-Hintergrund"
+bg_elevated = "Erhöhter Hintergrund"
+hover_bg = "Hover-Hintergrund"
+bg_active = "Aktiver Hintergrund"
+icon_primary = "Primäres Symbol"
+icon_secondary = "Sekundäres Symbol"
+accent = "Akzent"
+panel_border = "Panel-Rand"
+component_border = "Komponentenrand"
 theme-name = "Designname"
 save-as-custom = "Als benutzerdefiniertes Design speichern"
 reset-defaults = "Auf Standardwerte zurücksetzen"
-separator = "Trennlinie"
-panels = "Paneele"
-panel_border = "Panel-Rand"
-buttons = "Schaltflächen"
-button_bg = "Schaltflächen-Hintergrund"
-button_hover = "Schaltflächen-Hintergrund (Hover)"
-button_label_hover = "Schaltflächen-Text (Hover)"
-button_label_active = "Schaltflächen-Text (Aktiv)"
-button_label_inactive = "Schaltflächen-Text (Inaktiv)"
-input = "Eingabefeld"
-input_bg = "Hintergrund des Eingabefelds"
-input_border_idle = "Rand des Eingabefelds (Ruhezustand)"
-input_border_focus = "Rand des Eingabefelds (Fokus)"
-sidebar = "Seitenleiste"
-sidebar_hover = "Hintergrund der Seitenleiste (Hover)"
-file_list = "Dateiliste"
-list_hover = "Listen-Hintergrund (Hover)"
-list_selected = "Listen-Hintergrund (Ausgewählt)"
-tools_bg = "Werkzeug-Hintergrund"
-tools_label_hover = "Werkzeug-Text (Hover)"
-tools_label_active = "Werkzeug-Text (Aktiv)"
-tools_label_inactive = "Werkzeug-Text (Inaktiv)"
-
-[configs_behavior]
-title = "In Arbeit :D"
 
 [configs_language]
 title = "Sprache ändern"
@@ -275,7 +241,7 @@ title_img = "Bild-URL"
 message_web = "Möchten Sie die Seite im Browser öffnen?"
 message_url = "Möchten Sie das Bild herunterladen?"
 
-[want_to_donwload_dialog]  
+[want_to_donwload_dialog]
 title = "Möchten Sie die App installieren?"
 message = "Dies erstellt eine '.desktop'-Datei"
 hint = "Sie können später über die Einstellungen installieren"
@@ -289,6 +255,7 @@ title = "Neue Version verfügbar!"
 message = "Es gibt ein Update für Blazepilot."
 current_version = "Aktuelle Version: \"{query}\""
 new_version = "Möchten Sie auf Version \"{query}\" aktualisieren?"
+changelog = "Änderungsprotokoll"
 
 [move_to_dialog]
 title = "Verschieben..."
@@ -300,7 +267,6 @@ to = "nach {query}"
 
 [sure_to_delete_dialog]
 title = "Möchten Sie endgültig löschen?"
-file = "Datei"
 file_dot = "• {query}"
 and_more = "... und {query} weitere Dateien"
 

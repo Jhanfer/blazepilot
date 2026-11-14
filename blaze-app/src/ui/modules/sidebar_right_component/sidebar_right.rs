@@ -18,33 +18,49 @@ use crate::core::bootstrap::configs::platform::linux::conf_structs::{
     OrderingDirection, OrderingKind, OrderingMode,
 };
 use crate::ui::blaze_ui_state::BlazeUiState;
-use crate::ui::custom_components::text_edit::BlazeTextEdit;
+use crate::ui::custom_components::UiExt;
 use crate::ui::icons_cache::icons;
 use crate::ui::modules::sidebar_right_component::components::animated_section::render_animated_section;
 use crate::ui::modules::sidebar_right_component::components::clipboard_manager::render_clipboard_menu;
 use crate::ui::modules::sidebar_right_component::rightbar_state::{
     MIN_PANEL_WIDTH_TOLERANCE, PANEL_TAB_WIDTH,
 };
-use crate::ui::modules::sidebar_right_component::sidebar_components::render_ordering_btn;
-use crate::ui::modules::utilities::ensure_min_lightness;
-use crate::ui::themes::platform::structs::ToColor;
+use crate::ui::themes::platform::structs::BlazeAppTheme;
 use crate::ui::themes::theme_manager::with_theme;
 use egui::{
-    Align, Area, Button, Color32, CornerRadius, FontId, Frame, Id, Layout, Margin, Panel, Rect,
-    Sense, Stroke, StrokeKind, Ui, pos2, vec2,
+    Align, Area, Color32, CornerRadius, Frame, Id, Layout, Margin, Panel, Rect, Sense, Stroke, Ui,
+    Vec2, pos2,
 };
 use std::sync::Arc;
+
+fn get_sort_icon(kind: OrderingKind, current_order: OrderingMode) -> (&'static str, &'static [u8]) {
+    match kind {
+        OrderingKind::Name => match current_order.direction {
+            OrderingDirection::Asc => ("alphabet-asc", icons::ICON_SORT_LETTERS_UP),
+            OrderingDirection::Desc => ("alphabet-desc", icons::ICON_SORT_LETTERS_DOWN),
+        },
+        OrderingKind::Size => match current_order.direction {
+            OrderingDirection::Asc => ("size-asc", icons::ICON_SORT_SHAPES_UP),
+            OrderingDirection::Desc => ("size-desc", icons::ICON_SORT_SHAPES_DOWN),
+        },
+        OrderingKind::Date => match current_order.direction {
+            OrderingDirection::Asc => ("date-asc", icons::ICON_CALENDAR_UP),
+            OrderingDirection::Desc => ("date-desc", icons::ICON_CALENDAR_DOWN),
+        },
+    }
+}
 
 fn render_expanded_panel(
     ui: &mut Ui,
     state: &mut BlazeCoreState,
     ui_state: &mut BlazeUiState,
-    current_theme: Arc<crate::ui::themes::platform::structs::NewTheme>,
+    current_theme: Arc<BlazeAppTheme>,
     current_order: OrderingMode,
 ) {
     let i18n = with_configs(|c| c.get_i18n());
+    let palette = current_theme.sidebar_right.palette(&current_theme.global);
     let custom_frame = Frame::NONE
-        .fill(current_theme.semantic.bg_main.to_color())
+        .fill(current_theme.global.bg_main())
         .inner_margin(Margin {
             left: 0,
             right: 15,
@@ -66,160 +82,68 @@ fn render_expanded_panel(
         .show(ui, |ui| {
             inner_width = ui.available_width();
 
-            let search_id = Id::new("search_bar");
+            let search_id: Id = Id::new("search_bar");
             let has_focus = ui.memory(|mem| mem.has_focus(search_id));
-
-            let search_color = if has_focus {
-                ensure_min_lightness(current_theme.components.input.border_focus.to_color())
-            } else {
-                current_theme.components.panel.border.to_color()
-            };
-
             Frame::NONE
                 .inner_margin(Margin::same(10))
-                .fill(current_theme.components.panel.bg.to_color())
+                .fill(palette.bg_panel)
                 .corner_radius(CornerRadius::same(20))
-                .stroke(Stroke {
-                    width: 0.5,
-                    color: current_theme.components.panel.border.to_color(),
-                })
+                .stroke(Stroke::new(
+                    current_theme.global.panel_stroke_width,
+                    palette.border_panel,
+                ))
                 .show(ui, |ui| {
-                    Frame::NONE
-                        .fill(current_theme.components.input.bg.to_color())
-                        .stroke(Stroke::new(0.5, search_color))
-                        .corner_radius(CornerRadius::same(99))
-                        .inner_margin(Margin::symmetric(10, 6))
-                        .show(ui, |ui| {
-                            ui.horizontal(|ui| {
-                                let icon_size = vec2(14.0, 14.0);
-                                let (icon_rect, _) =
-                                    ui.allocate_exact_size(icon_size, Sense::hover());
-                                let (icon_name, icon_bytes) = ("search", icons::ICON_SEARCH);
-                                let rounded_rect = Rect::from_min_max(
-                                    pos2(icon_rect.min.x.round(), icon_rect.min.y.round()),
-                                    pos2(icon_rect.max.x.round(), icon_rect.max.y.round()),
-                                );
+                    let search_color = if has_focus {
+                        palette.border_focus
+                    } else {
+                        palette.border_component
+                    };
 
-                                let search_color = if has_focus {
-                                    ensure_min_lightness(
-                                        current_theme.components.input.border_focus.to_color(),
-                                    )
-                                } else {
-                                    ensure_min_lightness(
-                                        current_theme.components.input.border_idle.to_color(),
-                                    )
-                                };
+                    let (icon_name, icon_bytes) = ("search", icons::ICON_SEARCH);
 
-                                let icon = ui_state.icon_cache.get_or_load(
-                                    ui,
-                                    icon_name,
-                                    icon_bytes,
-                                    search_color,
-                                    icon_size,
-                                );
+                    let mut search = state.current_search_filter().to_string();
 
-                                ui.painter().image(
-                                    icon.id(),
-                                    rounded_rect,
-                                    Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
-                                    Color32::WHITE,
-                                );
-
-                                let mut search = state.current_search_filter().to_string();
-
-                                let response = ui.add(
-                                    BlazeTextEdit::singleline(&mut search)
-                                        .hint_text(i18n.t("search.placeholder"))
-                                        .desired_width(100.0)
-                                        .id(search_id),
-                                );
-
-                                if response.changed() {
-                                    state.set_search(search);
-                                    response.request_focus();
-                                }
-
-                                let extra_right_pad = 8.0;
-                                let trailing_size = vec2(28.0, 20.0);
-                                let (alloc_rect, _) =
-                                    ui.allocate_exact_size(trailing_size, Sense::hover());
-
-                                if !has_focus {
-                                    let hint = "Ctrl + K";
-
-                                    let c = current_theme.semantic.accent_glow.to_color();
-
-                                    let hint_stroke_color = Color32::from_rgba_unmultiplied(
-                                        c.r().saturating_add(20),
-                                        c.g().saturating_add(20),
-                                        c.b().saturating_add(20),
-                                        120,
-                                    );
-
-                                    let hint_color = Color32::from_rgba_unmultiplied(
-                                        c.r().saturating_add(60),
-                                        c.g().saturating_add(60),
-                                        c.b().saturating_add(60),
-                                        160,
-                                    );
-
-                                    let hint_galley = ui.painter().layout_no_wrap(
-                                        hint.to_string(),
-                                        FontId::proportional(10.0),
-                                        ensure_min_lightness(hint_color),
-                                    );
-
-                                    let pad = vec2(8.0, 2.0);
-                                    let hint_size = hint_galley.size();
-                                    let badge_size = hint_size + pad * 2.0;
-
-                                    let trailing_rect =
-                                        alloc_rect.translate(vec2(-extra_right_pad, 0.0));
-
-                                    let hint_pos = pos2(
-                                        trailing_rect.center().x - hint_size.x / 2.0,
-                                        trailing_rect.center().y - hint_size.y / 2.0,
-                                    );
-                                    let hint_rect =
-                                        Rect::from_center_size(trailing_rect.center(), badge_size);
-
-                                    ui.painter().rect(
-                                        hint_rect,
-                                        3.0,
-                                        current_theme.semantic.bg_container.to_color(),
-                                        Stroke::new(1.0, hint_stroke_color),
-                                        StrokeKind::Outside,
-                                    );
-
-                                    ui.painter().galley(hint_pos, hint_galley, hint_color);
-                                } else {
-                                    let btn = ui.put(alloc_rect, Button::new("X").small());
-                                    if btn.clicked() && !state.is_filter_empty() {
-                                        ui.memory_mut(|m| m.request_focus(search_id));
-                                        state.clean_search();
-                                    }
-                                }
-                            });
+                    let response = ui
+                        .blaze_input(&i18n.t("search.placeholder"), Some("Ctrl + K"), &mut search)
+                        .id(search_id)
+                        .hint_background_color(palette.accent_soft)
+                        .hint_stroke_color(palette.accent_text)
+                        .hint_text_color(palette.accent_text)
+                        .size((200.0, 30.0))
+                        .radius(20)
+                        .text_color(palette.fg_primary)
+                        .background_color(palette.bg_elevated)
+                        .stroke_color(search_color)
+                        .x_color(palette.accent_text)
+                        .icon(icon_name, icon_bytes)
+                        .icon_color(if has_focus {
+                            palette.accent_text
+                        } else {
+                            palette.icon_secondary
+                        })
+                        .stroke_width(current_theme.global.components_stroke_width)
+                        .show(|| {
+                            state.clean_search();
                         });
+
+                    if response.changed() {
+                        state.set_search(search);
+                        response.request_focus();
+                    }
 
                     ui.add_space(5.0);
 
                     let frame_width = 110.0;
                     ui.with_layout(Layout::top_down(Align::Center), |ui| {
                         Frame::NONE
-                            .fill(current_theme.components.sidebar_item.bg_hover.to_color())
-                            .stroke(Stroke::new(
-                                0.5,
-                                current_theme.components.panel.border.to_color(),
-                            ))
-                            .corner_radius(CornerRadius::same(99))
+                            .fill(Color32::TRANSPARENT)
                             .inner_margin(Margin::symmetric(10, 6))
                             .show(ui, |ui| {
                                 ui.set_max_height(25.0);
                                 ui.set_width(frame_width);
 
                                 ui.horizontal_centered(|ui| {
-                                    let icon_size_f = 18.0;
+                                    let icon_size_f = 20.0;
                                     let button_count = 3;
                                     let available = frame_width - 20.0;
                                     let total_buttons = icon_size_f * button_count as f32;
@@ -228,133 +152,72 @@ fn render_expanded_panel(
 
                                     ui.add_space(spacing);
 
-                                    let mut current_ordering =
-                                        with_configs(|c| c.get_ordering_mode());
-
+                                    let mut c_mode = with_configs(|c| c.get_ordering_mode());
                                     let mut needs_update = false;
 
-                                    render_ordering_btn(
-                                        ui,
-                                        ui_state,
-                                        (
-                                            "alphabet",
-                                            icons::ICON_SORT_LETTERS_UP,
-                                            icons::ICON_SORT_LETTERS_DOWN,
-                                        ),
-                                        current_ordering,
-                                        || {
-                                            current_ordering = match (
-                                                current_ordering.kind,
-                                                current_ordering.direction,
-                                            ) {
-                                                (OrderingKind::Name, OrderingDirection::Asc) => {
-                                                    OrderingMode {
-                                                        kind: OrderingKind::Name,
-                                                        direction: OrderingDirection::Desc,
-                                                        ..current_ordering
-                                                    }
-                                                }
-                                                (OrderingKind::Name, OrderingDirection::Desc) => {
-                                                    OrderingMode {
-                                                        kind: OrderingKind::Name,
-                                                        direction: OrderingDirection::Asc,
-                                                        ..current_ordering
-                                                    }
-                                                }
-                                                _ => OrderingMode {
-                                                    kind: OrderingKind::Name,
-                                                    direction: OrderingDirection::Asc,
-                                                    ..current_ordering
-                                                },
-                                            };
-                                            needs_update = true;
-                                        },
-                                    );
+                                    let (i, b) = get_sort_icon(OrderingKind::Name, c_mode);
+                                    if ui
+                                        .blaze_button("")
+                                        .id(i.to_string())
+                                        .size(Vec2::splat(icon_size_f))
+                                        .icon(i, b)
+                                        .icon_size(icon_size_f)
+                                        .background_color(Color32::TRANSPARENT)
+                                        .hover_background_color(Color32::TRANSPARENT)
+                                        .stroke_color(Color32::TRANSPARENT)
+                                        .icon_color(palette.icon_primary)
+                                        .hover_icon_color(palette.icon_hover)
+                                        .show()
+                                        .clicked()
+                                    {
+                                        c_mode = c_mode.toggle(OrderingKind::Name);
+                                        needs_update = true;
+                                    }
 
                                     ui.add_space(spacing);
 
-                                    render_ordering_btn(
-                                        ui,
-                                        ui_state,
-                                        (
-                                            "size",
-                                            icons::ICON_SORT_SHAPES_UP,
-                                            icons::ICON_SORT_SHAPES_DOWN,
-                                        ),
-                                        current_ordering,
-                                        || {
-                                            current_ordering = match (
-                                                current_ordering.kind,
-                                                current_ordering.direction,
-                                            ) {
-                                                (OrderingKind::Size, OrderingDirection::Asc) => {
-                                                    OrderingMode {
-                                                        kind: OrderingKind::Size,
-                                                        direction: OrderingDirection::Desc,
-                                                        ..current_ordering
-                                                    }
-                                                }
-                                                (OrderingKind::Size, OrderingDirection::Desc) => {
-                                                    OrderingMode {
-                                                        kind: OrderingKind::Size,
-                                                        direction: OrderingDirection::Asc,
-                                                        ..current_ordering
-                                                    }
-                                                }
-                                                _ => OrderingMode {
-                                                    kind: OrderingKind::Size,
-                                                    direction: OrderingDirection::Asc,
-                                                    ..current_ordering
-                                                },
-                                            };
-                                            needs_update = true;
-                                        },
-                                    );
+                                    let (i, b) = get_sort_icon(OrderingKind::Size, c_mode);
+                                    if ui
+                                        .blaze_button("")
+                                        .id(i.to_string())
+                                        .size(Vec2::splat(icon_size_f))
+                                        .icon(i, b)
+                                        .icon_size(icon_size_f)
+                                        .background_color(Color32::TRANSPARENT)
+                                        .hover_background_color(Color32::TRANSPARENT)
+                                        .stroke_color(Color32::TRANSPARENT)
+                                        .icon_color(palette.icon_primary)
+                                        .hover_icon_color(palette.icon_hover)
+                                        .show()
+                                        .clicked()
+                                    {
+                                        c_mode = c_mode.toggle(OrderingKind::Size);
+                                        needs_update = true;
+                                    }
 
                                     ui.add_space(spacing);
 
-                                    render_ordering_btn(
-                                        ui,
-                                        ui_state,
-                                        (
-                                            "date",
-                                            icons::ICON_CALENDAR_UP,
-                                            icons::ICON_CALENDAR_DOWN,
-                                        ),
-                                        current_ordering,
-                                        || {
-                                            current_ordering = match (
-                                                current_ordering.kind,
-                                                current_ordering.direction,
-                                            ) {
-                                                (OrderingKind::Date, OrderingDirection::Asc) => {
-                                                    OrderingMode {
-                                                        kind: OrderingKind::Date,
-                                                        direction: OrderingDirection::Desc,
-                                                        ..current_ordering
-                                                    }
-                                                }
-                                                (OrderingKind::Date, OrderingDirection::Desc) => {
-                                                    OrderingMode {
-                                                        kind: OrderingKind::Date,
-                                                        direction: OrderingDirection::Asc,
-                                                        ..current_ordering
-                                                    }
-                                                }
-                                                _ => OrderingMode {
-                                                    kind: OrderingKind::Date,
-                                                    direction: OrderingDirection::Asc,
-                                                    ..current_ordering
-                                                },
-                                            };
-                                            needs_update = true;
-                                        },
-                                    );
-
-                                    ui.add_space(spacing);
+                                    let (i, b) = get_sort_icon(OrderingKind::Date, c_mode);
+                                    if ui
+                                        .blaze_button("")
+                                        .id(i.to_string())
+                                        .size(Vec2::splat(icon_size_f))
+                                        .icon(i, b)
+                                        .icon_size(icon_size_f)
+                                        .background_color(Color32::TRANSPARENT)
+                                        .hover_background_color(Color32::TRANSPARENT)
+                                        .stroke_color(Color32::TRANSPARENT)
+                                        .icon_color(palette.icon_primary)
+                                        .hover_icon_color(palette.icon_hover)
+                                        .show()
+                                        .clicked()
+                                    {
+                                        c_mode = c_mode.toggle(OrderingKind::Date);
+                                        needs_update = true;
+                                    }
 
                                     if needs_update {
-                                        with_configs(|c| c.set_ordering_mode(current_ordering));
+                                        with_configs(|c| c.set_ordering_mode(c_mode));
                                         state.refresh();
                                     }
                                 });
@@ -364,33 +227,46 @@ fn render_expanded_panel(
                     render_animated_section(ui, state, ui_state, current_theme.clone());
                 });
 
-            render_clipboard_menu(ui, state, ui_state, current_theme);
+            render_clipboard_menu(ui, state, ui_state, current_theme.clone());
         });
 
-    if inner_width < MIN_PANEL_WIDTH_TOLERANCE
-        && current_order.rightpanel_state.width >= MIN_PANEL_WIDTH_TOLERANCE
-    {
+    let stroke_total = 3.0 * current_theme.global.panel_stroke_width;
+
+    let min_width = MIN_PANEL_WIDTH_TOLERANCE + stroke_total;
+
+    let prev_width = current_order.rightpanel_state.width;
+    let was_open = prev_width >= min_width;
+    let is_growing = inner_width > prev_width;
+
+    if inner_width < min_width {
+        if was_open && !is_growing {
+            with_configs(|c| {
+                let mut o = c.get_ordering_mode();
+                o.rightpanel_state.collapsed = true;
+                c.set_ordering_mode(o);
+            });
+        } else if !was_open && is_growing {
+            with_configs(|c| {
+                let mut o = c.get_ordering_mode();
+                o.rightpanel_state.collapsed = false;
+                o.rightpanel_state.width = min_width;
+                c.set_ordering_mode(o);
+            });
+        }
+    } else {
         with_configs(|c| {
-            let mut current_ordering = c.get_ordering_mode();
-            current_ordering.rightpanel_state.collapsed = true;
-            c.set_ordering_mode(current_ordering);
-        });
-    } else if inner_width >= MIN_PANEL_WIDTH_TOLERANCE {
-        with_configs(|c| {
-            let mut current_ordering = c.get_ordering_mode();
-            current_ordering.rightpanel_state.width = inner_width;
-            c.set_ordering_mode(current_ordering);
+            let mut o = c.get_ordering_mode();
+            o.rightpanel_state.width = inner_width;
+            o.rightpanel_state.collapsed = false;
+            c.set_ordering_mode(o);
         });
     }
 }
 
-fn render_collapsed_tab(
-    ui: &mut Ui,
-    ui_state: &mut BlazeUiState,
-    current_theme: Arc<crate::ui::themes::platform::structs::NewTheme>,
-) {
+fn render_collapsed_tab(ui: &mut Ui, current_theme: Arc<BlazeAppTheme>) {
     let area_id = Id::new("right_tab");
     let hover_state_id = Id::new("right_tab_hover_state");
+    let palette = current_theme.sidebar_right.palette(&current_theme.global);
 
     let mut is_hovered = ui.data(|data| data.get_temp::<bool>(hover_state_id).unwrap_or(false));
 
@@ -413,10 +289,14 @@ fn render_collapsed_tab(
 
                     Frame::NONE
                         .inner_margin(Margin::same(10))
-                        .fill(current_theme.components.panel.bg.to_color())
+                        .fill(if is_hovered {
+                            palette.bg_hover
+                        } else {
+                            palette.bg_panel
+                        })
                         .stroke(Stroke::new(
-                            0.5,
-                            current_theme.components.panel.border.to_color(),
+                            current_theme.global.panel_stroke_width,
+                            palette.border_panel,
                         ))
                         .corner_radius(CornerRadius::same(20))
                         .show(ui, |ui| {
@@ -425,31 +305,19 @@ fn render_collapsed_tab(
 
                             let area_center = area_rect.center();
 
-                            let icon_size = 18.0;
+                            let icon_size = Vec2::splat(18.0);
 
-                            let t_icon_rect =
-                                Rect::from_center_size(area_center, vec2(icon_size, icon_size));
+                            let t_icon_rect = Rect::from_center_size(area_center, icon_size);
                             let (icon_n, icon_b) = ("right_sidebar", icons::ICON_SIDEBAR_RIGHT);
 
-                            let icon = ui_state.icon_cache.get_or_load(
-                                ui,
-                                icon_n,
-                                icon_b,
-                                Color32::GRAY,
-                                vec2(icon_size, icon_size),
-                            );
-
-                            let rounded_rect = Rect::from_min_max(
-                                pos2(t_icon_rect.min.x.round(), t_icon_rect.min.y.round()),
-                                pos2(t_icon_rect.max.x.round(), t_icon_rect.max.y.round()),
-                            );
-
-                            ui.painter().image(
-                                icon.id(),
-                                rounded_rect,
-                                Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
-                                Color32::WHITE,
-                            );
+                            ui.draw_icon((icon_n, icon_b))
+                                .size(icon_size)
+                                .tint(if is_hovered {
+                                    palette.icon_hover
+                                } else {
+                                    palette.icon_secondary
+                                })
+                                .show_at(t_icon_rect);
                         });
                 })
                 .response;
@@ -469,7 +337,6 @@ fn render_collapsed_tab(
                 ui.data_mut(|data| {
                     data.insert_temp(hover_state_id, is_hovered);
                 });
-                ui.request_repaint();
             }
         });
 }
@@ -483,7 +350,7 @@ pub fn sidebar_right_component(
     let current_order = with_configs(|c| c.get_ordering_mode());
 
     if current_order.rightpanel_state.collapsed {
-        render_collapsed_tab(ui, ui_state, current_theme);
+        render_collapsed_tab(ui, current_theme);
     } else {
         render_expanded_panel(ui, state, ui_state, current_theme, current_order);
     }

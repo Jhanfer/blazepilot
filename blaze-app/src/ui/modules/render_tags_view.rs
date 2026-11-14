@@ -12,7 +12,7 @@ use crate::{
     },
     ui::{
         blaze_ui_state::BlazeUiState,
-        custom_components::UiExt,
+        custom_components::{UiExt, panel_border::OpenSide},
         icons_cache::thumbnails::thumbnails_manager::Thumbnail,
         modules::{
             island_n_bubble::render_tags_island_bubble,
@@ -20,7 +20,7 @@ use crate::{
                 ensure_min_lightness, render_button, render_op_buttons, render_quicklink_icon,
             },
         },
-        themes::{platform::structs::ToColor, theme_manager::with_theme},
+        themes::theme_manager::with_theme,
     },
     utils::formating::{format_date, format_size},
 };
@@ -49,27 +49,23 @@ pub fn tag_views(
 
     let i18n = with_configs(|c| c.get_i18n());
 
-    Frame::NONE
+    let panel_radius = CornerRadius {
+        nw: 0,
+        ne: 0,
+        sw: 20,
+        se: 20,
+    };
+
+    let frame = Frame::NONE
         .inner_margin(Margin {
             left: 10,
             right: 10,
             top: 0,
             bottom: 10,
         })
-        .fill(current_theme.components.panel.bg.to_color())
-        .corner_radius(CornerRadius {
-            nw: 0,
-            ne: 0,
-            sw: 20,
-            se: 20,
-        })
-        .stroke(Stroke {
-            width: 0.5,
-            color: current_theme.semantic.accent_glow.to_color(),
-        })
+        .fill(current_theme.main_area.bg_panel())
+        .corner_radius(panel_radius)
         .show(ui, |ui| {
-            let current_theme = with_theme(|t| t.current());
-
             ScrollArea::vertical().id_salt("all_tags").show(ui, |ui| {
                 if !ui.memory(|m| m.focused().is_some()) {
                     ui.memory_mut(|m| m.request_focus(ui.id()));
@@ -110,8 +106,8 @@ pub fn tag_views(
                         render_button(
                             ui,
                             &i18n.t("tags_quick.new"),
-                            current_theme.semantic.bg_main.to_color(),
-                            current_theme.semantic.accent_glow.to_color(),
+                            current_theme.global.bg_main(),
+                            current_theme.main_area.accent(),
                             Some(|| {
                                 dispatcher
                                     .send(UiEvent::QuickTagEvent(QuickTagEvent::CreateNewTag {
@@ -126,8 +122,8 @@ pub fn tag_views(
                         render_button(
                             ui,
                             &i18n.t("tags_quick.all"),
-                            current_theme.semantic.bg_main.to_color(),
-                            current_theme.semantic.accent_glow.to_color(),
+                            current_theme.global.bg_main(),
+                            current_theme.main_area.accent(),
                             Some(|| {
                                 state.tag_filter = TagViewFilter::All {
                                     all_items_len: total_items,
@@ -213,7 +209,7 @@ pub fn tag_views(
                         |ui| {
                             ui.label_ns(
                                 egui::RichText::new(&*i18n.t("tags_quick.empty"))
-                                    .color(current_theme.semantic.text_secondary.to_color())
+                                    .color(current_theme.global.text_primary())
                                     .size(14.0)
                                     .strong(),
                             );
@@ -242,7 +238,10 @@ pub fn tag_views(
                         Frame::NONE
                             .corner_radius(CornerRadius::same(20))
                             .fill(color)
-                            .stroke(Stroke::new(0.5, vivid_color))
+                            .stroke(Stroke::new(
+                                current_theme.global.panel_stroke_width,
+                                vivid_color,
+                            ))
                             .show(ui, |ui| {
                                 ui.set_width(ui.available_width());
 
@@ -265,7 +264,7 @@ pub fn tag_views(
                                                 "tags_quick.count",
                                                 &[("query", &tag.items.len().to_string())],
                                             ))
-                                            .color(current_theme.semantic.text_secondary.to_color())
+                                            .color(current_theme.global.text_primary())
                                             .size(11.0),
                                         )
                                         .selectable(false),
@@ -273,7 +272,6 @@ pub fn tag_views(
 
                                     render_op_buttons(
                                         ui,
-                                        ui_state,
                                         color,
                                         || {
                                             dispatcher
@@ -329,12 +327,7 @@ pub fn tag_views(
                                                     RichText::new(
                                                         &*i18n.t("tags_quick.add_something"),
                                                     )
-                                                    .color(
-                                                        current_theme
-                                                            .semantic
-                                                            .text_secondary
-                                                            .to_color(),
-                                                    )
+                                                    .color(current_theme.global.text_secondary())
                                                     .size(14.0)
                                                     .strong(),
                                                 );
@@ -453,8 +446,11 @@ pub fn tag_views(
                                                 color.g().saturating_add(bg_alpha),
                                                 color.b().saturating_add(bg_alpha),
                                             ),
-                                            Stroke::new(0.5, color),
-                                            StrokeKind::Outside,
+                                            Stroke::new(
+                                                current_theme.global.panel_stroke_width,
+                                                color,
+                                            ),
+                                            StrokeKind::Middle,
                                         );
 
                                         let n = 3;
@@ -555,8 +551,17 @@ pub fn tag_views(
                 });
             });
 
-            render_tags_island_bubble(ui, state, ui_state, bottom_padding, tag_len);
+            render_tags_island_bubble(ui, state, bottom_padding, tag_len);
         });
+
+    ui.panel_border(frame.response.rect)
+        .radius(panel_radius)
+        .open_side(Some(OpenSide::Top))
+        .stroke(Stroke::new(
+            current_theme.global.panel_stroke_width,
+            current_theme.main_area.panel_border(),
+        ))
+        .paint_border();
 
     //Tags
     if ui.input(|i| i.modifiers.ctrl) && ui.input(|i| i.key_pressed(egui::Key::T)) {

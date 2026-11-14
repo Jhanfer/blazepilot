@@ -39,22 +39,20 @@ impl IconCache {
         ui: &mut Ui,
         name: &str,
         svg_bytes: &[u8],
-        tint: egui::Color32,
         icon_size: egui::Vec2,
     ) -> TextureHandle {
-        let tint_key = format!("{:02X}{:02X}{:02X}", tint.r(), tint.g(), tint.b());
         let pixels_per_point = ui.pixels_per_point();
         let w = (icon_size.x * pixels_per_point).round() as u32;
         let h = (icon_size.y * pixels_per_point).round() as u32;
         let scale_key = (pixels_per_point * 10.0).round() as u32;
-        let full_key = format!("{}-{}-{}x{}-{}ppp", name, tint_key, w, h, scale_key);
+        let full_key = format!("{}-{}x{}-{}ppp", name, w, h, scale_key);
 
         if let Some(texture) = self.cache.get(&full_key) {
             return texture.clone();
         }
 
-        let image = rasterize_svg(svg_bytes, w, h, tint);
-        let texture = ui.load_texture(name, image, TextureOptions::LINEAR);
+        let image = rasterize_svg(svg_bytes, w, h);
+        let texture = ui.load_texture(&full_key, image, TextureOptions::LINEAR);
 
         self.cache.push(full_key, texture.clone());
 
@@ -62,12 +60,7 @@ impl IconCache {
     }
 }
 
-fn rasterize_svg(
-    svg_bytes: &[u8],
-    mut width: u32,
-    mut height: u32,
-    tint: egui::Color32,
-) -> ColorImage {
+fn rasterize_svg(svg_bytes: &[u8], mut width: u32, mut height: u32) -> ColorImage {
     if width == 0 || height == 0 {
         width = 1;
         height = 1;
@@ -87,7 +80,7 @@ fn rasterize_svg(
     let pixels: Vec<egui::Color32> = pixmap
         .pixels()
         .iter()
-        .map(|p| egui::Color32::from_rgba_unmultiplied(tint.r(), tint.g(), tint.b(), p.alpha()))
+        .map(|p| egui::Color32::from_rgba_unmultiplied(255, 255, 255, p.alpha()))
         .collect();
 
     ColorImage {

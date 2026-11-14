@@ -14,19 +14,19 @@ use crate::{
     },
     ui::{
         blaze_ui_state::BlazeUiState,
-        custom_components::text_edit::BlazeTextEdit,
+        custom_components::{UiExt, text_edit::BlazeTextEdit},
         icons_cache::thumbnails::thumbnails_manager::Thumbnail,
         modules::{
             custom_context_menu::context_state::ContextMenuKind,
             utilities::{ensure_min_lightness, git_dot_color, resolve_icon, text_color_for_git},
         },
-        themes::{platform::structs::ToColor, theme_manager::with_theme},
+        themes::{platform::color_ops, theme_manager::with_theme},
     },
 };
 use egui::{
     Align, Align2, Color32, ColorImage, CursorIcon, FontId, Id, Key, Layout, Modifiers,
-    PointerButton, Rect, ScrollArea, Sense, TextureOptions, Ui, pos2, scroll_area::ScrollSource,
-    vec2,
+    PointerButton, Rect, ScrollArea, Sense, TextureOptions, Ui, Vec2, pos2,
+    scroll_area::ScrollSource, vec2,
 };
 use std::{borrow::Cow, collections::HashMap, path::Path, sync::Arc};
 use tracing::info;
@@ -257,6 +257,7 @@ pub fn render_miller_scrollview(
     ui_state.enforce_texture_cache_limit(500);
 
     let current_theme = with_theme(|t| t.current());
+    let palette = current_theme.main_area.palette(&current_theme.global);
     let i18n = with_configs(|c| c.get_i18n());
     let col_id = ui.id().with(("miller_col", col_index));
 
@@ -438,14 +439,11 @@ pub fn render_miller_scrollview(
 
                         let is_selected = state.is_selected_for(&col_path, i);
 
-                        // painter de la selección y directorio abierto
                         if is_opened || is_selected {
                             let color = if is_opened {
-                                let c = current_theme.components.list_item.bg_selected.to_color();
-                                Color32::from_rgba_unmultiplied(c.r(), c.g(), c.b(), 200)
+                                color_ops::with_alpha(palette.accent, 200)
                             } else {
-                                let c = current_theme.components.list_item.bg_selected.to_color();
-                                Color32::from_rgba_unmultiplied(c.r(), c.g(), c.b(), 60)
+                                color_ops::with_alpha(palette.accent, 60)
                             };
 
                             ui.painter().rect_filled(rect, 5.0, color);
@@ -454,11 +452,7 @@ pub fn render_miller_scrollview(
                         // painter del hover
                         if resp.hovered() {
                             ui.set_cursor_icon(CursorIcon::PointingHand);
-
-                            let mut c = current_theme.components.list_item.bg_selected.to_color();
-                            c = Color32::from_rgba_unmultiplied(c.r(), c.g(), c.b(), 60);
-
-                            ui.painter().rect_filled(rect, 5.0, c);
+                            ui.painter().rect_filled(rect, 5.0, palette.bg_hover);
                         }
 
                         // interacción por cada row
@@ -541,27 +535,14 @@ pub fn render_miller_scrollview(
                                 .copied();
 
                             let (icon_name, icon_bytes, color) = resolve_icon(file, snapshot_color);
-                            let rounded_rect = Rect::from_min_max(
-                                pos2(icon_rect.min.x.round(), icon_rect.min.y.round()),
-                                pos2(icon_rect.max.x.round(), icon_rect.max.y.round()),
-                            );
 
                             let normalized_color = ensure_min_lightness(color);
 
-                            let icon = ui_state.icon_cache.get_or_load(
-                                ui,
-                                &icon_name,
-                                icon_bytes,
-                                normalized_color,
-                                vec2(icon_size, icon_size),
-                            );
-
-                            ui.painter().image(
-                                icon.id(),
-                                rounded_rect,
-                                Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
-                                icon_tint,
-                            );
+                            ui.draw_icon((&icon_name, icon_bytes))
+                                .id(format!("icon_{i}"))
+                                .size(Vec2::splat(icon_size))
+                                .tint(normalized_color)
+                                .show_at(icon_rect);
                         }
 
                         if let Some(dot) = dot_color {
@@ -633,7 +614,7 @@ pub fn render_miller_scrollview(
                                 Align2::RIGHT_CENTER,
                                 "›",
                                 FontId::proportional(14.0),
-                                current_theme.semantic.text_secondary.to_color(),
+                                palette.fg_primary,
                             );
                         }
                     }
@@ -643,18 +624,17 @@ pub fn render_miller_scrollview(
                     match ctx_menu.kind {
                         ContextMenuKind::FileNormal => {
                             if ctx_menu.target_col == Some(col_index) {
-                                ctx_menu.file_context_menu(ui, state, ui_state);
+                                ctx_menu.file_context_menu(ui, state);
                             }
                         }
                         ContextMenuKind::FileTrash => {
-                            ctx_menu.file_context_menu_in_trash(ui, state, ui_state)
+                            ctx_menu.file_context_menu_in_trash(ui, state)
                         }
                         _ => {}
                     }
                     ui_state.context_menu_state = ctx_menu;
 
                     if ui_state.needs_repaint || should_repaint {
-                        ui.request_repaint();
                         ui_state.needs_repaint = false;
                     }
 

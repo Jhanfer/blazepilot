@@ -14,6 +14,7 @@
 
 use egui::{Color32, TextureHandle};
 use file_id::FileId;
+use parking_lot::Mutex;
 use std::{
     collections::{HashMap, HashSet},
     path::Path,
@@ -42,7 +43,7 @@ use crate::{
 
 pub struct BlazeUiState {
     pub dialog_manager: DialogManager,
-    pub icon_cache: IconCache,
+    pub icon_cache: Arc<Mutex<IconCache>>,
     pub folder_color_manager: FolderColorManager,
     pub context_menu_state: ContextMenuState,
     pub thumb_texture_cache: HashMap<Arc<Path>, TextureHandle>,
@@ -67,7 +68,7 @@ impl BlazeUiState {
         let dialog_manager = DialogManager::new();
         Self {
             dialog_manager,
-            icon_cache: IconCache::new(500),
+            icon_cache: Arc::new(Mutex::new(IconCache::new(500))),
             folder_color_manager: FolderColorManager::new(),
             context_menu_state: ContextMenuState::new(),
             thumb_texture_cache: HashMap::new(),

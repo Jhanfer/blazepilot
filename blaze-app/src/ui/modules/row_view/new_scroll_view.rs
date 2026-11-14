@@ -17,19 +17,19 @@ use crate::{
     },
     ui::{
         blaze_ui_state::BlazeUiState,
-        custom_components::text_edit::BlazeTextEdit,
+        custom_components::{UiExt, text_edit::BlazeTextEdit},
         icons_cache::thumbnails::thumbnails_manager::Thumbnail,
         modules::{
             custom_context_menu::context_state::ContextMenuKind,
             utilities::{ensure_min_lightness, git_dot_color, resolve_icon, text_color_for_git},
         },
-        themes::{platform::structs::ToColor, theme_manager::with_theme},
+        themes::{platform::color_ops, theme_manager::with_theme},
     },
     utils::formating::{format_date, format_size},
 };
 use egui::{
     Button, Color32, ColorImage, CursorIcon, FontId, Id, Key, Modifiers, PointerButton, Rect,
-    RichText, ScrollArea, Sense, Stroke, StrokeKind, TextureOptions, Ui, pos2,
+    RichText, ScrollArea, Sense, Stroke, StrokeKind, TextureOptions, Ui, Vec2, pos2,
     scroll_area::ScrollSource, vec2,
 };
 use std::{borrow::Cow, collections::HashMap, path::Path, sync::Arc};
@@ -249,6 +249,7 @@ pub fn new_render_scrollview(
     content_rect: Rect,
 ) {
     let current_theme = with_theme(|t| t.current());
+    let palette = current_theme.main_area.palette(&current_theme.global);
 
     let icon_size = state.row_view.icon_size;
 
@@ -298,9 +299,9 @@ pub fn new_render_scrollview(
             Button::new(
                 RichText::new(name_label)
                     .size(11.0)
-                    .color(current_theme.semantic.text_primary.to_color()),
+                    .color(palette.fg_primary),
             )
-            .fill(current_theme.semantic.bg_container.to_color())
+            .fill(palette.bg_panel)
             .stroke(Stroke::NONE)
             .frame(true),
         )
@@ -340,9 +341,9 @@ pub fn new_render_scrollview(
             Button::new(
                 RichText::new(date_label)
                     .size(11.0)
-                    .color(current_theme.semantic.text_primary.to_color()),
+                    .color(palette.fg_primary),
             )
-            .fill(current_theme.semantic.bg_container.to_color())
+            .fill(palette.bg_panel)
             .stroke(Stroke::NONE)
             .frame(true),
         )
@@ -382,9 +383,9 @@ pub fn new_render_scrollview(
             Button::new(
                 RichText::new(size_label)
                     .size(11.0)
-                    .color(current_theme.semantic.text_primary.to_color()),
+                    .color(palette.fg_primary),
             )
-            .fill(current_theme.semantic.bg_container.to_color())
+            .fill(palette.bg_panel)
             .stroke(Stroke::NONE)
             .frame(true),
         )
@@ -419,13 +420,9 @@ pub fn new_render_scrollview(
 
         if handle_response.hovered() || handle_response.dragged() {
             ui.set_cursor_icon(CursorIcon::ResizeColumn);
-            painter.rect_filled(handle_rect, 0.0, current_theme.semantic.accent.to_color());
+            painter.rect_filled(handle_rect, 0.0, palette.accent);
         } else {
-            painter.rect_filled(
-                handle_rect,
-                0.0,
-                current_theme.semantic.text_muted.to_color(),
-            );
+            painter.rect_filled(handle_rect, 0.0, palette.fg_secondary);
         }
 
         if handle_response.dragged() {
@@ -545,39 +542,12 @@ pub fn new_render_scrollview(
                 // --- Selección y hover ---
                 if response.hovered() {
                     ui.set_cursor_icon(CursorIcon::PointingHand);
-                    ui.painter().rect_filled(
-                        rect,
-                        5.0,
-                        current_theme.components.list_item.bg_hover.to_color(),
-                    );
+                    ui.painter().rect_filled(rect, 5.0, palette.bg_hover);
                 }
 
                 if state.is_selected(i) {
-                    ui.painter().rect_filled(
-                        rect,
-                        5.0,
-                        Color32::from_rgba_unmultiplied(
-                            current_theme
-                                .components
-                                .list_item
-                                .bg_selected
-                                .to_color()
-                                .r(),
-                            current_theme
-                                .components
-                                .list_item
-                                .bg_selected
-                                .to_color()
-                                .g(),
-                            current_theme
-                                .components
-                                .list_item
-                                .bg_selected
-                                .to_color()
-                                .b(),
-                            60,
-                        ),
-                    );
+                    let selection = color_ops::with_alpha(palette.accent, 60);
+                    ui.painter().rect_filled(rect, 8.0, selection);
                 }
 
                 // Drop target highlight
@@ -586,8 +556,11 @@ pub fn new_render_scrollview(
                         ui.painter().rect_stroke(
                             rect,
                             5.0,
-                            Stroke::new(2.0, Color32::from_rgb(150, 150, 255)),
-                            StrokeKind::Outside,
+                            Stroke::new(
+                                current_theme.global.components_stroke_width,
+                                current_theme.global.success(),
+                            ),
+                            StrokeKind::Middle,
                         );
                     }
                 } else if let Some(ref target_invalid) = state.row_view.drop_invalid_target.clone()
@@ -596,8 +569,11 @@ pub fn new_render_scrollview(
                     ui.painter().rect_stroke(
                         rect,
                         5.0,
-                        Stroke::new(2.0, Color32::from_rgb(255, 150, 150)),
-                        StrokeKind::Outside,
+                        Stroke::new(
+                            current_theme.global.components_stroke_width,
+                            current_theme.global.error(),
+                        ),
+                        StrokeKind::Middle,
                     );
                 }
 
@@ -730,27 +706,13 @@ pub fn new_render_scrollview(
                         .copied();
 
                     let (icon_name, icon_bytes, color) = resolve_icon(file, snapshot_color);
-                    let rounded_rect = Rect::from_min_max(
-                        pos2(icon_rect.min.x.round(), icon_rect.min.y.round()),
-                        pos2(icon_rect.max.x.round(), icon_rect.max.y.round()),
-                    );
-
                     let normalized_color = ensure_min_lightness(color);
 
-                    let icon = ui_state.icon_cache.get_or_load(
-                        ui,
-                        &icon_name,
-                        icon_bytes,
-                        normalized_color,
-                        vec2(icon_size, icon_size),
-                    );
-
-                    ui.painter().image(
-                        icon.id(),
-                        rounded_rect,
-                        Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
-                        icon_tint,
-                    );
+                    ui.draw_icon((&icon_name, icon_bytes))
+                        .id(format!("icon_{i}"))
+                        .size(Vec2::splat(icon_size))
+                        .tint(normalized_color)
+                        .show_at(icon_rect);
                 }
 
                 // Dot git
@@ -816,7 +778,7 @@ pub fn new_render_scrollview(
                     f.layout_no_wrap(
                         format_date(file.modified).to_string(),
                         FontId::proportional(date_font_size),
-                        current_theme.semantic.text_primary.to_color(),
+                        palette.fg_primary,
                     )
                 });
                 ui.painter().with_clip_rect(date_rect).galley(
@@ -855,7 +817,7 @@ pub fn new_render_scrollview(
                     f.layout_no_wrap(
                         size_text,
                         FontId::proportional(size_font_size),
-                        current_theme.semantic.text_primary.to_color(),
+                        palette.fg_primary,
                     )
                 });
                 ui.painter().with_clip_rect(size_rect).galley(
@@ -871,16 +833,13 @@ pub fn new_render_scrollview(
             // Context menu
             let mut ctx_menu = std::mem::take(&mut ui_state.context_menu_state);
             match ctx_menu.kind {
-                ContextMenuKind::FileNormal => ctx_menu.file_context_menu(ui, state, ui_state),
-                ContextMenuKind::FileTrash => {
-                    ctx_menu.file_context_menu_in_trash(ui, state, ui_state)
-                }
+                ContextMenuKind::FileNormal => ctx_menu.file_context_menu(ui, state),
+                ContextMenuKind::FileTrash => ctx_menu.file_context_menu_in_trash(ui, state),
                 _ => {}
             }
             ui_state.context_menu_state = ctx_menu;
 
             if ui_state.needs_repaint || should_repaint {
-                ui.request_repaint();
                 ui_state.needs_repaint = false;
             }
 

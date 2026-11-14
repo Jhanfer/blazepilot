@@ -25,11 +25,14 @@ use crate::{
     },
     ui::{
         custom_components::UiExt,
-        dialog_manager::manager::ModalDialog,
-        themes::{platform::structs::ToColor, theme_manager::with_theme},
+        dialog_manager::{
+            dialogs::{DialogButtonKind, dialog_button, dialog_button_spacing, dialog_frame},
+            manager::ModalDialog,
+        },
+        themes::theme_manager::with_theme,
     },
 };
-use egui::{CornerRadius, Frame, Margin, Order, Ui, Window};
+use egui::{Order, RichText, Ui, Window};
 use tracing::{debug, warn};
 
 pub struct WantToDonwloadDialog {
@@ -76,6 +79,7 @@ impl WantToDonwloadDialog {
         let i18n = with_configs(|c| c.get_i18n());
 
         let current_theme = with_theme(|t| t.current());
+        let palette = current_theme.dialogs.palette(&current_theme.global);
 
         let mut should_close = false;
 
@@ -86,11 +90,6 @@ impl WantToDonwloadDialog {
         };
 
         let is_html = mime.starts_with("text/html");
-
-        let custom_frame = Frame::NONE
-            .fill(current_theme.semantic.bg_main.to_color())
-            .corner_radius(CornerRadius::same(10))
-            .inner_margin(Margin::same(10));
 
         let (title, message) = if is_html {
             (
@@ -104,8 +103,11 @@ impl WantToDonwloadDialog {
             )
         };
 
-        Window::new(title)
-            .frame(custom_frame)
+        Window::new(RichText::new(title).color(palette.fg_primary))
+            .frame(dialog_frame(
+                &palette,
+                current_theme.global.panel_stroke_width,
+            ))
             .order(Order::Foreground)
             .collapsible(false)
             .resizable(false)
@@ -113,29 +115,32 @@ impl WantToDonwloadDialog {
             .open(&mut self.show_modal)
             .show(ui, |ui| {
                 ui.set_min_width(250.0);
+                ui.set_max_width(300.0);
                 ui.set_min_height(100.0);
 
                 ui.vertical_centered(|ui| {
-                    ui.label_ns(message);
+                    ui.label_ns(RichText::new(message).color(palette.fg_primary));
                     ui.add_space(8.0);
                 });
 
-                ui.add_space(50.0);
+                ui.add_space(20.0);
 
                 let cwd = cwd.clone();
 
                 ui.horizontal(|ui| {
-                    let width = ui.available_width();
-                    let button_width = 120.0;
-                    let spacing = (width - button_width * 2.0) / 3.0;
+                    let spacing = dialog_button_spacing(ui, 2);
 
                     ui.add_space(spacing);
-                    if ui.button(i18n.t("general_dialog.cancel")).clicked() {
-                        should_close = true;
-                    }
 
-                    ui.add_space(spacing);
-                    if ui.button(i18n.t("general_dialog.accept")).clicked() {
+                    if dialog_button(
+                        ui,
+                        i18n.t("general_dialog.accept"),
+                        &palette,
+                        DialogButtonKind::Primary,
+                    )
+                    .show()
+                    .clicked()
+                    {
                         if is_html {
                             debug!("abriendo url: {url}");
                             ui.open_url(egui::OpenUrl::new_tab(url));
@@ -178,9 +183,24 @@ impl WantToDonwloadDialog {
                                 write_to_media(file_ext, cwd, data);
                             });
                         }
-
                         should_close = true;
                     }
+
+                    ui.add_space(spacing);
+
+                    if dialog_button(
+                        ui,
+                        i18n.t("general_dialog.cancel"),
+                        &palette,
+                        DialogButtonKind::Secondary,
+                    )
+                    .show()
+                    .clicked()
+                    {
+                        should_close = true;
+                    }
+
+                    ui.add_space(spacing);
                 });
             });
 

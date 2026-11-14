@@ -1,7 +1,6 @@
 use crate::{
     core::{
-        blaze_state::BlazeCoreState,
-        blaze_state::state_structs::NewItemType,
+        blaze_state::{BlazeCoreState, state_structs::NewItemType},
         bootstrap::configs::config_manager::with_configs,
         files::blaze_motor::motor_structs::FileEntry,
         runtime::{
@@ -15,29 +14,25 @@ use crate::{
     },
     ui::{
         blaze_ui_state::BlazeUiState,
-        custom_components::text_edit::BlazeTextEdit,
+        custom_components::{UiExt, text_edit::BlazeTextEdit},
         icons_cache::thumbnails::thumbnails_manager::Thumbnail,
         modules::{
             custom_context_menu::context_state::ContextMenuKind,
             utilities::{ensure_min_lightness, git_dot_color, resolve_icon, text_color_for_git},
         },
-        themes::{platform::structs::ToColor, theme_manager::with_theme},
+        themes::{platform::color_ops, theme_manager::with_theme},
     },
     utils::formating::{format_date, format_size},
 };
 use egui::{
-    Color32, ColorImage, CursorIcon, FontId, Id, Key, Modifiers, PointerButton, Rect, ScrollArea,
-    Sense, Stroke, StrokeKind, TextureOptions, Ui, pos2, scroll_area::ScrollSource, vec2,
+    Align, Color32, ColorImage, CursorIcon, FontId, Id, Key, Modifiers, PointerButton, Rect,
+    ScrollArea, Sense, Stroke, StrokeKind, TextureOptions, Ui, Vec2, pos2,
+    scroll_area::ScrollSource, text::LayoutJob, vec2,
 };
 use std::{borrow::Cow, collections::HashMap, path::Path, sync::Arc};
 use tracing::info;
 
-fn grid_file_creation(
-    state: &mut BlazeCoreState,
-    ui: &mut Ui,
-    available_width: f32,
-    ui_state: &mut BlazeUiState,
-) {
+fn grid_file_creation(state: &mut BlazeCoreState, ui: &mut Ui, available_width: f32) {
     if let Some(item_type) = state.creating_new.clone() {
         let icon_size = state.grid_view.base.icon_size;
         let cell_size = state.grid_view.cell_size;
@@ -66,24 +61,10 @@ fn grid_file_creation(
         let icon_x = rect.min.x + (cell_size - icon_size) / 2.0;
         let icon_rect = Rect::from_min_size(pos2(icon_x, icon_top), vec2(icon_size, icon_size));
 
-        let rounded_rect = Rect::from_min_max(
-            pos2(icon_rect.min.x.round(), icon_rect.min.y.round()),
-            pos2(icon_rect.max.x.round(), icon_rect.max.y.round()),
-        );
-
-        let icon = ui_state.icon_cache.get_or_load(
-            ui,
-            &icon_name,
-            icon_bytes,
-            color,
-            vec2(icon_size, icon_size),
-        );
-        ui.painter().image(
-            icon.id(),
-            rounded_rect,
-            Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
-            Color32::WHITE,
-        );
+        ui.draw_icon((&icon_name, icon_bytes))
+            .size(Vec2::splat(icon_size))
+            .tint(color)
+            .show();
 
         let creating_new_id = Id::new("creating_new");
 
@@ -298,6 +279,7 @@ pub fn render_grid_scrollview(
     content_rect: Rect,
 ) {
     let current_theme = with_theme(|t| t.current());
+    let palette = current_theme.main_area.palette(&current_theme.global);
 
     let i18n = with_configs(|c| c.get_i18n());
 
@@ -305,11 +287,14 @@ pub fn render_grid_scrollview(
     ui_state.enforce_texture_cache_limit(500);
 
     let cell_padding = 8.0_f32;
-
     let icon_size = state.grid_view.base.icon_size;
     let cell_size = icon_size + 40.0;
 
-    let row_height = cell_size + 28.0;
+    let name_font = FontId::proportional((11.0 + icon_size * 0.05).clamp(12.0, 16.0));
+    let line_h = ui.fonts_mut(|f| f.row_height(&name_font));
+    const NAME_LINES: f32 = 2.0;
+
+    let row_height = cell_padding + icon_size + 4.0 + line_h * NAME_LINES + 6.0;
 
     state.grid_view.row_height = row_height;
 
@@ -348,7 +333,7 @@ pub fn render_grid_scrollview(
 
     let scroll_output = scroll_area.show_rows(ui, row_height, total_rows, |ui, row_range| {
         // --- Creación de carpeta/archivo nuevo ---
-        grid_file_creation(state, ui, available_width, ui_state);
+        grid_file_creation(state, ui, available_width);
 
         let mut should_repaint = false;
 
@@ -449,11 +434,8 @@ pub fn render_grid_scrollview(
                         pos2(rect.max.x - margin, rect.max.y - margin),
                     );
 
-                    ui.painter().rect_filled(
-                        selection_rect,
-                        8.0,
-                        current_theme.components.list_item.bg_hover.to_color(),
-                    );
+                    ui.painter()
+                        .rect_filled(selection_rect, 8.0, palette.bg_hover);
                 }
 
                 if state.is_selected(i) {
@@ -463,31 +445,8 @@ pub fn render_grid_scrollview(
                         pos2(rect.max.x - margin, rect.max.y - margin),
                     );
 
-                    ui.painter().rect_filled(
-                        selection_rect,
-                        8.0,
-                        Color32::from_rgba_unmultiplied(
-                            current_theme
-                                .components
-                                .list_item
-                                .bg_selected
-                                .to_color()
-                                .r(),
-                            current_theme
-                                .components
-                                .list_item
-                                .bg_selected
-                                .to_color()
-                                .g(),
-                            current_theme
-                                .components
-                                .list_item
-                                .bg_selected
-                                .to_color()
-                                .b(),
-                            60,
-                        ),
-                    );
+                    let selection = color_ops::with_alpha(palette.accent, 60);
+                    ui.painter().rect_filled(selection_rect, 8.0, selection);
                 }
 
                 // Drop target highlight
@@ -496,8 +455,11 @@ pub fn render_grid_scrollview(
                         ui.painter().rect_stroke(
                             rect,
                             8.0,
-                            Stroke::new(2.0, Color32::from_rgb(150, 150, 255)),
-                            StrokeKind::Outside,
+                            Stroke::new(
+                                current_theme.global.components_stroke_width,
+                                current_theme.global.success(),
+                            ),
+                            StrokeKind::Middle,
                         );
                     }
                 } else if let Some(ref target_invalid) =
@@ -507,8 +469,11 @@ pub fn render_grid_scrollview(
                     ui.painter().rect_stroke(
                         rect,
                         8.0,
-                        Stroke::new(2.0, Color32::from_rgb(255, 150, 150)),
-                        StrokeKind::Outside,
+                        Stroke::new(
+                            current_theme.global.components_stroke_width,
+                            current_theme.global.error(),
+                        ),
+                        StrokeKind::Middle,
                     );
                 }
 
@@ -634,26 +599,13 @@ pub fn render_grid_scrollview(
 
                     let (icon_name, icon_bytes, color) = resolve_icon(file, snapshot_color);
 
-                    let rounded_rect = Rect::from_min_max(
-                        pos2(icon_rect.min.x.round(), icon_rect.min.y.round()),
-                        pos2(icon_rect.max.x.round(), icon_rect.max.y.round()),
-                    );
-
                     let normalized_color = ensure_min_lightness(color);
 
-                    let icon = ui_state.icon_cache.get_or_load(
-                        ui,
-                        &icon_name,
-                        icon_bytes,
-                        normalized_color,
-                        vec2(icon_size, icon_size),
-                    );
-                    ui.painter().image(
-                        icon.id(),
-                        rounded_rect,
-                        Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
-                        icon_tint,
-                    );
+                    ui.draw_icon((&icon_name, icon_bytes))
+                        .id(format!("icon_{i}"))
+                        .size(Vec2::splat(icon_size))
+                        .tint(normalized_color)
+                        .show_at(icon_rect);
                 }
 
                 if let Some(dot) = dot_color {
@@ -686,83 +638,33 @@ pub fn render_grid_scrollview(
                         Cow::Borrowed(&file.name)
                     };
 
-                    let display_name = cow_display_name.to_string();
-
                     let name_top = icon_rect.max.y + 4.0;
-                    let name_padding = 3.0;
+                    let name_padding = 7.0;
                     let name_rect = Rect::from_min_max(
                         pos2(rect.min.x + name_padding, name_top),
                         pos2(rect.max.x - name_padding, rect.max.y - 2.0),
                     );
 
-                    let name_font_size = (icon_size / 4.5).clamp(13.0, 25.0);
+                    let final_color = ensure_min_lightness(name_color);
 
-                    let mut name_galley = ui.fonts_mut(|f| {
-                        f.layout(
-                            display_name.clone(),
-                            FontId::proportional(name_font_size),
-                            name_color,
-                            name_rect.width(),
-                        )
-                    });
+                    let mut job = LayoutJob::simple(
+                        cow_display_name.into_owned(),
+                        name_font.clone(),
+                        final_color,
+                        name_rect.width(),
+                    );
 
-                    let max_height = name_rect.height();
+                    job.wrap.max_rows = 2;
+                    job.wrap.break_anywhere = true;
+                    job.wrap.overflow_character = Some('…');
+                    job.halign = Align::Center;
 
-                    if name_galley.size().y > max_height && !name_galley.rows.is_empty() {
-                        let line_height = name_galley.size().y / name_galley.rows.len() as f32;
-                        let max_lines = (max_height / line_height).floor() as usize;
-                        let max_lines = max_lines.max(1);
-
-                        if name_galley.rows.len() > max_lines {
-                            let last_row_idx = max_lines - 1;
-
-                            let mut absolute_byte_idx = 0;
-                            for row_idx in 0..=last_row_idx {
-                                for glyph in &name_galley.rows[row_idx].glyphs {
-                                    absolute_byte_idx += glyph.chr.len_utf8();
-                                }
-                            }
-
-                            let mut truncated = display_name.clone();
-                            if absolute_byte_idx > 0 && absolute_byte_idx <= truncated.len() {
-                                truncated.truncate(absolute_byte_idx);
-                            } // revisar esto <----
-
-                            truncated.push_str("...");
-
-                            let mut iterations = 0;
-                            while iterations < 10 {
-                                name_galley = ui.fonts_mut(|f| {
-                                    f.layout(
-                                        truncated.clone(),
-                                        FontId::proportional(name_font_size),
-                                        name_color,
-                                        name_rect.width(),
-                                    )
-                                });
-
-                                if name_galley.size().y <= max_height || truncated.len() <= 3 {
-                                    break;
-                                }
-
-                                truncated.pop();
-                                truncated.pop();
-                                truncated.pop();
-                                truncated.pop();
-                                truncated.push_str("...");
-
-                                iterations += 1;
-                            }
-                        }
-                    }
-
-                    let text_y = name_rect.min.y;
-                    let text_x = name_rect.min.x + (name_rect.width() - name_galley.size().x) / 2.0;
+                    let galley = ui.fonts_mut(|f| f.layout_job(job));
 
                     ui.painter().with_clip_rect(name_rect).galley(
-                        pos2(text_x, text_y),
-                        name_galley,
-                        ensure_min_lightness(name_color),
+                        pos2(name_rect.center().x, name_rect.min.y),
+                        galley,
+                        final_color,
                     );
                 }
 
@@ -807,8 +709,8 @@ pub fn render_grid_scrollview(
 
         let mut ctx_menu = std::mem::take(&mut ui_state.context_menu_state);
         match ctx_menu.kind {
-            ContextMenuKind::FileNormal => ctx_menu.file_context_menu(ui, state, ui_state),
-            ContextMenuKind::FileTrash => ctx_menu.file_context_menu_in_trash(ui, state, ui_state),
+            ContextMenuKind::FileNormal => ctx_menu.file_context_menu(ui, state),
+            ContextMenuKind::FileTrash => ctx_menu.file_context_menu_in_trash(ui, state),
             _ => {}
         }
         ui_state.context_menu_state = ctx_menu;

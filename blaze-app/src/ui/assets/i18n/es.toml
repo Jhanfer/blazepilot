@@ -1,7 +1,3 @@
-[app]
-title = "BlazePilot"
-loading = "Cargando..."
-
 [left_sidebar]
 root = "Raíz"
 locals = "Locales"
@@ -13,8 +9,9 @@ pictures = "Imágenes"
 videos = "Vídeos"
 music = "Música"
 public = "Público"
-trash = "Papelera" 
+trash = "Papelera"
 disks = "Discos"
+used_percent = "Usado {query}%"
 
 [right_sidebar]
 info = "Información"
@@ -25,16 +22,20 @@ owner = "Dueño:"
 group_name = "Nombre de grupo:"
 dimensions = "Dimensión:"
 git_status = "Estado Git:"
+modified = "Modificado:"
+folder = "Carpeta"
+
+[route]
+placeholder = "Escribe una ruta"
 
 [search]
 placeholder = "Buscar"
 no_results = "Sin resultados para \"{query}\""
-searching = "Buscando..."
 
 [bg_ctx_menu]
 new_tab = "Nueva pestaña"
 open_terminal_here = "Abrir terminal aquí"
-new_folder = "Nueva carpeta" 
+new_folder = "Nueva carpeta"
 new_file = "Nuevo archivo"
 
 [file_ctx_menu]
@@ -49,7 +50,6 @@ add_to_tag = "Agregar al tag"
 [file_ops]
 copy = "Copiar"
 cut = "Cortar"
-paste = "Pegar"
 paste_here = "Pegar aquí"
 extract_here = "Extraer aquí"
 folder_color = "Color de carpeta"
@@ -57,12 +57,19 @@ rename = "Renombrar"
 restore = "Restaurar"
 move_to_trash = "Mover a la papelera"
 delete = "Eliminar"
-delete_confirm = "¿Eliminar {count} archivo(s)?"
 
 [tools]
 name = "Nombre"
 modified = "Modificado"
 size = "Tamaño"
+extension = "Extensión"
+created = "Creado"
+accessed = "Accedido"
+owner = "Propietario"
+group = "Grupo"
+permissions = "Permisos"
+dimensions = "Dimensiones"
+symlink = "Enlace a"
 
 [tags_quick]
 new = "Nuevo"
@@ -104,7 +111,6 @@ language = "Idioma"
 gratitude = "¡Gracias por usar BlazePilot!"
 made_for = "Hecho con ❤ por Jhanfer. :D"
 report = "Reportar un bug"
-sys_info = "Información del sistema"
 disclaimer = "Las configuraciones son limitadas por ahora. Seguimos trabajando."
 
 [configs_terminal]
@@ -117,10 +123,7 @@ max_retries_error = "❌ No se ha podido encontrar ninguna terminal después de 
 verify_terminals_message = "Por favor, verifique que tenga al menos una terminal instalada."
 suggestion_message = "💡 Sugerencia: Instale una terminal como gnome-terminal, konsole, o alacritty"
 retry = "Reintentar"
-max_retries = 3
-timeout_seconds = 5
 combo_box_label = "Terminal predeterminado"
-
 
 [configs_backend]
 title = "Protocolo de pantalla"
@@ -133,56 +136,22 @@ X11: Mayor compatibilidad con apps antiguas. Permite el drag & drop desde otras 
 """
 disclaimer = "Estos cambios requieren reiniciar la app."
 
-
 [configs_appearance]
 title = "Cambia la apariencia"
-reload_theme = "Recargar tema"
 selection = "Selecciona un tema"
+reload_theme = "Recargar tema"
 message = "Puedes modificar cada tema en ~/.config/blazepilotapp/themes"
-
-# Editor de colores
 color_editor = "Editor de colores"
-
-# Estados
-states = "Estados"
+section_global = "Global"
+main_bg = "Fondo principal"
+rubberband = "Banda de selección"
+primary_text = "Texto principal"
+secondary_text = "Texto secundario"
 error = "Error"
 success = "Éxito"
 warn = "Advertencia"
-
-# Fondos
-background = "Fondos"
-main_bg = "Fondo principal"
-panel_bg = "Fondo del panel"
-container_bg = "Fondo del contenedor"
-hover_bg = "Fondo al pasar el cursor"
-
-# Bordes y botones
-border-buttons = "Bordes y botones"
-border_panel = "Borde del panel"
-main_buttons = "Botones principales"
-
-# Acentos
-accent = "Acentos"
-accent_glow = "Brillo del acento"
-rubberband = "Banda de selección"
-selected_item = "Elemento seleccionado"
-
-# Textos
-texts = "Textos"
-primary_text = "Texto principal"
-secondary_text = "Texto secundario"
-muted_text = "Texto atenuado"
-
-# Herramientas
-tools = "Herramientas"
-primary-tool-color = "Color principal de herramienta"
-secondary-tool-color = "Color secundario de herramienta"
-tool-btn-active = "Botón de herramienta activo"
-tool-btn-inactive = "Botón de herramienta inactivo"
-tool-btn-hovered = "Botón de herramienta al pasar el cursor"
-
-# Iconos de archivo
-files = "Archivos"
+stroke_width = "Grosor del borde"
+files = "Iconos de archivo"
 folder = "Carpeta"
 image = "Imagen"
 pdf = "PDF"
@@ -194,51 +163,24 @@ code = "Código"
 font = "Fuente"
 exe = "Ejecutable"
 fallback = "Por defecto"
-
-# Acciones del tema
+section_sidebar_left = "Barra lateral izquierda"
+section_top_bar = "Barra superior"
+section_main_area = "Panel central"
+section_sidebar_right = "Barra lateral derecha"
+section_context_menu = "Menú contextual"
+section_dialogs = "Diálogos"
+panel_bg = "Fondo del panel"
+bg_elevated = "Fondo elevado"
+hover_bg = "Fondo al pasar el cursor"
+bg_active = "Fondo activo"
+icon_primary = "Icono principal"
+icon_secondary = "Icono secundario"
+accent = "Acento"
+panel_border = "Borde del panel"
+component_border = "Borde de componente"
 theme-name = "Nombre del tema"
 save-as-custom = "Guardar como tema personalizado"
 reset-defaults = "Restablecer valores por defecto"
-
-# Fondos (completar)
-separator = "Separador"
-
-# Paneles
-panels = "Paneles"
-panel_border = "Borde del panel"
-
-# Botones
-buttons = "Botones"
-button_bg = "Fondo del botón"
-button_hover = "Fondo del botón (hover)"
-button_label_hover = "Texto del botón (hover)"
-button_label_active = "Texto del botón (activo)"
-button_label_inactive = "Texto del botón (inactivo)"
-
-# Input/Búsqueda
-input = "Barra de búsqueda"
-input_bg = "Fondo del input"
-input_border_idle = "Borde del input (reposo)"
-input_border_focus = "Borde del input (foco)"
-
-# Sidebar
-sidebar = "Barra lateral"
-sidebar_hover = "Fondo del sidebar (hover)"
-
-# Lista de archivos
-file_list = "Lista de archivos"
-list_hover = "Fondo de lista (hover)"
-list_selected = "Fondo de lista (seleccionado)"
-
-# Tools View (completar)
-tools_bg = "Fondo de herramientas"
-tools_label_hover = "Texto de herramienta (hover)"
-tools_label_active = "Texto de herramienta (activo)"
-tools_label_inactive = "Texto de herramienta (inactivo)"
-
-
-[configs_behavior]
-title = "WIP :D"
 
 [configs_language]
 title = "Cambiar idioma"
@@ -252,10 +194,8 @@ close = "Cerrar"
 save = "Guardar"
 delete = "Eliminar"
 
-
 [error_dialog]
 title = "¡Ha ocurrido un error!"
-
 
 [search_keywords_terminal]
 terminal = "terminal"
@@ -295,15 +235,13 @@ undo = "deshacer"
 language = "idioma"
 idiom = "lenguaje"
 
-
 [want_download_dialog]
 title_web = "Url de página"
 title_img = "Url de imagen"
 message_web = "¿Desea abrir la página en un navegador?"
 message_url = "¿Desea descargar la imagen?"
 
-
-[want_to_donwload_dialog]  
+[want_to_donwload_dialog]
 title = "¿Deseas instalar la app?"
 message = "Esto creará un '.desktop'"
 hint = "Puedes instalar desde configuraciones más tarde"
@@ -312,13 +250,12 @@ remind_me_later = "Recuerdame luego"
 installation_success = "Instalado con éxito"
 installation_path = "Se ha instalado en: \"{query}\""
 
-
 [update_dialog]
 title = "¡Nueva versión disponible!"
 message = "Hay una actualización de Blazepilot."
 current_version = "Versión actual: \"{query}\""
 new_version = "¿Quieres actualizar a la versión \"{query}\"?"
-
+changelog = "Registro de cambios"
 
 [move_to_dialog]
 title = "Mover..."
@@ -328,13 +265,10 @@ file_dot = "• {query}"
 and_more = "... y {query} archivos más"
 to = "a {query}"
 
-
 [sure_to_delete_dialog]
 title = "¿Deseas eliminar permanentemente?"
-file = "Archivo"
 file_dot = "• {query}"
 and_more = "... y {query} archivos más"
-
 
 [selector_dialog]
 searching_apps = "Buscando aplicaciones..."
@@ -343,7 +277,6 @@ select_app = "Seleccionar aplicación"
 recomends = "Recomendadas"
 all_apps = "Todas las apps"
 select_as_default = "Seleccionar como predeterminado"
-
 
 [quick_dialog_quick_to_tag]
 title = "Añadir al tag"
@@ -374,11 +307,9 @@ text_edit_hint = "Nombre del Quick:"
 name_empty = "El nombre está vacío"
 update_error = "Error al actualizar el tag"
 
-
 [image_preview_dialog]
 image_loading = "Cargando imagen..."
 image_not_loaded = "No se ha podido cargar la imagen"
-
 
 [select_folder_color_dialog]
 title = "Selecciona un color"

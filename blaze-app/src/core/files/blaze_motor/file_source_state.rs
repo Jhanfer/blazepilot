@@ -86,12 +86,7 @@ impl FileSource {
 
             let result = recursive_guard
                 .iter()
-                .filter(|f| {
-                    if !show_hidden && f.is_hidden {
-                        return false;
-                    }
-                    true
-                })
+                .filter(|f| !(!show_hidden && f.is_hidden))
                 .cloned()
                 .collect();
 

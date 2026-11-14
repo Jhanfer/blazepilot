@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::{path::Path, sync::Arc};
+
 use crate::{
     core::{
         bootstrap::configs::config_manager::with_configs,
@@ -19,12 +21,14 @@ use crate::{
     },
     ui::{
         custom_components::UiExt,
-        dialog_manager::manager::ModalDialog,
-        themes::{platform::structs::ToColor, theme_manager::with_theme},
+        dialog_manager::{
+            dialogs::{DialogButtonKind, dialog_button, dialog_button_spacing, dialog_frame},
+            manager::ModalDialog,
+        },
+        themes::theme_manager::with_theme,
     },
 };
-use egui::{CornerRadius, Frame, Margin, Order, RichText, Ui, Window};
-use std::{path::Path, sync::Arc};
+use egui::{Order, RichText, Ui, Window};
 
 pub struct SureToMoveToDialog {
     pub sources: Option<Vec<Arc<Path>>>,
@@ -65,8 +69,8 @@ impl SureToMoveToDialog {
 
     pub fn render_dialog(&mut self, ui: &mut Ui) -> bool {
         let i18n = with_configs(|c| c.get_i18n());
-
         let current_theme = with_theme(|t| t.current());
+        let palette = current_theme.dialogs.palette(&current_theme.global);
 
         let mut should_close = false;
 
@@ -74,13 +78,11 @@ impl SureToMoveToDialog {
             return false;
         };
 
-        let custom_frame = Frame::NONE
-            .fill(current_theme.semantic.bg_main.to_color())
-            .corner_radius(CornerRadius::same(10))
-            .inner_margin(Margin::same(10));
-
-        Window::new(i18n.t("move_to_dialog.title"))
-            .frame(custom_frame)
+        Window::new(RichText::new(i18n.t("move_to_dialog.title")).color(palette.fg_primary))
+            .frame(dialog_frame(
+                &palette,
+                current_theme.global.panel_stroke_width,
+            ))
             .order(Order::Foreground)
             .collapsible(false)
             .resizable(false)
@@ -88,41 +90,41 @@ impl SureToMoveToDialog {
             .open(&mut self.show_modal)
             .show(ui, |ui| {
                 ui.set_min_width(250.0);
+                ui.set_max_width(300.0);
                 ui.set_min_height(100.0);
 
-                ui.heading(i18n.t("move_to_dialog.heading"));
+                ui.vertical_centered(|ui| {
+                    ui.label_ns(
+                        RichText::new(i18n.t("move_to_dialog.heading"))
+                            .color(palette.fg_primary)
+                            .size(18.0),
+                    );
+                });
 
                 const MAX_SHOWN: usize = 5;
                 let total = sources.len();
 
-                if total <= MAX_SHOWN {
-                    for source in sources {
-                        let file_name = source
-                            .file_name()
-                            .map(|f| f.to_string_lossy().into_owned())
-                            .unwrap_or_else(|| i18n.t("move_to_dialog.file").into_string());
+                for source in sources.iter().take(MAX_SHOWN) {
+                    let file_name = source
+                        .file_name()
+                        .map(|f| f.to_string_lossy().into_owned())
+                        .unwrap_or_else(|| i18n.t("move_to_dialog.file").into_string());
 
-                        ui.label_ns(
+                    ui.label_ns(
+                        RichText::new(
                             i18n.t_args("move_to_dialog.file_dot", &[("query", &file_name)]),
-                        );
-                    }
-                } else {
-                    for source in sources {
-                        let file_name = source
-                            .file_name()
-                            .map(|f| f.to_string_lossy().into_owned())
-                            .unwrap_or_else(|| i18n.t("move_to_dialog.file").into_string());
+                        )
+                        .color(palette.fg_primary),
+                    );
+                }
 
-                        ui.label_ns(
-                            i18n.t_args("move_to_dialog.file_dot", &[("query", &file_name)]),
-                        );
-                    }
+                if total > MAX_SHOWN {
                     ui.label_ns(
                         RichText::new(i18n.t_args(
                             "move_to_dialog.and_more",
                             &[("query", &(total - MAX_SHOWN).to_string())],
                         ))
-                        .color(current_theme.semantic.text_primary.to_color())
+                        .color(palette.fg_secondary)
                         .weak()
                         .italics(),
                     );
@@ -134,31 +136,51 @@ impl SureToMoveToDialog {
                     .unwrap_or_else(|| dest.to_string_lossy().into_owned());
 
                 ui.add_space(8.0);
-                ui.label_ns(i18n.t_args("move_to_dialog.to", &[("query", &dest_name)]));
+                ui.label_ns(
+                    RichText::new(i18n.t_args("move_to_dialog.to", &[("query", &dest_name)]))
+                        .color(palette.fg_primary),
+                );
 
-                ui.add_space(50.0);
+                ui.add_space(20.0);
 
                 ui.horizontal(|ui| {
-                    let width = ui.available_width();
-                    let button_width = 120.0;
-                    let spacing = (width - button_width * 2.0) / 3.0;
+                    let spacing = dialog_button_spacing(ui, 2);
 
                     ui.add_space(spacing);
-                    if ui.button(i18n.t("general_dialog.cancel")).clicked() {
-                        should_close = true;
-                    }
 
-                    ui.add_space(spacing);
-                    if ui.button(i18n.t("general_dialog.accept")).clicked() {
+                    if dialog_button(
+                        ui,
+                        i18n.t("general_dialog.accept"),
+                        &palette,
+                        DialogButtonKind::Primary,
+                    )
+                    .show()
+                    .clicked()
+                    {
                         Dispatcher::current()
                             .send(FileOperation::Move {
                                 sources: sources.to_vec(),
                                 dest: dest.to_owned(),
                             })
                             .ok();
-
                         should_close = true;
                     }
+
+                    ui.add_space(spacing);
+
+                    if dialog_button(
+                        ui,
+                        i18n.t("general_dialog.cancel"),
+                        &palette,
+                        DialogButtonKind::Secondary,
+                    )
+                    .show()
+                    .clicked()
+                    {
+                        should_close = true;
+                    }
+
+                    ui.add_space(spacing);
                 });
             });
 

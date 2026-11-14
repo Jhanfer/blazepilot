@@ -48,7 +48,7 @@ impl ArchiveExtractor for ZipExtractor {
 
         for i in 0..archive.len() {
             let mut file = archive.by_index(i)?;
-            let outpath = dest.join(file.name());
+            let outpath = dest.join(file.name()?.to_string());
 
             if !outpath.starts_with(dest) {
                 continue;

@@ -24,10 +24,7 @@ use crate::platform::x11::x11_events::process_event_x11;
 use crate::ui::blaze_ui_state::BlazeUiState;
 use crate::ui::fonts::fonts_manager::with_fonts;
 use crate::ui::modules::ui_callback::connect_ui_components_callback;
-use crate::ui::themes::platform::structs::ToColor;
-use crate::ui::themes::theme_manager::with_theme;
 use crate::utils::mimalloc_fn::free_mi;
-use crate::window_backend::repaint_signal::RepaintSignal;
 use egui::Ui;
 use std::path::Path;
 use std::sync::Arc;
@@ -75,7 +72,6 @@ impl BlazeAppBuilder {
             state,
             ui_state,
             dnd,
-            repaint_signal: RepaintSignal::new(),
             past_cleanup: Instant::now(),
         }
     }
@@ -91,52 +87,7 @@ pub struct BlazeApp {
     pub state: BlazeCoreState,  //motor, archivos, mover
     pub ui_state: BlazeUiState, //visuales
     pub dnd: Option<WaylandDndReceiver>,
-    repaint_signal: RepaintSignal,
     past_cleanup: Instant,
-}
-
-impl BlazeApp {
-    pub fn set_custom_visuals(&self, ui: &mut Ui) {
-        let current_theme = with_theme(|t| t.current());
-        ui.global_style_mut(|style| {
-            let vmut = &mut style.visuals;
-            let s = &current_theme.semantic;
-            let c = &current_theme.components;
-
-            vmut.widgets.inactive.bg_fill = c.button.bg.to_color();
-            vmut.widgets.inactive.bg_stroke = egui::Stroke::new(1.0, c.panel.border.to_color());
-            vmut.widgets.inactive.fg_stroke = egui::Stroke::new(1.0, s.text_primary.to_color());
-            vmut.widgets.inactive.weak_bg_fill = s.bg_container.to_color();
-
-            vmut.widgets.hovered.bg_fill = c.button.bg_hover.to_color();
-            vmut.widgets.hovered.bg_stroke = egui::Stroke::new(1.0, s.accent_glow.to_color());
-            vmut.widgets.hovered.fg_stroke = egui::Stroke::new(1.0, s.text_primary.to_color());
-            vmut.widgets.hovered.weak_bg_fill = c.button.bg_hover.to_color();
-
-            vmut.widgets.active.bg_fill = c.list_item.bg_selected.to_color();
-            vmut.widgets.active.bg_stroke = egui::Stroke::new(1.0, s.accent.to_color());
-            vmut.widgets.active.fg_stroke = egui::Stroke::new(1.0, s.text_primary.to_color());
-            vmut.widgets.active.weak_bg_fill = c.list_item.bg_selected.to_color();
-
-            vmut.widgets.open.bg_fill = s.bg_container.to_color();
-            vmut.widgets.open.bg_stroke = egui::Stroke::new(1.0, c.panel.border.to_color());
-            vmut.widgets.open.fg_stroke = egui::Stroke::new(1.0, s.text_secondary.to_color());
-            vmut.widgets.open.weak_bg_fill = s.bg_container.to_color();
-
-            vmut.widgets.noninteractive.bg_stroke = egui::Stroke::new(1.0, s.separator.to_color());
-            vmut.widgets.noninteractive.fg_stroke = egui::Stroke::new(1.0, s.text_muted.to_color());
-            vmut.widgets.noninteractive.weak_bg_fill = s.bg_main.to_color();
-
-            vmut.selection.bg_fill = s.rubberband.to_color();
-            vmut.selection.stroke = egui::Stroke::new(1.0, s.accent.to_color());
-
-            vmut.extreme_bg_color = s.bg_container.to_color();
-            vmut.window_fill = c.panel.bg.to_color();
-            vmut.panel_fill = s.bg_main.to_color();
-            vmut.faint_bg_color = s.bg_container.to_color();
-            vmut.override_text_color = Some(s.text_primary.to_color());
-        });
-    }
 }
 
 impl BlazeApp {
@@ -192,8 +143,6 @@ impl BlazeApp {
     }
 
     pub fn ui(&mut self, ui: &mut Ui) {
-        self.set_custom_visuals(ui);
-
         if self.past_cleanup.elapsed() > Duration::from_secs(1) {
             self.ui_state.cleanup();
             self.past_cleanup = Instant::now();
@@ -206,7 +155,7 @@ impl BlazeApp {
             if f.dirty {
                 let defs = f.build_font_definitions();
                 ui.set_fonts(defs);
-                ui.request_repaint();
+
                 f.dirty = false;
             }
 
@@ -215,7 +164,6 @@ impl BlazeApp {
 
                 let defs = f.build_font_definitions();
                 ui.set_fonts(defs);
-                ui.request_repaint();
             }
         });
 
@@ -234,14 +182,6 @@ impl BlazeApp {
         self.ui_state.process_events();
 
         connect_ui_components_callback(ui, &mut self.state, &mut self.ui_state);
-
-        if self.state.is_loading || self.state.active_tasks > 0 {
-            self.repaint_signal.request_repaint_immediate();
-            ui.request_repaint();
-        } else {
-            self.repaint_signal.request_repaint_after(100);
-            ui.request_repaint_after(std::time::Duration::from_millis(100));
-        }
     }
 
     pub fn on_exit(&mut self) {

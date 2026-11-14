@@ -43,13 +43,11 @@ pub struct MediaPlayer {
 impl MediaPlayer {
     pub fn init() -> Self {
         let clock = Arc::new(Mutex::new(PlaybackClock::new()));
-        let seek_epoch = Arc::new(AtomicU64::new(0));
-
         Self {
-            video_player: VideoPlayer::init(clock.clone(), seek_epoch.clone()),
-            audio_player: AudioPlayer::init(clock.clone(), seek_epoch.clone()),
+            video_player: VideoPlayer::init(clock.clone()),
+            audio_player: AudioPlayer::init(clock.clone()),
             clock,
-            seek_epoch,
+            seek_epoch: Arc::new(AtomicU64::new(0)),
             audio_enabled: false,
             video_enabled: false,
             media_path: None,
@@ -104,7 +102,6 @@ impl MediaPlayer {
 
     pub fn stop(&mut self) {
         debug!("Llamado stop de mediaplayer");
-        self.media_path = None;
         if self.audio_enabled {
             match self.audio_player.stop() {
                 Ok(_) => {}
@@ -117,13 +114,7 @@ impl MediaPlayer {
 
         self.audio_enabled = false;
         self.video_enabled = false;
-        self.stop_players();
         self.clock.lock().reset();
-    }
-
-    pub fn stop_players(&mut self) {
-        debug!("StopPlayers");
-        self.seek_epoch.store(0, Ordering::SeqCst);
     }
 
     pub fn play_audio(&mut self) {
@@ -173,14 +164,11 @@ impl MediaPlayer {
     }
 
     pub fn play_video_audio(&mut self) {
-        debug!("Estamos llamando a pva");
         if self.clock.lock().is_playing() {
-            debug!("Está reproduciendo, paramos");
             self.stop();
         }
 
         if self.clock.lock().is_ended() {
-            debug!("reset en mp");
             self.reset();
         }
 
@@ -189,28 +177,23 @@ impl MediaPlayer {
             self.audio_player.load_path(path.into());
 
             match self.audio_player.play() {
-                Ok(_) => {
-                    debug!("Iniciado audio");
-                }
+                Ok(_) => self.audio_enabled = true,
                 Err(e) => {
-                    is_err = true;
+                    self.audio_enabled = false;
                     warn!("Error hacer play audio: {e}")
                 }
             }
-            self.audio_enabled = true;
 
             self.video_player.load_path(path.into());
             match self.video_player.play() {
-                Ok(_) => {}
+                Ok(_) => self.video_enabled = true,
                 Err(e) => {
                     is_err = true;
                     warn!("Error hacer play video: {e}")
                 }
             }
-            self.video_enabled = true;
 
             std::thread::sleep(Duration::from_millis(50));
-
             self.clock.lock().play();
         }
 
@@ -238,14 +221,12 @@ impl MediaPlayer {
     pub fn seek_5s_forward(&mut self) {
         let add = 5.0;
         let current = self.clock.lock().elapsed();
-
-        let clamped = if let Some(dur) = self.clock.lock().media_duration {
-            (current + add).clamp(current, dur)
-        } else {
-            current + add
+        let dur = self.clock.lock().media_duration;
+        let target = match dur {
+            Some(d) => (current + add).min(d),
+            None => current + add,
         };
-
-        self.seek(clamped);
+        self.seek(target);
     }
 
     pub fn seek_5s_back(&mut self) {
@@ -265,23 +246,28 @@ impl MediaPlayer {
     where
         C: FnMut(&TextureHandle, &mut Ui, (u32, u32)),
     {
+        let mut ended = false;
+        let playing;
         {
-            let clock_guard = self.clock.clone();
-            let mut clock = clock_guard.lock();
-            let mut ended = false;
-            if let ClockState::Playing(start) = clock.state {
+            let mut clock = self.clock.lock();
+            if let ClockState::Playing(start) = clock.state
+                && let Some(duration) = clock.media_duration
+            {
                 let pos = clock.accumulated + start.elapsed().as_secs_f32();
-                let duration = clock.media_duration.unwrap_or(0.0);
                 if pos >= duration {
                     clock.state = ClockState::Ended;
                     ended = true;
                 }
-            }
-            drop(clock);
+            };
+            playing = matches!(clock.state, ClockState::Playing(_));
+        }
 
-            if ended {
-                self.stop_players();
-            }
+        if ended && self.audio_enabled {
+            self.audio_player.halt();
+        }
+
+        if playing {
+            ui.ctx().request_repaint_after(Duration::from_millis(16));
         }
 
         if self.video_enabled {

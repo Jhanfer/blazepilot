@@ -11,6 +11,7 @@ use crate::{
     },
     ui::{
         blaze_ui_state::BlazeUiState,
+        custom_components::{UiExt, panel_border::OpenSide},
         fonts::fonts_manager::with_fonts,
         icons_cache::thumbnails::thumbnails_manager::ThumbnailMessages,
         modules::{
@@ -18,7 +19,7 @@ use crate::{
             island_n_bubble::render_island_bubble,
             miller_view::miller_scrollview::render_miller_scrollview,
         },
-        themes::{platform::structs::ToColor, theme_manager::with_theme},
+        themes::theme_manager::with_theme,
     },
 };
 use egui::{CornerRadius, Frame, Margin, Rect, ScrollArea, Sense, Stroke, Ui};
@@ -116,10 +117,8 @@ fn background_response_logic(
 
     let mut ctx_menu = std::mem::take(&mut ui_state.context_menu_state);
     match ctx_menu.kind {
-        ContextMenuKind::BackgroundNormal => ctx_menu.background_context_menu(ui, state, ui_state),
-        ContextMenuKind::BackgroundTrash => {
-            ctx_menu.background_context_menu_in_trash(ui, state, ui_state)
-        }
+        ContextMenuKind::BackgroundNormal => ctx_menu.background_context_menu(ui, state),
+        ContextMenuKind::BackgroundTrash => ctx_menu.background_context_menu_in_trash(ui, state),
         _ => {}
     }
     ui_state.context_menu_state = ctx_menu;
@@ -136,6 +135,7 @@ pub fn miller_panel_frame(
     bottom_padding: i8,
 ) {
     let current_theme = with_theme(|t| t.current());
+    let palette = current_theme.main_area.palette(&current_theme.global);
 
     ScrollArea::horizontal()
         .id_salt("miller_horizontal")
@@ -159,6 +159,13 @@ pub fn miller_panel_frame(
                     let is_focused = focused == *col_path;
                     let files: &[Arc<FileEntry>] = &state.get_files_for(col_path);
 
+                    let panel_radius = CornerRadius {
+                        nw: 0,
+                        ne: 0,
+                        sw: 20,
+                        se: 20,
+                    };
+
                     let frame_response = Frame::NONE
                         .inner_margin(Margin {
                             left: 5,
@@ -166,21 +173,8 @@ pub fn miller_panel_frame(
                             top: 0,
                             bottom: 5,
                         })
-                        .fill(current_theme.components.panel.bg.to_color())
-                        .corner_radius(CornerRadius {
-                            nw: 0,
-                            ne: 0,
-                            sw: 20,
-                            se: 20,
-                        })
-                        .stroke(Stroke {
-                            width: 0.5,
-                            color: if is_focused {
-                                current_theme.semantic.accent_glow.to_color()
-                            } else {
-                                current_theme.components.panel.bg.to_color()
-                            },
-                        })
+                        .fill(palette.bg_panel)
+                        .corner_radius(panel_radius)
                         .show(ui, |ui| {
                             let original_clip = ui.clip_rect();
                             let frame_rect = ui.max_rect();
@@ -332,12 +326,21 @@ pub fn miller_panel_frame(
                         let tab = motor.active_tab_mut();
                         tab.set_focus(path);
                     }
+
+                    ui.panel_border(frame_rect)
+                        .radius(panel_radius)
+                        .open_side(Some(OpenSide::Top))
+                        .stroke(Stroke::new(
+                            current_theme.global.panel_stroke_width,
+                            palette.border_panel,
+                        ))
+                        .paint_border();
                 }
 
                 {
                     let files: &[Arc<FileEntry>] = &state.get_files_for(&focused);
                     //Isla y burbuja y las tabs
-                    render_island_bubble(ui, state, ui_state, files, bottom_padding);
+                    render_island_bubble(ui, state, files, bottom_padding);
                 }
             });
         });

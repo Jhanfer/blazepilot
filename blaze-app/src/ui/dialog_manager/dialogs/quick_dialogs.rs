@@ -21,11 +21,14 @@ use crate::{
     },
     ui::{
         custom_components::{UiExt, text_edit::BlazeTextEdit},
-        dialog_manager::manager::ModalDialog,
-        themes::{platform::structs::ToColor, theme_manager::with_theme},
+        dialog_manager::{
+            dialogs::{DialogButtonKind, dialog_button, dialog_button_spacing, dialog_frame},
+            manager::ModalDialog,
+        },
+        themes::theme_manager::with_theme,
     },
 };
-use egui::{Color32, CornerRadius, Frame, Margin, Modal, Order, Ui, Window};
+use egui::{Color32, Margin, Modal, Order, RichText, Ui, Window};
 
 pub struct QuickAccDialog {
     event: Option<QuickTagEvent>,
@@ -68,12 +71,31 @@ impl QuickAccDialog {
     }
 
     fn show_warn(&mut self, message: &str, ui: &mut Ui) {
-        Modal::new("warn_modal".into()).show(ui, |ui| {
-            ui.label_ns(message);
-            if ui.button("Cerrar").clicked() {
-                self.show_warn = false;
-            }
-        });
+        let i18n = with_configs(|c| c.get_i18n());
+        let current_theme = with_theme(|t| t.current());
+        let palette = current_theme.dialogs.palette(&current_theme.global);
+
+        Modal::new("warn_modal".into())
+            .frame(dialog_frame(
+                &palette,
+                current_theme.global.panel_stroke_width,
+            ))
+            .show(ui, |ui| {
+                ui.label_ns(RichText::new(message).color(palette.fg_primary));
+                ui.add_space(8.0);
+
+                if dialog_button(
+                    ui,
+                    i18n.t("general_dialog.close"),
+                    &palette,
+                    DialogButtonKind::Secondary,
+                )
+                .show()
+                .clicked()
+                {
+                    self.show_warn = false;
+                }
+            });
     }
 
     fn process_events(&mut self, ui: &mut Ui) -> bool {
@@ -81,6 +103,8 @@ impl QuickAccDialog {
             return false;
         };
 
+        let current_theme = with_theme(|t| t.current().clone());
+        let palette = current_theme.dialogs.palette(&current_theme.global);
         let i18n = with_configs(|c| c.get_i18n());
 
         match event {
@@ -98,44 +122,102 @@ impl QuickAccDialog {
                     &i18n.t("quick_dialog_quick_to_tag.title"),
                     |ui, mut should_close| {
                         ui.set_min_width(250.0);
+                        ui.set_max_width(300.0);
                         ui.set_min_height(100.0);
 
                         ui.vertical_centered(|ui| {
-                            egui::ComboBox::from_label(
-                                i18n.t("quick_dialog_quick_to_tag.select_tag"),
-                            )
-                            .selected_text(
-                                tags.get(selected_index)
-                                    .map(|t| t.title.as_ref())
-                                    .unwrap_or(&i18n.t("quick_dialog_quick_to_tag.select_tag")),
-                            )
-                            .show_ui(ui, |ui| {
-                                for (i, tag) in tags.iter().enumerate() {
-                                    if ui
-                                        .selectable_label(selected_index == i, &*tag.title)
-                                        .clicked()
-                                    {
-                                        selected_index = i;
-                                    }
-                                }
+                            let hover_bg = palette.bg_hover;
+
+                            ui.label_ns(
+                                RichText::new(i18n.t("quick_dialog_quick_to_tag.select_tag"))
+                                    .color(palette.fg_primary),
+                            );
+
+                            ui.horizontal(|ui| {
+                                ui.blaze_combobox()
+                                    .selected_text(
+                                        tags.get(selected_index)
+                                            .map(|t| t.title.as_ref())
+                                            .unwrap_or(
+                                                &i18n.t("quick_dialog_quick_to_tag.select_tag"),
+                                            ),
+                                    )
+                                    .text_color(palette.fg_primary)
+                                    .size((150.0, 30.0))
+                                    .background_color(palette.bg_elevated)
+                                    .hover_background_color(palette.bg_hover)
+                                    .show(|ui| {
+                                        let w = ui.available_width();
+
+                                        for (i, tag) in tags.iter().enumerate() {
+                                            let is_selected = selected_index == i;
+                                            let text_color = if is_selected {
+                                                palette.fg_primary
+                                            } else {
+                                                palette.fg_secondary
+                                            };
+                                            let label =
+                                                RichText::new(&*tag.title).color(text_color);
+
+                                            let bg = if is_selected {
+                                                palette.bg_selected
+                                            } else {
+                                                Color32::TRANSPARENT
+                                            };
+
+                                            if ui
+                                                .blaze_button(label)
+                                                .id(format!("quick_tag{i}"))
+                                                .size((w, 20.0))
+                                                .background_color(bg)
+                                                .hover_background_color(hover_bg)
+                                                .stroke_color(Color32::TRANSPARENT)
+                                                .radius(20)
+                                                .stroke_width(
+                                                    current_theme.global.components_stroke_width,
+                                                )
+                                                .show()
+                                                .clicked()
+                                            {
+                                                selected_index = i;
+                                            }
+                                        }
+                                    });
                             });
 
                             ui.add_space(8.0);
                         });
 
-                        ui.add_space(50.0);
+                        ui.add_space(20.0);
 
                         ui.horizontal(|ui| {
-                            let width = ui.available_width();
-                            let button_width = 120.0;
-                            let spacing = (width - button_width * 2.0) / 2.0;
+                            let spacing = dialog_button_spacing(ui, 2);
 
                             ui.add_space(spacing);
-                            if ui.button(i18n.t("general_dialog.close")).clicked() {
+
+                            if dialog_button(
+                                ui,
+                                i18n.t("general_dialog.close"),
+                                &palette,
+                                DialogButtonKind::Secondary,
+                            )
+                            .show()
+                            .clicked()
+                            {
                                 should_close = true;
                             }
 
-                            if ui.button(i18n.t("general_dialog.accept")).clicked() {
+                            ui.add_space(spacing);
+
+                            if dialog_button(
+                                ui,
+                                i18n.t("general_dialog.accept"),
+                                &palette,
+                                DialogButtonKind::Primary,
+                            )
+                            .show()
+                            .clicked()
+                            {
                                 with_quick_tags(|qtm| {
                                     let tag = tags.get(selected_index);
                                     if let Some(tag) = tag {
@@ -198,34 +280,41 @@ impl QuickAccDialog {
                             );
                             ui.add_space(8.0);
 
-                            let mut rgb: [f32; 3] = [
-                                temp_color.r() as f32 / 255.0,
-                                temp_color.g() as f32 / 255.0,
-                                temp_color.b() as f32 / 255.0,
-                            ];
-
-                            if ui.color_edit_button_rgb(&mut rgb).changed() {
-                                temp_color = Color32::from_rgb(
-                                    (rgb[0] * 255.0) as u8,
-                                    (rgb[1] * 255.0) as u8,
-                                    (rgb[2] * 255.0) as u8,
-                                );
-                            }
+                            ui.color_picker(&mut temp_color, "quick_tag_color")
+                                .background_color(palette.bg_elevated)
+                                .show();
                         });
 
-                        ui.add_space(50.0);
+                        ui.add_space(20.0);
 
                         ui.horizontal(|ui| {
-                            let width = ui.available_width();
-                            let button_width = 120.0;
-                            let spacing = (width - button_width * 2.0) / 2.0;
+                            let spacing = dialog_button_spacing(ui, 2);
 
                             ui.add_space(spacing);
-                            if ui.button(i18n.t("general_dialog.close")).clicked() {
+
+                            if dialog_button(
+                                ui,
+                                i18n.t("general_dialog.close"),
+                                &palette,
+                                DialogButtonKind::Secondary,
+                            )
+                            .show()
+                            .clicked()
+                            {
                                 should_close = true;
                             }
 
-                            if ui.button(i18n.t("general_dialog.accept")).clicked() {
+                            ui.add_space(spacing);
+
+                            if dialog_button(
+                                ui,
+                                i18n.t("general_dialog.accept"),
+                                &palette,
+                                DialogButtonKind::Primary,
+                            )
+                            .show()
+                            .clicked()
+                            {
                                 if title.trim().is_empty() {
                                     show_warn = true;
                                     message = i18n.t("quick_dialog_create.title_empty").into();
@@ -287,34 +376,41 @@ impl QuickAccDialog {
                             );
                             ui.add_space(8.0);
 
-                            let mut rgb: [f32; 3] = [
-                                temp_color.r() as f32 / 255.0,
-                                temp_color.g() as f32 / 255.0,
-                                temp_color.b() as f32 / 255.0,
-                            ];
-
-                            if ui.color_edit_button_rgb(&mut rgb).changed() {
-                                temp_color = Color32::from_rgb(
-                                    (rgb[0] * 255.0) as u8,
-                                    (rgb[1] * 255.0) as u8,
-                                    (rgb[2] * 255.0) as u8,
-                                );
-                            }
+                            ui.color_picker(&mut temp_color, "quick_tag_color")
+                                .background_color(palette.bg_elevated)
+                                .show();
                         });
 
-                        ui.add_space(50.0);
+                        ui.add_space(20.0);
 
                         ui.horizontal(|ui| {
-                            let width = ui.available_width();
-                            let button_width = 120.0;
-                            let spacing = (width - button_width * 2.0) / 2.0;
+                            let spacing = dialog_button_spacing(ui, 2);
 
                             ui.add_space(spacing);
-                            if ui.button(i18n.t("general_dialog.close")).clicked() {
+
+                            if dialog_button(
+                                ui,
+                                i18n.t("general_dialog.close"),
+                                &palette,
+                                DialogButtonKind::Secondary,
+                            )
+                            .show()
+                            .clicked()
+                            {
                                 should_close = true;
                             }
 
-                            if ui.button(i18n.t("general_dialog.save")).clicked() {
+                            ui.add_space(spacing);
+
+                            if dialog_button(
+                                ui,
+                                i18n.t("general_dialog.save"),
+                                &palette,
+                                DialogButtonKind::Primary,
+                            )
+                            .show()
+                            .clicked()
+                            {
                                 if title.trim().is_empty() {
                                     show_warn = true;
                                     message = i18n.t("quick_dialog_edit_tag.title_empty").into();
@@ -366,19 +462,36 @@ impl QuickAccDialog {
                     ui,
                     &i18n.t_args("quick_dialog_delete_tag.title", &[("query", &title)]),
                     |ui, mut should_close| {
-                        ui.add_space(50.0);
+                        ui.add_space(20.0);
 
                         ui.horizontal(|ui| {
-                            let width = ui.available_width();
-                            let button_width = 120.0;
-                            let spacing = (width - button_width * 2.0) / 2.0;
+                            let spacing = dialog_button_spacing(ui, 2);
 
                             ui.add_space(spacing);
-                            if ui.button(i18n.t("general_dialog.close")).clicked() {
+
+                            if dialog_button(
+                                ui,
+                                i18n.t("general_dialog.close"),
+                                &palette,
+                                DialogButtonKind::Secondary,
+                            )
+                            .show()
+                            .clicked()
+                            {
                                 should_close = true;
                             }
 
-                            if ui.button(i18n.t("general_dialog.delete")).clicked() {
+                            ui.add_space(spacing);
+
+                            if dialog_button(
+                                ui,
+                                i18n.t("general_dialog.delete"),
+                                &palette,
+                                DialogButtonKind::Danger,
+                            )
+                            .show()
+                            .clicked()
+                            {
                                 with_quick_tags(|qtm| {
                                     qtm.remove_tag(id);
                                 });
@@ -411,19 +524,36 @@ impl QuickAccDialog {
                         &[("query", &quick_title)],
                     ),
                     |ui, mut should_close| {
-                        ui.add_space(50.0);
+                        ui.add_space(20.0);
 
                         ui.horizontal(|ui| {
-                            let width = ui.available_width();
-                            let button_width = 120.0;
-                            let spacing = (width - button_width * 2.0) / 2.0;
+                            let spacing = dialog_button_spacing(ui, 2);
 
                             ui.add_space(spacing);
-                            if ui.button(i18n.t("general_dialog.close")).clicked() {
+
+                            if dialog_button(
+                                ui,
+                                i18n.t("general_dialog.close"),
+                                &palette,
+                                DialogButtonKind::Secondary,
+                            )
+                            .show()
+                            .clicked()
+                            {
                                 should_close = true;
                             }
 
-                            if ui.button(i18n.t("general_dialog.delete")).clicked() {
+                            ui.add_space(spacing);
+
+                            if dialog_button(
+                                ui,
+                                i18n.t("general_dialog.delete"),
+                                &palette,
+                                DialogButtonKind::Danger,
+                            )
+                            .show()
+                            .clicked()
+                            {
                                 with_quick_tags(|qtm| {
                                     qtm.remove_quick_to_tag(tag_id, quick_id);
                                 });
@@ -470,34 +600,41 @@ impl QuickAccDialog {
                             );
                             ui.add_space(8.0);
 
-                            let mut rgb: [f32; 3] = [
-                                temp_color.r() as f32 / 255.0,
-                                temp_color.g() as f32 / 255.0,
-                                temp_color.b() as f32 / 255.0,
-                            ];
-
-                            if ui.color_edit_button_rgb(&mut rgb).changed() {
-                                temp_color = Color32::from_rgb(
-                                    (rgb[0] * 255.0) as u8,
-                                    (rgb[1] * 255.0) as u8,
-                                    (rgb[2] * 255.0) as u8,
-                                );
-                            }
+                            ui.color_picker(&mut temp_color, "quick_tag_color")
+                                .background_color(palette.bg_elevated)
+                                .show();
                         });
 
-                        ui.add_space(50.0);
+                        ui.add_space(20.0);
 
                         ui.horizontal(|ui| {
-                            let width = ui.available_width();
-                            let button_width = 120.0;
-                            let spacing = (width - button_width * 2.0) / 2.0;
+                            let spacing = dialog_button_spacing(ui, 2);
 
                             ui.add_space(spacing);
-                            if ui.button(i18n.t("general_dialog.close")).clicked() {
+
+                            if dialog_button(
+                                ui,
+                                i18n.t("general_dialog.close"),
+                                &palette,
+                                DialogButtonKind::Secondary,
+                            )
+                            .show()
+                            .clicked()
+                            {
                                 should_close = true;
                             }
 
-                            if ui.button(i18n.t("general_dialog.save")).clicked() {
+                            ui.add_space(spacing);
+
+                            if dialog_button(
+                                ui,
+                                i18n.t("general_dialog.save"),
+                                &palette,
+                                DialogButtonKind::Primary,
+                            )
+                            .show()
+                            .clicked()
+                            {
                                 if title.trim().is_empty() {
                                     show_warn = true;
                                     message = i18n.t("quick_dialog_edit_quick.name_empty").into();
@@ -551,16 +688,15 @@ impl QuickAccDialog {
         F: FnMut(&mut Ui, bool) -> bool,
     {
         let current_theme = with_theme(|t| t.current());
+        let palette = current_theme.dialogs.palette(&current_theme.global);
 
         let mut should_close = false;
 
-        let custom_frame = Frame::NONE
-            .fill(current_theme.semantic.bg_main.to_color())
-            .corner_radius(CornerRadius::same(10))
-            .inner_margin(Margin::same(10));
-
-        Window::new(title)
-            .frame(custom_frame)
+        Window::new(RichText::new(title).color(palette.fg_primary))
+            .frame(dialog_frame(
+                &palette,
+                current_theme.global.panel_stroke_width,
+            ))
             .order(Order::Foreground)
             .collapsible(false)
             .resizable(false)
