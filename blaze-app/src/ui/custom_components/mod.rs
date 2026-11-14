@@ -1,11 +1,12 @@
-use egui::{Color32, Response, Ui, WidgetText, emath::Numeric};
+use egui::{Color32, Rect, Response, Ui, WidgetText, emath::Numeric};
 use parking_lot::Mutex;
 use std::{fmt::Debug, hash::Hash, sync::Arc};
 
 use crate::ui::{
     custom_components::{
         button::BlazeButton, color_picker::BlazeColorSelector, combobox::BlazeComboBox,
-        icon::BlazeIcon, input::BlazeInput, popup::BlazePopup, slider::BlazeSlider,
+        icon::BlazeIcon, input::BlazeInput, panel_border::PanelBorder, popup::BlazePopup,
+        slider::BlazeSlider,
     },
     icons_cache::icon_cache::IconCache,
 };
@@ -16,6 +17,7 @@ pub mod combobox;
 pub mod icon;
 pub mod input;
 pub mod label;
+pub mod panel_border;
 pub mod popup;
 pub mod slider;
 pub mod text_edit;
@@ -90,6 +92,14 @@ pub trait UiExt<'a> {
     /// # Parámetros
     /// - `icon_data`: Tupla con el identificador o nombre del icono y los bytes de la imagen
     fn draw_icon(&'a mut self, icon_data: (&'a str, impl Into<&'a [u8]>)) -> BlazeIcon<'a>;
+
+    /// Crea un builder de [`PanelBorder`]
+    ///
+    /// Permite generar bordes de paneles con huecos siguiendo la direción de OpenSide
+    ///
+    /// # Parámetros:
+    /// - `rect`: Rectángulo dee egui que representa un espacio en pantalla
+    fn panel_border(&'a mut self, rect: Rect) -> PanelBorder<'a>;
 }
 
 impl<'a> UiExt<'a> for Ui {
@@ -150,5 +160,9 @@ impl<'a> UiExt<'a> for Ui {
                 .expect("IconCache no inyectado en el frame")
         });
         BlazeIcon::new(self, icon_data, cache_arc)
+    }
+
+    fn panel_border(&'a mut self, rect: Rect) -> PanelBorder<'a> {
+        PanelBorder::new(self, rect)
     }
 }

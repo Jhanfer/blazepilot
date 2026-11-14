@@ -11,6 +11,7 @@ use crate::{
     },
     ui::{
         blaze_ui_state::BlazeUiState,
+        custom_components::{UiExt, panel_border::OpenSide},
         fonts::fonts_manager::with_fonts,
         icons_cache::thumbnails::thumbnails_manager::ThumbnailMessages,
         modules::{
@@ -142,7 +143,14 @@ pub fn detailed_row_panel_frame(
     let current_theme = with_theme(|t| t.current());
     let palette = current_theme.main_area.palette(&current_theme.global);
 
-    Frame::NONE
+    let panel_radius = CornerRadius {
+        nw: 0,
+        ne: 0,
+        sw: 20,
+        se: 20,
+    };
+
+    let frame = Frame::NONE
         .inner_margin(Margin {
             left: 10,
             right: 10,
@@ -150,16 +158,7 @@ pub fn detailed_row_panel_frame(
             bottom: 10,
         })
         .fill(palette.bg_panel)
-        .corner_radius(CornerRadius {
-            nw: 0,
-            ne: 0,
-            sw: 20,
-            se: 20,
-        })
-        .stroke(Stroke {
-            width: 0.5,
-            color: palette.border_panel,
-        })
+        .corner_radius(panel_radius)
         .show(ui, |ui| {
             let original_clip = ui.clip_rect();
             let frame_rect = ui.max_rect();
@@ -305,4 +304,13 @@ pub fn detailed_row_panel_frame(
 
             ui.set_clip_rect(original_clip);
         });
+
+    ui.panel_border(frame.response.rect)
+        .radius(panel_radius)
+        .open_side(Some(OpenSide::Top))
+        .stroke(Stroke::new(
+            current_theme.global.panel_stroke_width,
+            palette.border_panel,
+        ))
+        .paint_border();
 }

@@ -12,7 +12,7 @@ use crate::{
     },
     ui::{
         blaze_ui_state::BlazeUiState,
-        custom_components::UiExt,
+        custom_components::{UiExt, panel_border::OpenSide},
         icons_cache::thumbnails::thumbnails_manager::Thumbnail,
         modules::{
             island_n_bubble::render_tags_island_bubble,
@@ -49,7 +49,14 @@ pub fn tag_views(
 
     let i18n = with_configs(|c| c.get_i18n());
 
-    Frame::NONE
+    let panel_radius = CornerRadius {
+        nw: 0,
+        ne: 0,
+        sw: 20,
+        se: 20,
+    };
+
+    let frame = Frame::NONE
         .inner_margin(Margin {
             left: 10,
             right: 10,
@@ -57,16 +64,7 @@ pub fn tag_views(
             bottom: 10,
         })
         .fill(current_theme.main_area.bg_panel())
-        .corner_radius(CornerRadius {
-            nw: 0,
-            ne: 0,
-            sw: 20,
-            se: 20,
-        })
-        .stroke(Stroke {
-            width: 0.5,
-            color: current_theme.main_area.panel_border(),
-        })
+        .corner_radius(panel_radius)
         .show(ui, |ui| {
             ScrollArea::vertical().id_salt("all_tags").show(ui, |ui| {
                 if !ui.memory(|m| m.focused().is_some()) {
@@ -555,6 +553,15 @@ pub fn tag_views(
 
             render_tags_island_bubble(ui, state, bottom_padding, tag_len);
         });
+
+    ui.panel_border(frame.response.rect)
+        .radius(panel_radius)
+        .open_side(Some(OpenSide::Top))
+        .stroke(Stroke::new(
+            current_theme.global.panel_stroke_width,
+            current_theme.main_area.panel_border(),
+        ))
+        .paint_border();
 
     //Tags
     if ui.input(|i| i.modifiers.ctrl) && ui.input(|i| i.key_pressed(egui::Key::T)) {

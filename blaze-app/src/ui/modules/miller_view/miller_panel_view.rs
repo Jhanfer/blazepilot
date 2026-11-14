@@ -11,6 +11,7 @@ use crate::{
     },
     ui::{
         blaze_ui_state::BlazeUiState,
+        custom_components::{UiExt, panel_border::OpenSide},
         fonts::fonts_manager::with_fonts,
         icons_cache::thumbnails::thumbnails_manager::ThumbnailMessages,
         modules::{
@@ -158,6 +159,13 @@ pub fn miller_panel_frame(
                     let is_focused = focused == *col_path;
                     let files: &[Arc<FileEntry>] = &state.get_files_for(col_path);
 
+                    let panel_radius = CornerRadius {
+                        nw: 0,
+                        ne: 0,
+                        sw: 20,
+                        se: 20,
+                    };
+
                     let frame_response = Frame::NONE
                         .inner_margin(Margin {
                             left: 5,
@@ -166,20 +174,7 @@ pub fn miller_panel_frame(
                             bottom: 5,
                         })
                         .fill(palette.bg_panel)
-                        .corner_radius(CornerRadius {
-                            nw: 0,
-                            ne: 0,
-                            sw: 20,
-                            se: 20,
-                        })
-                        .stroke(Stroke {
-                            width: 0.5,
-                            color: if is_focused {
-                                palette.border_focus
-                            } else {
-                                palette.bg_panel
-                            },
-                        })
+                        .corner_radius(panel_radius)
                         .show(ui, |ui| {
                             let original_clip = ui.clip_rect();
                             let frame_rect = ui.max_rect();
@@ -331,6 +326,15 @@ pub fn miller_panel_frame(
                         let tab = motor.active_tab_mut();
                         tab.set_focus(path);
                     }
+
+                    ui.panel_border(frame_rect)
+                        .radius(panel_radius)
+                        .open_side(Some(OpenSide::Top))
+                        .stroke(Stroke::new(
+                            current_theme.global.panel_stroke_width,
+                            palette.border_panel,
+                        ))
+                        .paint_border();
                 }
 
                 {

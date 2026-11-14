@@ -13,7 +13,7 @@ use crate::{
         system::trash_manager::manager::get_backend,
     },
     ui::{
-        custom_components::UiExt,
+        custom_components::{UiExt, panel_border::OpenSide},
         icons_cache::icons::*,
         modules::utilities::{ensure_min_lightness, shade_color},
         themes::theme_manager::with_theme,
@@ -240,7 +240,14 @@ pub fn tools(state: &mut BlazeCoreState, ui: &mut Ui) {
     let current_theme = with_theme(|t| t.current());
     let palette = current_theme.main_area.palette(&current_theme.global);
 
-    Frame::new()
+    let toolbar_radius = CornerRadius {
+        nw: 20,
+        ne: 20,
+        sw: 0,
+        se: 0,
+    };
+
+    let frame = Frame::new()
         .fill(palette.bg_elevated)
         .inner_margin(Margin {
             left: 15,
@@ -248,16 +255,7 @@ pub fn tools(state: &mut BlazeCoreState, ui: &mut Ui) {
             top: 15,
             bottom: 15,
         })
-        .corner_radius(CornerRadius {
-            nw: 20,
-            ne: 20,
-            sw: 0,
-            se: 0,
-        })
-        .stroke(Stroke::new(
-            current_theme.global.panel_stroke_width,
-            palette.border_panel,
-        ))
+        .corner_radius(toolbar_radius)
         .show(ui, |ui| {
             let toolbar_height = 25.0;
             ui.set_min_height(toolbar_height);
@@ -555,4 +553,13 @@ pub fn tools(state: &mut BlazeCoreState, ui: &mut Ui) {
                 });
             });
         });
+
+    ui.panel_border(frame.response.rect)
+        .radius(toolbar_radius)
+        .open_side(Some(OpenSide::Bottom))
+        .stroke(Stroke::new(
+            current_theme.global.panel_stroke_width,
+            palette.border_panel,
+        ))
+        .paint_border();
 }
