@@ -1,7 +1,3 @@
-[app]
-title = "BlazePilot"
-loading = "Caricamento..."
-
 [left_sidebar]
 root = "Radice"
 locals = "Locali"
@@ -13,8 +9,9 @@ pictures = "Immagini"
 videos = "Video"
 music = "Musica"
 public = "Pubblico"
-trash = "Cestino" 
+trash = "Cestino"
 disks = "Dischi"
+used_percent = "Usato: {query} %"
 
 [right_sidebar]
 info = "Informazioni"
@@ -25,11 +22,15 @@ owner = "Proprietario:"
 group_name = "Nome gruppo:"
 dimensions = "Dimensioni:"
 git_status = "Stato Git:"
+modified = "Modificato:"
+folder = "Cartella"
+
+[route]
+placeholder = "Inserisci un percorso"
 
 [search]
 placeholder = "Cercare"
 no_results = "Nessun risultato per \"{query}\""
-searching = "Ricerca in corso..."
 
 [bg_ctx_menu]
 new_tab = "Nuova scheda"
@@ -49,7 +50,6 @@ add_to_tag = "Aggiungi al tag"
 [file_ops]
 copy = "Copia"
 cut = "Taglia"
-paste = "Incolla"
 paste_here = "Incolla qui"
 extract_here = "Estrai qui"
 folder_color = "Colore cartella"
@@ -57,12 +57,19 @@ rename = "Rinomina"
 restore = "Ripristina"
 move_to_trash = "Sposta nel cestino"
 delete = "Elimina"
-delete_confirm = "Eliminare {count} file?"
 
 [tools]
 name = "Nome"
 modified = "Modificato"
 size = "Dimensione"
+extension = "Estensione"
+created = "Creato"
+accessed = "Accesso"
+owner = "Proprietario"
+group = "Gruppo"
+permissions = "Permessi"
+dimensions = "Dimensioni"
+symlink = "Destinazione link"
 
 [tags_quick]
 new = "Nuovo"
@@ -104,7 +111,6 @@ language = "Lingua"
 gratitude = "Grazie per usare BlazePilot!"
 made_for = "Fatto con ❤ da Jhanfer. :D"
 report = "Segnala un bug"
-sys_info = "Informazioni di sistema"
 disclaimer = "Le impostazioni sono limitate per ora. Stiamo ancora lavorando."
 
 [configs_terminal]
@@ -117,10 +123,7 @@ max_retries_error = "❌ Impossibile trovare alcun terminale dopo diversi tentat
 verify_terminals_message = "Verifica di avere almeno un terminale installato."
 suggestion_message = "💡 Suggerimento: Installa un terminale come gnome-terminal, konsole o alacritty"
 retry = "Riprova"
-max_retries = 3
-timeout_seconds = 5
 combo_box_label = "Terminale predefinito"
-
 
 [configs_backend]
 title = "Protocollo di visualizzazione"
@@ -133,48 +136,22 @@ X11: Maggiore compatibilità con le app più vecchie. Consente il drag & drop da
 """
 disclaimer = "Queste modifiche richiedono il riavvio dell'app."
 
-
 [configs_appearance]
 title = "Cambia aspetto"
-reload_theme = "Ricarica tema"
 selection = "Seleziona un tema"
+reload_theme = "Ricarica tema"
 message = "Puoi modificare ogni tema in ~/.config/blazepilotapp/themes"
-
 color_editor = "Editor colori"
-
-states = "Stati"
+section_global = "Generale"
+main_bg = "Sfondo principale"
+rubberband = "Banda di selezione"
+primary_text = "Testo principale"
+secondary_text = "Testo secondario"
 error = "Errore"
 success = "Successo"
 warn = "Avvertenza"
-
-background = "Sfondi"
-main_bg = "Sfondo principale"
-panel_bg = "Sfondo del pannello"
-container_bg = "Sfondo del contenitore"
-hover_bg = "Sfondo al passaggio del mouse"
-
-border-buttons = "Bordi e pulsanti"
-border_panel = "Bordo del pannello"
-main_buttons = "Pulsanti principali"
-
-accent = "Accenti"
-accent_glow = "Luminosità dell'accento"
-rubberband = "Banda di selezione"
-selected_item = "Elemento selezionato"
-
-texts = "Testi"
-primary_text = "Testo principale"
-secondary_text = "Testo secondario"
-muted_text = "Testo attenuato"
-
-tools = "Strumenti"
-primary-tool-color = "Colore principale dello strumento"
-secondary-tool-color = "Colore secondario dello strumento"
-tool-btn-active = "Pulsante strumento attivo"
-tool-btn-inactive = "Pulsante strumento inattivo"
-tool-btn-hovered = "Pulsante strumento al passaggio del mouse"
-
-files = "File"
+stroke_width = "Spessore del bordo"
+files = "Icone dei file"
 folder = "Cartella"
 image = "Immagine"
 pdf = "PDF"
@@ -186,35 +163,24 @@ code = "Codice"
 font = "Carattere"
 exe = "Eseguibile"
 fallback = "Predefinito"
-
+section_sidebar_left = "Barra laterale sinistra"
+section_top_bar = "Barra superiore"
+section_main_area = "Pannello principale"
+section_sidebar_right = "Barra laterale destra"
+section_context_menu = "Menu contestuale"
+section_dialogs = "Finestre di dialogo"
+panel_bg = "Sfondo del pannello"
+bg_elevated = "Sfondo elevato"
+hover_bg = "Sfondo al passaggio del mouse"
+bg_active = "Sfondo attivo"
+icon_primary = "Icona principale"
+icon_secondary = "Icona secondaria"
+accent = "Accento"
+panel_border = "Bordo del pannello"
+component_border = "Bordo del componente"
 theme-name = "Nome del tema"
 save-as-custom = "Salva come tema personalizzato"
 reset-defaults = "Ripristina valori predefiniti"
-separator = "Separatore"
-panels = "Pannelli"
-panel_border = "Bordo del pannello"
-buttons = "Pulsanti"
-button_bg = "Sfondo del pulsante"
-button_hover = "Sfondo del pulsante (hover)"
-button_label_hover = "Testo del pulsante (hover)"
-button_label_active = "Testo del pulsante (attivo)"
-button_label_inactive = "Testo del pulsante (inattivo)"
-input = "Campo di input"
-input_bg = "Sfondo del campo di input"
-input_border_idle = "Bordo del campo di input (riposo)"
-input_border_focus = "Bordo del campo di input (focus)"
-sidebar = "Barra laterale"
-sidebar_hover = "Sfondo della barra laterale (hover)"
-file_list = "Elenco file"
-list_hover = "Sfondo dell'elenco (hover)"
-list_selected = "Sfondo dell'elenco (selezionato)"
-tools_bg = "Sfondo degli strumenti"
-tools_label_hover = "Testo dello strumento (hover)"
-tools_label_active = "Testo dello strumento (attivo)"
-tools_label_inactive = "Testo dello strumento (inattivo)"
-
-[configs_behavior]
-title = "WIP :D"
 
 [configs_language]
 title = "Cambia lingua"
@@ -275,7 +241,7 @@ title_img = "URL immagine"
 message_web = "Vuoi aprire la pagina in un browser?"
 message_url = "Vuoi scaricare l'immagine?"
 
-[want_to_donwload_dialog]  
+[want_to_donwload_dialog]
 title = "Vuoi installare l'app?"
 message = "Questo creerà un file '.desktop'"
 hint = "Puoi installare dalle impostazioni in seguito"
@@ -301,7 +267,6 @@ to = "in {query}"
 
 [sure_to_delete_dialog]
 title = "Vuoi eliminare definitivamente?"
-file = "File"
 file_dot = "• {query}"
 and_more = "... e altri {query} file"
 

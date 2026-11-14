@@ -286,11 +286,13 @@ pub fn hot_keys_logic(
     // Creación de items
     if cmd && mods_key.shift && input.key_pressed(Key::N) {
         state.creating_new = Some(NewItemType::Folder);
-        state.new_item_buffer = "nueva carpeta".to_string();
+        state.new_item_buffer =
+            with_configs(|c| c.get_i18n().t("bg_ctx_menu.new_folder").to_string());
     }
     if cmd && mods_key.shift && input.key_pressed(Key::F) {
         state.creating_new = Some(NewItemType::File);
-        state.new_item_buffer = "nuevo archivo".to_string();
+        state.new_item_buffer =
+            with_configs(|c| c.get_i18n().t("bg_ctx_menu.new_file").to_string());
     }
 
     // Terminal

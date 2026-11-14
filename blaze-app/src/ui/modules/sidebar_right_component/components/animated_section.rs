@@ -167,10 +167,18 @@ pub(crate) fn render_animated_section(
                                 ui.end_row();
                             };
 
-                            row(ui, "Modificado:", &format_date(file.modified));
+                            row(
+                                ui,
+                                &i18n.t("right_sidebar.modified"),
+                                &format_date(file.modified),
+                            );
 
                             if file.is_dir() {
-                                row(ui, &i18n.t("right_sidebar.ext"), "Folder");
+                                row(
+                                    ui,
+                                    &i18n.t("right_sidebar.ext"),
+                                    &i18n.t("right_sidebar.folder"),
+                                );
                             } else {
                                 row(
                                     ui,

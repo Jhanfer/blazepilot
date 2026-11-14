@@ -93,5 +93,14 @@ pub(crate) fn render_backend_settings(ui: &mut Ui, _query: &str) {
             )
             .selectable(false),
         );
+
+        ui.add_space(12.0);
+
+        ui.add(
+            Label::new(
+                RichText::new(i18n.t("configs_backend.disclaimer")).color(palette.fg_secondary),
+            )
+            .selectable(false),
+        );
     });
 }

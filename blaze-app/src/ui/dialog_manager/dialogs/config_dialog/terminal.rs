@@ -111,8 +111,8 @@ pub(crate) fn render_terminal_settings(c_dialog: &mut ConfigDialog, ui: &mut Ui,
                         RichText::new(i18n.t_args(
                             "configs_terminal.loading_message",
                             &[
-                                ("query", &c_dialog.retry_count.to_string()),
-                                ("query", &c_dialog.max_retries.to_string()),
+                                ("retry_count", &c_dialog.retry_count.to_string()),
+                                ("max_retries", &c_dialog.max_retries.to_string()),
                             ],
                         ))
                         .color(palette.fg_primary),

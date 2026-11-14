@@ -80,8 +80,8 @@ impl CurrentConfigTab {
             CurrentConfigTab::Backend => {
                 let keywords = [
                     i18n.t("search_keywords_backend.backend"),
-                    "gpu".into(),
-                    "cpu".into(),
+                    i18n.t("search_keywords_backend.gpu"),
+                    i18n.t("search_keywords_backend.cpu"),
                     i18n.t("search_keywords_backend.render"),
                     "vulkan".into(),
                     "opengl".into(),

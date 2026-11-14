@@ -287,7 +287,8 @@ pub fn tools(state: &mut BlazeCoreState, ui: &mut Ui) {
                         .clicked()
                     {
                         state.creating_new = Some(NewItemType::Folder);
-                        state.new_item_buffer = "nueva carpeta".to_string();
+                        state.new_item_buffer =
+                            with_configs(|c| c.get_i18n().t("bg_ctx_menu.new_folder").to_string());
                     }
 
                     let btn_name = "plus-file";
@@ -308,7 +309,8 @@ pub fn tools(state: &mut BlazeCoreState, ui: &mut Ui) {
                         .clicked()
                     {
                         state.creating_new = Some(NewItemType::File);
-                        state.new_item_buffer = "nuevo archivo".to_string();
+                        state.new_item_buffer =
+                            with_configs(|c| c.get_i18n().t("bg_ctx_menu.new_file").to_string());
                     }
 
                     ui.separator();

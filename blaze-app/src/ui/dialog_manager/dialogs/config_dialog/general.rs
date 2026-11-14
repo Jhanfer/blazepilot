@@ -120,7 +120,7 @@ pub(crate) fn render_general_settings(ui: &mut Ui, _query: &str) {
                     }
 
                     if ui
-                        .blaze_button("Report")
+                        .blaze_button(i18n.t("configs_general.report"))
                         .size((100.0, 15.0))
                         .icon("bug", icons::ICON_BUG)
                         .icon_color(palette.icon_primary)

@@ -1,5 +1,8 @@
 use crate::{
-    core::{blaze_state::BlazeCoreState, system::disk_reader::disk::Disk},
+    core::{
+        blaze_state::BlazeCoreState, bootstrap::configs::config_manager::with_configs,
+        system::disk_reader::disk::Disk,
+    },
     ui::{
         blaze_ui_state::BlazeUiState, custom_components::UiExt, icons_cache::icons::*,
         modules::custom_context_menu::context_state::ContextMenuKind,
@@ -108,15 +111,19 @@ pub fn render_drives_button(
 ) {
     let current_theme = with_theme(|t| t.current());
     let palette = current_theme.sidebar_left.palette(&current_theme.global);
+    let i18n = with_configs(|c| c.get_i18n());
 
     let used = drive.used_percent / 100.0;
     let is_mounted = drive.mountpoint.is_some();
-    let used_percentage = format!("Used {}%", drive.used_percent as i32);
+    let used_percentage = i18n.t_args(
+        "left_sidebar.used_percent",
+        &[("query", &(drive.used_percent as i32).to_string())],
+    );
     let is_removable = drive.is_removable;
     let is_system = drive.is_system;
 
     let display_name = if drive.mountpoint == Some("/".to_owned()) {
-        "Root".to_owned()
+        i18n.t("left_sidebar.root").to_string()
     } else {
         drive.display_name.clone()
     };

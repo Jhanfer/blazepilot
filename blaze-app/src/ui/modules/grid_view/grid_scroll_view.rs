@@ -665,8 +665,8 @@ pub fn render_grid_scrollview(
                             let last_row_idx = max_lines - 1;
 
                             let mut absolute_byte_idx = 0;
-                            for row_idx in 0..=last_row_idx {
-                                for glyph in &name_galley.rows[row_idx].glyphs {
+                            for row in name_galley.rows.iter().take(last_row_idx + 1) {
+                                for glyph in &row.glyphs {
                                     absolute_byte_idx += glyph.chr.len_utf8();
                                 }
                             }

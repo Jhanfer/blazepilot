@@ -1,7 +1,3 @@
-[app]
-title = "BlazePilot"
-loading = "Loading..."
-
 [left_sidebar]
 root = "Root"
 locals = "Locals"
@@ -13,8 +9,9 @@ pictures = "Pictures"
 videos = "Videos"
 music = "Music"
 public = "Public"
-trash = "Trash" 
+trash = "Trash"
 disks = "Disks"
+used_percent = "Used {query}%"
 
 [right_sidebar]
 info = "Information"
@@ -25,11 +22,15 @@ owner = "Owner:"
 group_name = "Group name:"
 dimensions = "Dimensions:"
 git_status = "Git status:"
+modified = "Modified:"
+folder = "Folder"
+
+[route]
+placeholder = "Enter a path"
 
 [search]
 placeholder = "Search"
 no_results = "No results for \"{query}\""
-searching = "Searching..."
 
 [bg_ctx_menu]
 new_tab = "New tab"
@@ -49,7 +50,6 @@ add_to_tag = "Add to tag"
 [file_ops]
 copy = "Copy"
 cut = "Cut"
-paste = "Paste"
 paste_here = "Paste here"
 extract_here = "Extract here"
 folder_color = "Folder color"
@@ -57,12 +57,19 @@ rename = "Rename"
 restore = "Restore"
 move_to_trash = "Move to trash"
 delete = "Delete"
-delete_confirm = "Delete {count} file(s)?"
 
 [tools]
 name = "Name"
 modified = "Modified"
 size = "Size"
+extension = "Extension"
+created = "Created"
+accessed = "Accessed"
+owner = "Owner"
+group = "Group"
+permissions = "Permissions"
+dimensions = "Dimensions"
+symlink = "Link target"
 
 [tags_quick]
 new = "New"
@@ -104,7 +111,6 @@ language = "Language"
 gratitude = "Thank you for using BlazePilot!"
 made_for = "Made with ❤ by Jhanfer. :D"
 report = "Report a bug"
-sys_info = "System information"
 disclaimer = "Settings are limited for now. We are still working on it."
 
 [configs_terminal]
@@ -117,10 +123,7 @@ max_retries_error = "❌ Could not find any terminal after several attempts."
 verify_terminals_message = "Please verify that you have at least one terminal installed."
 suggestion_message = "💡 Suggestion: Install a terminal like gnome-terminal, konsole, or alacritty"
 retry = "Retry"
-max_retries = 3
-timeout_seconds = 5
 combo_box_label = "Default terminal"
-
 
 [configs_backend]
 title = "Display protocol"
@@ -133,56 +136,22 @@ X11: Greater compatibility with older apps. Allows drag & drop from other applic
 """
 disclaimer = "These changes require restarting the app."
 
-
 [configs_appearance]
 title = "Change appearance"
-reload_theme = "Reload theme"
 selection = "Select a theme"
+reload_theme = "Reload theme"
 message = "You can modify each theme in ~/.config/blazepilotapp/themes"
-
-# Color editor
 color_editor = "Color editor"
-
-# States
-states = "States"
+section_global = "Global"
+main_bg = "Main background"
+rubberband = "Selection band"
+primary_text = "Primary text"
+secondary_text = "Secondary text"
 error = "Error"
 success = "Success"
 warn = "Warning"
-
-# Backgrounds
-background = "Backgrounds"
-main_bg = "Main background"
-panel_bg = "Panel background"
-container_bg = "Container background"
-hover_bg = "Hover background"
-
-# Borders and buttons
-border-buttons = "Borders and buttons"
-border_panel = "Panel border"
-main_buttons = "Main buttons"
-
-# Accents
-accent = "Accents"
-accent_glow = "Accent glow"
-rubberband = "Selection band"
-selected_item = "Selected item"
-
-# Texts
-texts = "Texts"
-primary_text = "Primary text"
-secondary_text = "Secondary text"
-muted_text = "Muted text"
-
-# Tools
-tools = "Tools"
-primary-tool-color = "Primary tool color"
-secondary-tool-color = "Secondary tool color"
-tool-btn-active = "Active tool button"
-tool-btn-inactive = "Inactive tool button"
-tool-btn-hovered = "Tool button hovered"
-
-# File icons
-files = "Files"
+stroke_width = "Stroke width"
+files = "File icons"
 folder = "Folder"
 image = "Image"
 pdf = "PDF"
@@ -194,36 +163,24 @@ code = "Code"
 font = "Font"
 exe = "Executable"
 fallback = "Default"
-
-# Theme actions
+section_sidebar_left = "Left sidebar"
+section_top_bar = "Top bar"
+section_main_area = "Main panel"
+section_sidebar_right = "Right sidebar"
+section_context_menu = "Context menu"
+section_dialogs = "Dialogs"
+panel_bg = "Panel background"
+bg_elevated = "Elevated background"
+hover_bg = "Hover background"
+bg_active = "Active background"
+icon_primary = "Primary icon"
+icon_secondary = "Secondary icon"
+accent = "Accent"
+panel_border = "Panel border"
+component_border = "Component border"
 theme-name = "Theme name"
 save-as-custom = "Save as custom theme"
 reset-defaults = "Reset to defaults"
-separator = "Separator"
-panels = "Panels"
-panel_border = "Panel border"
-buttons = "Buttons"
-button_bg = "Button background"
-button_hover = "Button background (hover)"
-button_label_hover = "Button text (hover)"
-button_label_active = "Button text (active)"
-button_label_inactive = "Button text (inactive)"
-input = "Input"
-input_bg = "Input background"
-input_border_idle = "Input border (idle)"
-input_border_focus = "Input border (focus)"
-sidebar = "Sidebar"
-sidebar_hover = "Sidebar background (hover)"
-file_list = "File list"
-list_hover = "List background (hover)"
-list_selected = "List background (selected)"
-tools_bg = "Tools background"
-tools_label_hover = "Tool text (hover)"
-tools_label_active = "Tool text (active)"
-tools_label_inactive = "Tool text (inactive)"
-
-[configs_behavior]
-title = "WIP :D"
 
 [configs_language]
 title = "Change language"
@@ -284,7 +241,7 @@ title_img = "Image URL"
 message_web = "Do you want to open the page in a browser?"
 message_url = "Do you want to download the image?"
 
-[want_to_donwload_dialog]  
+[want_to_donwload_dialog]
 title = "Do you want to install the app?"
 message = "This will create a '.desktop' file"
 hint = "You can install from settings later"
@@ -310,7 +267,6 @@ to = "to {query}"
 
 [sure_to_delete_dialog]
 title = "Do you want to permanently delete?"
-file = "File"
 file_dot = "• {query}"
 and_more = "... and {query} more files"
 

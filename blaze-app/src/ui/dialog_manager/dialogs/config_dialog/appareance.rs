@@ -10,7 +10,8 @@ use egui_extras::{Size, StripBuilder};
 use tracing::{info, warn};
 
 macro_rules! color_field {
-    ($ui:expr, $label:expr, $c_theme:expr, $($path:tt)*) => {{
+    ($ui:expr, $i18n:expr, $key:expr, $c_theme:expr, $($path:tt)*) => {{
+        let label = $i18n.t($key);
         $ui.horizontal(|ui| {
             let palette = $c_theme.dialogs.palette(&$c_theme.global);
             let current_hex = &$c_theme.$($path)*;
@@ -18,11 +19,11 @@ macro_rules! color_field {
                 .unwrap_or(Color32::DEBUG_COLOR);
 
             ui.label_ns(
-                RichText::new($label)
+                RichText::new(&*label)
                     .color(palette.fg_primary),
             );
 
-            if ui.color_picker(&mut color, ($label, stringify!($($path)*)))
+            if ui.color_picker(&mut color, (&*label, stringify!($($path)*)))
                 .background_color(palette.bg_elevated)
                 .show()
                 .changed() {
@@ -63,6 +64,11 @@ pub(crate) fn render_appearance_settings(c_dialog: &mut ConfigDialog, ui: &mut U
             .selectable(false),
         );
         ui.add_space(8.0);
+
+        ui.label_ns(
+            RichText::new(&*i18n.t("configs_appearance.selection")).color(palette.fg_secondary),
+        );
+        ui.add_space(4.0);
 
         let hover_bg = palette.bg_hover;
 
@@ -121,6 +127,7 @@ pub(crate) fn render_appearance_settings(c_dialog: &mut ConfigDialog, ui: &mut U
                 .icon_color(palette.accent)
                 .stroke_width(current_theme.global.components_stroke_width)
                 .show()
+                .on_hover_text(&*i18n.t("configs_appearance.reload_theme"))
                 .clicked()
             {
                 with_theme(|t| match t.reload() {
@@ -164,51 +171,68 @@ pub(crate) fn render_appearance_settings(c_dialog: &mut ConfigDialog, ui: &mut U
                                     .show(ui, |ui| {
                                         // --- 1. Globales ---
                                         CollapsingHeader::new(
-                                            RichText::new("Globales").color(palette.fg_primary),
+                                            RichText::new(
+                                                &*i18n.t("configs_appearance.section_global"),
+                                            )
+                                            .color(palette.fg_primary),
                                         )
                                         .default_open(true) // Mantenemos el primero abierto por defecto
                                         .show(ui, |ui| {
                                             color_field!(
                                                 ui,
-                                                "Fondo Principal",
+                                                i18n,
+                                                "configs_appearance.main_bg",
                                                 current_theme,
                                                 global.bg_main
                                             );
                                             color_field!(
                                                 ui,
-                                                "Efecto Rebote",
+                                                i18n,
+                                                "configs_appearance.rubberband",
                                                 current_theme,
                                                 global.rubberband
                                             );
                                             color_field!(
                                                 ui,
-                                                "Texto Principal",
+                                                i18n,
+                                                "configs_appearance.primary_text",
                                                 current_theme,
                                                 global.text_primary
                                             );
                                             color_field!(
                                                 ui,
-                                                "Texto Secundario",
+                                                i18n,
+                                                "configs_appearance.secondary_text",
                                                 current_theme,
                                                 global.text_secondary
                                             );
-                                            color_field!(ui, "Error", current_theme, global.error);
                                             color_field!(
                                                 ui,
-                                                "Advertencia",
+                                                i18n,
+                                                "configs_appearance.error",
+                                                current_theme,
+                                                global.error
+                                            );
+                                            color_field!(
+                                                ui,
+                                                i18n,
+                                                "configs_appearance.warn",
                                                 current_theme,
                                                 global.warn
                                             );
                                             color_field!(
                                                 ui,
-                                                "Éxito",
+                                                i18n,
+                                                "configs_appearance.success",
                                                 current_theme,
                                                 global.success
                                             );
 
                                             ui.label_ns(
-                                                RichText::new("Stroke Width")
-                                                    .color(palette.fg_primary),
+                                                RichText::new(
+                                                    &*i18n.t("configs_appearance.stroke_width"),
+                                                )
+                                                .color(palette.fg_primary),
                                             );
 
                                             let mut panel_stroke =
@@ -261,68 +285,84 @@ pub(crate) fn render_appearance_settings(c_dialog: &mut ConfigDialog, ui: &mut U
 
                                         // --- 2. Iconos de Archivos ---
                                         CollapsingHeader::new(
-                                            RichText::new("Iconos de Archivos")
+                                            RichText::new(&*i18n.t("configs_appearance.files"))
                                                 .color(palette.fg_primary),
                                         )
                                         .show(ui, |ui| {
                                             color_field!(
                                                 ui,
-                                                "Carpeta (Por defecto)",
+                                                i18n,
+                                                "configs_appearance.folder",
                                                 current_theme,
                                                 file_icons.folder_default
                                             );
                                             color_field!(
                                                 ui,
-                                                "Imagen",
+                                                i18n,
+                                                "configs_appearance.image",
                                                 current_theme,
                                                 file_icons.image
                                             );
-                                            color_field!(ui, "PDF", current_theme, file_icons.pdf);
                                             color_field!(
                                                 ui,
-                                                "Documento",
+                                                i18n,
+                                                "configs_appearance.pdf",
+                                                current_theme,
+                                                file_icons.pdf
+                                            );
+                                            color_field!(
+                                                ui,
+                                                i18n,
+                                                "configs_appearance.doc",
                                                 current_theme,
                                                 file_icons.document
                                             );
                                             color_field!(
                                                 ui,
-                                                "Vídeo",
+                                                i18n,
+                                                "configs_appearance.video",
                                                 current_theme,
                                                 file_icons.video
                                             );
                                             color_field!(
                                                 ui,
-                                                "Audio",
+                                                i18n,
+                                                "configs_appearance.audio",
                                                 current_theme,
                                                 file_icons.audio
                                             );
                                             color_field!(
                                                 ui,
-                                                "Archivo (Zip/Rar)",
+                                                i18n,
+                                                "configs_appearance.archive",
                                                 current_theme,
                                                 file_icons.archive
                                             );
                                             color_field!(
                                                 ui,
-                                                "Código",
+                                                i18n,
+                                                "configs_appearance.code",
                                                 current_theme,
                                                 file_icons.code
                                             );
                                             color_field!(
                                                 ui,
-                                                "Fuente",
+                                                i18n,
+                                                "configs_appearance.font",
                                                 current_theme,
                                                 file_icons.font
                                             );
                                             color_field!(
                                                 ui,
-                                                "Ejecutable",
+                                                i18n,
+                                                "configs_appearance.exe",
                                                 current_theme,
                                                 file_icons.executable
                                             );
                                             color_field!(
                                                 ui,
-                                                "Desconocido (Fallback)",
+                                                i18n,
+                                                "configs_appearance.fallback",
                                                 current_theme,
                                                 file_icons.fallback
                                             );
@@ -330,365 +370,433 @@ pub(crate) fn render_appearance_settings(c_dialog: &mut ConfigDialog, ui: &mut U
 
                                         // --- 3. Secciones (Ejemplo: Barra Lateral Izquierda) ---
                                         CollapsingHeader::new(
-                                            RichText::new("Barra lateral izquierda")
-                                                .color(palette.fg_primary),
+                                            RichText::new(
+                                                &*i18n.t("configs_appearance.section_sidebar_left"),
+                                            )
+                                            .color(palette.fg_primary),
                                         )
                                         .show(ui, |ui| {
                                             color_field!(
                                                 ui,
-                                                "Fondo del Panel",
+                                                i18n,
+                                                "configs_appearance.panel_bg",
                                                 current_theme,
                                                 sidebar_left.bg_panel
                                             );
                                             color_field!(
                                                 ui,
-                                                "Fondo Elevado",
+                                                i18n,
+                                                "configs_appearance.bg_elevated",
                                                 current_theme,
                                                 sidebar_left.bg_elevated
                                             );
                                             color_field!(
                                                 ui,
-                                                "Fondo Hover",
+                                                i18n,
+                                                "configs_appearance.hover_bg",
                                                 current_theme,
                                                 sidebar_left.bg_hover
                                             );
                                             color_field!(
                                                 ui,
-                                                "Fondo Activo",
+                                                i18n,
+                                                "configs_appearance.bg_active",
                                                 current_theme,
                                                 sidebar_left.bg_active
                                             );
                                             color_field!(
                                                 ui,
-                                                "Icono Principal",
+                                                i18n,
+                                                "configs_appearance.icon_primary",
                                                 current_theme,
                                                 sidebar_left.icon_primary
                                             );
                                             color_field!(
                                                 ui,
-                                                "Icono Secundario",
+                                                i18n,
+                                                "configs_appearance.icon_secondary",
                                                 current_theme,
                                                 sidebar_left.icon_secondary
                                             );
                                             color_field!(
                                                 ui,
-                                                "Acento",
+                                                i18n,
+                                                "configs_appearance.accent",
                                                 current_theme,
                                                 sidebar_left.accent
                                             );
                                             color_field!(
                                                 ui,
-                                                "Borde",
+                                                i18n,
+                                                "configs_appearance.panel_border",
                                                 current_theme,
                                                 sidebar_left.panel_border
                                             );
                                             color_field!(
                                                 ui,
-                                                "Borde componente",
+                                                i18n,
+                                                "configs_appearance.component_border",
                                                 current_theme,
                                                 sidebar_left.component_border
                                             );
                                         });
 
                                         CollapsingHeader::new(
-                                            RichText::new("Barra superior")
-                                                .color(palette.fg_primary),
+                                            RichText::new(
+                                                &*i18n.t("configs_appearance.section_top_bar"),
+                                            )
+                                            .color(palette.fg_primary),
                                         )
                                         .show(ui, |ui| {
                                             color_field!(
                                                 ui,
-                                                "Fondo del Panel",
+                                                i18n,
+                                                "configs_appearance.panel_bg",
                                                 current_theme,
                                                 top_bar.bg_panel
                                             );
                                             color_field!(
                                                 ui,
-                                                "Fondo Elevado",
+                                                i18n,
+                                                "configs_appearance.bg_elevated",
                                                 current_theme,
                                                 top_bar.bg_elevated
                                             );
                                             color_field!(
                                                 ui,
-                                                "Fondo Hover",
+                                                i18n,
+                                                "configs_appearance.hover_bg",
                                                 current_theme,
                                                 top_bar.bg_hover
                                             );
                                             color_field!(
                                                 ui,
-                                                "Fondo Activo",
+                                                i18n,
+                                                "configs_appearance.bg_active",
                                                 current_theme,
                                                 top_bar.bg_active
                                             );
                                             color_field!(
                                                 ui,
-                                                "Icono Principal",
+                                                i18n,
+                                                "configs_appearance.icon_primary",
                                                 current_theme,
                                                 top_bar.icon_primary
                                             );
                                             color_field!(
                                                 ui,
-                                                "Icono Secundario",
+                                                i18n,
+                                                "configs_appearance.icon_secondary",
                                                 current_theme,
                                                 top_bar.icon_secondary
                                             );
                                             color_field!(
                                                 ui,
-                                                "Acento",
+                                                i18n,
+                                                "configs_appearance.accent",
                                                 current_theme,
                                                 top_bar.accent
                                             );
                                             color_field!(
                                                 ui,
-                                                "Borde",
+                                                i18n,
+                                                "configs_appearance.panel_border",
                                                 current_theme,
                                                 top_bar.panel_border
                                             );
                                             color_field!(
                                                 ui,
-                                                "Borde componente",
+                                                i18n,
+                                                "configs_appearance.component_border",
                                                 current_theme,
                                                 top_bar.component_border
                                             );
                                         });
 
                                         CollapsingHeader::new(
-                                            RichText::new("Panel central")
-                                                .color(palette.fg_primary),
+                                            RichText::new(
+                                                &*i18n.t("configs_appearance.section_main_area"),
+                                            )
+                                            .color(palette.fg_primary),
                                         )
                                         .show(ui, |ui| {
                                             color_field!(
                                                 ui,
-                                                "Fondo del Panel",
+                                                i18n,
+                                                "configs_appearance.panel_bg",
                                                 current_theme,
                                                 main_area.bg_panel
                                             );
                                             color_field!(
                                                 ui,
-                                                "Fondo Elevado",
+                                                i18n,
+                                                "configs_appearance.bg_elevated",
                                                 current_theme,
                                                 main_area.bg_elevated
                                             );
                                             color_field!(
                                                 ui,
-                                                "Fondo Hover",
+                                                i18n,
+                                                "configs_appearance.hover_bg",
                                                 current_theme,
                                                 main_area.bg_hover
                                             );
                                             color_field!(
                                                 ui,
-                                                "Fondo Activo",
+                                                i18n,
+                                                "configs_appearance.bg_active",
                                                 current_theme,
                                                 main_area.bg_active
                                             );
                                             color_field!(
                                                 ui,
-                                                "Icono Principal",
+                                                i18n,
+                                                "configs_appearance.icon_primary",
                                                 current_theme,
                                                 main_area.icon_primary
                                             );
                                             color_field!(
                                                 ui,
-                                                "Icono Secundario",
+                                                i18n,
+                                                "configs_appearance.icon_secondary",
                                                 current_theme,
                                                 main_area.icon_secondary
                                             );
                                             color_field!(
                                                 ui,
-                                                "Acento",
+                                                i18n,
+                                                "configs_appearance.accent",
                                                 current_theme,
                                                 main_area.accent
                                             );
                                             color_field!(
                                                 ui,
-                                                "Borde",
+                                                i18n,
+                                                "configs_appearance.panel_border",
                                                 current_theme,
                                                 main_area.panel_border
                                             );
                                             color_field!(
                                                 ui,
-                                                "Borde componente",
+                                                i18n,
+                                                "configs_appearance.component_border",
                                                 current_theme,
                                                 main_area.component_border
                                             );
                                         });
 
                                         CollapsingHeader::new(
-                                            RichText::new("Barra lateral derecha")
-                                                .color(palette.fg_primary),
+                                            RichText::new(
+                                                &*i18n
+                                                    .t("configs_appearance.section_sidebar_right"),
+                                            )
+                                            .color(palette.fg_primary),
                                         )
                                         .show(ui, |ui| {
                                             color_field!(
                                                 ui,
-                                                "Fondo del Panel",
+                                                i18n,
+                                                "configs_appearance.panel_bg",
                                                 current_theme,
                                                 sidebar_right.bg_panel
                                             );
                                             color_field!(
                                                 ui,
-                                                "Fondo Elevado",
+                                                i18n,
+                                                "configs_appearance.bg_elevated",
                                                 current_theme,
                                                 sidebar_right.bg_elevated
                                             );
                                             color_field!(
                                                 ui,
-                                                "Fondo Hover",
+                                                i18n,
+                                                "configs_appearance.hover_bg",
                                                 current_theme,
                                                 sidebar_right.bg_hover
                                             );
                                             color_field!(
                                                 ui,
-                                                "Fondo Activo",
+                                                i18n,
+                                                "configs_appearance.bg_active",
                                                 current_theme,
                                                 sidebar_right.bg_active
                                             );
                                             color_field!(
                                                 ui,
-                                                "Icono Principal",
+                                                i18n,
+                                                "configs_appearance.icon_primary",
                                                 current_theme,
                                                 sidebar_right.icon_primary
                                             );
                                             color_field!(
                                                 ui,
-                                                "Icono Secundario",
+                                                i18n,
+                                                "configs_appearance.icon_secondary",
                                                 current_theme,
                                                 sidebar_right.icon_secondary
                                             );
                                             color_field!(
                                                 ui,
-                                                "Acento",
+                                                i18n,
+                                                "configs_appearance.accent",
                                                 current_theme,
                                                 sidebar_right.accent
                                             );
                                             color_field!(
                                                 ui,
-                                                "Borde",
+                                                i18n,
+                                                "configs_appearance.panel_border",
                                                 current_theme,
                                                 sidebar_right.panel_border
                                             );
                                             color_field!(
                                                 ui,
-                                                "Borde componente",
+                                                i18n,
+                                                "configs_appearance.component_border",
                                                 current_theme,
                                                 sidebar_right.component_border
                                             );
                                         });
 
                                         CollapsingHeader::new(
-                                            RichText::new("Menu contextual")
-                                                .color(palette.fg_primary),
+                                            RichText::new(
+                                                &*i18n.t("configs_appearance.section_context_menu"),
+                                            )
+                                            .color(palette.fg_primary),
                                         )
                                         .show(ui, |ui| {
                                             color_field!(
                                                 ui,
-                                                "Fondo del Panel",
+                                                i18n,
+                                                "configs_appearance.panel_bg",
                                                 current_theme,
                                                 context_menu.bg_panel
                                             );
                                             color_field!(
                                                 ui,
-                                                "Fondo Elevado",
+                                                i18n,
+                                                "configs_appearance.bg_elevated",
                                                 current_theme,
                                                 context_menu.bg_elevated
                                             );
                                             color_field!(
                                                 ui,
-                                                "Fondo Hover",
+                                                i18n,
+                                                "configs_appearance.hover_bg",
                                                 current_theme,
                                                 context_menu.bg_hover
                                             );
                                             color_field!(
                                                 ui,
-                                                "Fondo Activo",
+                                                i18n,
+                                                "configs_appearance.bg_active",
                                                 current_theme,
                                                 context_menu.bg_active
                                             );
                                             color_field!(
                                                 ui,
-                                                "Icono Principal",
+                                                i18n,
+                                                "configs_appearance.icon_primary",
                                                 current_theme,
                                                 context_menu.icon_primary
                                             );
                                             color_field!(
                                                 ui,
-                                                "Icono Secundario",
+                                                i18n,
+                                                "configs_appearance.icon_secondary",
                                                 current_theme,
                                                 context_menu.icon_secondary
                                             );
                                             color_field!(
                                                 ui,
-                                                "Acento",
+                                                i18n,
+                                                "configs_appearance.accent",
                                                 current_theme,
                                                 context_menu.accent
                                             );
                                             color_field!(
                                                 ui,
-                                                "Borde",
+                                                i18n,
+                                                "configs_appearance.panel_border",
                                                 current_theme,
                                                 context_menu.panel_border
                                             );
                                             color_field!(
                                                 ui,
-                                                "Borde componente",
+                                                i18n,
+                                                "configs_appearance.component_border",
                                                 current_theme,
                                                 context_menu.component_border
                                             );
                                         });
 
                                         CollapsingHeader::new(
-                                            RichText::new("Dialogos").color(palette.fg_primary),
+                                            RichText::new(
+                                                &*i18n.t("configs_appearance.section_dialogs"),
+                                            )
+                                            .color(palette.fg_primary),
                                         )
                                         .show(ui, |ui| {
                                             color_field!(
                                                 ui,
-                                                "Fondo del Panel",
+                                                i18n,
+                                                "configs_appearance.panel_bg",
                                                 current_theme,
                                                 dialogs.bg_panel
                                             );
                                             color_field!(
                                                 ui,
-                                                "Fondo Elevado",
+                                                i18n,
+                                                "configs_appearance.bg_elevated",
                                                 current_theme,
                                                 dialogs.bg_elevated
                                             );
                                             color_field!(
                                                 ui,
-                                                "Fondo Hover",
+                                                i18n,
+                                                "configs_appearance.hover_bg",
                                                 current_theme,
                                                 dialogs.bg_hover
                                             );
                                             color_field!(
                                                 ui,
-                                                "Fondo Activo",
+                                                i18n,
+                                                "configs_appearance.bg_active",
                                                 current_theme,
                                                 dialogs.bg_active
                                             );
                                             color_field!(
                                                 ui,
-                                                "Icono Principal",
+                                                i18n,
+                                                "configs_appearance.icon_primary",
                                                 current_theme,
                                                 dialogs.icon_primary
                                             );
                                             color_field!(
                                                 ui,
-                                                "Icono Secundario",
+                                                i18n,
+                                                "configs_appearance.icon_secondary",
                                                 current_theme,
                                                 dialogs.icon_secondary
                                             );
                                             color_field!(
                                                 ui,
-                                                "Acento",
+                                                i18n,
+                                                "configs_appearance.accent",
                                                 current_theme,
                                                 dialogs.accent
                                             );
                                             color_field!(
                                                 ui,
-                                                "Borde",
+                                                i18n,
+                                                "configs_appearance.panel_border",
                                                 current_theme,
                                                 dialogs.panel_border
                                             );
                                             color_field!(
                                                 ui,
-                                                "Borde componente",
+                                                i18n,
+                                                "configs_appearance.component_border",
                                                 current_theme,
                                                 dialogs.component_border
                                             );
@@ -723,16 +831,20 @@ pub(crate) fn render_appearance_settings(c_dialog: &mut ConfigDialog, ui: &mut U
 
         ui.horizontal(|ui| {
             // Input para nombre de tema personalizado
-            ui.blaze_input("save", None, &mut c_dialog.custom_theme_name)
-                .id("save_theme_placeholder")
-                .size((200.0, 30.0))
-                .radius(20)
-                .text_color(palette.fg_secondary)
-                .background_color(palette.bg_elevated)
-                .stroke_color(Color32::TRANSPARENT)
-                .x_color(palette.accent)
-                .stroke_width(current_theme.global.components_stroke_width)
-                .show(|| {});
+            ui.blaze_input(
+                &i18n.t("configs_appearance.theme-name"),
+                None,
+                &mut c_dialog.custom_theme_name,
+            )
+            .id("save_theme_placeholder")
+            .size((200.0, 30.0))
+            .radius(20)
+            .text_color(palette.fg_secondary)
+            .background_color(palette.bg_elevated)
+            .stroke_color(Color32::TRANSPARENT)
+            .x_color(palette.accent)
+            .stroke_width(current_theme.global.components_stroke_width)
+            .show(|| {});
 
             ui.add_space(8.0);
 
@@ -750,6 +862,7 @@ pub(crate) fn render_appearance_settings(c_dialog: &mut ConfigDialog, ui: &mut U
                 .icon("server", icons::ICON_SERVER)
                 .icon_color(palette.accent)
                 .show()
+                .on_hover_text(&*i18n.t("configs_appearance.save-as-custom"))
                 .clicked()
             {
                 if !c_dialog.custom_theme_name.trim().is_empty() {
@@ -780,6 +893,7 @@ pub(crate) fn render_appearance_settings(c_dialog: &mut ConfigDialog, ui: &mut U
                 .icon("reset", icons::ICON_RESTORE)
                 .icon_color(error)
                 .show()
+                .on_hover_text(&*i18n.t("configs_appearance.reset-defaults"))
                 .clicked()
             {
                 with_theme(|t| match t.reset_to_default() {
