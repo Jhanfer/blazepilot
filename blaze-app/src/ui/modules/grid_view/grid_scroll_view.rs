@@ -25,8 +25,9 @@ use crate::{
     utils::formating::{format_date, format_size},
 };
 use egui::{
-    Color32, ColorImage, CursorIcon, FontId, Id, Key, Modifiers, PointerButton, Rect, ScrollArea,
-    Sense, Stroke, StrokeKind, TextureOptions, Ui, Vec2, pos2, scroll_area::ScrollSource, vec2,
+    Align, Color32, ColorImage, CursorIcon, FontId, Id, Key, Modifiers, PointerButton, Rect,
+    ScrollArea, Sense, Stroke, StrokeKind, TextureOptions, Ui, Vec2, pos2,
+    scroll_area::ScrollSource, text::LayoutJob, vec2,
 };
 use std::{borrow::Cow, collections::HashMap, path::Path, sync::Arc};
 use tracing::info;
@@ -286,11 +287,14 @@ pub fn render_grid_scrollview(
     ui_state.enforce_texture_cache_limit(500);
 
     let cell_padding = 8.0_f32;
-
     let icon_size = state.grid_view.base.icon_size;
     let cell_size = icon_size + 40.0;
 
-    let row_height = cell_size + 28.0;
+    let name_font = FontId::proportional((11.0 + icon_size * 0.05).clamp(12.0, 16.0));
+    let line_h = ui.fonts_mut(|f| f.row_height(&name_font));
+    const NAME_LINES: f32 = 2.0;
+
+    let row_height = cell_padding + icon_size + 4.0 + line_h * NAME_LINES + 6.0;
 
     state.grid_view.row_height = row_height;
 
@@ -634,83 +638,33 @@ pub fn render_grid_scrollview(
                         Cow::Borrowed(&file.name)
                     };
 
-                    let display_name = cow_display_name.to_string();
-
                     let name_top = icon_rect.max.y + 4.0;
-                    let name_padding = 3.0;
+                    let name_padding = 7.0;
                     let name_rect = Rect::from_min_max(
                         pos2(rect.min.x + name_padding, name_top),
                         pos2(rect.max.x - name_padding, rect.max.y - 2.0),
                     );
 
-                    let name_font_size = (icon_size / 4.5).clamp(13.0, 25.0);
+                    let final_color = ensure_min_lightness(name_color);
 
-                    let mut name_galley = ui.fonts_mut(|f| {
-                        f.layout(
-                            display_name.clone(),
-                            FontId::proportional(name_font_size),
-                            name_color,
-                            name_rect.width(),
-                        )
-                    });
+                    let mut job = LayoutJob::simple(
+                        cow_display_name.into_owned(),
+                        name_font.clone(),
+                        final_color,
+                        name_rect.width(),
+                    );
 
-                    let max_height = name_rect.height();
+                    job.wrap.max_rows = 2;
+                    job.wrap.break_anywhere = true;
+                    job.wrap.overflow_character = Some('…');
+                    job.halign = Align::Center;
 
-                    if name_galley.size().y > max_height && !name_galley.rows.is_empty() {
-                        let line_height = name_galley.size().y / name_galley.rows.len() as f32;
-                        let max_lines = (max_height / line_height).floor() as usize;
-                        let max_lines = max_lines.max(1);
-
-                        if name_galley.rows.len() > max_lines {
-                            let last_row_idx = max_lines - 1;
-
-                            let mut absolute_byte_idx = 0;
-                            for row in name_galley.rows.iter().take(last_row_idx + 1) {
-                                for glyph in &row.glyphs {
-                                    absolute_byte_idx += glyph.chr.len_utf8();
-                                }
-                            }
-
-                            let mut truncated = display_name.clone();
-                            if absolute_byte_idx > 0 && absolute_byte_idx <= truncated.len() {
-                                truncated.truncate(absolute_byte_idx);
-                            } // revisar esto <----
-
-                            truncated.push_str("...");
-
-                            let mut iterations = 0;
-                            while iterations < 10 {
-                                name_galley = ui.fonts_mut(|f| {
-                                    f.layout(
-                                        truncated.clone(),
-                                        FontId::proportional(name_font_size),
-                                        name_color,
-                                        name_rect.width(),
-                                    )
-                                });
-
-                                if name_galley.size().y <= max_height || truncated.len() <= 3 {
-                                    break;
-                                }
-
-                                truncated.pop();
-                                truncated.pop();
-                                truncated.pop();
-                                truncated.pop();
-                                truncated.push_str("...");
-
-                                iterations += 1;
-                            }
-                        }
-                    }
-
-                    let text_y = name_rect.min.y;
-                    let text_x = name_rect.min.x + (name_rect.width() - name_galley.size().x) / 2.0;
+                    let galley = ui.fonts_mut(|f| f.layout_job(job));
 
                     ui.painter().with_clip_rect(name_rect).galley(
-                        pos2(text_x, text_y),
-                        name_galley,
-                        ensure_min_lightness(name_color),
+                        pos2(name_rect.center().x, name_rect.min.y),
+                        galley,
+                        final_color,
                     );
                 }
 
