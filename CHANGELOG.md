@@ -1,6 +1,38 @@
 # Changelog
 
 ---
+## [0.22.0](https://github.com/Jhanfer/blazepilot/compare/v0.21.0..v0.22.0) - 2026-11-15
+
+### ✦ Bug fixes
+
+- **(ci)** Limpia dependencias sin usar, corrige clippy y completa internacionalización([`0f9a078`](https://github.com/Jhanfer/blazepilot/commit/0f9a0782caa2e3398679ee91299b543c74536f18)) - Jhanfer
+- **(core)** Evita reset de files_just_loaded, mejora check de cálculo y asegura first/last en scrollviews([`2ea871c`](https://github.com/Jhanfer/blazepilot/commit/2ea871cc4eb06e40aeb1230f30e55413c99cb1f3)) - Jhanfer
+- **(media)** Corrige pausado, seek y ciclo de vida del reproductor multimedia([`a52d492`](https://github.com/Jhanfer/blazepilot/commit/a52d492a76b6dbce349520aa59e4e5f0b05f26e6)) - Jhanfer
+- **(thumbnails)** Elimina flags unsafe de FFmpeg y simplifica textura para probar crash en miniaturas de video [test] (#9)([`cf764c2`](https://github.com/Jhanfer/blazepilot/commit/cf764c2aa65d603817d9259a59eacd12944676ba)) - Jhan
+
+### ✦ Features
+
+- **(core)** Implementa el gestor del portapapeles y componentes personalizados en la interfaz([`dc5cec4`](https://github.com/Jhanfer/blazepilot/commit/dc5cec474ccd05111d583f26e52c8f987d48b6b3)) - Jhanfer
+- **(sidebar)** Limpia búsqueda al navegar e instala icono hicolor en Linux([`a2b986d`](https://github.com/Jhanfer/blazepilot/commit/a2b986d7e17011ca560d6010be18062c3c805048)) - Jhanfer
+- **(toolbar)** Añade barra de ruta editable con doble clic y navegación manual([`ef1893f`](https://github.com/Jhanfer/blazepilot/commit/ef1893fb349e245064f51f030cdd93fd2d4389b0)) - Jhanfer
+- **(ui)** Implementa bordes de panel abiertos y los integra en las vistas principales([`72e710d`](https://github.com/Jhanfer/blazepilot/commit/72e710d8cc6a04ee4c88eb243bc16abcf6fbf3fe)) - Jhanfer
+- **(views)** Extrae el sistema de pestañas a 'tab_views.rs' y rediseña la barra superior de la interfaz([`fafe2bb`](https://github.com/Jhanfer/blazepilot/commit/fafe2bb59517572b0fa9c8857e3613266c673f48)) - Jhanfer
+
+### ✦ Refactor
+
+- **(render)** Optimiza el bucle de eventos y la canalización de renderizado con msaa([`e9d3243`](https://github.com/Jhanfer/blazepilot/commit/e9d324310f1cff7199f1c649a9975916866e957c)) - Jhanfer
+- **(ui)** Integra blazeinput y refactoriza gestor de dialogos y temas([`a1a2c50`](https://github.com/Jhanfer/blazepilot/commit/a1a2c504d992a3b6b5b9720f8328abb642c3b167)) - Jhanfer
+- **(ui)** Integra combobox custom y renueva vistas de configuración([`692e0df`](https://github.com/Jhanfer/blazepilot/commit/692e0df0c9ae0739690b2be27d048d9f57aed9c0)) - Jhanfer
+- **(ui)** Rediseña el selector de color y estandariza componentes de interfaz([`196067b`](https://github.com/Jhanfer/blazepilot/commit/196067b7ca8ae67b1b9f7d81e9392267435b01e7)) - Jhanfer
+- **(ui)** Refactoriza inyección de icon_cache y simplifica trazado de iconos([`916a1d4`](https://github.com/Jhanfer/blazepilot/commit/916a1d4e1750a155af5eef9eeb111e9bbc0d3655)) - Jhanfer
+- **(ui)** Estandariza el manejo de paletas de color y simplifica los popups contextuales([`0e50990`](https://github.com/Jhanfer/blazepilot/commit/0e50990ec6a9ba2422125d39a6d2052ce9c98f88)) - Jhanfer
+- **(ui)** Unifica paleta de diálogos, mejora configuración y actualiza dependencias([`14bdacb`](https://github.com/Jhanfer/blazepilot/commit/14bdacb41793166e9863b6d0280d6fab3f695032)) - Jhanfer
+- **(ui)** Rediseña el diálogo del reproductor multimedia e integra componentes custom([`5e1d435`](https://github.com/Jhanfer/blazepilot/commit/5e1d4356449761cd56d598b4dc6fe8efaaf1c057)) - Jhanfer
+- **(views)** Mejora hotkeys y añade estado visual de corte([`0e26732`](https://github.com/Jhanfer/blazepilot/commit/0e267320bd22c8ab5fa7307f47218757d8145647)) - Jhanfer
+- **(views)** Modulariza menús contextuales y mejora barra de búsqueda([`6bf66ca`](https://github.com/Jhanfer/blazepilot/commit/6bf66ca513e31f2d799deb5058ee57f10c19199a)) - Jhanfer
+- **(views)** Simplifica el truncado y alineación de nombres en la vista de cuadrícula([`c195ea5`](https://github.com/Jhanfer/blazepilot/commit/c195ea53df1df5bf281037fcdfd5acdf3e45ecb1)) - Jhanfer
+
+---
 ## [0.21.0](https://github.com/Jhanfer/blazepilot/compare/v0.20.0..v0.21.0) - 2026-09-25
 
 ### ✦ Features
